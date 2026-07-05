@@ -1,0 +1,49 @@
+from snakemake.utils import min_version
+
+min_version("8.11")
+
+rule run_snakefile_scen_corrige_baseline:
+    output: touch("run_snakefile_scen_corrige_baseline.done")
+    log: "logs/run_snakefile_scen_corrige_baseline.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_corrige_baseline --cores 1 -call all"
+
+rule run_snakefile_scen_corrige_2030:
+    input: "run_snakefile_scen_corrige_baseline.done"
+    output: touch("run_snakefile_scen_corrige_2030.done")
+    log: "logs/run_snakefile_scen_corrige_2030.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_corrige_2030 --cores 1 -call all"
+        
+rule run_snakefile_scen_corrige_2035:
+    input: "run_snakefile_scen_corrige_2030.done"
+    output: touch("run_snakefile_scen_corrige_2035.done")
+    log: "logs/run_snakefile_scen_corrige_2035.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_corrige_2035 --cores 1 -call all"
+
+rule run_snakefile_scen_corrige_2040:
+    input: "run_snakefile_scen_corrige_2035.done"
+    output: touch("run_snakefile_scen_corrige_2040.done")
+    log: "logs/run_snakefile_scen_corrige_2040.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_corrige_2040 --cores 1 -call all"
+        
+rule run_snakefile_scen_corrige_2045:
+    input: "run_snakefile_scen_corrige_2040.done"
+    output: touch("run_snakefile_scen_corrige_2045.done")
+    log: "logs/run_snakefile_scen_corrige_2045.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_corrige_2045 --cores 1 -call all"
+        
+rule run_snakefile_scen_corrige_2050:
+    input: "run_snakefile_scen_corrige_2045.done"
+    output: touch("run_snakefile_scen_corrige_2050.done")
+    log: "logs/run_snakefile_scen_corrige_2050.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_corrige_2050 --cores 1 -call all"
+        
+rule run_all_snakefiles:
+    input: "run_snakefile_scen_corrige_2050.done"
+    
+

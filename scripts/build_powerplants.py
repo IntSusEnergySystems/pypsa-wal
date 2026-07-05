@@ -72,7 +72,7 @@ import pandas as pd
 import powerplantmatching as pm
 import pypsa
 from shapely.geometry import MultiPolygon, Polygon
-
+from walloon_scripts.custom_clustering import ppl_by_subregion
 from scripts._helpers import configure_logging, set_scenario_config
 
 logger = logging.getLogger(__name__)
@@ -176,6 +176,7 @@ def map_to_country_bus(
 
     for country, plants in ppl.groupby("Country"):
         country_regions = regions[regions.index.str[:2] == country]
+        plants = plants.drop(columns=["bus"], errors="ignore")
         joined = (
             plants.sjoin(country_regions)
             .rename(columns={"name": "bus"})
@@ -255,10 +256,13 @@ if __name__ == "__main__":
     )
 
     ppl = ppl.dropna(subset=["lat", "lon"])
+    
 
     ppl = gpd.GeoDataFrame(ppl, geometry=gpd.points_from_xy(ppl.lon, ppl.lat), crs=4326)
 
     ppl = map_to_country_bus(ppl, regions)
+    if snakemake.params.walloon_reassignment:
+        n, ppl = ppl_by_subregion(n, ppl)
 
     bus_null_b = ppl["bus"].isnull()
     if bus_null_b.any():

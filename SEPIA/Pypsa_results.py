@@ -1,0 +1,2953 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import logging
+
+logger = logging.getLogger(__name__)
+import pandas as pd
+import pypsa
+import logging
+import geopandas as gpd
+import os
+import sys
+import panel as pn
+import base64
+import matplotlib.pyplot as plt
+from pandas.plotting import table
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.lines import Line2D
+import cartopy.crs as ccrs
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots 
+from jinja2 import Template
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+scripts_path = os.path.join(current_script_dir, "../scripts/")
+sys.path.append(scripts_path)
+from plot_summary import rename_techs, preferred_order
+from plot_power_network import load_projection
+from scripts.make_summary import assign_locations
+from pypsa.plot import add_legend_circles, add_legend_lines, add_legend_patches
+from add_electricity import calculate_annuity
+from make_summary import assign_carriers
+import yaml
+import plotly.io as pio
+
+def rename_techs_tyndp(tech):
+    tech = rename_techs(tech)
+    if "heat pump" in tech or "resistive heater" in tech:
+        return "power-to-heat"
+    elif tech in ["H2 Electrolysis", "methanation","helmeth", "H2 liquefaction"]:
+        return "power-to-gas"
+    elif tech in ["electricity distribution grid"]:
+        return "distribution network"
+    elif tech in [ "CHP", "H2 Fuel Cell","H2 turbine"]:
+        return "CHP"
+    elif tech in [ "battery charger", "battery discharger","battery", "Li ion", "BEV charger", "V2G"]:
+        return "battery storage"
+    elif tech in [ "biomass boiler", "oil boiler","gas boiler"]:
+        return "boilers"
+    elif "solar" in tech:
+        return "solar"
+    elif tech == "Fischer-Tropsch":
+        return "power-to-liquid"
+    elif "offshore" in tech:
+        return "offshore wind"
+    elif tech in ["co2 sequestered","CO2 sequestration", "co2", "SMR CC", "process emissions CC","process emissions", "solid biomass for industry CC", "gas for industry CC","CO2 pipeline","co2 vent"]:
+        if study == "suff":
+            return "CCU"
+        else:
+            return "CCUS"
+    elif tech in ["biomass", "solid biomass", "solid biomass for industry", "biogas", "solid biomass transport", "biomass exports", "biogas exports","municipal solid waste","municipal solid waste transport","solid biomass powerplants","unsustainable bioliquids","unsustainable solid biomass"]:
+          return "biomass fuel & techs"
+    elif tech in ["shipping oil", "naphtha for industry", "land transport oil", "kerosene for aviation", "agriculture machinery oil", "coal for industry","gas for industry","coal fuel","gas fuel","oil","gas","coal","lignite","CCGT","OCGT","coal powerplants", "oil powerplants","oil primary","oil refining"]:
+          return "Fossil fuels & powerplants"
+    elif tech in ["hot water storage", "H2", "H2 storage","H2 Store","water pits","water pits charger","water pits discharger","heat vent"]:
+        return "TES & H2 storage"
+    elif "load" in tech:
+        return "load shedding"
+    elif tech in ["SMR", "ammonia cracker", "Haber-Bosch", "BioSNG", "biomass to liquid","methanol","ammonia", "methanol exports", "ammonia exports","methanolisation","shipping methanol" ,"BioSNG CC","HVC to air","ammonia store","biomass to liquid CC","industry methanol","non-sequestered HVC","electrobiofuels","biomass-to-methanol"]:
+          return "synthetic fuels & techs"
+    elif tech in ["uranium", "nuclear", "nuclear fuel"]:
+          return "nuclear"
+    elif tech in ["H2 pipeline", "gas pipeline","gas pipeline new","H2 pipeline retrofitted"]:
+          return "H2 & gas pipelines"
+    elif "electricity imports/exports" in tech:
+        return "Electricity Imports/Exports"
+    elif "hydrogen imports/exports" in tech:
+        return "Hydrogen Imports/Exports"
+    else:
+        return tech
+
+def build_filename(cluster,opt,sector_opt,planning_horizon):
+    prefix=f"results/{study}/networks/base_"
+    return prefix+"s_{cluster}_{opt}_{sector_opt}_{planning_horizon}.nc".format(
+        cluster=cluster,
+        opt=opt,
+        sector_opt=sector_opt,
+        planning_horizon=planning_horizon
+    )
+
+def load_file(filename):
+    # Use pypsa.Network to load the network from the filename
+    return pypsa.Network(filename)
+
+def load_files(study, planning_horizons, cluster, opt, sector_opt):
+    files = {}
+    for planning_horizon in planning_horizons:
+        filename = build_filename(cluster, opt, sector_opt, planning_horizon)
+        files[planning_horizon] = load_file(filename)
+    return files
+
+
+def calculate_elec_import_export_costs(country, planning_horizons):
+    def calculate_import_export_separate(flows, direction, network, marginal_prices):
+        import_cost = pd.DataFrame(index=flows.index, columns=flows.columns)
+        export_revenue = pd.DataFrame(index=flows.index, columns=flows.columns)
+
+        for line in flows.columns:
+            # Identify buses
+            if direction == 'ac0' or direction == 'dc0':
+                bus0 = network.lines.loc[line, "bus0"] if 'ac' in direction else network.links.loc[line, "bus0"]
+                bus1 = network.lines.loc[line, "bus1"] if 'ac' in direction else network.links.loc[line, "bus1"]
+            else:
+                bus0 = network.lines.loc[line, "bus1"] if 'ac' in direction else network.links.loc[line, "bus1"]
+                bus1 = network.lines.loc[line, "bus0"] if 'ac' in direction else network.links.loc[line, "bus0"]
+
+            if bus0 not in marginal_prices.columns or bus1 not in marginal_prices.columns:
+                continue
+
+            price_bus0 = marginal_prices[bus0]
+            price_bus1 = marginal_prices[bus1]
+
+            for t in flows.index:
+                flow = flows.at[t, line]
+                if flow < 0:  # Import
+                    import_cost.at[t, line] = -flow * price_bus1[t]
+                    export_revenue.at[t, line] = 0
+                else:  # Export
+                    import_cost.at[t, line] = 0
+                    export_revenue.at[t, line] = flow * price_bus0[t]
+
+        return import_cost, export_revenue
+
+    results = {}
+
+    for planning_horizon in planning_horizons:
+        # Load network
+        n = loaded_files[planning_horizon]
+
+        # Marginal prices
+        marginal_price_filter = n.buses.carrier == "AC"
+        marginal_price = n.buses_t.marginal_price.filter(items=marginal_price_filter[marginal_price_filter].index)
+
+        # AC lines
+        filtered_ac_lines = n.lines.bus0 == country
+        ac_lines = n.lines_t.p0.filter(items=filtered_ac_lines[filtered_ac_lines].index)
+
+        filtered_ac_lines_r = n.lines.bus1 == country
+        ac_lines_r = n.lines_t.p1.filter(items=filtered_ac_lines_r[filtered_ac_lines_r].index)
+
+        # DC links
+        filtered_dc_lines = (n.links.carrier == 'DC') & (n.links.bus0 == country)
+        dc_lines = n.links_t.p0.filter(items=filtered_dc_lines[filtered_dc_lines].index)
+
+        filtered_dc_lines_r = (n.links.carrier == 'DC') & (n.links.bus1 == country)
+        dc_lines_r = n.links_t.p1.filter(items=filtered_dc_lines_r[filtered_dc_lines_r].index)
+
+        # Calculate import/export
+        ac_import, ac_export = calculate_import_export_separate(ac_lines, "ac0", n, marginal_price)
+        ac_r_import, ac_r_export = calculate_import_export_separate(ac_lines_r, "acr", n, marginal_price)
+        dc_import, dc_export = calculate_import_export_separate(dc_lines, "dc0", n, marginal_price)
+        dc_r_import, dc_r_export = calculate_import_export_separate(dc_lines_r, "dcr", n, marginal_price)
+
+        # Total import/export
+        total_import_cost = ac_import.add(ac_r_import, fill_value=0).add(dc_import, fill_value=0).add(dc_r_import, fill_value=0)
+        total_export_revenue = ac_export.add(ac_r_export, fill_value=0).add(dc_export, fill_value=0).add(dc_r_export, fill_value=0)
+
+        # Net cost
+        total_import_cost_sum = total_import_cost.sum().sum()
+        total_export_revenue_sum = total_export_revenue.sum().sum()
+        net_cost = total_import_cost_sum - total_export_revenue_sum
+
+        results[planning_horizon] = net_cost
+
+    # Convert results to DataFrame
+    results_df = pd.DataFrame.from_dict(results, orient='index', columns=['net_cost'])
+    results_df.index.name = 'planning_horizon'
+
+    return results_df
+
+def calculate_h2_import_export_costs(country, planning_horizons):
+    def calculate_import_export_separate(flows, direction, network, marginal_prices):
+     import_cost = pd.DataFrame(index=flows.index, columns=flows.columns)
+     export_revenue = pd.DataFrame(index=flows.index, columns=flows.columns)
+
+     for pipeline in flows.columns:
+        # Always use network.links for pipelines
+        if direction == 'forward':
+            bus0 = network.links.loc[pipeline, "bus0"]
+            bus1 = network.links.loc[pipeline, "bus1"]
+        else:  # reverse
+            bus0 = network.links.loc[pipeline, "bus1"]
+            bus1 = network.links.loc[pipeline, "bus0"]
+
+        if bus0 not in marginal_prices.columns or bus1 not in marginal_prices.columns:
+            continue
+
+        price_bus0 = marginal_prices[bus0]
+        price_bus1 = marginal_prices[bus1]
+
+        for t in flows.index:
+            flow = flows.at[t, pipeline]
+            if flow < 0:  # Import
+                import_cost.at[t, pipeline] = -flow * price_bus1[t]
+                export_revenue.at[t, pipeline] = 0
+            else:  # Export
+                import_cost.at[t, pipeline] = 0
+                export_revenue.at[t, pipeline] = flow * price_bus0[t]
+
+     return import_cost, export_revenue
+
+    results = {}
+
+    for planning_horizon in planning_horizons:
+        # Load network
+        n = loaded_files[planning_horizon]
+
+        # Marginal prices
+        marginal_price_filter = n.buses.carrier == "H2"
+        marginal_price = n.buses_t.marginal_price.filter(items=marginal_price_filter[marginal_price_filter].index)
+
+        # AC lines
+        filtered_h2_pipelines = (n.links.carrier == 'H2 pipeline') & (n.links.bus0 == country)
+        h2_pipelines = n.links_t.p0.filter(items=filtered_h2_pipelines[filtered_h2_pipelines].index)
+
+        filtered_h2_pipelines_r = (n.links.carrier == 'H2 pipeline') & (n.links.bus1 == country)
+        h2_pipelines_r = n.links_t.p1.filter(items=filtered_h2_pipelines_r[filtered_h2_pipelines_r].index)
+
+        # DC links
+        filtered_h2_retro_pipelines = (n.links.carrier == 'H2 pipeline retrofitted') & (n.links.bus0 == country)
+        h2_retro_pipelines = n.links_t.p0.filter(items=filtered_h2_retro_pipelines[filtered_h2_retro_pipelines].index)
+
+
+        filtered_h2_retro_pipelines_r = (n.links.carrier == 'H2 pipeline retrofitted') & (n.links.bus1 == country)
+        h2_retro_pipelines_r = n.links_t.p1.filter(items=filtered_h2_retro_pipelines_r[filtered_h2_retro_pipelines_r].index)
+
+        # Calculate import/export
+        h2_import, h2_export = calculate_import_export_separate(h2_pipelines, "ac0", n, marginal_price)
+        h2_r_import, h2_r_export = calculate_import_export_separate(h2_pipelines_r, "acr", n, marginal_price)
+        h2_retro_import, h2_retro_export = calculate_import_export_separate(h2_retro_pipelines, "dc0", n, marginal_price)
+        h2_retro_r_import, h2_retro_r_export = calculate_import_export_separate(h2_retro_pipelines_r, "dcr", n, marginal_price)
+
+        # Total import/export
+        total_import_cost = h2_import.add(h2_r_import, fill_value=0).add(h2_retro_import, fill_value=0).add(h2_retro_r_import, fill_value=0)
+        total_export_revenue = h2_export.add(h2_r_export, fill_value=0).add(h2_retro_export, fill_value=0).add(h2_retro_r_export, fill_value=0)
+
+        # Net cost
+        total_import_cost_sum = total_import_cost.sum().sum()
+        total_export_revenue_sum = total_export_revenue.sum().sum()
+        net_cost = total_import_cost_sum - total_export_revenue_sum
+
+        results[planning_horizon] = net_cost
+
+    # Convert results to DataFrame
+    results_df = pd.DataFrame.from_dict(results, orient='index', columns=['net_cost'])
+    results_df.index.name = 'planning_horizon'
+
+    return results_df
+
+
+def costs(countries):
+    costs = {}
+    fn = snakemake.input.costs
+    options = pd.read_csv(fn, index_col=[0, 1]).sort_index()
+    for country in countries:
+      net_costs_elc = calculate_elec_import_export_costs(country, planning_horizons)
+      net_costs_h2 = calculate_h2_import_export_costs(country, planning_horizons)
+      uranium = pd.read_excel(f"results/{study}/htmls/ChartData_{country}.xlsx",sheet_name="Chart 22", index_col=0,skiprows=2)
+      uranium = uranium["Uranium"]
+      coal_df = pd.read_csv(f"results/{study}/country_csvs/total_imports_{country}.csv", index_col=0)
+      coal = coal_df["imp_cms_pe"]
+      exports = pd.read_csv(f"results/{study}/country_csvs/exports_{country}.csv", index_col=0)
+      exports = exports.clip(lower=0)
+      exports = exports.where(exports <= 0, -exports)
+      df=pd.read_csv(f"results/{study}/csvs/nodal_costs.csv", index_col=2)
+      df = df.iloc[:, 2:]
+      df = df.iloc[3:, :]
+      # df.index = df.index.str[:2]
+      if country != 'EU':
+       df = df[df.index == country]
+      else:
+       df = df
+      df = df.rename(columns={'Unnamed: 3': 'tech', f'{cluster}': '2020',f'{cluster}.1': '2030',f'{cluster}.2': '2040',f'{cluster}.3': '2050'})
+      df[['2020','2030', '2040', '2050']] = df[['2020','2030', '2040', '2050']].apply(pd.to_numeric, errors='coerce')
+      df = df.groupby('tech').sum().reset_index()
+      
+      if country != 'EU':
+       elc_row = {"tech": "electricity imports/exports"}
+       for year in net_costs_elc.index:
+          elc_row[str(year)] = net_costs_elc.loc[year, 'net_cost']
+       df = pd.concat([df, pd.DataFrame([elc_row])], ignore_index=True)
+       h2_row = {"tech": "hydrogen imports/exports"}
+       for year in net_costs_h2.index:
+          h2_row[str(year)] = net_costs_h2.loc[year, 'net_cost']
+       df = pd.concat([df, pd.DataFrame([h2_row])], ignore_index=True)
+       ura_row = {"tech": "nuclear fuel"}
+       for year in uranium.index:
+           ura_row[str(year)] = uranium.loc[year] * float(options.loc[("uranium", "fuel")]) * 1e6  
+       df = pd.concat([df, pd.DataFrame([ura_row])], ignore_index=True)
+       coal_row = {"tech": "coal fuel"}
+       for year in coal.index:
+           coal_row[str(year)] = coal.loc[year] * float(options.loc[("coal", "fuel")]) * 1e6  
+       df = pd.concat([df, pd.DataFrame([coal_row])], ignore_index=True)
+       
+       biomass_exports = exports["enc_pe_exp"]
+       bm_row = {"tech": "biomass exports"}
+       for year in biomass_exports.index:
+           bm_row[str(year)] = biomass_exports.loc[year] * float(options.loc[("biomass", "fuel")]) * 1e6
+       df = pd.concat([df, pd.DataFrame([bm_row])], ignore_index=True)
+
+       biogas_exports = exports["gaz_se_exp"]
+       biogas_row = {"tech": "biogas exports"}
+       for year in biogas_exports.index:
+           biogas_row[str(year)] = biogas_exports.loc[year] * float(options.loc[("biogas", "fuel")]) * 1e6
+       df = pd.concat([df, pd.DataFrame([biogas_row])], ignore_index=True)
+
+       meth_exports = exports["met_fe_exp"]
+       meth_row = {"tech": "methanol exports"}
+       for year in meth_exports.index:
+           meth_row[str(year)] = meth_exports.loc[year] * methanol_fuel * 1e6
+       df = pd.concat([df, pd.DataFrame([meth_row])], ignore_index=True)
+
+       amm_exports = exports["amm_fe_exp"]
+       amm_row = {"tech": "ammonia exports"}
+       for year in amm_exports.index:
+           amm_row[str(year)] = amm_exports.loc[year] * ammonia_fuel * 1e6
+       df = pd.concat([df, pd.DataFrame([amm_row])], ignore_index=True)
+      
+       if 'nuclear' not in df['tech'].values:
+          new_row = pd.DataFrame(
+              [['nuclear'] + [0]*len(planning_horizons)],
+              columns=['tech'] + [str(h) for h in planning_horizons]
+          )
+          df = pd.concat([df, new_row], ignore_index=True)
+
+       for planning_horizon in planning_horizons:
+
+          n = loaded_files[planning_horizon]
+
+          nuclear_links = n.links[
+              n.links.index.str.contains(country) &
+              n.links.index.str.contains("nuclear")
+          ]
+          nuc_inv=float(options.loc[("nuclear", "capital_cost")])
+          efficiency = nuclear_links.efficiency.mean()
+          nuclear_cap = nuclear_links.p_nom_opt.sum() * efficiency
+          df.loc[df['tech'] == 'nuclear', str(planning_horizon)] = nuclear_cap * nuc_inv
+      df['tech'] = df['tech'].map(rename_techs_tyndp)
+      df = df.groupby('tech').sum().reset_index()
+
+      result_df = df
+      result_df.fillna(0, inplace=True)
+      
+      result_df.iloc[:, 1:] = result_df.iloc[:, 1:]#.clip(lower=0) 
+      if not result_df.empty:
+            years = ['2020','2030','2040', '2050']
+            technologies = result_df['tech'].unique()
+            
+            costs[country] = result_df.set_index('tech').loc[technologies, years]
+
+    if country == 'EU':
+     costs['EU'].index = costs['EU'].index.map(rename_techs_tyndp)
+     costs['EU'] = costs['EU'].groupby(costs['EU'].index).sum()
+    for country, dataframe in costs.items():
+         # Specify the file path within the output directory
+         file_path = f"results/{study}/country_csvs/{country}_costs.csv"
+    
+         # Save the DataFrame to a CSV file
+         dataframe.to_csv(file_path, index=True)
+
+         print(f"CSV file for {country} saved at: {file_path}")
+    return costs
+
+
+def Investment_costs(countries):
+    fn = snakemake.input.costs
+    options = pd.read_csv(fn, index_col=[0, 1]).sort_index()
+    investment_costs = {}
+    for country in countries:
+      df=pd.read_csv(f"results/{study}/csvs/nodal_costs.csv", index_col=2)
+      df.drop(df.columns[1], axis=1, inplace=True)
+      df = df.iloc[3:, :]
+      # df.index = df.index.str[:2]
+      if country != 'EU':
+       df = df[df.index == country]
+      else:
+       df=df
+      df = df.rename(columns={'cluster': 'Costs','Unnamed: 3': 'tech', f'{cluster}': '2020',f'{cluster}.1': '2030',f'{cluster}.2': '2040',f'{cluster}.3': '2050'})
+      df[['2020','2030', '2040', '2050']] = df[['2020','2030', '2040', '2050']].apply(pd.to_numeric, errors='coerce')
+      df = df[df['Costs'] == 'capital']
+      df = df.groupby('tech').sum().reset_index()
+      df = df.drop(columns=['Costs'])
+      if country != 'EU':
+       if 'nuclear' not in df['tech'].values:
+          new_row = pd.DataFrame(
+              [['nuclear'] + [0]*len(planning_horizons)],
+              columns=['tech'] + [str(h) for h in planning_horizons]
+          )
+          df = pd.concat([df, new_row], ignore_index=True)
+
+       for planning_horizon in planning_horizons:
+
+          n = loaded_files[planning_horizon]
+
+          nuclear_links = n.links[
+              n.links.index.str.contains(country) &
+              n.links.index.str.contains("nuclear")
+          ]
+          nuc_inv=float(options.loc[("nuclear", "capital_cost")])
+          efficiency = nuclear_links.efficiency.mean()
+          nuclear_cap = nuclear_links.p_nom_opt.sum() * efficiency
+          df.loc[df['tech'] == 'nuclear', str(planning_horizon)] = nuclear_cap * nuc_inv
+      df['tech'] = df['tech'].map(rename_techs_tyndp)
+      df = df.groupby('tech').sum().reset_index()
+      tech_mapping = {'Fossil fuels & powerplants':'Fossil fuel powerplants' }
+      df['tech'] = df['tech'].replace(tech_mapping)
+      condition = df[['2020','2030', '2040', '2050']].eq(0).all(axis=1)
+      df = df[~condition]
+      
+      result_df = df
+      result_df.fillna(0, inplace=True)
+      if not result_df.empty:
+            years = ['2020','2030', '2040', '2050']
+            technologies = result_df['tech'].unique()
+            
+            investment_costs[country] = result_df.set_index('tech').loc[technologies, years]
+
+    if country == 'EU':
+     investment_costs['EU'].index = investment_costs['EU'].index.map(rename_techs_tyndp)
+     investment_costs['EU'] = investment_costs['EU'].groupby(investment_costs['EU'].index).sum()
+    for country, dataframe in investment_costs.items():
+         # Specify the file path within the output directory
+         file_path = f"results/{study}/country_csvs/{country}_investment costs.csv"
+    
+         # Save the DataFrame to a CSV file
+         dataframe.to_csv(file_path, index=True)
+
+         print(f"CSV file for {country} saved at: {file_path}")
+    return investment_costs 
+
+def rename_techs_tynd(tech):
+    tech = rename_techs(tech)
+    if tech in ["H2 Electrolysis", "methanation","helmeth", "H2 liquefaction","heat pump","resistive heater","Fischer-Tropsch","BioSNG CC","HVC to air","battery storage","municipal solid waste","municipal solid waste transport",
+                "electricity distribution grid","CHP", "H2 Fuel Cell","CCGT","OCGT","H2 turbine","solid biomass powerplants","coal powerplants", "oil powerplants","geothermal heat", "geothermal organic rankine cycle","heat vent",
+                "battery charger", "battery discharger","battery", "Li ion", "BEV charger", "V2G","hot water storage", "H2", "H2 storage","biomass to liquid CC","biomass-to-methanol CC","electrobiofuels","geothermal district heat",
+                "biomass boiler", "oil boiler","gas boiler","solar","Wind","co2 sequestered","CO2 sequestration", "co2", "SMR CC", "process emissions CC","process emissions", "solid biomass for industry CC", "gas for industry CC","DAC",
+                "hydroelectricity","SMR", "ammonia cracker", "Haber-Bosch", "BioSNG", "biomass to liquid","methanol","ammonia","methanolisation","shipping methanol","non-sequestered HVC","offshore wind (Float)","solar-hsat","water pits",
+                "air heat pump","air-sourced heat pump","ground heat pump","solar PV","solar rooftop", "offshore wind","offshore wind (AC)", "offshore wind (DC)","solid biomass to hydrogen","water pits charger","water pits discharger",
+                "onshore wind", "solar thermal","H2 pipeline", "gas pipeline","gas pipeline new","H2 pipeline retrofitted","transmission lines","Transmission Lines","biomass-to-methanol","industry methanol", "OCGT methanol","CO2 pipeline","co2 vent"]:
+        return "VOM of Technologies"
+    elif tech in ["biomass", "solid biomass", "solid biomass for industry", "biogas", "solid biomass transport", "biomass exports", "biogas exports","solid biomass import","unsustainable bioliquids","unsustainable solid biomass"]:
+          return "Biomass"
+    elif tech in ["shipping oil", "naphtha for industry", "land transport oil", "kerosene for aviation", "agriculture machinery oil", "oil","gas", "coal for industry","gas for industry","coal","lignite","coal fuel","gas fuel","oil fuel","oil primary","oil refining"]:
+          return "Fossil Fuels"
+    elif "load" in tech:
+        return "load shedding"
+    elif "electricity imports/exports" in tech:
+        return "Electricity Imports/Exports"
+    elif "hydrogen imports/exports" in tech:
+        return "Hydrogen Imports/Exports"
+    elif tech in ["uranium", "nuclear", "nuclear fuel"]:
+          return "Nuclear"
+    elif tech in ["methanol exports", "ammonia exports"]:
+          return "Synthetic Fuels"
+    else:
+        return tech
+    
+def operational_costs(countries):
+    operational_costs = {}
+    fn = snakemake.input.costs
+    options = pd.read_csv(fn, index_col=[0, 1]).sort_index()
+    for country in countries:
+      net_costs_elc = calculate_elec_import_export_costs(country, planning_horizons)
+      net_costs_h2 = calculate_h2_import_export_costs(country, planning_horizons)
+      uranium = pd.read_excel(f"results/{study}/htmls/ChartData_{country}.xlsx",sheet_name="Chart 22", index_col=0,skiprows=2)
+      uranium = uranium["Uranium"]
+      coal_df = pd.read_csv(f"results/{study}/country_csvs/total_imports_{country}.csv", index_col=0)
+      coal = coal_df["imp_cms_pe"]
+      exports = pd.read_csv(f"results/{study}/country_csvs/exports_{country}.csv", index_col=0)
+      exports = exports.clip(lower=0)
+      exports = exports.where(exports <= 0, -exports)
+      df=pd.read_csv(f"results/{study}/csvs/nodal_costs.csv", index_col=2)
+      df.drop(df.columns[1], axis=1, inplace=True)
+      df = df.iloc[3:, :]
+      # df.index = df.index.str[:2]
+      if country != 'EU':
+       df = df[df.index == country]
+      else:
+       df=df
+      df = df.rename(columns={'cluster': 'Costs','Unnamed: 3': 'tech',  f'{cluster}': '2020',f'{cluster}.1': '2030',f'{cluster}.2': '2040',f'{cluster}.3': '2050'})
+      df[['2020','2030', '2040', '2050']] = df[['2020','2030', '2040', '2050']].apply(pd.to_numeric, errors='coerce')
+      df = df[df['Costs'] == 'marginal']
+      df = df.groupby('tech').sum().reset_index()
+      df = df.drop(columns=['Costs'])
+      if country != 'EU':
+       elc_row = {"tech": "electricity imports/exports"}
+       for year in net_costs_elc.index:
+          elc_row[str(year)] = net_costs_elc.loc[year, 'net_cost']
+       df = pd.concat([df, pd.DataFrame([elc_row])], ignore_index=True)
+       h2_row = {"tech": "hydrogen imports/exports"}
+       for year in net_costs_h2.index:
+          h2_row[str(year)] = net_costs_h2.loc[year, 'net_cost']
+       df = pd.concat([df, pd.DataFrame([h2_row])], ignore_index=True)
+       ura_row = {"tech": "nuclear fuel"}
+       for year in uranium.index:
+           ura_row[str(year)] = uranium.loc[year] * float(options.loc[("uranium", "fuel")]) * 1e6  
+       df = pd.concat([df, pd.DataFrame([ura_row])], ignore_index=True)
+       coal_row = {"tech": "coal fuel"}
+       for year in coal.index:
+           coal_row[str(year)] = coal.loc[year] * float(options.loc[("coal", "fuel")]) * 1e6
+       df = pd.concat([df, pd.DataFrame([coal_row])], ignore_index=True)
+       biomass_exports = exports["enc_pe_exp"]
+       bm_row = {"tech": "biomass exports"}
+       for year in biomass_exports.index:
+           bm_row[str(year)] = biomass_exports.loc[year] * float(options.loc[("biomass", "fuel")]) * 1e6
+       df = pd.concat([df, pd.DataFrame([bm_row])], ignore_index=True)
+
+       biogas_exports = exports["gaz_se_exp"]
+       biogas_row = {"tech": "biogas exports"}
+       for year in biogas_exports.index:
+           biogas_row[str(year)] = biogas_exports.loc[year] * float(options.loc[("biogas", "fuel")]) * 1e6
+       df = pd.concat([df, pd.DataFrame([biogas_row])], ignore_index=True)
+
+       meth_exports = exports["met_fe_exp"]
+       meth_row = {"tech": "methanol exports"}
+       for year in meth_exports.index:
+           meth_row[str(year)] = meth_exports.loc[year] * methanol_fuel * 1e6
+       df = pd.concat([df, pd.DataFrame([meth_row])], ignore_index=True)
+
+       amm_exports = exports["amm_fe_exp"]
+       amm_row = {"tech": "ammonia exports"}
+       for year in amm_exports.index:
+           amm_row[str(year)] = amm_exports.loc[year] * ammonia_fuel * 1e6
+       df = pd.concat([df, pd.DataFrame([amm_row])], ignore_index=True)
+      df['tech'] = df['tech'].map(rename_techs_tynd)
+      df = df.groupby('tech').sum().reset_index()
+      condition = df[['2020','2030', '2040', '2050']].eq(0).all(axis=1)
+      df = df[~condition]
+      
+      result_df = df
+      result_df.fillna(0, inplace=True)
+      if not result_df.empty:
+            years = ['2020','2030', '2040', '2050']
+            technologies = result_df['tech'].unique()
+            
+            operational_costs[country] = result_df.set_index('tech').loc[technologies, years]
+
+      
+    for country, dataframe in operational_costs.items():
+         # Specify the file path within the output directory
+         file_path = f"results/{study}/country_csvs/{country}_operational costs.csv"
+    
+         # Save the DataFrame to a CSV file
+         dataframe.to_csv(file_path, index=True)
+
+         print(f"CSV file for {country} saved at: {file_path}")
+    return operational_costs 
+
+def rename_techs_tyndpp(tech):
+    tech = rename_techs(tech)
+    if "heat pump" in tech or "resistive heater" in tech:
+        return "power-to-heat"
+    elif tech in ["H2 Electrolysis", "methanation","helmeth", "H2 liquefaction"]:
+        return "power-to-gas"
+    elif tech in ["electricity distribution grid"]:
+        return "distribution network"
+    elif tech in [ "CHP", "H2 Fuel Cell","H2 turbine"]:
+        return "CHP"
+    elif "solar" in tech:
+        return "solar"
+    elif tech == "Fischer-Tropsch":
+        return "power-to-liquid"
+    elif "offshore wind" in tech:
+        return "offshore wind"
+    elif tech in ["hot water storage","water pits","water pits charger","water pits discharger"]:
+        return "thermal energy storage"
+    elif "load" in tech:
+        return "load shedding"
+    elif tech in ["nuclear"]:
+          return "nuclear"
+    elif tech in ["H2 pipeline", "gas pipeline","gas pipeline new","H2 pipeline retrofitted"]:
+          return "H2 & gas pipelines"
+    else:
+        return tech
+    
+def capacities(countries):
+    capacities = {}
+    for country in countries:
+      cf = pd.read_csv(f"results/{study}/csvs/nodal_capacities.csv", index_col=1)
+      cf = cf.iloc[:, 1:]
+      cf = cf.iloc[3:, :]
+      if country != 'EU':
+       cf = cf[cf.index == country]
+      else:
+       cf=cf
+      cf = cf.rename(columns={'Unnamed: 2': 'tech', f'{cluster}': '2020',f'{cluster}.1': '2030',f'{cluster}.2': '2040',f'{cluster}.3': '2050'})
+      columns_to_convert = ['2020','2030', '2040', '2050']
+      cf[columns_to_convert] = cf[columns_to_convert].apply(pd.to_numeric, errors='coerce')
+      cf = cf.groupby('tech').sum().reset_index()
+      
+      if 'nuclear' not in cf['tech'].values:
+          new_row = pd.DataFrame(
+              [['nuclear'] + [0]*len(planning_horizons)],
+              columns=['tech'] + [str(h) for h in planning_horizons]
+          )
+          cf = pd.concat([cf, new_row], ignore_index=True)
+
+      for planning_horizon in planning_horizons:
+
+          n = loaded_files[planning_horizon]
+          if country != 'EU':
+           nuclear_links = n.links[
+            (n.links.bus1 == country) &
+            (n.links.carrier == "nuclear")]
+          else:
+           nuclear_links = n.links[
+             (n.links.carrier == "nuclear")
+         ]
+          efficiency = nuclear_links.efficiency.mean()
+          nuclear_cap = nuclear_links.p_nom_opt.sum() * efficiency
+          cf.loc[cf['tech'] == 'nuclear', str(planning_horizon)] = nuclear_cap
+          
+      cf['tech'] = cf['tech'].map(rename_techs_tyndpp)
+      cf = cf.groupby('tech').sum().reset_index()
+      result_df = cf
+      result_df.fillna(0, inplace=True)
+      if country == 'EU':
+          result_df['tech'] = result_df['tech'].map(rename_techs_tyndpp)
+          result_df = result_df.groupby('tech').sum().reset_index()
+      if not result_df.empty:
+            years = ['2020','2030', '2040', '2050']
+            technologies = result_df['tech'].unique()
+
+            capacities[country] = result_df.set_index('tech').loc[technologies, years]
+
+    for country in countries:
+
+       for country, dataframe in capacities.items():
+        # Specify the file path where you want to save the CSV file
+        file_path = f"results/{study}/country_csvs/{country}_capacities.csv"
+    
+         # Save the DataFrame to a CSV file
+        dataframe.to_csv(file_path, index=True)
+
+        print(f"CSV file for {country} saved at: {file_path}")  
+
+    return capacities
+
+def storage_capacities(countries):
+    s_capacities = {}
+    for country in countries:
+      cf = pd.read_csv(f"results/{study}/csvs/nodal_capacities.csv", index_col=1)
+      cf = cf[cf['cluster'] == 'Store']
+      if country != 'EU':
+       cf = cf[cf.index == country]
+      else:
+       cf=cf
+      cf = cf.rename(columns={'Unnamed: 2': 'tech',  f'{cluster}': '2020',f'{cluster}.1': '2030',f'{cluster}.2': '2040',f'{cluster}.3': '2050'})
+      columns_to_convert = ['2020','2030', '2040', '2050']
+      cf[columns_to_convert] = cf[columns_to_convert].apply(pd.to_numeric, errors='coerce')
+      cf = cf.groupby('tech').sum().reset_index()
+      result_df = cf
+      result_df.fillna(0, inplace=True)
+      result_df['tech'] = result_df['tech'].replace({'urban central water pits': 'Thermal Energy Storage', 'battery':'Grid-scale battery', 'gas':'Gas storage'})
+      if not result_df.empty:
+            years = ['2020','2030', '2040', '2050']
+            technologies = result_df['tech'].unique()
+
+            s_capacities[country] = result_df.set_index('tech').loc[technologies, years]
+            for country, dataframe in s_capacities.items():
+             # Specify the file path where you want to save the CSV file
+             file_path = f"results/{study}/country_csvs/{country}_storage_capacities.csv"
+         
+              # Save the DataFrame to a CSV file
+             dataframe.to_csv(file_path, index=True)
+
+             print(f"CSV file for {country} saved at: {file_path}") 
+
+    return s_capacities
+
+def plot_demands(countries):
+    colors = snakemake.params.plotting["tech_colors"]
+    colors["methane"] = "#f0833a"
+    colors["Non-energy demand"] = "#c5c9c7" 
+    colors["hydrogen for industry"] = "#ffbacd"
+    colors["agriculture electricity"] = "#11875d"
+    colors["agriculture heat"] = "#fbeeac"
+    colors["agriculture oil"] = "#fddc5c"
+    colors["electricity demand of residential and tertairy"] = "#01889f"
+    colors["gas for Industry"] = "#f0833a"
+    colors["electricity for Industry"] = "#06b1c4"
+    colors["aviation oil demand"] = "#fd5956"
+    colors["land transport EV"] = "#95d0fc"
+    colors["land transport hydrogen demand"] = "#82cbb2"
+    colors["oil to transport demand"] = "#9a0200"
+    colors["low-temperature heat for industry"] = "#c14a09"
+    colors["naphtha for non-energy"] = "#c5c9c7"
+    colors["shipping methanol"] = "#95d0fc"
+    colors["shipping hydrogen"] = "#fcc006"
+    colors["shipping oil"] = "#fcc006"
+    colors["solid biomass for Industry"] = "#11875d"
+    colors["solid biomass"] = "#11875d"
+    colors["Residential and tertiary DH demand"] = "#f0833a"
+    colors["Residential and tertiary heat demand"] = "#ffb07c"
+    colors["electricity demand for rail network"] = "#82cbb2"
+    colors["H2 for non-energy"] = "#32bf84" 
+    colors["Oil for industry"] = "#ffbacd"
+    
+    mapping = {
+        "hydrogen for industry": "hydrogen",
+        "H2 for non-energy": "Non-energy",
+        "shipping hydrogen": "hydrogen",
+        "shipping oil": "oil",
+        "agriculture electricity": "electricity",
+        "agriculture heat": "heat",
+        "agriculture oil": "oil",
+        "electricity demand of residential and tertairy": "electricity",
+        "gas for Industry": "methane",
+        "electricity for Industry": "electricity",
+        "aviation oil demand": "oil",
+        "land transport EV": "electricity",
+        "land transport hydrogen demand": "hydrogen",
+        "oil to transport demand": "oil",
+        "low-temperature heat for industry": "heat",
+        "naphtha for non-energy": "Non-energy",
+        "electricity demand for rail network": "electricity",
+        "Residential and tertiary DH demand": "heat",
+        "Residential and tertiary heat demand": "heat",
+        "solid biomass for Industry": "solid biomass",
+        "NH3":"hydrogen",
+        "Oil for industry": "oil"
+    }
+    mapping_eu = {
+            "preshydcfind": "hydrogen for industry",
+            "preshydcfneind": "H2 for non-energy",
+            "preshydwati": "shipping hydrogen",
+            "preslqfcffrewati": "shipping oil",
+            "preselccfagr": "agriculture electricity",
+            "presvapcfagr": "agriculture heat",
+            "prespetcfagr": "agriculture oil",
+            "preselccfres": "electricity demand of residential and tertairy",
+            "presgazcfind": "gas for Industry",
+            "presgazcfindd": "gas for Industry",
+            "preselccfind": "electricity for Industry",
+            "preslqfcfavi": "aviation oil demand",
+            "preselccftra": "land transport EV",
+            "preshydcftra": "land transport hydrogen demand",
+            "preslqfcftra": "oil to transport demand",
+            "presvapcfind": "low-temperature heat for industry",
+            "prespetcfneind": "naphtha for non-energy",
+            "preserail": "electricity demand for rail network",
+            "presvapcfdhs": "Residential and tertiary DH demand",
+            "demandheat": "Residential and tertiary heat demand",
+            "demandheata": "Residential and tertiary heat demand",
+            "demandheatb": "Residential and tertiary heat demand",
+            "demandheats": "Residential and tertiary heat demand",
+            "presenccfind": "solid biomass for Industry",
+            "presenccfindd": "solid biomass for Industry",
+            "preammind":"NH3",
+            "prespetcfind": "Oil for industry"
+    }
+   
+    for country in countries:
+        data = pd.read_excel(f"results/{study}/sepia/inputs{country}.xlsx", index_col=0)
+        data.rename(columns={"2020": "2025"}, inplace=True)
+        if country != 'EU':
+         columns_to_drop = ['source', 'target']
+         data = data.drop(columns=columns_to_drop)
+         data = data.groupby(data.index).sum()
+        else:
+         columns_to_drop = ['source', 'target']
+         data = data.drop(columns=columns_to_drop)
+         data.rename(index=mapping_eu, inplace=True)
+         data = data.groupby(data.index).sum()
+
+        # Apply your mapping to the data
+        data = data[data.index.isin(mapping.keys())]
+        data.index = pd.MultiIndex.from_tuples([(mapping[i], i) for i in data.index])
+        data = data.reset_index()
+        data.rename(columns={'level_0': 'Demand'}, inplace=True)
+        data.rename(columns={'level_1': 'Sectors'}, inplace=True)
+
+        
+        melted_data = pd.melt(data, id_vars=['Demand', 'Sectors'], var_name='year', value_name='value')
+        melted_data['color'] = melted_data['Sectors'].map(colors)
+
+        # Use plotly express to create a stacked bar plot
+        fig = px.bar(
+        melted_data,
+        x='year',
+        y='value',
+        color='Sectors',
+        color_discrete_map=dict(zip(melted_data['Sectors'].unique(), melted_data['color'])),
+        facet_col='Demand',
+        labels={'year': '', 'value': 'Final energy and non-energy demand [TWh/a]'}
+        )
+        fig.for_each_annotation(lambda a: a.update(text=a.text.split('=')[-1].strip()))
+        fig.update_layout(height=800, width=1400)
+        html_filename = f"{country}_sectoral_demands.html"
+        output_folder = f'results/{study}/htmls/raw_html' # Set your desired output folder
+        os.makedirs(output_folder, exist_ok=True)
+        html_filepath = os.path.join(output_folder, html_filename)
+        fig.write_html(html_filepath,full_html=False, include_plotlyjs=False)
+        file_path = f"results/{study}/country_csvs/{country}_sectordemands.csv"
+        data.to_csv(file_path, index=True)
+
+def plot_series_power(cluster, opt, sector_opt, planning_horizons,start,stop,title):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    colors = tech_colors 
+    tabs = pn.Tabs()
+
+    for country in countries:
+      tabs = pn.Tabs()
+
+      for planning_horizon in planning_horizons:
+        tab = pn.Tabs()
+        n = loaded_files[planning_horizon]
+
+        assign_locations(n)
+        assign_carriers(n)
+        carrier = 'AC'
+        busesn = n.buses.index[n.buses.carrier.str.contains(carrier)]
+
+        supplyn = pd.DataFrame(index=n.snapshots)
+
+        if country != 'EU':
+          for c in n.iterate_components(n.branch_components):
+            n_port = 4 if c.name == "Link" else 2  # port3
+            for i in range(n_port):
+                supplyn = pd.concat(
+                    (
+                        supplyn,
+                        (-1)
+                        * c.pnl["p" + str(i)]
+                        .loc[:, c.df.index[c.df["bus" + str(i)].isin(busesn)]].filter(like=country)
+                        .groupby(c.df.carrier, axis=1)
+                        .sum(),
+                    ),
+                    axis=1,
+                )
+        else:
+          for c in n.iterate_components(n.branch_components):
+            n_port = 4 if c.name == "Link" else 2  # port3
+            for i in range(n_port):
+                supplyn = pd.concat(
+                    (
+                        supplyn,
+                        (-1)
+                        * c.pnl["p" + str(i)]
+                        .loc[:, c.df.index[c.df["bus" + str(i)].isin(busesn)]]
+                        .groupby(c.df.carrier, axis=1)
+                        .sum(),
+                    ),
+                    axis=1,
+                )
+        if country != 'EU':
+          for c in n.iterate_components(n.one_port_components):
+            comps = c.df.index[c.df.bus.isin(busesn)]
+            supplyn = pd.concat(
+                (
+                    supplyn,
+                    ((c.pnl["p"].loc[:, comps]).multiply(c.df.loc[comps, "sign"])).filter(like=country)
+                    .groupby(c.df.carrier, axis=1)
+                    .sum(),
+                ),
+                axis=1,
+            )
+        else:
+          for c in n.iterate_components(n.one_port_components):
+            comps = c.df.index[c.df.bus.isin(busesn)]
+            supplyn = pd.concat(
+                (
+                    supplyn,
+                    ((c.pnl["p"].loc[:, comps]).multiply(c.df.loc[comps, "sign"]))
+                    .groupby(c.df.carrier, axis=1)
+                    .sum(),
+                ),
+                axis=1,
+            ) 
+
+        supplyn = supplyn.groupby(rename_techs_tyndp, axis=1).sum()
+        filtered_ac_lines = n.lines.bus0 == country
+        ac_lines = n.lines_t.p0.filter(items=filtered_ac_lines[filtered_ac_lines == True].index).sum(axis=1)
+        filtered_ac_lines_r = n.lines.bus1 == country
+        ac_lines_r = n.lines_t.p1.filter(items=filtered_ac_lines_r[filtered_ac_lines_r == True].index).sum(axis=1)
+        filtered_dc_lines = (n.links.carrier == 'DC') & (n.links.bus0 == country)
+        dc_lines = n.links_t.p0.filter(items=filtered_dc_lines[filtered_dc_lines == True].index).sum(axis=1)
+        filtered_dc_lines_r = (n.links.carrier == 'DC') & (n.links.bus1 == country)
+        dc_lines_r = n.links_t.p1.filter(items=filtered_dc_lines_r[filtered_dc_lines_r == True].index).sum(axis=1)
+        merged_series = pd.concat([ac_lines,ac_lines_r, dc_lines, dc_lines_r], axis=1)
+        imp_exp = merged_series.sum(axis=1)
+        imp_exp = imp_exp.rename('Imports_Exports')
+        imp_exp=-imp_exp
+        supplyn['Imports_Exports'] = imp_exp
+
+        bothn = supplyn.columns[(supplyn < 0.0).any() & (supplyn > 0.0).any()]
+
+        positive_supplyn = supplyn[bothn]
+        negative_supplyn = supplyn[bothn]
+
+        positive_supplyn = positive_supplyn.mask(positive_supplyn < 0.0, 0.0)
+        negative_supplyn = negative_supplyn.mask(negative_supplyn > 0.0, 0.0)
+
+        supplyn[bothn] = positive_supplyn
+
+        supplyn = pd.concat((supplyn, negative_supplyn), axis=1)
+
+
+
+        threshold = 0.1
+
+        to_dropn = supplyn.columns[(abs(supplyn) < threshold).all()]
+
+        if len(to_dropn) != 0:
+            logger.info(f"Dropping {to_dropn.tolist()} from supplyn")
+            supplyn.drop(columns=to_dropn, inplace=True)
+
+        supplyn.index.name = None
+
+        supplyn = supplyn / 1e3
+
+        
+        supplyn = supplyn.groupby(supplyn.columns, axis=1).sum()
+
+        if country != 'EU':
+          c_solarn = ((n.generators_t.p_max_pu * n.generators.p_nom_opt) - n.generators_t.p).filter(
+            like="solar", axis=1
+          ).filter(like=country).sum(axis=1) / 1e3
+          c_onwindn = ((n.generators_t.p_max_pu * n.generators.p_nom_opt) - n.generators_t.p).filter(
+            like="onwind", axis=1
+          ).filter(like=country).sum(axis=1) / 1e3
+          c_offwindn = ((n.generators_t.p_max_pu * n.generators.p_nom_opt) - n.generators_t.p).filter(
+            like="offwind", axis=1
+          ).filter(like=country).sum(axis=1) / 1e3
+        else:
+          c_solarn = ((n.generators_t.p_max_pu * n.generators.p_nom_opt) - n.generators_t.p).filter(
+            like="solar", axis=1
+          ).sum(axis=1) / 1e3
+          c_onwindn = ((n.generators_t.p_max_pu * n.generators.p_nom_opt) - n.generators_t.p).filter(
+            like="onwind", axis=1
+          ).sum(axis=1) / 1e3
+          c_offwindn = ((n.generators_t.p_max_pu * n.generators.p_nom_opt) - n.generators_t.p).filter(
+            like="offwind", axis=1
+          ).sum(axis=1) / 1e3
+        supplyn = supplyn.T
+        if "solar" in supplyn.index:
+          supplyn.loc["solar"] = supplyn.loc["solar"] + c_solarn
+          supplyn.loc["solar curtailment"] = -abs(c_solarn)
+        if "onshore wind" in supplyn.index:
+          supplyn.loc["onshore wind"] = supplyn.loc["onshore wind"] + c_onwindn
+          supplyn.loc["onshore curtailment"] = -abs(c_onwindn)
+        if "offshore wind" in supplyn.index:
+          supplyn.loc["offshore wind"] = supplyn.loc["offshore wind"] + c_offwindn
+          supplyn.loc["offshore curtailment"] = -abs(c_offwindn)
+        if "H2 pipeline" in supplyn.index:
+            supplyn = supplyn.drop('H2 pipeline')
+        if "gas pipeline" in supplyn.index:
+            supplyn = supplyn.drop('gas pipeline')
+        supplyn = supplyn.T
+        if "V2G" in n.carriers.index:
+          if country != 'EU':
+              v2g = n.links_t.p1.filter(like=country).filter(like="V2G").sum(axis=1)
+              v2g = v2g.to_frame()
+              v2g = v2g.rename(columns={v2g.columns[0]: 'V2G'})
+              v2g = v2g/1e3
+              if 'electricity distribution grid' not in supplyn.columns:
+                 supplyn['electricity distribution grid'] = 0
+              supplyn['electricity distribution grid'] += v2g['V2G']
+              supplyn['V2G'] = v2g['V2G'].abs()
+          else:
+              v2g = n.links_t.p1.filter(like="V2G").sum(axis=1)
+              v2g = v2g.to_frame()
+              v2g = v2g.rename(columns={v2g.columns[0]: 'V2G'})
+              v2g = v2g/1e3
+              if 'electricity distribution grid' not in supplyn.columns:
+                 supplyn['electricity distribution grid'] = 0
+              supplyn['electricity distribution grid'] += v2g['V2G']
+              supplyn['V2G'] = v2g['V2G'].abs()
+        
+        positive_supplyn = supplyn[supplyn >= 0].fillna(0)
+        negative_supplyn = supplyn[supplyn < 0].fillna(0)
+        
+        positive_supplyn = positive_supplyn.loc[start:stop]
+        negative_supplyn = negative_supplyn.loc[start:stop]
+        positive_supplyn = positive_supplyn.applymap(lambda x: x if x >= 0.1 else 0)
+        negative_supplyn = negative_supplyn.applymap(lambda x: x if x <= -0.1 else 0)
+        positive_supplyn = positive_supplyn.loc[:, (positive_supplyn > 0).any()]
+        negative_supplyn = negative_supplyn.loc[:, (negative_supplyn < 0).any()]
+        
+
+        display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+        fig = go.Figure()
+
+        for col in positive_supplyn.columns:
+            fig.add_trace(go.Scatter(
+                x=positive_supplyn.index,
+                y=positive_supplyn[col],
+                mode='lines',
+                line=dict(color=colors.get(col, 'black')),
+                stackgroup='positive',
+                showlegend=False,
+                hovertemplate='%{y:.2f}',
+                name=col
+            ))
+
+        for col in negative_supplyn.columns:
+            fig.add_trace(go.Scatter(
+                x=negative_supplyn.index,
+                y=negative_supplyn[col],
+                mode='lines',
+                line=dict(color=colors.get(col, 'black')),
+                stackgroup='negative',
+                showlegend=False,
+                hovertemplate='%{y:.2f}',
+                name=col
+            ))
+         
+        # Collect unique column names from both positive_supplyn and negative_supplyn
+        unique_columns = set(positive_supplyn.columns).union(set(negative_supplyn.columns))
+        preferred_order = ['solar', 'onshore wind', 'oil', 'offshore wind', 'nuclear', 'hydroelectricity', 'coal', 'battery storage','Imports_Exports', 'OCGT','H2 turbine', 'CHP', 'CCGT','electricity distribution grid','power-to-gas']
+        unique_columns = list(unique_columns)
+        sorted_columns = sorted(unique_columns, key=lambda x: preferred_order.index(x) if x in preferred_order else len(preferred_order))
+        sorted_columns = sorted_columns[::-1]
+        # Add a dummy trace for each unique column name to the legend
+        for col in sorted_columns:
+           fig.add_trace(go.Scatter(
+             x=[None],
+             y=[None],
+             mode='lines',
+             line=dict(color=colors.get(col, 'black'), width=4),
+             legendgroup='supply',
+             showlegend=True,
+             name=col))
+        # Update layout to customize axes, title, etc.
+        fig.update_layout(
+          xaxis=dict(title='Time', tickformat="%m-%d"),
+          yaxis=dict(title='Power [GW]',),
+          title=title + " - " + country + ' - ' + display_label,
+          width=1200, height=600,
+          hovermode='x',)
+        # if country == 'BE':
+        #   pio.write_image(fig, f"results/pdf/Power dispatch_{planning_horizon}.pdf", format='pdf')
+        # fig.add_layout_image(logo)
+            # Add the plot to the tabs
+        tab.append((f"{display_label}", fig))
+
+            # Add the tab for the planning horizon to the main Tabs
+        tabs.append((f"{display_label}", tab))
+        
+      html_filename = title + " - " + country + '.html'
+      output_folder = f'results/{study}/htmls/raw_html' # Set your desired output folder
+      os.makedirs(output_folder, exist_ok=True)
+      html_filepath = os.path.join(output_folder, html_filename)
+      tabs.save(html_filepath)
+      
+def plot_series_power_cluster(cluster, opt, sector_opt, planning_horizons,start,stop,title):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    colors = tech_colors 
+    tabs = pn.Tabs()
+
+    for country in countries:
+     tabs = pn.Tabs()
+
+     for planning_horizon in planning_horizons:
+        tab = pn.Tabs()
+        n = loaded_files[planning_horizon]
+
+        assign_locations(n)
+        assign_carriers(n)
+        carrier = 'AC'
+        busesn = n.buses.index[n.buses.carrier.str.contains(carrier)]
+
+        supplyn = pd.DataFrame(index=n.snapshots)
+
+        if country != 'EU':
+         for c in n.iterate_components(n.branch_components):
+            n_port = 4 if c.name == "Link" else 2  # port3
+            for i in range(n_port):
+                supplyn = pd.concat(
+                    (
+                        supplyn,
+                        (-1)
+                        * c.pnl["p" + str(i)]
+                        .loc[:, c.df.index[c.df["bus" + str(i)].isin(busesn)]].filter(like=country)
+                        .groupby(c.df.carrier, axis=1)
+                        .sum(),
+                    ),
+                    axis=1,
+                )
+        else:
+         for c in n.iterate_components(n.branch_components):
+            n_port = 4 if c.name == "Link" else 2  # port3
+            for i in range(n_port):
+                supplyn = pd.concat(
+                    (
+                        supplyn,
+                        (-1)
+                        * c.pnl["p" + str(i)]
+                        .loc[:, c.df.index[c.df["bus" + str(i)].isin(busesn)]]
+                        .groupby(c.df.carrier, axis=1)
+                        .sum(),
+                    ),
+                    axis=1,
+                )
+        if country != 'EU':
+         for c in n.iterate_components(n.one_port_components):
+            comps = c.df.index[c.df.bus.isin(busesn)]
+            supplyn = pd.concat(
+                (
+                    supplyn,
+                    ((c.pnl["p"].loc[:, comps]).multiply(c.df.loc[comps, "sign"])).filter(like=country)
+                    .groupby(c.df.carrier, axis=1)
+                    .sum(),
+                ),
+                axis=1,
+            )
+        else:
+         for c in n.iterate_components(n.one_port_components):
+            comps = c.df.index[c.df.bus.isin(busesn)]
+            supplyn = pd.concat(
+                (
+                    supplyn,
+                    ((c.pnl["p"].loc[:, comps]).multiply(c.df.loc[comps, "sign"]))
+                    .groupby(c.df.carrier, axis=1)
+                    .sum(),
+                ),
+                axis=1,
+            ) 
+
+        supplyn = supplyn.groupby(rename_techs_tyndp, axis=1).sum()
+
+        bothn = supplyn.columns[(supplyn < 0.0).any() & (supplyn > 0.0).any()]
+
+        positive_supplyn = supplyn[bothn]
+        negative_supplyn = supplyn[bothn]
+
+        positive_supplyn = positive_supplyn.mask(positive_supplyn < 0.0, 0.0)
+        negative_supplyn = negative_supplyn.mask(negative_supplyn > 0.0, 0.0)
+
+        supplyn[bothn] = positive_supplyn
+
+        supplyn = pd.concat((supplyn, negative_supplyn), axis=1)
+
+
+
+        threshold = 0.1
+
+        to_dropn = supplyn.columns[(abs(supplyn) < threshold).all()]
+
+        if len(to_dropn) != 0:
+            # logger.info(f"Dropping {to_dropn.tolist()} from supplyn")
+            supplyn.drop(columns=to_dropn, inplace=True)
+
+        supplyn.index.name = None
+
+        supplyn = supplyn / 1e3
+
+        
+        supplyn = supplyn.groupby(supplyn.columns, axis=1).sum()
+
+        
+        positive_supplyn = supplyn[supplyn >= 0].fillna(0)
+        # positive_supplyn = positive_supplyn.drop(columns=["battery storage", "power-to-gas"])
+        negative_supplyn = supplyn[supplyn < 0].fillna(0)
+        # negative_supplyn = negative_supplyn[["distribution network"]]
+        total_demand_df = pd.DataFrame({"Total Demand": negative_supplyn.sum(axis=1)}).abs()
+        total_supply_df = pd.DataFrame({"Total Supply": positive_supplyn.sum(axis=1)})
+        
+        total_demand_df = total_demand_df.loc[start:stop]
+        total_supply_df = total_supply_df.loc[start:stop]
+        
+        dispatch = total_supply_df["Total Supply"]
+        demand = total_demand_df["Total Demand"]
+        index = total_supply_df.index
+        
+        display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+         x=index, 
+         y=demand, 
+         mode='lines', 
+         name='Total Demand', 
+         line=dict(color='red',width=3)))
+
+        fig.add_trace(go.Scatter(
+         x=index, 
+         y=dispatch, 
+         mode='lines', 
+         name='Total Supply', 
+         line=dict(color='#01889f',width=3)))
+
+
+        fig.add_trace(go.Scatter(
+         x=index,
+         y=demand,
+         mode='none',
+         fill='tozeroy',
+         fillcolor='rgba(255,0,0,0.2)',
+         name='Shortfall'))
+
+
+        fig.add_trace(go.Scatter(
+         x=index,
+         y=dispatch,
+         mode='none',
+         fill='tozeroy',
+         fillcolor='rgba(0, 120, 255, 0.1)',
+         name='Surplus'))
+        
+        fig.add_trace(go.Scatter(
+         x=[None],
+         y=[None],
+         mode='lines',
+         line=dict(color='rgba(128, 0, 128, 0.4)', width=6),  # purple
+         name='Direct Match',
+         showlegend=True))
+
+
+        fig.update_layout(
+          title=title + " - " + country + ' - ' + display_label,
+          xaxis=dict(title='Time', tickformat="%m-%d"),
+          yaxis=dict(title='Power [GW]',),
+          legend_itemclick=False,
+          legend_itemdoubleclick=False,
+          width=1200, height=600,
+          # hovermode='x unified',
+          legend=dict(font=dict(size=12)))
+        
+        # if country == 'BE':
+        #   pio.write_image(fig, f"results/pdf/Power dispatch_cluster_{planning_horizon}.pdf", format='pdf')
+        # fig.add_layout_image(logo)
+            # Add the plot to the tabs
+        tab.append((f"{display_label}", fig))
+
+            # Add the tab for the planning horizon to the main Tabs
+        tabs.append((f"{display_label}", tab))
+        
+     html_filename = title + " - " + country + '.html'
+     output_folder = f'results/{study}/htmls/raw_html' # Set your desired output folder
+     os.makedirs(output_folder, exist_ok=True)
+     html_filepath = os.path.join(output_folder, html_filename)
+     tabs.save(html_filepath)
+
+def plot_series_heat(cluster, opt, sector_opt, planning_horizons,start,stop,title):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    colors = tech_colors 
+    tabs = pn.Tabs()
+
+    for country in countries:
+     tabs = pn.Tabs()
+
+     for planning_horizon in planning_horizons:
+        tab = pn.Tabs()
+        n = loaded_files[planning_horizon]
+
+        assign_locations(n)
+        assign_carriers(n)
+        carrier = 'heat'
+        busesn = n.buses.index[n.buses.carrier.str.contains(carrier)]
+
+        supplyn = pd.DataFrame(index=n.snapshots)
+
+        if country != 'EU':
+         for c in n.iterate_components(n.branch_components):
+            n_port = 4 if c.name == "Link" else 2  # port3
+            for i in range(n_port):
+                supplyn = pd.concat(
+                    (
+                        supplyn,
+                        (-1)
+                        * c.pnl["p" + str(i)]
+                        .loc[:, c.df.index[c.df["bus" + str(i)].isin(busesn)]].filter(like=country)
+                        .groupby(c.df.carrier, axis=1)
+                        .sum(),
+                    ),
+                    axis=1,
+                )
+        else:
+         for c in n.iterate_components(n.branch_components):
+            n_port = 4 if c.name == "Link" else 2  # port3
+            for i in range(n_port):
+                supplyn = pd.concat(
+                    (
+                        supplyn,
+                        (-1)
+                        * c.pnl["p" + str(i)]
+                        .loc[:, c.df.index[c.df["bus" + str(i)].isin(busesn)]]
+                        .groupby(c.df.carrier, axis=1)
+                        .sum(),
+                    ),
+                    axis=1,
+                )
+        if country != 'EU':
+         for c in n.iterate_components(n.one_port_components):
+            comps = c.df.index[c.df.bus.isin(busesn)]
+            supplyn = pd.concat(
+                (
+                    supplyn,
+                    ((c.pnl["p"].loc[:, comps]).multiply(c.df.loc[comps, "sign"])).filter(like=country)
+                    .groupby(c.df.carrier, axis=1)
+                    .sum(),
+                ),
+                axis=1,
+            )
+        else:
+         for c in n.iterate_components(n.one_port_components):
+            comps = c.df.index[c.df.bus.isin(busesn)]
+            supplyn = pd.concat(
+                (
+                    supplyn,
+                    ((c.pnl["p"].loc[:, comps]).multiply(c.df.loc[comps, "sign"]))
+                    .groupby(c.df.carrier, axis=1)
+                    .sum(),
+                ),
+                axis=1,
+            )
+        supplyn = supplyn.rename(columns={"urban central resistive heater": "centralised electric boiler"})
+        supplyn = supplyn.groupby(rename_techs_tyndp, axis=1).sum()
+
+        bothn = supplyn.columns[(supplyn < 0.0).any() & (supplyn > 0.0).any()]
+
+        positive_supplyn = supplyn[bothn]
+        negative_supplyn = supplyn[bothn]
+
+        positive_supplyn = positive_supplyn.mask(positive_supplyn < 0.0, 0.0)
+        negative_supplyn = negative_supplyn.mask(negative_supplyn > 0.0, 0.0)
+
+        supplyn[bothn] = positive_supplyn
+
+        supplyn = pd.concat((supplyn, negative_supplyn), axis=1)
+
+
+        threshold = 0.1
+
+        to_dropn = supplyn.columns[(abs(supplyn) < threshold).all()]
+
+        if len(to_dropn) != 0:
+            logger.info(f"Dropping {to_dropn.tolist()} from supplyn")
+            supplyn.drop(columns=to_dropn, inplace=True)
+
+        supplyn.index.name = None
+
+        supplyn = supplyn / 1e3
+        supplyn.rename(
+            columns={"electricity": "electric demand", "heat": "heat demand"}, inplace=True
+        )
+        supplyn.columns = supplyn.columns.str.replace("residential ", "")
+        supplyn.columns = supplyn.columns.str.replace("services ", "")
+        supplyn.columns = supplyn.columns.str.replace("urban decentral ", "decentral ")
+
+
+        supplyn = supplyn.groupby(supplyn.columns, axis=1).sum()
+        positive_supplyn = supplyn[supplyn >= 0].fillna(0)
+        negative_supplyn = supplyn[supplyn < 0].fillna(0)
+
+        positive_supplyn = positive_supplyn.loc[start:stop]
+        negative_supplyn = negative_supplyn.loc[start:stop]
+        positive_supplyn = positive_supplyn.applymap(lambda x: x if x >= 0.1 else 0)
+        negative_supplyn = negative_supplyn.applymap(lambda x: x if x <= -0.1 else 0)
+        positive_supplyn = positive_supplyn.loc[:, (positive_supplyn > 0).any()]
+        negative_supplyn = negative_supplyn.loc[:, (negative_supplyn < 0).any()]
+        
+        display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+        fig = go.Figure()
+
+        for col in positive_supplyn.columns:
+            fig.add_trace(go.Scatter(
+                x=positive_supplyn.index,
+                y=positive_supplyn[col],
+                mode='lines',
+                line=dict(color=colors.get(col, 'black')),
+                stackgroup='positive',
+                showlegend=False,
+                hovertemplate='%{y:.2f}',
+                name=col
+            ))
+
+        for col in negative_supplyn.columns:
+            fig.add_trace(go.Scatter(
+                x=negative_supplyn.index,
+                y=negative_supplyn[col],
+                mode='lines',
+                line=dict(color=colors.get(col, 'black')),
+                stackgroup='negative',
+                showlegend=False,
+                hovertemplate='%{y:.2f}',
+                name=col
+            ))
+         
+        # Collect unique column names from both positive_supplyn and negative_supplyn
+        unique_columns = set(positive_supplyn.columns).union(set(negative_supplyn.columns))
+        # Add a dummy trace for each unique column name to the legend
+        for col in unique_columns:
+            fig.add_trace(go.Scatter(
+                x=[None],
+                y=[None],
+                mode='lines',
+                line=dict(color=colors.get(col, 'black'), width=4),
+                legendgroup='supply',
+                showlegend=True,
+                name=col
+            ))
+        
+        # Update layout to customize axes, title, etc.
+        fig.update_layout(
+         xaxis=dict(title='Time', tickformat="%m-%d"),
+         yaxis=dict(title='Heat [GW]',),
+         title=title + " - " + country + ' - ' + display_label,
+         width=1200, height=600,
+         hovermode='x',)
+        # if country == 'BE':
+        #  pio.write_image(fig, f"results/pdf/Heat dispatch_{planning_horizon}.pdf", format='pdf')
+        # fig.add_layout_image(logo)
+            # Add the plot to the tabs
+        tab.append((f"{display_label}", fig))
+
+            # Add the tab for the planning horizon to the main Tabs
+        tabs.append((f"{display_label}", tab))
+
+
+        # Save the tabs as an HTML file
+     html_filename = title + " - " + country + '.html'
+     output_folder = f'results/{study}/htmls/raw_html'  # Set your desired output folder
+     os.makedirs(output_folder, exist_ok=True)
+     html_filepath = os.path.join(output_folder, html_filename)
+     tabs.save(html_filepath)
+
+def plot_map(
+    network,country,
+    components=["links", "stores", "storage_units", "generators"],
+    bus_size_factor=35e9,
+    transmission=True,
+    with_legend=True,
+):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    tech_colors["distribution network"] = tech_colors["electricity distribution grid"]
+    tech_colors["thermal energy storage"] = tech_colors["hot water storage"]
+    tech_colors["H2 storage"] = tech_colors["H2"]
+    tech_colors["CCUS"] = tech_colors["CCS"]
+    tech_colors["CCU"] = tech_colors["CCS"]
+    n = network.copy()
+    assign_locations(n)
+    # Drop non-electric buses so they don't clutter the plot
+    n.buses.drop(n.buses.index[n.buses.carrier != "AC"], inplace=True)
+
+    costs = pd.DataFrame(index=n.buses.index)
+
+    for comp in components:
+        df_c = getattr(n, comp)
+
+        if df_c.empty:
+            continue
+
+        df_c["nice_group"] = df_c.carrier.map(rename_techs_tyndp)
+        df_c.loc[df_c["nice_group"] == "Fossil Fuels", "nice_group"] = "Oil & Gas Storage"
+
+        attr = "e_nom_opt" if comp == "stores" else "p_nom_opt"
+
+        costs_c = (
+            (df_c.capital_cost * df_c[attr])
+            .groupby([df_c.location, df_c.nice_group])
+            .sum()
+            .unstack()
+            .fillna(0.0)
+        )
+        costs = pd.concat([costs, costs_c], axis=1)
+
+        logger.debug(f"{comp}, {costs}")
+
+    costs = costs.T.groupby(costs.columns).sum().T
+
+    costs.drop(list(costs.columns[(costs == 0.0).all()]), axis=1, inplace=True)
+
+    new_columns = preferred_order.intersection(costs.columns).append(
+        costs.columns.difference(preferred_order)
+    )
+    costs = costs[new_columns]
+
+    for item in new_columns:
+        if item not in tech_colors:
+            logger.warning(f"{item} not in config/plotting/tech_colors")
+
+    costs = costs.stack()  # .sort_index()
+
+    n.links.drop(
+        n.links.index[(n.links.carrier != "DC") & (n.links.carrier != "B2B")],
+        inplace=True,
+    )
+
+    # drop non-bus
+    to_drop = costs.index.levels[0].symmetric_difference(n.buses.index)
+    if len(to_drop) != 0:
+        logger.info(f"Dropping non-buses {to_drop.tolist()}")
+        costs.drop(to_drop, level=0, inplace=True, axis=0, errors="ignore")
+
+    # make sure they are removed from index
+    costs.index = pd.MultiIndex.from_tuples(costs.index.values)
+    combined_costs = costs.groupby(costs.index).sum()
+    multi_index = pd.MultiIndex.from_tuples(combined_costs.index)
+    combined_costs.index = multi_index
+    combined_costs = combined_costs.groupby(level=0).sum()/1e9
+    threshold = 100e6  # 100 mEUR/a
+    carriers = costs.groupby(level=1).sum()
+    carriers = carriers.where(carriers > threshold).dropna()
+    carriers = list(carriers.index)
+
+    # PDF has minimum width, so set these to zero
+    line_lower_threshold = 500.0
+    line_upper_threshold = 1e4
+    linewidth_factor = 1e3
+    # ac_color = "#FF3030"
+    # dc_color = "#104E8B"
+    ac_color = "#9a0200"
+    dc_color = "#11875d"
+
+    title = "added grid"
+    ll = 'lvopt'
+    if ll == "v1.0":
+        # should be zero
+        line_widths = n.lines.s_nom_opt - n.lines.s_nom
+        link_widths = n.links.p_nom_opt - n.links.p_nom
+        if transmission:
+            line_widths = n.lines.s_nom_opt
+            link_widths = n.links.p_nom_opt
+            linewidth_factor = 1e3
+            line_lower_threshold = 0.0
+            title = "current grid"
+    else:
+        line_widths = n.lines.s_nom_opt - n.lines.s_nom_min
+        link_widths = n.links.p_nom_opt - n.links.p_nom_min
+        if transmission:
+            line_widths = n.lines.s_nom_opt
+            link_widths = n.links.p_nom_opt
+            title = "total grid capacity"
+
+    line_widths = line_widths.clip(line_lower_threshold, line_upper_threshold)
+    link_widths = link_widths.clip(line_lower_threshold, line_upper_threshold)
+
+    line_widths = line_widths.replace(line_lower_threshold, 0)
+    link_widths = link_widths.replace(line_lower_threshold, 0)
+    
+    value_dict = {
+        'BEWAL': 136,
+        'BEBRU': 102,
+        'BEVLG': 357,
+        'LU': 82,
+        'DE': 3985,
+        'FR': 2688,
+        'GB': 2977,
+        'NL': 1016}
+    new_values = [value_dict.get(idx, 0) for idx in combined_costs.index]
+    gdp_costs = pd.Series(new_values, index=combined_costs.index)
+    gdp_ratio = (combined_costs / (gdp_costs)) * 100
+    
+    regions = gpd.read_file(f"resources/{study}/regions_onshore_base_s_{cluster}.geojson").set_index("name")
+    regions['GDP'] = regions.index.map(gdp_ratio)
+    regions = regions.to_crs(ccrs.EqualEarth())
+    
+    fig, ax = plt.subplots(figsize=(15, 15), subplot_kw={"projection": proj})
+    # eu_location = config["plotting"].get("eu_node_location", dict(x=-50, y=46))
+    # n.buses.loc["EU gas", "x"] = eu_location["x"]
+    # n.buses.loc["EU gas", "y"] = eu_location["y"]
+    
+    n.plot(
+        bus_sizes=costs / bus_size_factor,
+        bus_colors=tech_colors,
+        line_colors=ac_color,
+        link_colors=dc_color,
+        line_widths=line_widths / linewidth_factor,
+        link_widths=link_widths / linewidth_factor,
+        ax=ax,
+        **map_opts,
+    )
+    regions.plot(
+           ax=ax,
+           column="GDP",
+           cmap="Greys",
+           linewidths=0,
+           legend=False,
+           vmax=6,
+           vmin=0,
+           legend_kwds={
+               "label": "GDP Percentage / year",
+               "shrink": 0.6,
+               # "extend": "max",
+           },
+       )
+
+    sizes = [20, 10, 5]
+    labels = [f"{s} bEUR/year" for s in sizes]
+    sizes = [s / bus_size_factor * 1e9 for s in sizes]
+
+    legend_kw = dict(
+        loc="upper left",
+        bbox_to_anchor=(0.001, 0.98),
+        labelspacing=1,
+        frameon=False,
+        handletextpad=1,
+        fontsize=15,
+        title="Annualised Investment Costs",
+    )
+
+    add_legend_circles(
+        ax,
+        sizes,
+        labels,
+        srid=n.srid,
+        patch_kw=dict(facecolor="black"),
+        legend_kw=legend_kw,
+    )
+
+    sizes = [10, 5, 1]
+    labels = [f"{s} GW" for s in sizes]
+    scale = 1e3 / linewidth_factor
+    sizes = [s * scale for s in sizes]
+    # if planning_horizons == 2020:
+    #     value = "current grid"
+    # else:
+    #     value = "total grid capacity"
+    legend_kw = dict(
+        loc="upper left",
+        bbox_to_anchor=(0.45, 0.98),
+        frameon=False,
+        labelspacing=1,
+        handletextpad=1,
+        fontsize=15,
+        title=title,
+    )
+
+    add_legend_lines(
+        ax, sizes, labels, patch_kw=dict(color="black"), legend_kw=legend_kw
+    )
+
+    legend_kw = dict(
+        bbox_to_anchor=(1.35, 1),
+        frameon=False,
+        fontsize=15
+    )
+
+    # if with_legend:
+    #     colors = [tech_colors[c] for c in carriers] + [ac_color, dc_color]
+    #     labels = carriers + ["HVAC line", "HVDC line"]
+
+    #     add_legend_patches(
+    #         ax,
+    #         colors,
+    #         labels,
+    #         legend_kw=legend_kw,
+    #     )
+    sm = plt.cm.ScalarMappable(cmap="Greys", norm=plt.Normalize(vmin=0, vmax=6))
+    sm._A = []
+    cbar = fig.colorbar(sm, ax=ax, orientation="vertical", shrink=0.5, pad=0)
+    cbar.set_label(r"Cost [% GDP$_{2023}$ / year]", fontsize=15)
+    legend_kw = dict(
+          bbox_to_anchor=(1, 1),
+          frameon=False,
+          fontsize=15,
+      )
+    cbar.ax.tick_params(labelsize=15)
+    colors = [tech_colors[c] for c in carriers] + [ac_color, dc_color]
+    labels = carriers + ['AC line', 'DC line']
+    legend_handles = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=15) for color in colors
+    ]
+    fig.legend(
+        legend_handles,
+        labels,
+        # loc="lower center",            # Position the legend at the bottom center of the figure
+        bbox_to_anchor=(0.9, 0.25),    # Centered horizontally and placed below the figure
+        ncol=4,                        # Number of columns in the legend
+        frameon=False,                 # No frame around the legend
+        fontsize=15,
+    )
+    # fig.tight_layout()
+    # logo = snakemake.input.logo
+    # img = plt.imread(logo)
+    # imagebox = OffsetImage(img, zoom=0.25)
+    # ab = AnnotationBbox(imagebox, xy=(0.5, 1.05), xycoords='axes fraction', boxcoords="axes fraction", frameon=False)
+    # ax.add_artist(ab)
+    return fig
+
+def create_map_plots(planning_horizons, country):
+    
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+    /* ... (existing styles) ... */
+    </style>
+    </head>
+    <body>
+    <div class="tab">
+    """
+    for i, planning_horizon in enumerate(planning_horizons):
+        # Load network for the current planning horizon
+         display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+         n = loaded_files[planning_horizon]
+
+        # Plot the map and get the figure
+         fig = plot_map(
+             n,country,
+             components=["generators", "links", "stores", "storage_units"],
+             bus_size_factor=35e9,
+             transmission=True,
+         )
+         plt.rcParams['legend.title_fontsize'] = '20'
+         
+        # Save the map plot as an image
+         output_image_path = f"results/{study}/htmls/raw_html/map_plot_{planning_horizon}_{country}.png"
+         fig.savefig(output_image_path)
+         plt.close(fig)  # Close the figure to avoid displaying it in the notebook
+
+        # Encode the image as base64
+         with open(output_image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+        # Add tab content for each planning horizon with embedded image data
+         html_content += f"""
+        <button class="map-tablinks{' active' if i == 0 else ''}" onclick="openMapTab(event, 'map_{planning_horizon}_{i + 1}')">{display_label}</button>
+        """
+
+    html_content += """
+    </div>
+    """
+
+    for i, planning_horizon in enumerate(planning_horizons):
+         display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+        # Load network for the current planning horizon
+         n = loaded_files[planning_horizon]
+         fig = plot_map(
+             n,country,
+             components=["generators", "links", "stores", "storage_units"],
+             bus_size_factor=35e9,
+             transmission=True,
+         )
+         plt.rcParams['legend.title_fontsize'] = '20'
+        # Save the map plot as an image
+         # if country == 'BE':
+         #  fig.savefig(f"results/pdf/Maps_{planning_horizon}.pdf", bbox_inches="tight")
+         output_image_path = f"results/{study}/htmls/raw_html/map_plot_{planning_horizon}_{country}.png"
+         fig.savefig(output_image_path)
+         plt.close(fig)  # Close the figure to avoid displaying it in the notebook
+
+        # Encode the image as base64
+         with open(output_image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+        # Add tab content for each planning horizon with embedded image data
+         html_content += f"""
+        <div id="map_{planning_horizon}_{i + 1}" class="map-tabcontent" style="display: {'block' if i == 0 else 'none'};">
+            <h2>Map Plot - {display_label}</h2>
+            <img src="data:image/png;base64,{encoded_image}" alt="Map Plot" width="1200" height="800">
+        </div>
+        """
+
+
+    # Add JavaScript for tab functionality
+    html_content += """
+    <script>
+    function openMapTab(evt, tabName) {
+      var i, tabcontent, tablinks;
+      tabcontent = document.getElementsByClassName("map-tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      tablinks = document.getElementsByClassName("map-tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+    </script>
+    </body>
+    </html>
+    """
+
+    # Save the entire HTML content to a single file
+    
+    output_combined_html_path = f"results/{study}/htmls/raw_html/map_plots_{country}.html"
+    with open(output_combined_html_path, "w") as html_file:
+        html_file.write(html_content)
+def group_pipes(df, drop_direction=False):
+    """
+    Group pipes which connect same buses and return overall capacity.
+    """
+    df = df.copy()
+    if drop_direction:
+        positive_order = df.bus0 < df.bus1
+        df_p = df[positive_order]
+        swap_buses = {"bus0": "bus1", "bus1": "bus0"}
+        df_n = df[~positive_order].rename(columns=swap_buses)
+        df = pd.concat([df_p, df_n])
+
+    # there are pipes for each investment period rename to AC buses name for plotting
+    df["index_orig"] = df.index
+    df.index = df.apply(
+        lambda x: f"H2 pipeline {x.bus0.replace(' H2', '')} -> {x.bus1.replace(' H2', '')}",
+        axis=1,
+    )
+    return df.groupby(level=0).agg(
+        {"p_nom_opt": "sum", "bus0": "first", "bus1": "first", "index_orig": "first"}
+    )
+
+
+def plot_h2_map(network):
+    # if "H2 pipeline" not in n.links.carrier.unique():
+    #     return
+    n = network.copy()
+    assign_locations(n)
+    h2_storage = n.stores.query("carrier == 'H2'")
+    regions = gpd.read_file(f"resources/{study}/regions_onshore_base_s_{cluster}.geojson").set_index("name")
+    regions["H2"] = (
+        h2_storage.rename(index=h2_storage.bus.map(n.buses.location))
+        .e_nom_opt.groupby(level=0)
+        .sum()
+        .div(1e6)
+    )  # TWh
+    regions["H2"] = regions["H2"].where(regions["H2"] > 0.1)
+
+    bus_size_factor = 1e5
+    linewidth_factor = 7e3
+    # MW below which not drawn
+    line_lower_threshold = 750
+
+    # Drop non-electric buses so they don't clutter the plot
+    n.buses.drop(n.buses.index[n.buses.carrier != "AC"], inplace=True)
+
+    carriers = ["H2 Electrolysis"]
+
+    elec = n.links[n.links.carrier.isin(carriers)].index
+
+    bus_sizes = (
+        n.links.loc[elec, "p_nom_opt"].groupby([n.links["bus0"], n.links.carrier]).sum()
+        / bus_size_factor
+    )
+
+    # make a fake MultiIndex so that area is correct for legend
+    bus_sizes.rename(index=lambda x: x.replace(" H2", ""), level=0, inplace=True)
+    # drop all links which are not H2 pipelines
+    n.links.drop(
+        n.links.index[~n.links.carrier.str.contains("H2 pipeline")], inplace=True
+    )
+
+    h2_new = n.links[n.links.carrier == "H2 pipeline"]
+    h2_retro = n.links[n.links.carrier == "H2 pipeline retrofitted"]
+
+    if snakemake.params.foresight == "myopic":
+        # sum capacitiy for pipelines from different investment periods
+        h2_new = group_pipes(h2_new)
+
+        if not h2_retro.empty:
+            h2_retro = (
+                group_pipes(h2_retro, drop_direction=True)
+                .reindex(h2_new.index)
+                .fillna(0)
+            )
+
+    if not h2_retro.empty:
+        if snakemake.params.foresight != "myopic":
+            positive_order = h2_retro.bus0 < h2_retro.bus1
+            h2_retro_p = h2_retro[positive_order]
+            swap_buses = {"bus0": "bus1", "bus1": "bus0"}
+            h2_retro_n = h2_retro[~positive_order].rename(columns=swap_buses)
+            h2_retro = pd.concat([h2_retro_p, h2_retro_n])
+
+            h2_retro["index_orig"] = h2_retro.index
+            h2_retro.index = h2_retro.apply(
+                lambda x: f"H2 pipeline {x.bus0.replace(' H2', '')} -> {x.bus1.replace(' H2', '')}",
+                axis=1,
+            )
+
+        retro_w_new_i = h2_retro.index.intersection(h2_new.index)
+        h2_retro_w_new = h2_retro.loc[retro_w_new_i]
+
+        retro_wo_new_i = h2_retro.index.difference(h2_new.index)
+        h2_retro_wo_new = h2_retro.loc[retro_wo_new_i]
+        h2_retro_wo_new.index = h2_retro_wo_new.index_orig
+
+        to_concat = [h2_new, h2_retro_w_new, h2_retro_wo_new]
+        h2_total = pd.concat(to_concat).p_nom_opt.groupby(level=0).sum()
+
+    else:
+        h2_total = h2_new.p_nom_opt
+
+    link_widths_total = h2_total / linewidth_factor
+
+    n.links.rename(index=lambda x: x.split("-2")[0], inplace=True)
+    n.links = n.links.groupby(level=0).first()
+    link_widths_total = link_widths_total.reindex(n.links.index).fillna(0.0)
+    link_widths_total[n.links.p_nom_opt < line_lower_threshold] = 0.0
+
+    retro = n.links.p_nom_opt.where(
+        n.links.carrier == "H2 pipeline retrofitted", other=0.0
+    )
+    link_widths_retro = retro / linewidth_factor
+    link_widths_retro[n.links.p_nom_opt < line_lower_threshold] = 0.0
+
+    n.links.bus0 = n.links.bus0.str.replace(" H2", "")
+    n.links.bus1 = n.links.bus1.str.replace(" H2", "")
+    regions = regions.to_crs(proj.proj4_init)
+
+    fig, ax = plt.subplots(figsize=(15, 15), subplot_kw={"projection": proj})
+
+    color_h2_pipe = "#b3f3f4"
+    color_retrofit = "#499a9c"
+    bus_colors = {"H2 Electrolysis": "#ff29d9"}
+    n.plot(
+        geomap=True,
+        bus_sizes=bus_sizes,
+        bus_colors=bus_colors,
+        link_colors=color_h2_pipe,
+        link_widths=link_widths_total,
+        branch_components=["Link"],
+        ax=ax,
+        **map_opts,
+    )
+
+    n.plot(
+        geomap=True,
+        bus_sizes=0,
+        link_colors=color_retrofit,
+        link_widths=link_widths_retro,
+        branch_components=["Link"],
+        ax=ax,
+        **map_opts,
+    )
+
+    regions.plot(
+        ax=ax,
+        column="H2",
+        cmap="Blues",
+        linewidths=0,
+        legend=True,
+        vmax=6,
+        vmin=0,
+        legend_kwds={
+            "label": "Hydrogen Storage [TWh]",
+            "shrink": 0.7,
+            "extend": "max",
+        },
+    )
+
+    sizes = [50, 10]
+    labels = [f"{s} GW" for s in sizes]
+    sizes = [s / bus_size_factor * 1e3 for s in sizes]
+
+    legend_kw = dict(
+        loc="upper left",
+        bbox_to_anchor=(0.05, 1),
+        labelspacing=1.2,
+        handletextpad=0,
+        frameon=False,
+        fontsize=15,
+    )
+
+    add_legend_circles(
+        ax,
+        sizes,
+        labels,
+        srid=n.srid,
+        patch_kw=dict(facecolor="black"),
+        legend_kw=legend_kw,
+    )
+
+    sizes = [30, 10]
+    labels = [f"{s} GW" for s in sizes]
+    scale = 1e3 / linewidth_factor
+    sizes = [s * scale for s in sizes]
+
+    legend_kw = dict(
+        loc="upper left",
+        bbox_to_anchor=(0.05, 0.9),
+        frameon=False,
+        labelspacing=0.8,
+        handletextpad=1,
+        fontsize=15,
+    )
+
+    add_legend_lines(
+        ax,
+        sizes,
+        labels,
+        patch_kw=dict(color="black"),
+        legend_kw=legend_kw,
+    )
+
+    colors = [bus_colors[c] for c in carriers] + [color_h2_pipe, color_retrofit]
+    labels = carriers + ["H2 pipeline (total)", "H2 pipeline (repurposed)"]
+
+    legend_kw = dict(
+        loc="upper left",
+        bbox_to_anchor=(0.2, 1),
+        ncol=1,
+        frameon=False,
+        fontsize=15,
+    )
+
+    add_legend_patches(ax, colors, labels, legend_kw=legend_kw)
+
+
+    ax.set_facecolor("white")
+    # logo = snakemake.input.logo
+    # img = plt.imread(logo)
+    # imagebox = OffsetImage(img, zoom=0.25)
+    # ab = AnnotationBbox(imagebox, xy=(0.5, 1.05), xycoords='axes fraction', boxcoords="axes fraction", frameon=False)
+    # ax.add_artist(ab)
+    return fig
+
+def plot_ch4_map(network):
+    # if "gas pipeline" not in n.links.carrier.unique():
+    #     return
+    n = network.copy()
+    assign_locations(n)
+
+    bus_size_factor = 10e8
+    linewidth_factor = 0.5e4
+    # MW below which not drawn
+    line_lower_threshold = 1e3
+
+    # Drop non-electric buses so they don't clutter the plot
+    n.buses.drop(n.buses.index[n.buses.carrier != "AC"], inplace=True)
+
+    fossil_gas_i = n.generators[n.generators.carrier == "gas"].index
+    fossil_gas = (
+        n.generators_t.p.loc[:, fossil_gas_i]
+        .mul(n.snapshot_weightings.generators, axis=0)
+        .sum()
+        .groupby(n.generators.loc[fossil_gas_i, "bus"])
+        .sum()
+        / bus_size_factor
+    )
+    
+    fossil_gas.rename(index=lambda x: x.replace(" gas", ""), inplace=True)
+    fossil_gas = fossil_gas.reindex(n.buses.index).fillna(0)
+    # make a fake MultiIndex so that area is correct for legend
+    fossil_gas.index = pd.MultiIndex.from_product([fossil_gas.index, ["fossil gas"]])
+
+    methanation_i = n.links.query("carrier == 'Sabatier'").index
+    methanation = (
+        abs(
+            n.links_t.p1.loc[:, methanation_i].mul(
+                n.snapshot_weightings.generators, axis=0
+            )
+        )
+        .sum()
+        .groupby(n.links.loc[methanation_i, "bus1"])
+        .sum()
+        / bus_size_factor
+    )
+    methanation = (
+        methanation.groupby(methanation.index)
+        .sum()
+        .rename(index=lambda x: x.replace(" gas", ""))
+    )
+    # make a fake MultiIndex so that area is correct for legend
+    methanation.index = pd.MultiIndex.from_product([methanation.index, ["methanation"]])
+
+    biogas_i = n.generators[n.generators.carrier == "biogas"].index
+    biogas = (
+        n.generators_t.p.loc[:, biogas_i]
+        .mul(n.snapshot_weightings.generators, axis=0)
+        .sum()
+        .groupby(n.generators.loc[biogas_i, "bus"])
+        .sum()
+        / bus_size_factor
+    )
+    biogas = (
+        biogas.groupby(biogas.index)
+        .sum()
+        .rename(index=lambda x: x.replace(" biogas", ""))
+    )
+    # make a fake MultiIndex so that area is correct for legend
+    biogas.index = pd.MultiIndex.from_product([biogas.index, ["biogas"]])
+
+    bus_sizes = pd.concat([fossil_gas, methanation, biogas])
+    bus_sizes.sort_index(inplace=True)
+
+    to_remove = n.links.index[~n.links.carrier.str.contains("gas pipeline")]
+    n.links.drop(to_remove, inplace=True)
+
+    link_widths_rem = n.links.p_nom_opt / linewidth_factor
+    link_widths_rem[n.links.p_nom_opt < line_lower_threshold] = 0.0
+
+    link_widths_orig = n.links.p_nom / linewidth_factor
+    link_widths_orig[n.links.p_nom < line_lower_threshold] = 0.0
+
+    max_usage = n.links_t.p0[n.links.index].abs().max(axis=0)
+    link_widths_used = max_usage / linewidth_factor
+    link_widths_used[max_usage < line_lower_threshold] = 0.0
+
+    tech_colors = snakemake.params.plotting["tech_colors"]
+
+    pipe_colors = {
+        "gas pipeline": "#f08080",
+        "gas pipeline new": "#c46868",
+        "gas pipeline (in 2020)": "lightgrey",
+        "gas pipeline (available)": "#e8d1d1",
+    }
+
+    link_color_used = n.links.carrier.map(pipe_colors)
+
+    n.links.bus0 = n.links.bus0.str.replace(" gas", "")
+    n.links.bus1 = n.links.bus1.str.replace(" gas", "")
+
+    bus_colors = {
+        "fossil gas": tech_colors["fossil gas"],
+        "methanation": tech_colors["methanation"],
+        "biogas": "seagreen",
+    }
+
+    fig, ax = plt.subplots(figsize=(15, 15), subplot_kw={"projection": proj})
+    # eu_location = config["plotting"].get("eu_node_location", dict(x=-50, y=46))
+    # n.buses.loc["EU gas", "x"] = eu_location["x"]
+    # n.buses.loc["EU gas", "y"] = eu_location["y"]
+    n.plot(
+        bus_sizes=bus_sizes,
+        bus_colors=bus_colors,
+        link_colors=pipe_colors["gas pipeline (in 2020)"],
+        link_widths=link_widths_orig,
+        branch_components=["Link"],
+        ax=ax,
+        **map_opts,
+    )
+
+    n.plot(
+        ax=ax,
+        bus_sizes=0.0,
+        link_colors=pipe_colors["gas pipeline (available)"],
+        link_widths=link_widths_rem,
+        branch_components=["Link"],
+        # color_geomap=False,
+        boundaries=map_opts["boundaries"],
+    )
+
+    n.plot(
+        ax=ax,
+        bus_sizes=0.0,
+        link_colors=link_color_used,
+        link_widths=link_widths_used,
+        branch_components=["Link"],
+        # color_geomap=False,
+        boundaries=map_opts["boundaries"],
+    )
+
+    sizes = [100, 10]
+    labels = [f"{s} TWh" for s in sizes]
+    sizes = [s / bus_size_factor * 1e6 for s in sizes]
+
+    legend_kw = dict(
+        loc="upper left",
+        bbox_to_anchor=(0, 1.03),
+        labelspacing=0.8,
+        frameon=False,
+        handletextpad=1,
+        title="gas sources",
+    )
+
+    add_legend_circles(
+        ax,
+        sizes,
+        labels,
+        srid=n.srid,
+        patch_kw=dict(facecolor="lightgrey"),
+        legend_kw=legend_kw,
+    )
+
+    sizes = [50, 10]
+    labels = [f"{s} GW" for s in sizes]
+    scale = 1e3 / linewidth_factor
+    sizes = [s * scale for s in sizes]
+
+    legend_kw = dict(
+        loc="upper left",
+        bbox_to_anchor=(0.25, 1.03),
+        frameon=False,
+        labelspacing=0.8,
+        handletextpad=1,
+        title="gas pipeline",
+    )
+
+    add_legend_lines(
+        ax,
+        sizes,
+        labels,
+        patch_kw=dict(color="lightgrey"),
+        legend_kw=legend_kw,
+    )
+
+    colors = list(pipe_colors.values()) + list(bus_colors.values())
+    labels = list(pipe_colors.keys()) + list(bus_colors.keys())
+
+    # legend on the side
+    # legend_kw = dict(
+    #     bbox_to_anchor=(1.47, 1.04),
+    #     frameon=False,
+    # )
+
+    legend_kw = dict(
+        loc="upper left",
+        bbox_to_anchor=(0, 1.24),
+        ncol=2,
+        frameon=False,
+    )
+
+    add_legend_patches(
+        ax,
+        colors,
+        labels,
+        legend_kw=legend_kw,
+    )
+    # logo = snakemake.input.logo
+    # img = plt.imread(logo)
+    # imagebox = OffsetImage(img, zoom=0.25)
+    # ab = AnnotationBbox(imagebox, xy=(0.5, 1.05), xycoords='axes fraction', boxcoords="axes fraction", frameon=False)
+    # ax.add_artist(ab)
+    return fig
+
+
+
+def create_H2_map_plots(planning_horizons):
+    
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+    /* ... (existing styles) ... */
+    </style>
+    </head>
+    <body>
+    <div class="tab">
+    """
+    planning_horizons = [2020,2030, 2040, 2050]
+    for i, planning_horizon in enumerate(planning_horizons):
+        display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+        # Load network for the current planning horizon
+        n = loaded_files[planning_horizon]
+
+        # Plot the H2 map and get the figure
+        fig = plot_h2_map(network=n)
+        plt.rcParams['legend.title_fontsize'] = '20'
+        
+        # Save the H2 map plot as an image
+        output_image_path = f"results/{study}/htmls/raw_html/map_h2_plot_{planning_horizon}.png"
+        fig.savefig(output_image_path, bbox_inches="tight")
+        plt.close(fig)  # Close the figure to avoid displaying it in the notebook
+
+        # Encode the image as base64
+        with open(output_image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+        # Add tab content for each planning horizon with embedded image data
+        html_content += f"""
+       <button class="h2-tablinks{' active' if i == 0 else ''}" onclick="openH2Tab(event, 'h2_{planning_horizon}_{i + 1}')">{display_label}</button>
+       """
+
+    html_content += """
+    </div>
+    """
+
+    for i, planning_horizon in enumerate(planning_horizons):
+        # Load network for the current planning horizon
+        display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+        n = loaded_files[planning_horizon]
+        fig = plot_h2_map(network=n)
+        plt.rcParams['legend.title_fontsize'] = '20'
+
+        # fig.savefig(f"results/pdf/H2_maps_{planning_horizon}.pdf", bbox_inches="tight")
+        # Save the H2 map plot as an image
+        output_image_path = f"results/{study}/htmls/raw_html/map_h2_plot_{planning_horizon}.png"
+        fig.savefig(output_image_path, bbox_inches="tight")
+        plt.close(fig)  # Close the figure to avoid displaying it in the notebook
+
+        # Encode the image as base64
+        with open(output_image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+        html_content += f"""
+        <div id="h2_{planning_horizon}_{i + 1}" class="h2-tabcontent" style="display: {'block' if i == 0 else 'none'};">
+            <h2>H2 Map Plot - {display_label}</h2>
+            <img src="data:image/png;base64,{encoded_image}" alt="H2 Map Plot" width="1200" height="800">
+        </div>
+        """
+    html_content += """
+    <script>
+    function openH2Tab(evt, tabName) {
+      var i, tabcontent, tablinks;
+      tabcontent = document.getElementsByClassName("h2-tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      tablinks = document.getElementsByClassName("h2-tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+    </script>
+    </body>
+    </html>
+    """
+
+    # Save the entire HTML content to a single file
+    output_combined_html_path = f"results/{study}/htmls/raw_html/map_h2_plots.html"
+    with open(output_combined_html_path, "w") as html_file:
+        html_file.write(html_content)
+
+def create_gas_map_plots(planning_horizons):
+   
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+    /* ... (existing styles) ... */
+    </style>
+    </head>
+    <body>
+    <div class="tab">
+    """
+    for i, planning_horizon in enumerate(planning_horizons):
+        # Load network for the current planning horizon
+        display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+        n = loaded_files[planning_horizon]
+
+        # Plot the H2 map and get the figure
+        fig = plot_ch4_map(network=n)
+        plt.rcParams['legend.title_fontsize'] = '20'
+        # Save the H2 map plot as an image
+        output_image_path = f"results/{study}/htmls/raw_html/map_ch4_plot_{planning_horizon}.png"
+        fig.savefig(output_image_path, bbox_inches="tight")
+        plt.close(fig)  # Close the figure to avoid displaying it in the notebook
+
+        # Encode the image as base64
+        with open(output_image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+        # Add tab content for each planning horizon with embedded image data
+        html_content += f"""
+        <button class="gas-tablinks{' active' if i == 0 else ''}" onclick="openGasTab(event, 'gas_{planning_horizon}_{i + 1}')">{display_label}</button>
+        """
+
+    html_content += """
+    </div>
+    """
+    
+    for i, planning_horizon in enumerate(planning_horizons):
+        # Load network for the current planning horizon
+        display_label = "2025" if str(planning_horizon) == "2020" else str(planning_horizon)
+        n = loaded_files[planning_horizon]
+        fig = plot_ch4_map(network=n)
+        plt.rcParams['legend.title_fontsize'] = '20'
+    
+        # fig.savefig(f"results/pdf/gas_maps_{planning_horizon}.pdf", bbox_inches="tight")
+        # Save the H2 map plot as an image
+        output_image_path = f"results/{study}/htmls/raw_html/map_ch4_plot_{planning_horizon}.png"
+        fig.savefig(output_image_path, bbox_inches="tight")
+        plt.close(fig)  # Close the figure to avoid displaying it in the notebook
+
+        # Encode the image as base64
+        with open(output_image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+        # Add tab content for each planning horizon with embedded image data
+        html_content += f"""
+        <div id="gas_{planning_horizon}_{i + 1}" class="gas-tabcontent" style="display: {'block' if i == 0 else 'none'};">
+            <h2>Gas Map Plot - {display_label}</h2>
+            <img src="data:image/png;base64,{encoded_image}" alt="Gas Map Plot" width="1200" height="800">
+        </div>
+        """
+
+    # Add JavaScript for tab functionality
+    html_content += """
+    <script>
+    function openGasTab(evt, tabName) {
+      var i, tabcontent, tablinks;
+      tabcontent = document.getElementsByClassName("gas-tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+      tablinks = document.getElementsByClassName("gas-tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+    </script>
+    </body>
+    </html>
+    """
+
+    # Save the entire HTML content to a single file
+    output_combined_html_path = f"results/{study}/htmls/raw_html/map_ch4_plots.html"
+    with open(output_combined_html_path, "w") as html_file:
+        html_file.write(html_content)
+        
+# def create_bar_chart(costs, country,  unit='Euros/year'):
+#     tech_colors = config["plotting"]["tech_colors"]
+#     colors = config["plotting"]["tech_colors"]
+#     colors["AC Transmission"] = "#FF3030"
+#     colors["DC Transmission"] = "#104E8B"
+
+#     title = f"{country} - Total Annual Costs"
+#     df = costs[country]
+#     df = df.rename_axis(unit)
+#     df = df.reset_index()
+#     df.index = df.index.astype(str)
+
+#     # Create a bar chart using Plotly
+#     fig = go.Figure()
+#     df_transposed = df.set_index(unit).T
+
+#     for tech in df_transposed.columns:
+#         fig.add_trace(go.Bar(x=df_transposed.index, y=df_transposed[tech], name=tech, marker_color=tech_colors.get(tech, 'lightgrey'),width=0.62))
+#     fig.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name='Euro reference value = 2020', marker=dict(color='rgba(0,0,0,0)')))
+#     # Configure layout and labels
+#     fig.update_layout(height=900, width=1000,title=title, barmode='stack', yaxis=dict(title=unit,title_font=dict(size=15),tickfont=dict(size=15)),xaxis=dict(tickfont=dict(size=15)),legend=dict(font=dict(size=15)))
+#     fig.update_layout(hovermode='y')
+#     if country == 'BE':
+#      pio.write_image(fig, "results/pdf/Annual Costs.pdf", format='pdf')
+#     # fig.add_layout_image(logo)
+#     # Save the HTML file for each country
+#     # output_file_path = os.path.join(output_folder, f"{country}_bar_chart.html")
+#     # fig.write_html(output_file_path)
+
+#     return fig
+def create_bar_chart(costs, country, unit='Euros/year'):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    tech_colors["AC Transmission"] = "#FF3030"
+    tech_colors["DC Transmission"] = "#104E8B"
+
+    title = f"{country} - Total Annual Costs"
+    df = costs[country]
+    df = df.rename_axis(unit)
+    df = df.reset_index()
+    df.index = df.index.astype(str)
+
+    fig = go.Figure()
+    df_transposed = df.set_index(unit).T
+
+    for tech in df_transposed.columns:
+        y = df_transposed[tech]
+        color = tech_colors.get(tech, 'lightgrey')
+
+        # Positive values
+        fig.add_trace(go.Bar(
+            x=df_transposed.index,
+            y=y.where(y > 0, 0),
+            name=tech,
+            marker_color=color,
+            width=0.62
+        ))
+
+        # Negative values (plotted separately, but still under the same name)
+        fig.add_trace(go.Bar(
+            x=df_transposed.index,
+            y=y.where(y < 0, 0),
+            name=tech,
+            marker_color=color,
+            width=0.62,
+            showlegend=False  # avoid duplicate legend
+        ))
+
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None],
+        mode='markers',
+        name='Euro reference value = 2020',
+        marker=dict(color='rgba(0,0,0,0)')
+    ))
+    years = df_transposed.index.tolist()
+    ticktext = ["2025" if str(y) == "2020" else str(y) for y in years]
+    fig.update_layout(
+        height=900, width=1000,
+        title=title,
+        barmode='relative',  # important for splitting positive and negative
+        yaxis=dict(title=unit, title_font=dict(size=15), tickfont=dict(size=15)),
+        xaxis=dict(tickfont=dict(size=15),tickvals=years,
+        ticktext=ticktext),
+        legend=dict(font=dict(size=15)),
+        hovermode='y'
+    )
+
+    # if country == 'BE':
+    #     pio.write_image(fig, "results/pdf/Annual Costs.pdf", format='pdf')
+
+    return fig
+
+
+def create_investment_costs(investment_costs, country,  unit='Euros/year'):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    colors = config["plotting"]["tech_colors"]
+    tech_colors["AC Transmission"] = "#FF3030"
+    tech_colors["DC Transmission"] = "#104E8B"
+    # tech_colors["Biogas Plants"] = tech_colors["Biomass"]
+
+    title = f"{country} - Investment Costs"
+    df = investment_costs[country]
+    df = df.rename_axis(unit)
+    df = df.reset_index()
+    df.index = df.index.astype(str)
+
+    # Create a bar chart using Plotly
+    fig = go.Figure()
+    df_transposed = df.set_index(unit).T
+
+    for tech in df_transposed.columns:
+        fig.add_trace(go.Bar(x=df_transposed.index, y=df_transposed[tech], name=tech, marker_color=tech_colors.get(tech, 'lightgrey'),width=0.62))
+    years = df_transposed.index.tolist()
+    ticktext = ["2025" if str(y) == "2020" else str(y) for y in years]
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name='Euro reference value = 2020', marker=dict(color='rgba(0,0,0,0)')))
+    # Configure layout and labels
+    fig.update_layout(height=900, width=1000,title=title, barmode='stack', yaxis=dict(title=unit,title_font=dict(size=15),tickfont=dict(size=15)),xaxis=dict(tickfont=dict(size=15),tickvals=years,
+        ticktext=ticktext),legend=dict(font=dict(size=15)))
+    fig.update_layout(hovermode='y')
+    # if country == 'BE':
+    #  pio.write_image(fig, "results/pdf/Annual Investment Costs.pdf", format='pdf')
+    # fig.add_layout_image(logo)
+    return fig
+
+# def create_operational_costs(operational_costs, country,  unit='Euros/year'):
+#     tech_colors = config["plotting"]["tech_colors"]
+#     colors = config["plotting"]["tech_colors"]
+
+#     title = f"{country} - Operational Costs"
+#     df = operational_costs[country]
+#     df = df.rename_axis(unit)
+#     df = df.reset_index()
+#     df.index = df.index.astype(str)
+
+#     # Create a bar chart using Plotly
+#     fig = go.Figure()
+#     df_transposed = df.set_index(unit).T
+
+#     for tech in df_transposed.columns:
+#         fig.add_trace(go.Bar(x=df_transposed.index, y=df_transposed[tech], name=tech, marker_color=tech_colors.get(tech, 'lightgrey'),width=0.62))
+    
+#     fig.add_trace(go.Scatter(x=[None], y=[None], mode='markers', name='Euro reference value = 2020', marker=dict(color='rgba(0,0,0,0)')))
+#     # Configure layout and labels
+#     fig.update_layout(height=900, width=1000,title=title, barmode='stack', yaxis=dict(title=unit,title_font=dict(size=15),tickfont=dict(size=15)),xaxis=dict(tickfont=dict(size=15)),legend=dict(font=dict(size=15)))
+#     fig.update_layout(hovermode='y')
+#     if country == 'BE':
+#      pio.write_image(fig, "results/pdf/Annual operational Costs.pdf", format='pdf')
+#     # fig.add_layout_image(logo)
+#     return fig
+
+def create_operational_costs(operational_costs, country, unit='Euros/year'):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    tech_colors["AC Transmission"] = "#FF3030"
+    tech_colors["DC Transmission"] = "#104E8B"
+
+    title = f"{country} - Operational Costs"
+    df = operational_costs[country]
+    df = df.rename_axis(unit)
+    df = df.reset_index()
+    df.index = df.index.astype(str)
+
+    fig = go.Figure()
+    df_transposed = df.set_index(unit).T
+    
+    for tech in df_transposed.columns:
+        y = df_transposed[tech]
+        color = tech_colors.get(tech, 'lightgrey')
+
+        # Positive values
+        fig.add_trace(go.Bar(
+            x=df_transposed.index,
+            y=y.where(y > 0, 0),
+            name=tech,
+            marker_color=color,
+            width=0.62
+        ))
+
+        # Negative values
+        fig.add_trace(go.Bar(
+            x=df_transposed.index,
+            y=y.where(y < 0, 0),
+            name=tech,
+            marker_color=color,
+            width=0.62,
+            showlegend=False
+        ))
+
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None],
+        mode='markers',
+        name='Euro reference value = 2020',
+        marker=dict(color='rgba(0,0,0,0)')
+    ))
+    years = df_transposed.index.tolist()
+    ticktext = ["2025" if str(y) == "2020" else str(y) for y in years]
+    fig.update_layout(
+        height=900, width=1000,
+        title=title,
+        barmode='relative',
+        yaxis=dict(title=unit, title_font=dict(size=15), tickfont=dict(size=15)),
+        xaxis=dict(tickfont=dict(size=15),tickvals=years,
+        ticktext=ticktext),
+        legend=dict(font=dict(size=15)),
+        hovermode='y'
+    )
+
+    # if country == 'BE':
+    #     pio.write_image(fig, "results/pdf/Annual operational Costs.pdf", format='pdf')
+
+    return fig
+
+def create_capacity_chart(capacities, country, unit='Capacity [GW]'):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    colors = config["plotting"]["tech_colors"]
+    tech_colors["AC Transmission"] = "#FF3030"
+    tech_colors["DC Transmission"] = "#104E8B"
+    tech_colors["Transmission lines"] = tech_colors["Transmission Lines"]
+    groups = [
+        ["solar"],
+        ["onshore wind", "offshore wind"],
+        ["power-to-heat"],
+        ["power-to-gas"],
+        ["transmission lines"],
+        ["nuclear"],
+        ["CCGT"],
+        ["CHP"],
+    ]
+    
+    groupss = [
+        ["solar"],
+        ["onshore wind", "offshore wind"],
+        ["power-to-heat"],
+        ["power-to-gas"],
+        ["transmission lines"],
+        ["power-to-liquid"],
+        ["CCGT"],
+        ["nuclear"],
+    ]
+
+    # Create a subplot for each technology
+    years = ['2020','2030', '2040', '2050']
+    if country != "EU":
+        value = groups
+    else:
+        value = groupss
+    def smart_capitalize(phrase):
+     return phrase[0].upper() + phrase[1:] if phrase and not phrase[0].isupper() else phrase
+    fig = make_subplots(rows=2, cols=len(value) // 2, subplot_titles=[", ".join(smart_capitalize(t) for t in tech_group) for tech_group in value], shared_yaxes=True)
+
+    df = capacities[country]
+
+    for i, tech_group in enumerate(value, start=1):
+        row_idx = 1 if i <= len(value) // 2 else 2
+        col_idx = i if i <= len(value) // 2 else i - len(value) // 2
+
+        for tech in tech_group:
+            if tech in df.index:
+                y_values = [val / 1000 for val in df.loc[tech, years]]
+                trace = go.Bar(
+                    x=years,
+                    y=y_values,
+                    name=smart_capitalize(tech),
+                    marker_color=tech_colors.get(tech, 'gray')
+                )
+                fig.add_trace(trace, row=row_idx, col=col_idx)
+                fig.update_yaxes(title_text=unit, row=2, col=1)
+
+    # Update layout
+    fig.update_layout(height=800, width=1200, showlegend=True, title=f"Capacities for {country}", yaxis_title=unit,legend=dict(font=dict(size=15)))
+    num_cols = len(value) // 2 + (len(value) % 2 > 0)
+    ticktext = ["2025" if y == "2020" else y for y in years]
+    for row in [1, 2]:
+     for col in range(1, num_cols + 1):
+        fig.update_xaxes(tickfont=dict(size=13), row=row, col=col,tickvals=years,ticktext=ticktext)
+        fig.update_yaxes(
+            tickfont=dict(size=13),
+            title_font=dict(size=15),
+            row=row,
+            col=col
+        )
+    # logo['y']=1.03
+    # if country == 'BE':
+    #  pio.write_image(fig, "results/pdf/Annual Capacities.pdf", format='pdf')
+    # fig.add_layout_image(logo)
+    # Save plot as HTML
+    # html_file_path = os.path.join(output_folder, f"{country}_capacities_chart.html")
+    # fig.write_html(html_file_path)
+
+    return fig
+
+def storage_capacity_chart(s_capacities, country, unit='Capacity [GWh]'):
+    tech_colors = snakemake.params.plotting["tech_colors"]
+    colors = config["plotting"]["tech_colors"]
+    colors["Thermal Energy Storage"] = colors["urban central water tanks"]
+    colors["Thermal Energy storage tanks"] = colors["urban central water tanks"]
+    colors["Grid-scale battery"] = 'green'
+    colors["Gas storage"] = colors["gas"]
+    groups = [
+        ["Grid-scale battery"],
+        ["Thermal Energy Storage"],
+        ["Gas storage"],
+    ]
+
+    # Create a subplot for each technology
+    years = ['2020','2030', '2040', '2050']
+    fig = make_subplots(rows=1, cols=len(groups) // 1, subplot_titles=[
+        f"{', '.join(tech_group)}" for tech_group in groups], shared_yaxes=False)
+
+    df = s_capacities[country]
+
+    for i, tech_group in enumerate(groups, start=1):
+        row_idx = 1 if i <= len(groups) // 1 else 2
+        col_idx = i if i <= len(groups) // 1 else i - len(groups) // 1
+
+        for tech in tech_group:
+            if tech in df.index:
+                y_values = [val / 1000 for val in df.loc[tech, years]]
+                trace = go.Bar(
+                    x=years,
+                    y=y_values,
+                    name=f"{tech}",
+                    marker_color=tech_colors.get(tech, 'gray')
+                )
+                fig.add_trace(trace, row=row_idx, col=col_idx)
+                fig.update_yaxes(title_text=unit, row=2, col=1)
+    
+    # Update layout
+    fig.update_layout(height=500, width=1200, showlegend=True, title=f" Storage Capacities for {country}", yaxis_title=unit,legend=dict(font=dict(size=15)))
+    num_cols = len(groups)
+    ticktext = ["2025" if y == "2020" else y for y in years]
+    for col in range(1, num_cols + 1):
+     fig.update_xaxes(tickfont=dict(size=13), row=1, col=col,tickvals=years,ticktext=ticktext)
+     fig.update_yaxes(
+        tickfont=dict(size=13),
+        title_font=dict(size=15),
+        row=1,
+        col=col
+    )
+    # logo['y']=1.05
+    # if country == 'BE':
+    #  pio.write_image(fig, "results/pdf/Annual storage capacities.pdf", format='pdf')
+    # fig.add_layout_image(logo)
+    
+
+    return fig
+
+def create_combined_chart_country(costs,investment_costs, capacities, s_capacities, country):
+    # Create output folder if it doesn't exist
+    output_folder = f"results/{study}/htmls"
+    raw_html = os.path.join(output_folder,'raw_html/')
+    os.makedirs(output_folder, exist_ok=True)
+    os.makedirs(raw_html, exist_ok=True)
+
+    # Create combined HTML
+    combined_html = "<html><head><title>Combined Plots</title></head><body>"
+    
+    #load the html plot flags
+    with open(snakemake.input.plots_html, 'r') as file:
+     plots = yaml.safe_load(file)
+    pypsa_plots = plots.get("Pypsa_plots", {})
+    display_country = "6 Countries" if country == "EU" else country
+    if pypsa_plots["Sectoral Demands"] == True:
+      display_country = "5 Countries" if country == "EU" else country
+      plot_demands_file_path = os.path.join(raw_html, f"{country}_sectoral_demands.html")
+      with open(plot_demands_file_path, "r") as plot_demands_file:
+        plot_demands_html = plot_demands_file.read()
+        combined_html += f"<div><h2>{display_country} - Sectoral Demands</h2>{plot_demands_html}</div>"
+    # Create bar chart
+    if pypsa_plots["Annual Costs"] == True:
+     bar_chart = create_bar_chart(costs, country)
+     combined_html += f"<div><h2>{display_country} - Annual Costs</h2>{bar_chart.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+     
+    
+    # Create Investment Costs
+    if pypsa_plots["Annual Investment Costs"] == True:
+     bar_chart_investment = create_investment_costs(investment_costs, country)
+     combined_html += f"<div><h2>{display_country} - Annual Investment Costs</h2>{bar_chart_investment.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+     
+    if pypsa_plots["Annual Operational Costs"] == True:
+     bar_chart_operational = create_operational_costs(operational_costs, country)
+     combined_html += f"<div><h2>{display_country} - Annual Operational Costs</h2>{bar_chart_operational.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+    
+    if pypsa_plots["Capacities"] == True:
+     capacities_chart = create_capacity_chart(capacities, country)
+     combined_html += f"<div><h2>{display_country} - Capacities </h2>{capacities_chart.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+    
+    # Create storage capacities chart
+    if pypsa_plots["Storage Capacities"] == True:
+     s_capacities_chart = storage_capacity_chart(s_capacities, country)
+     combined_html += f"<div><h2>{display_country} - Storage Capacities </h2>{s_capacities_chart.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+
+    # Save the Panel object to HTML
+    if pypsa_plots["Power Dispatch Winter"] == True:
+     plot_series_file_path = os.path.join(raw_html, f"Power Dispatch (Winter Week) - {country}.html")
+     plot_series_file_path_simp = os.path.join(raw_html, f"Power Dispatch Simplified (Winter Week) - {country}.html")
+     with open(plot_series_file_path, "r") as plot_series_file:
+         plot_series_html = plot_series_file.read()
+         combined_html += f"<div><h2>{display_country} - Power Dispatch Winter</h2>{plot_series_html}</div>"
+    with open(plot_series_file_path_simp, "r") as plot_series_file_simp:
+        plot_series_simp_html = plot_series_file_simp.read()
+        combined_html += f"<div><h2>{display_country} - Power Dispatch Winter Simplified</h2>{plot_series_simp_html}</div>"
+    if pypsa_plots["Power Dispatch Summer"] == True:
+     plot_series_file_path_sum = os.path.join(raw_html, f"Power Dispatch (Summer Week) - {country}.html")
+     plot_series_file_path_sum_simp = os.path.join(raw_html, f"Power Dispatch Simplified (Summer Week) - {country}.html")
+     with open(plot_series_file_path_sum, "r") as plot_series_file_sum:
+         plot_series_html_w = plot_series_file_sum.read()
+         combined_html += f"<div><h2>{display_country} - Power Dispatch Summer</h2>{plot_series_html_w}</div>"
+    with open(plot_series_file_path_sum_simp, "r") as plot_series_file_sum_simp:
+        plot_series_html_w_simp = plot_series_file_sum_simp.read()
+        combined_html += f"<div><h2>{display_country} - Power Dispatch Summer Simplified</h2>{plot_series_html_w_simp}</div>"
+    if pypsa_plots["Heat Dispatch Winter"] == True:    
+     plot_series_heat_file_path = os.path.join(raw_html, f"Heat Dispatch (Winter Week) - {country}.html")
+     with open(plot_series_heat_file_path, "r") as plot_series_heat_file:
+         plot_series_heat_html = plot_series_heat_file.read()
+         combined_html += f"<div><h2>{display_country} - Heat Dispatch Winter</h2>{plot_series_heat_html}</div>"
+    if pypsa_plots["Heat Dispatch Summer"] == True:   
+     plot_series_heat_file_path_sum = os.path.join(raw_html, f"Heat Dispatch (Summer Week) - {country}.html")
+     with open(plot_series_heat_file_path_sum, "r") as plot_series_heat_file_sum:
+         plot_series_heat_html_w = plot_series_heat_file_sum.read()
+         combined_html += f"<div><h2>{display_country} - Heat Dispatch Summer</h2>{plot_series_heat_html_w}</div>"
+    if pypsa_plots["Map Plots"] == True:
+     plot_map_path = os.path.join(raw_html, f"map_plots_{country}.html")
+     with open(plot_map_path, "r") as plot_map_path:
+         plot_map_html = plot_map_path.read()
+         combined_html += f"<div><h2>Map Plots</h2>{plot_map_html}</div>"
+    if pypsa_plots["H2 Map Plots"] == True:
+     plot_map_h2_path = os.path.join(raw_html, "map_h2_plots.html")
+     with open(plot_map_h2_path, "r") as plot_map_h2_path:
+         plot_map_h2_html = plot_map_h2_path.read()
+         combined_html += f"<div><h2>H2 Map Plots</h2>{plot_map_h2_html}</div>"
+    if pypsa_plots["Gas Map Plots"] == True:
+     plot_map_ch4_path = os.path.join(raw_html, "map_ch4_plots.html")
+     with open(plot_map_ch4_path, "r") as plot_map_ch4_path:
+         plot_map_ch4_html = plot_map_ch4_path.read()
+         combined_html += f"<div><h2>Gas Map Plots</h2>{plot_map_ch4_html}</div>"
+
+    # Create the content for the "Table of Contents" and "Main" sections
+    table_of_contents = {
+    "demands.html": "<a href='#sectoral_demands'>Sectoral Demands</a><br>",
+    "costs.html": "<a href='#annual_costs'>Annual Costs</a><br>" 
+                  # "<a href='#annual_total_costs'>Annual Total Costs</a><br>"
+                  "<a href='#investment_costs'>Annual Investment Costs</a><br>"
+                  "<a href='#operational_costs'>Annual Operational Costs</a><br>",
+                  
+    "capacities.html": "<a href='#capacities'>Capacities</a><br>"
+                       "<a href='#storage capacities'>Storage Capacities</a><br>",
+    "dispatch_plots.html": "<a href='#heat_dispatch_winter'>Heat Dispatch (Winter)</a><br>"
+                           "<a href='#heat_dispatch_summer'>Heat Dispatch (Summer)</a><br>"
+                           "<a href='#power_dispatch_winter'>Power Dispatch (Winter)</a><br>"
+                           "<a href='#power_dispatch_summer'>Power Dispatch (Summer)</a><br>"
+                           "<a href='#power_dispatch_winter_simplified'>Power Dispatch Simplified (Winter)</a><br>"
+                           "<a href='#power_dispatch_summer_simplified'>Power Dispatch Simplified (Summer)</a><br>",
+    "maps.html": "<a href='#map_plots'>Map Plots</a><br>"
+                 "<a href='#h2_map_plots'>H2 Map Plots</a><br>"
+                 "<a href='#gas_map_plots'>Gas Map Plots</a><br>",}
+    if country == "BE":
+     table_of_contents["costs.html"] += "<a href='#Electricity_and_CO2_Price'>Electricity and CO2 Price</a><br>"
+    
+    html_sections = {
+    "demands.html": f"<div id='sectoral_demands'><h2>{display_country} - Sectoral Demands</h2>{plot_demands_html}</div>",
+    "costs.html": f"<div id='annual_costs'><h2>{display_country} - Annual Costs</h2>{bar_chart.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+                  # f"<div id='annual_total_costs'><h2>{display_country} - Annual Total Costs</h2>{annual_clustered_costs_desc}{bar_chart_clustered.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+                  f"<div id='investment_costs'><h2>{display_country} - Annual Investment Costs</h2>{bar_chart_investment.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+                  f"<div id='operational_costs'><h2>{display_country} - Annual Operational Costs</h2>{bar_chart_operational.to_html(full_html=False, include_plotlyjs='cdn')}</div>",
+    "capacities.html": f"<div id='capacities'><h2>{display_country} - Capacities</h2>{capacities_chart.to_html(full_html=False, include_plotlyjs='cdn')}</div>"
+                       f"<div id='storage capacities'><h2>{display_country} - Storage Capacities</h2>{s_capacities_chart.to_html(full_html=False, include_plotlyjs='cdn')}</div>",
+    "dispatch_plots.html": f"<div id='heat_dispatch_winter'><h2>{display_country} - Heat Dispatch (Winter)</h2>{plot_series_heat_html}</div>"
+                           f"<div id='heat_dispatch_summer'><h2>{display_country} - Heat Dispatch (Summer)</h2>{plot_series_heat_html_w}</div>"
+                           f"<div id='power_dispatch_winter'><h2>{display_country} - Power Dispatch (Winter)</h2>{plot_series_html}</div>"
+                           f"<div id='power_dispatch_summer'><h2>{display_country} - Power Dispatch (Summer)</h2>{plot_series_html_w}</div>"
+                           f"<div id='power_dispatch_winter_simplified'><h2>{display_country} - Power Dispatch Simplified (Winter)</h2>{plot_series_simp_html}</div>"
+                           f"<div id='power_dispatch_summer_simplified'><h2>{display_country} - Power Dispatch Simplified (Summer)</h2>{plot_series_html_w_simp}</div>",
+    "maps.html": f"<div id='map_plots'><h2>Map Plots</h2>{plot_map_html}</div>"
+                 f"<div id='h2_map_plots'><h2>H2 Map Plots</h2>{plot_map_h2_html}</div>"
+                 f"<div id='gas_map_plots'><h2>Gas Map Plots</h2>{plot_map_ch4_html}</div>",}
+    
+    template_path =  snakemake.input.template
+    with open(template_path, "r") as template_file:
+        template_content = template_file.read()
+        template = Template(template_content)
+        
+    for file_name, main_content in html_sections.items():
+      rendered_html = template.render(
+        title=f"{country} - {file_name.split('.')[0].capitalize()}",
+        country=country,
+        TABLE_OF_CONTENTS=table_of_contents.get(file_name, ""),  # Add TOC per section
+        MAIN=main_content,
+      )
+      file_name = file_name.replace(".html", "")
+      combined_file_path = os.path.join(output_folder, f"{country}_{file_name}_{study}.html")
+      with open(combined_file_path, "w", encoding='utf-8') as html_file:
+        html_file.write(rendered_html)
+
+    
+if __name__ == "__main__":
+    if "snakemake" not in globals():
+        #from _helpers import mock_snakemake
+        #snakemake = mock_snakemake("prepare_results")
+
+        import pickle
+        with open("snakemake_dump.pkl", "rb") as f:
+            snakemake = pickle.load(f)
+
+        # Updating the configuration from the standard config file to run in standalone:
+    #import pickle
+    #with open("snakemake_dump.pkl", "wb") as f:
+    #    pickle.dump(snakemake, f)
+    cluster = snakemake.params.scenario["clusters"][0]
+    opt = snakemake.params.scenario["opts"][0]
+    sector_opt = snakemake.params.scenario["sector_opts"][0]
+    planning_horizons = [2020,2030, 2040, 2050]
+    discount_rate = 0.07
+    methanol_fuel = 119 #https://www.methanol.org/wp-content/uploads/2023/05/Marine_Methanol_Report_Methanol_Institute_May_2023.pdf
+    ammonia_fuel = 92 #https://www.iee.fraunhofer.de/en/presse-infothek/press-media/2022/green-ammonia-for-climate-protection.html
+    total_country = 'EU'
+    countries = ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'NL', 'GB', 'LU'] 
+    fn = snakemake.input.costs
+    proj = load_projection(snakemake.params.plotting)
+    map_opts = snakemake.params.plotting["map"]
+    countries.append(total_country)
+    logging.basicConfig(level=snakemake.config["logging"]["level"])
+    config = snakemake.config
+    study = snakemake.params.study
+    loaded_files = load_files(study, planning_horizons,cluster, opt, sector_opt)
+    costs = costs(countries)
+    # c_costs = clustered_costs(countries, results)
+    investment_costs = Investment_costs(countries)
+    operational_costs = operational_costs(countries)
+    capacities = capacities(countries)
+    s_capacities = storage_capacities(countries)
+
+    with open(snakemake.input.plots_html, 'r') as file:
+     plots = yaml.safe_load(file).get('Pypsa_plots')
+    if plots['Power Dispatch Winter']:
+        plot_series_power(cluster, opt, sector_opt, planning_horizons,start = "2013-02-08",stop = "2013-02-14",title="Power Dispatch (Winter Week)")
+        plot_series_power_cluster(cluster, opt, sector_opt, planning_horizons,start = "2013-02-06",stop = "2013-02-12",title="Power Dispatch Simplified (Winter Week)")
+    if plots['Power Dispatch Summer']:
+        plot_series_power(cluster, opt, sector_opt, planning_horizons,start = "2013-07-01",stop = "2013-07-07",title="Power Dispatch (Summer Week)")
+        plot_series_power_cluster(cluster, opt, sector_opt, planning_horizons,start = "2013-06-20",stop = "2013-06-26",title="Power Dispatch Simplified (Summer Week)")
+    if plots['Heat Dispatch Winter']:
+        plot_series_heat(cluster, opt, sector_opt, planning_horizons,start = "2013-02-01",stop = "2013-02-07",title="Heat Dispatch (Winter Week)")
+    if plots['Heat Dispatch Summer']:
+        plot_series_heat(cluster, opt, sector_opt, planning_horizons,start = "2013-07-01",stop = "2013-07-07",title="Heat Dispatch (Summer Week)")
+    plot_demands(countries)
+    if plots['Map Plots']:
+        for country in countries:
+            create_map_plots(planning_horizons, country)
+    if plots['H2 Map Plots']:
+        create_H2_map_plots(planning_horizons)
+    if plots['Gas Map Plots']:
+        create_gas_map_plots(planning_horizons)
+    
+    for country in countries:
+        create_combined_chart_country(costs,investment_costs, capacities,s_capacities, country)
+    

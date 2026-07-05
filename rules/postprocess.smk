@@ -293,7 +293,85 @@ rule make_summary:
     script:
         scripts("make_summary.py")
 
+rule calculate_electricity_prices_bills:
+    input:
+        network=RESULTS
+        + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
+        households="data/walloon/households.csv",
+    output:
+        weighted_prices=RESULTS
+        + "csvs/individual/weighted_electricity_prices_ts_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv",
+        household_bills_ts=RESULTS
+        + "csvs/individual/household_bills_ts_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv",
+        household_bills_agg=RESULTS
+        + "csvs/individual/household_bills_agg_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv",
+    threads: 1
+    resources:
+        mem_mb=4000,
+    log:
+        RESULTS
+        + "logs/calculate_electricity_prices_bills_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.log",
+    benchmark:
+        (
+            RESULTS
+            + "benchmarks/calculate_electricity_prices_bills_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}"
+        )
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/walloon_scripts/calculate_prices.py"
 
+
+rule calculate_costs:
+    input:
+        network=RESULTS
+        + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
+    output:
+        capex=RESULTS
+        + "csvs/individual/capex_by_bus_carrier_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv",
+        opex=RESULTS
+        + "csvs/individual/opex_by_bus_carrier_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv",
+        lcoe=RESULTS
+        + "csvs/individual/lcoe_by_carrier_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv",
+    threads: 1
+    resources:
+        mem_mb=4000,
+    log:
+        RESULTS
+        + "logs/calculate_costs_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.log",
+    benchmark:
+        RESULTS
+        + "benchmarks/calculate_costs_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}",
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/walloon_scripts/calculate_costs.py"
+
+
+rule calculate_market_value:
+    input:
+        network=RESULTS
+        + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
+    output:
+        market_value_by_generator=RESULTS
+        + "csvs/individual/market_value_by_generator_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv",
+    threads: 1
+    resources:
+        mem_mb=4000,
+    log:
+        RESULTS
+        + "logs/calculate_market_value_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.log",
+    benchmark:
+        (
+            RESULTS
+            + "benchmarks/calculate_market_value_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}"
+        )
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/walloon_scripts/calculate_market_value.py"
+        
+        
 rule make_global_summary:
     message:
         "Creating global summary of optimization results for all scenarios"
@@ -519,6 +597,141 @@ rule plot_heatmap_timeseries:
     script:
         scripts("plot_heatmap_timeseries.py")
 
+countries = ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'NL', 'GB', 'LU']
+local_countries = countries.copy()
+if "EU" not in local_countries:
+    local_countries.append("EU") 
+                             
+rule prepare_sepia:
+    params:
+        countries=countries,
+        planning_horizons=config_provider("scenario", "planning_horizons"),
+        sector_opts=config_provider("scenario", "sector_opts"),
+        emissions_scope=config_provider("energy", "emissions"),
+        eurostat_report_year=config_provider("energy", "eurostat_report_year"),
+        plotting=config_provider("plotting"),
+        scenario=config_provider("scenario"),
+        study = config_provider("run", "name"),
+        year = config_provider("energy", "energy_totals_year"),
+    input:
+        networks=expand(
+            RESULTS
+            + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
+            **config["scenario"]
+        ),
+        costs = resources("costs_2050_processed.csv"),
+        summary = RESULTS + "graphs/costs.svg",
+    output:
+        excelfile=expand(RESULTS + "sepia/inputs{country}.xlsx", country=local_countries),
+    threads: 1
+    resources:
+        mem_mb=10000,
+    log:
+        RESULTS + "logs/prepare_sepia.log",
+    benchmark:
+        RESULTS + "benchmarks/prepare_sepia",
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../SEPIA/excel_generator.py"
+        
+rule generate_sepia:
+    params:
+        countries=countries,
+        year = config_provider("energy", "energy_totals_year"),
+        study = config_provider("run", "name"),
+        planning_horizons=config_provider("scenario", "planning_horizons"),
+        cluster=config_provider("scenario","clusters"),
+    input:
+        countries = "SEPIA/COUNTRIES.xlsx",
+        costs = resources("costs_2050_processed.csv"),
+        sepia_config = "SEPIA/SEPIA_config.xlsx",
+        template = "SEPIA/Template/pypsa.html",
+        biomass_potentials = expand(resources("biomass_potentials_s_{clusters}_{planning_horizons}.csv"),**config["scenario"]),
+        excelfile=expand(RESULTS + "sepia/inputs{country}.xlsx", country=local_countries),
+        plots_html = "config/plots.yaml",
+        
+    output:
+        excelfile=expand(RESULTS + "htmls/ChartData_{country}.xlsx", country=local_countries),
+        htmlfile_emissions=expand(RESULTS + "htmls/{country}_emissions_{study}.html", country=local_countries, study=config["run"]["name"]),
+        htmlfile_sankeys=expand(RESULTS + "htmls/{country}_sankeys_{study}.html", country=local_countries, study=config["run"]["name"]),
+        htmlfile_fec=expand(RESULTS + "htmls/{country}_fec_{study}.html", country=local_countries, study=config["run"]["name"]),
+    threads: 1
+    resources:
+        mem_mb=10000,
+    log:
+        RESULTS + "logs/generate_sepia.log",
+    benchmark:
+        RESULTS + "benchmarks/generate_sepia",
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../SEPIA/SEPIA.py"
+             
+
+rule prepare_results:
+    params:
+        countries=countries,
+        planning_horizons=config_provider("scenario", "planning_horizons"),
+        sector_opts=config_provider("scenario", "sector_opts"),
+        plotting=config_provider("plotting"),
+        scenario=config_provider("scenario"),
+        study = config_provider("run", "name"),
+        foresight=config_provider("foresight"),
+    input:
+        networks=expand(
+            RESULTS
+            + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
+            **config["scenario"]
+        ),
+        excelfile=expand(RESULTS + "htmls/ChartData_{country}.xlsx", country=local_countries),
+        costs = resources("costs_2050_processed.csv"),
+        sepia_config = "SEPIA/SEPIA_config.xlsx",
+        template = "SEPIA/Template/pypsa.html",
+        plots_html = "config/plots.yaml",       
+    output:
+        htmlfile=expand(RESULTS + "htmls/{country}_{section}_{study}.html",study = config["run"]["name"], country=local_countries,section=["costs", "capacities", "dispatch_plots", "maps"]),
+    threads: 1
+    resources:
+        mem_mb=10000,
+    log:
+        RESULTS + "logs/prepare_results.log",
+    benchmark:
+        RESULTS + "benchmarks/prepare_results",
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../SEPIA/Pypsa_results.py"
+
+rule prepare_dispatch_plots:
+    params:
+        countries=countries,
+        planning_horizons=config_provider("scenario", "planning_horizons"),
+        sector_opts=config_provider("scenario", "sector_opts"),
+        plotting=config_provider("plotting"),
+        scenario=config_provider("scenario"),
+        study = config_provider("run", "name"),
+    input:
+        networks=expand(
+            RESULTS
+            + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
+            **config["scenario"]
+        ),
+        htmlfile=expand(RESULTS + "htmls/{country}_maps_{study}.html",study = config["run"]["name"], country=countries),      
+    output:
+        powerfile=expand(RESULTS + "htmls/raw_html/Power_Dispatch-{country}_{planning_horizons}.html", country=countries,planning_horizons=config["scenario"]["planning_horizons"],),
+        heatfile=expand(RESULTS + "htmls/raw_html/Heat_Dispatch-{country}_{planning_horizons}.html", country=countries,planning_horizons=config["scenario"]["planning_horizons"],),
+    threads: 1
+    resources:
+        mem_mb=10000,
+    log:
+        RESULTS + "logs/prepare_dispatch_plots.log",
+    benchmark:
+        RESULTS + "benchmarks/prepare_dispatch_plots",
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../SEPIA/Dispatch_plots_weekly.py"
 
 STATISTICS_BARPLOTS = [
     "capacity_factor",

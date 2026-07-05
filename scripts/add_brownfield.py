@@ -15,12 +15,17 @@ import xarray as xr
 from scripts._helpers import (
     configure_logging,
     get_snapshots,
+    load_costs,
     sanitize_custom_columns,
     set_scenario_config,
     update_config_from_wildcards,
 )
 from scripts.add_electricity import flatten, sanitize_carriers
+from scripts.prepare_network import set_transmission_limit
 from scripts.add_existing_baseyear import add_build_year_to_new_assets
+
+from scripts.walloon_scripts.nuclear_helper import add_BEWAL_nuclear, retrofit_retired_nuclear
+from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
 
 logger = logging.getLogger(__name__)
 idx = pd.IndexSlice
@@ -59,58 +64,52 @@ def add_brownfield(
     dc_i = n.links[n.links.carrier == "DC"].index
     n.links.loc[dc_i, "p_nom_min"] = n_p.links.loc[dc_i, "p_nom_opt"]
 
-    for c in n_p.components[["Link", "Generator", "Store"]]:
-        if c.static.empty:
-            continue
+    decomissioned_assets = {"Link": None, "Generator": None, "Store": None}
+    for c in n_p.iterate_components(["Link", "Generator", "Store"]):
         attr = "e" if c.name == "Store" else "p"
 
         # first, remove generators, links and stores that track
         # CO2 or global EU values since these are already in n
-        n_p.remove(c.name, c.static.index[c.static.lifetime == np.inf])
+        n_p.remove(c.name, c.df.index[c.df.lifetime == np.inf])
 
         # remove assets whose build_year + lifetime <= year
-        n_p.remove(
-            c.name, c.static.index[c.static.build_year + c.static.lifetime <= year]
-        )
+        decomissioned_assets_index = c.df.index[c.df.build_year + c.df.lifetime <= year]
+        decomissioned_assets[c.name] = c.df.loc[decomissioned_assets_index]
+        n_p.remove(c.name, decomissioned_assets_index)
 
         # remove assets if their optimized nominal capacity is lower than a threshold
         # since CHP heat Link is proportional to CHP electric Link, make sure threshold is compatible
-        chp_heat = c.static.index[
-            (
-                c.static[f"{attr}_nom_extendable"]
-                & c.static.index.str.contains("urban central")
-            )
-            & c.static.index.str.contains("CHP")
-            & c.static.index.str.contains("heat")
+        chp_heat = c.df.index[
+            (c.df[f"{attr}_nom_extendable"] & c.df.index.str.contains("urban central"))
+            & c.df.index.str.contains("CHP")
+            & c.df.index.str.contains("heat")
         ]
 
         if not chp_heat.empty:
             threshold_chp_heat = (
                 capacity_threshold
-                * c.static.efficiency[chp_heat.str.replace("heat", "electric")].values
-                * c.static.p_nom_ratio[chp_heat.str.replace("heat", "electric")].values
-                / c.static.efficiency[chp_heat].values
+                * c.df.efficiency[chp_heat.str.replace("heat", "electric")].values
+                * c.df.p_nom_ratio[chp_heat.str.replace("heat", "electric")].values
+                / c.df.efficiency[chp_heat].values
             )
             n_p.remove(
                 c.name,
-                chp_heat[
-                    c.static.loc[chp_heat, f"{attr}_nom_opt"] < threshold_chp_heat
-                ],
+                chp_heat[c.df.loc[chp_heat, f"{attr}_nom_opt"] < threshold_chp_heat],
             )
 
         n_p.remove(
             c.name,
-            c.static.index[
-                (c.static[f"{attr}_nom_extendable"] & ~c.static.index.isin(chp_heat))
-                & (c.static[f"{attr}_nom_opt"] < capacity_threshold)
+            c.df.index[
+                (c.df[f"{attr}_nom_extendable"] & ~c.df.index.isin(chp_heat))
+                & (c.df[f"{attr}_nom_opt"] < capacity_threshold)
             ],
         )
 
         # copy over assets but fix their capacity
-        c.static[f"{attr}_nom"] = c.static[f"{attr}_nom_opt"]
-        c.static[f"{attr}_nom_extendable"] = False
+        c.df[f"{attr}_nom"] = c.df[f"{attr}_nom_opt"]
+        c.df[f"{attr}_nom_extendable"] = False
 
-        n.add(c.name, c.static.index, **c.static)
+        n.add(c.name, c.df.index, **c.df)
 
         # copy time-dependent
         selection = n.component_attrs[c.name].type.str.contains(
@@ -118,7 +117,18 @@ def add_brownfield(
         ) & n.component_attrs[c.name].status.str.contains("Input")
         for tattr in n.component_attrs[c.name].index[selection]:
             # TODO: Needs to be rewritten to
-            n._import_series_from_df(c.dynamic[tattr], c.name, tattr)
+            n._import_series_from_df(c.pnl[tattr], c.name, tattr)
+
+    # Preserve built nuclear capacity (non-retrofit) from the previous horizon, using previous p_nom_opt
+    if "p_nom_min" in n.links.columns:
+        prev_nuclear = n_p.links[
+            (n_p.links.carrier == "nuclear")
+            & n_p.links.index.str.contains(" nuclear-2025")
+            & ~n_p.links.index.str.contains("retrofit")
+        ]
+        keep = n.links.index.intersection(prev_nuclear.index)
+        if len(keep):
+            n.links.loc[keep, "p_nom_min"] = prev_nuclear.loc[keep, "p_nom_opt"]
 
     # deal with gas network
     if h2_retrofit:
@@ -129,7 +139,7 @@ def add_brownfield(
         ].index
         h2_retrofitted = n.links[
             (n.links.carrier == "H2 pipeline retrofitted")
-            & (n.links.build_year == year)
+            & (n.links.build_year != year)
         ].index
 
         # pipe capacity always set in prepare_sector_network to todays gas grid capacity * H2_per_CH4
@@ -163,6 +173,8 @@ def add_brownfield(
             )
             n.links.loc[gas_pipes_i, "p_nom"] = remaining_capacity
             n.links.loc[gas_pipes_i, "p_nom_max"] = remaining_capacity
+
+    return decomissioned_assets
 
 
 def disable_grid_expansion_if_limit_hit(n):
@@ -370,7 +382,7 @@ if __name__ == "__main__":
     if snakemake.params.tes and snakemake.params.dynamic_ptes_capacity:
         update_dynamic_ptes_capacity(n, n_p, year)
 
-    add_brownfield(
+    decomissioned_assets = add_brownfield(
         n,
         n_p,
         year,
@@ -379,10 +391,46 @@ if __name__ == "__main__":
         capacity_threshold=snakemake.params.threshold_capacity,
     )
 
-    disable_grid_expansion_if_limit_hit(n)
-
     n.meta = dict(snakemake.config, **dict(wildcards=dict(snakemake.wildcards)))
 
     sanitize_custom_columns(n)
     sanitize_carriers(n, snakemake.config)
+
+    planning_horizon = int(snakemake.wildcards.planning_horizons)
+
+    add_BEWAL_nuclear(
+        n=n,
+        planning_horizon=planning_horizon,
+        extendable_nuclear_nodes=(
+            snakemake.config["electricity"]["extendable_carriers"]
+            .get("extendable_nuclear_links", {})
+        ),
+    )
+
+    decomissioned_nuclear = (
+        decomissioned_assets["Link"].query("carrier == 'nuclear'")
+    )
+
+    retrofit_retired_nuclear(
+        n,
+        decomissioned_nuclear,
+        int(snakemake.wildcards.planning_horizons),
+        costs = load_costs(snakemake.input.costs),
+        retrofit_nuclear_once=snakemake.config["electricity"].get("retrofit_nuclear_once", False),
+        MILP = False,
+    )
+
+    update_BEWAL_potentials(
+        n=n,
+        planning_horizons=int(snakemake.wildcards.planning_horizons),
+        walloon_potentials=snakemake.config["electricity"].get("walloon_potentials", None),
+    )
+
+    kind = snakemake.params.transmission_limit[planning_horizon][0]
+    factor = snakemake.params.transmission_limit[planning_horizon][1:]
+    set_transmission_limit(n, kind, factor, load_costs(snakemake.input.costs))
+
+    if float(factor) == 1.0:
+        disable_grid_expansion_if_limit_hit(n)
+
     n.export_to_netcdf(snakemake.output[0])

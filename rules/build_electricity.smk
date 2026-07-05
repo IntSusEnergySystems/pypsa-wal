@@ -38,6 +38,7 @@ rule build_powerplants:
     params:
         powerplants_filter=config_provider("electricity", "powerplants_filter"),
         custom_powerplants=config_provider("electricity", "custom_powerplants"),
+        walloon_reassignment=config_provider("electricity", "walloon_reassignment", default=False),
         everywhere_powerplants=config_provider("electricity", "everywhere_powerplants"),
         countries=config_provider("countries"),
     input:
@@ -45,7 +46,7 @@ rule build_powerplants:
         regions_onshore=resources("regions_onshore_base_s_{clusters}.geojson"),
         regions_offshore=resources("regions_offshore_base_s_{clusters}.geojson"),
         powerplants=rules.retrieve_powerplants.output["powerplants"],
-        custom_powerplants="data/custom_powerplants.csv",
+        custom_powerplants=resources("custom_powerplants.csv"),
     output:
         resources("powerplants_s_{clusters}.csv"),
     log:
@@ -58,7 +59,24 @@ rule build_powerplants:
     script:
         scripts("build_powerplants.py")
 
-
+rule build_BE_powerplants:
+    input:
+        wal_capacities="data/walloon/wal_2021_existing_capacities_2.csv",
+        custom_powerplants="data/custom_powerplants.csv"
+    output:
+        custom_powerplants=resources("custom_powerplants.csv"),
+    log:
+        logs("build_BE_powerplants.log"),
+    benchmark:
+        benchmarks("build_BE_powerplants")
+    threads: 1
+    resources:
+        mem_mb=7000,
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/walloon_scripts/create_custom_powerplants.py"
+        
 def input_base_network(w):
     base_network = config_provider("electricity", "base_network")(w)
     source = config_provider("data", "osm", "source")(w)
@@ -701,7 +719,25 @@ def input_custom_busmap(w):
         "custom_busshapes": custom_busshapes,
     }
 
-
+rule build_custom_BE_busmap:
+    input:
+        network=resources("networks/base_s.nc"),
+        be_shapefile="data/walloon/be.json",
+    output:
+        resources("resources/base_s_adm.csv")
+    log:
+        logs("build_custom_BE_busmap.log"),
+    resources:
+        mem_mb=20000,
+    benchmark:
+        benchmarks("build_custom_BE_busmap")
+    threads: 8
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/custom_busmap_for_BE.py"
+        
+        
 rule cluster_network:
     message:
         "Clustering network to {wildcards.clusters} clusters"
@@ -724,6 +760,11 @@ rule cluster_network:
         copperplate_regions=config_provider("clustering", "copperplate_regions"),
     input:
         unpack(input_custom_busmap),
+        custom_busmap_BE=lambda w: (
+            resources("resources/base_s_adm.csv")
+            if config_provider("clustering", "mode")(w) == "custom_busmap_BE"
+            else []
+        ),
         network=resources("networks/base_s.nc"),
         admin_shapes=resources("admin_shapes.geojson"),
         bidding_zones=lambda w: (

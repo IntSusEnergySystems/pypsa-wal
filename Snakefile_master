@@ -1,0 +1,61 @@
+from snakemake.utils import min_version
+
+min_version("8.11")
+
+rule run_snakefile_scen_base:
+    output: touch("run_snakefile_scen_base.done")
+    log: "logs/run_snakefile_scen_base.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_base --cores 1 -call all"
+
+rule run_snakefile_scen_corrige:
+    input: "run_snakefile_scen_base.done"
+    output: touch("run_snakefile_scen_corrige.done")
+    log: "logs/run_snakefile_scen_corrige.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_corrige --cores 1 -call all"
+
+rule run_snakefile_scen_suff:
+    input: "run_snakefile_scen_corrige.done"
+    output: touch("run_snakefile_scen_suff.done")
+    log: "logs/run_snakefile_scen_suff.done",
+    shell:
+        "snakemake --snakefile Snakefile_scen_suff --cores 1 -call all"
+
+rule run_all_snakefiles:
+    input: "run_snakefile_scen_suff.done"
+    
+
+configfile: "config/config.scen_base.yaml"
+configfile: "config/plotting.default.yaml"
+
+local_countries = ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'NL', 'GB', 'LU']
+if "EU" not in local_countries:
+    local_countries.append("EU") 
+rule prepare_scenarios:
+    params:
+        countries = config["countries"],
+        plotting=config["plotting"],
+    input:
+        "run_snakefile_scen_corrige.done",
+        sepia_config = "SEPIA/SEPIA_config.xlsx",
+        template = "SEPIA/Template/pypsa.html",
+        plots_html = "config/plots.yaml",
+        shape = "resources/scen_base/regions_onshore_base_s_adm.geojson",
+        
+    output:
+        htmlfile=expand("results/scenario_results/{country}_combined_scenario_chart.html", country=local_countries),
+    threads: 1
+    resources:
+        mem_mb=10000,
+    log:
+        "logs/scenario_results.log",
+    benchmark:
+        "benchmarks/scenario_results",
+    conda:
+        "envs/environment.yaml"
+    script:
+        "SEPIA/scenario_results.py"
+        
+rule run_all_scenarios:
+    input: "run_prepare_scenarios.done"

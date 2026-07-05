@@ -43,7 +43,7 @@ import yaml
 from linopy.remote.oetc import OetcCredentials, OetcHandler, OetcSettings
 from pypsa.descriptors import get_activity_mask
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
-
+from prepare_sector_network import determine_emission_sectors
 from scripts._benchmark import memory_logger
 from scripts._helpers import (
     PYPSA_V1,
@@ -514,7 +514,7 @@ def prepare_network(
         n.set_snapshots(n.snapshots[:nhours])
         n.snapshot_weightings[:] = 8760.0 / nhours
 
-    if foresight == "myopic" and planning_horizons:
+    if not config['solving']['constraints']['CCL'] and foresight == "myopic" and planning_horizons:
         add_land_use_constraint(n, planning_horizons)
 
     if foresight == "perfect":
@@ -527,6 +527,7 @@ def prepare_network(
         add_co2_sequestration_limit(
             n, limit_dict=limit_dict, planning_horizons=planning_horizons
         )
+    
 
 
 def add_CCL_constraints(
@@ -559,17 +560,67 @@ def add_CCL_constraints(
     assert planning_horizons is not None, (
         "add_CCL_constraints are not implemented for perfect foresight, yet"
     )
-
+    
     agg_p_nom_minmax = pd.read_csv(
         config["solving"]["agg_p_nom_limits"]["file"], index_col=[0, 1], header=[0, 1]
-    )[planning_horizons]
+    )
+    
+    if planning_horizons in agg_p_nom_minmax.columns:
+        agg_p_nom_minmax = agg_p_nom_minmax[planning_horizons]
+    else:
+        return
+    
+    buses_to_country = True
+    # alias_buses = {}
+    # alias_original = None
+    if buses_to_country:
+        # temporarily set bus countries to region names for CCL constraint application
+        regions = set(agg_p_nom_minmax.index.get_level_values(0))
+        region_buses = list(regions.intersection(n.buses.index))
+        original_country = None
+        if region_buses:
+            original_country = n.buses.loc[region_buses, "country"].copy()
+            n.buses.loc[region_buses, "country"] = region_buses
+            # when a bus has its own constraint entry, subtract it from its parent country
+            for region in region_buses:
+                parent = original_country.loc[region]
+                if parent == region:
+                    continue
+                for carrier in agg_p_nom_minmax.index.get_level_values(1).unique():
+                    region_idx = (region, carrier)
+                    parent_idx = (parent, carrier)
+                    if region_idx not in agg_p_nom_minmax.index:
+                        continue
+                    if parent_idx not in agg_p_nom_minmax.index:
+                        continue
+                    for col in agg_p_nom_minmax.columns:
+                        region_val = agg_p_nom_minmax.loc[region_idx, col]
+                        parent_val = agg_p_nom_minmax.loc[parent_idx, col]
+                        if pd.isna(region_val) or pd.isna(parent_val):
+                            continue
+                        agg_p_nom_minmax.loc[parent_idx, col] = max(
+                            parent_val - region_val, 0
+                        )
+
+        # Map " low voltage" buses to their base region if present
+        # alias_buses = {
+        #     bus: bus.replace(" low voltage", "").strip()
+        #     for bus in n.buses.index
+        #     if " low voltage" in bus and bus.replace(" low voltage", "").strip() in regions
+        # }
+        # if alias_buses:
+        #     alias_original = n.buses.loc[list(alias_buses.keys()), "country"].copy()
+        #     n.buses.loc[list(alias_buses.keys()), "country"] = list(alias_buses.values())
     logger.info("Adding generation capacity constraints per carrier and country")
     p_nom = n.model["Generator-p_nom"]
+    p_nom_link = n.model["Link-p_nom"]
 
     gens = n.generators.query("p_nom_extendable")
+    links = n.links.query("p_nom_extendable")
 
     if not PYPSA_V1:
         gens = gens.rename_axis(index="Generator-ext")
+        links = links.rename_axis(index="Link-ext")
 
     if config["solving"]["agg_p_nom_limits"]["agg_offwind"]:
         rename_offwind = {
@@ -582,12 +633,40 @@ def add_CCL_constraints(
     if config["solving"]["agg_p_nom_limits"]["agg_solar"]:
         rename_solar = {
             "solar": "solar-all",
+            "solar-utility": "solar-all",
             "solar-hsat": "solar-all",
             "solar rooftop": "solar-all",
         }
         gens = gens.replace(rename_solar)
+    if config["solving"]["agg_p_nom_limits"]["agg_nuclear"]:
+        if foresight == "overnight":
+            rename_nuclear = {
+                "nuclear": "nuclear-all",
+                "nuclear (SMR)": "nuclear-all",
+            }
+            gens = gens.replace(rename_nuclear)
+        else:
+            rename_nuclear = {
+            "nuclear": "nuclear-all",
+            "nuclear (SMR)": "nuclear-all",
+            }
+            links = links.replace(rename_nuclear)
+    if config["solving"]["agg_p_nom_limits"]["agg_ccgt"]:
+        links = links.replace({"CCGT": "CCGT-all"})
     grouper = pd.concat([gens.bus.map(n.buses.country), gens.carrier], axis=1)
+    grouper_links = pd.concat([links.bus1.map(n.buses.country), links.carrier], axis=1)
     lhs = p_nom.groupby(grouper).sum().rename(bus="country")
+
+    if not links.empty:
+        eff_links = xr.DataArray(
+            links.efficiency,
+            coords={p_nom_link.dims[0]: links.index},
+            dims=[p_nom_link.dims[0]],
+        )
+        p_nom_e = p_nom_link.loc[links.index] * eff_links
+        lhs_links = p_nom_e.groupby(grouper_links).sum().rename(bus1="country")
+    else:
+        lhs_links = xr.DataArray([])
 
     if config["solving"]["agg_p_nom_limits"]["include_existing"]:
         gens_cst = n.generators.query("~p_nom_extendable").rename_axis(
@@ -596,10 +675,21 @@ def add_CCL_constraints(
         gens_cst = gens_cst[
             (gens_cst["build_year"] + gens_cst["lifetime"]) >= int(planning_horizons)
         ]
+        links_cst = n.links.query("~p_nom_extendable").rename_axis(index="Link-cst")
+        links_cst = links_cst[
+            (links_cst["build_year"] + links_cst["lifetime"]) >= int(planning_horizons)
+        ]
         if config["solving"]["agg_p_nom_limits"]["agg_offwind"]:
             gens_cst = gens_cst.replace(rename_offwind)
         if config["solving"]["agg_p_nom_limits"]["agg_solar"]:
             gens_cst = gens_cst.replace(rename_solar)
+        if config["solving"]["agg_p_nom_limits"]["agg_nuclear"]:
+            if foresight == "overnight":
+                gens_cst = gens_cst.replace(rename_nuclear)
+            else:
+                links_cst = links_cst.replace(rename_nuclear)
+        if config["solving"]["agg_p_nom_limits"]["agg_ccgt"]:
+            links_cst = links_cst.replace({"CCGT": "CCGT-all"})
         rhs_cst = (
             pd.concat(
                 [gens_cst.bus.map(n.buses.country), gens_cst[["carrier", "p_nom"]]],
@@ -608,37 +698,86 @@ def add_CCL_constraints(
             .groupby(["bus", "carrier"])
             .sum()
         )
+        links_cst = links_cst.assign(p_nom_e=links_cst.p_nom * links_cst.efficiency)
+        rhs_cst_links = (
+            pd.concat(
+                [
+                    links_cst.bus1.map(n.buses.country),
+                    links_cst[["carrier", "p_nom_e"]],
+                ],
+                axis=1,
+            )
+            .groupby(["bus1", "carrier"])
+            .sum()
+        )
         rhs_cst.index = rhs_cst.index.rename({"bus": "country"})
+        rhs_cst_links.index = rhs_cst_links.index.rename({"bus1": "country"})
         rhs_min = agg_p_nom_minmax["min"].dropna()
         idx_min = rhs_min.index.join(rhs_cst.index, how="left")
+        idx_min_links = rhs_min.index.join(rhs_cst_links.index, how="left")
         rhs_min = rhs_min.reindex(idx_min).fillna(0)
+        rhs_min_links = rhs_min.reindex(idx_min_links).fillna(0)
         rhs = (rhs_min - rhs_cst.reindex(idx_min).fillna(0).p_nom).dropna()
+        rhs_links = (
+            rhs_min_links - rhs_cst_links.reindex(idx_min_links).fillna(0).p_nom_e
+        ).dropna()
         rhs[rhs < 0] = 0
+        rhs_links[rhs_links < 0] = 0
         minimum = xr.DataArray(rhs).rename(dim_0="group")
+        minimum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:
         minimum = xr.DataArray(agg_p_nom_minmax["min"].dropna()).rename(dim_0="group")
+        minimum_links = xr.DataArray(agg_p_nom_minmax["min"].dropna()).rename(
+            dim_0="group"
+        )
 
     index = minimum.indexes["group"].intersection(lhs.indexes["group"])
+    index_links = minimum_links.indexes["group"].intersection(
+        lhs_links.indexes["group"]
+    )
     if not index.empty:
         n.model.add_constraints(
             lhs.sel(group=index) >= minimum.loc[index], name="agg_p_nom_min"
+        )
+    if not index_links.empty:
+        n.model.add_constraints(
+            lhs_links.sel(group=index_links) >= minimum_links.loc[index_links],
+            name="agg_p_nom_min_links",
         )
 
     if config["solving"]["agg_p_nom_limits"]["include_existing"]:
         rhs_max = agg_p_nom_minmax["max"].dropna()
         idx_max = rhs_max.index.join(rhs_cst.index, how="left")
+        idx_max_links = rhs_max.index.join(rhs_cst_links.index, how="left")
         rhs_max = rhs_max.reindex(idx_max).fillna(0)
-        rhs = (rhs_max - rhs_cst.reindex(idx_max).fillna(0).p_nom).dropna()
-        rhs[rhs < 0] = 0
-        maximum = xr.DataArray(rhs).rename(dim_0="group")
+        rhs_links[rhs_links < 0] = 0
+        maximum = xr.DataArray(rhs_max).rename(dim_0="group")
+        maximum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:
         maximum = xr.DataArray(agg_p_nom_minmax["max"].dropna()).rename(dim_0="group")
+        maximum_links = xr.DataArray(agg_p_nom_minmax["max"].dropna()).rename(
+            dim_0="group"
+        )
 
     index = maximum.indexes["group"].intersection(lhs.indexes["group"])
+    index_links = maximum_links.indexes["group"].intersection(
+        lhs_links.indexes["group"]
+    )
     if not index.empty:
         n.model.add_constraints(
             lhs.sel(group=index) <= maximum.loc[index], name="agg_p_nom_max"
         )
+    if not index_links.empty:
+        n.model.add_constraints(
+            lhs_links.sel(group=index_links) <= maximum_links.loc[index_links],
+            name="agg_p_nom_max_links",
+        )
+
+    # reset original country assignments
+    # if alias_buses and alias_original is not None:
+    #     n.buses.loc[list(alias_buses.keys()), "country"] = alias_original
+    # if buses_to_country and region_buses:
+    #     n.buses.loc[region_buses, "country"] = original_country
 
 
 def add_EQ_constraints(n, o, scaling=1e-1):
@@ -1163,7 +1302,301 @@ def add_co2_atmosphere_constraint(n, snapshots):
 
             n.model.add_constraints(lhs <= rhs, name=f"GlobalConstraint-{name}")
 
+def add_selfsufficiency_constraints(n, level):
+    """
+     Add self-sufficiency constraint using a import variable.
+     Addapted from the work of Koen van Greevenbroek
+    """
+    logger.info(f"Adding self sufficiency constraint")
 
+    def group(df, b="bus"):
+        """
+        Group given dataframe by bus location or country.
+        """
+        # Ensure 'location' exists in n.buses
+        return df[b].map(n.buses.location).to_xarray()
+
+    #Calculate Total Local Production
+    local_gen_carriers = list(
+        set(
+            config["pypsa_eur"]["Generator"]
+            + ["solar rooftop"]
+        )
+    )
+    local_gen_i = n.generators.loc[
+        n.generators.carrier.isin(local_gen_carriers)
+        & (n.generators.bus.map(n.buses.location) != "EU")
+    ].index
+    local_gen_p = (
+        n.model["Generator-p"]
+        .loc[:, local_gen_i]
+        .groupby(group(n.generators.loc[local_gen_i]))
+        .sum()
+    )
+    local_gen = (local_gen_p * n.snapshot_weightings.generators).sum("snapshot")
+
+    #Hydro
+    local_hydro_i = n.storage_units.loc[n.storage_units.carrier == "hydro"].index
+    local_hydro_p = (
+        n.model["StorageUnit-p_dispatch"]
+        .loc[:, local_hydro_i]
+        .groupby(group(n.storage_units.loc[local_hydro_i]))
+        .sum()
+    )
+    local_hydro = (local_hydro_p * n.snapshot_weightings.stores).sum("snapshot")
+
+    # Conventional technologies modeled as links in pypsa
+    conv_carriers = config["electricity"].get("conventional_carriers", {})
+    local_conv_gen_i = n.links.loc[n.links.carrier.isin(conv_carriers)].index
+    local_conv_gen = None
+    if len(local_conv_gen_i) > 0:
+        local_conv_gen_p = n.model["Link-p"].loc[:, local_conv_gen_i]
+        efficiencies = n.links.loc[local_conv_gen_i, "efficiency"]
+        local_conv_gen_p = (
+            (local_conv_gen_p * efficiencies)
+            .groupby(group(n.links.loc[local_conv_gen_i], b="bus1"))
+            .sum()
+            .rename({"bus1": "bus"})
+        )
+        local_conv_gen = (local_conv_gen_p * n.snapshot_weightings.generators).sum("snapshot")
+
+    # Total locally produced energy
+    local_energy = sum(e for e in [local_gen, local_hydro, local_conv_gen] if e is not None)
+
+    #Use a new import variable
+    buses = n.buses.location.rename("bus").drop_duplicates()
+    coords = {"bus": buses, "snapshot": n.snapshots}
+    dims = ("bus", "snapshot")
+    n.model.add_variables(
+      coords=coords,
+      dims=dims,
+      name="Import_p",
+      lower=0,
+    )
+    
+    #Define transmission lines and DC links
+    cross_region_lines = n.lines.loc[(group(n.lines, b="bus0") != group(n.lines, b="bus1")).to_numpy()]
+    cross_region_links = n.links.loc[(group(n.links, b="bus0") != group(n.links, b="bus1")).to_numpy()]
+    #Removing reversed transmission lines as efficiency is already considered
+    cross_region_links = cross_region_links.loc[ cross_region_links.carrier.isin(["DC"])
+    & ~cross_region_links.index.str.contains("reversed") ]
+
+    cross_region_components = {
+        'Line': cross_region_lines,
+        'Link': cross_region_links,
+    }
+
+    for component_name, df in cross_region_components.items():
+        if df.empty:
+            continue
+
+        if component_name == "Line":
+          avail = df["s_max_pu"]
+          flow = n.model["Line-s"].loc[:, df.index] / avail
+          inflow  = flow.groupby(group(df, "bus1")).sum()
+          outflow = flow.groupby(group(df, "bus0")).sum()
+        else:
+          eff = df["efficiency"]
+          flow = n.model["Link-p"].loc[:, df.index] / eff
+          inflow  = flow.groupby(group(df, "bus1")).sum()
+          outflow = flow.groupby(group(df, "bus0")).sum()
+        
+        #Total cross border flows
+        net = inflow - outflow
+        #Impose a positive netflow constraint to consider as imports
+        n.model.add_constraints(
+          n.model["Import_p"] >= net,
+          name=f"import_positive_{component_name}"
+        )
+        
+    #Total imported electricity
+    imported_elec = (
+      n.model["Import_p"] * n.snapshot_weightings.generators).sum("snapshot")
+    #Self-sufficiency constraint, level is set in configfile
+    n.model.add_constraints(
+      imported_elec <= (1 - level) * local_energy,
+      name="import_energy_limit")
+      
+def add_co2limit_country(n, limit_countries, nyears=1.0):
+    """
+    Add a set of emissions limit constraints for specified countries.
+    The countries and emissions limits are specified in the config file entry 'co2_budget_country_{investment_year}'.
+    Parameters
+    ----------
+    n : pypsa.Network
+    config : dict
+    limit_countries : dict
+    nyears: float, optional
+        Used to scale the emissions constraint to the number of snapshots of the base network.
+    """
+    logger.info(f"Adding CO2 budget limit for each country as per unit of 1990 levels")
+
+    countries = ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'NL', 'GB', 'LU']
+
+    # TODO: import function from prepare_sector_network? Move to common place?
+    sectors = determine_emission_sectors(options)
+    
+    # convert Mt to tCO2
+    co2_totals = 1e6 * pd.read_csv(snakemake.input.co2_totals_name, index_col=0)
+    co2_limit_countries = co2_totals.loc[countries, sectors].sum(axis=1)
+    if foresight == "overnight":
+        updates = {
+            "BEBRU": 9000000,
+            "BEVLG": 56000000,
+            "BEWAL": 31000000,
+            "DE": 649000000,
+            "FR": 369000000,
+            "NL": 147000000,
+            "GB": 385000000,
+            "LU": 9000000
+        }
+        co2_limit_countries.update(updates)
+    co2_limit_countries = co2_limit_countries.loc[
+        co2_limit_countries.index.isin(limit_countries.keys())
+    ]
+    if suff_demand:
+        lulucf = co2_totals.loc[countries, 'LULUCF']
+        lulucf[lulucf > 0] = 0
+        lulucf = lulucf * -1
+        co2_limit_countries *= co2_limit_countries.index.map(limit_countries) * nyears
+        co2_limit_countries = (co2_limit_countries + lulucf)
+    else:
+        co2_limit_countries *= co2_limit_countries.index.map(limit_countries) * nyears
+        co2_limit_countries = (co2_limit_countries)
+
+    p = n.model["Link-p"]  # dimension: (time, component)
+
+    # NB: Most country-specific links retain their locational information in bus1 (except for DAC, where it is in bus2, and pattern sources, where it is in bus0)
+    country = n.links.bus1.map(n.buses.location)
+    
+    country_DAC = (
+        n.links[n.links.carrier == "DAC"]
+        .bus3.map(n.buses.location)
+    )
+    country[country_DAC.index] = country_DAC
+    patterns = ["process emissions", "HVC to air", "electrobiofuels","unsustainable bioliquids","biomass-to-methanol","biomass to liquid"]
+
+    for pattern in patterns:
+      source = n.links[n.links.carrier.str.contains(pattern)].bus0.map(n.buses.location)
+      country[source.index] = source
+    mask = country.isna() | (country == '')
+    country[mask] = country[mask].index
+    country = country[country != 'EU']
+    lhs = []
+    for port in [col[3:] for col in n.links if col.startswith("bus")]:
+        if port == str(0):
+            efficiency = (
+                n.links["efficiency"].apply(lambda x: 1.0).rename("efficiency0")
+            )
+        elif port == str(1):
+            efficiency = n.links["efficiency"]
+        else:
+            efficiency = n.links[f"efficiency{port}"]
+        mask = n.links[f"bus{port}"].map(n.buses.carrier).eq("co2")
+
+        idx = n.links[mask].index
+        exclude = ["EU oil refining", "EU methanol import", "EU oil import"]
+        idx = idx[~np.isin(idx, exclude)]
+        idx = idx[idx.isin(country.index)]
+        grouping = country.loc[idx]
+
+        if not grouping.isnull().all():
+            expr = (
+                (p.loc[:, idx] * efficiency[idx])
+                .groupby(grouping, axis=1)
+                .sum()
+                * n.snapshot_weightings.generators
+            ).sum(dims="snapshot")
+            lhs.append(expr)
+
+    lhs = sum(lhs)  # dimension: (country)
+    lhs = lhs.rename({list(lhs.dims)[0]: "snapshot"})
+    rhs = pd.Series(co2_limit_countries)  # dimension: (country)
+    for ct in lhs.indexes["snapshot"]:
+        n.model.add_constraints(
+            lhs.loc[ct] <= rhs[ct],
+            name=f"GlobalConstraint-co2_limit_per_country{ct}",
+        )
+        n.add(
+            "GlobalConstraint",
+            f"co2_limit_per_country{ct}",
+            constant=rhs[ct],
+            sense="<=",
+            type="",
+        )
+
+def add_co2price_country(n, co2_price_countries, nyears=1.0):
+    """
+    Add a CO2 price per country by internalizing emissions into the objective.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+    co2_price_countries : dict
+        CO2 price in €/tCO2 per country (keys must match country codes)
+    nyears : float, optional
+        Scaling factor for snapshot weighting
+    """
+
+    logger.info("Adding CO2 price per country to objective function")
+    p = n.model["Link-p"]  # dimension: (time, component)
+
+    # NB: Most country-specific links retain their locational information in bus1 (except for DAC, where it is in bus2, and pattern sources, where it is in bus0)
+    country = n.links.bus1.map(n.buses.location)
+    
+    country_DAC = (
+        n.links[n.links.carrier == "DAC"]
+        .bus3.map(n.buses.location)
+    )
+    country[country_DAC.index] = country_DAC
+    patterns = ["process emissions", "HVC to air", "electrobiofuels","unsustainable bioliquids","biomass-to-methanol","biomass to liquid"]
+
+    for pattern in patterns:
+      source = n.links[n.links.carrier.str.contains(pattern)].bus0.map(n.buses.location)
+      country[source.index] = source
+    mask = country.isna() | (country == '')
+    country[mask] = country[mask].index
+    country = country[country != 'EU']
+    lhs = []
+    for port in [col[3:] for col in n.links if col.startswith("bus")]:
+        if port == str(0):
+            efficiency = (
+                n.links["efficiency"].apply(lambda x: 1.0).rename("efficiency0")
+            )
+        elif port == str(1):
+            efficiency = n.links["efficiency"]
+        else:
+            efficiency = n.links[f"efficiency{port}"]
+        mask = n.links[f"bus{port}"].map(n.buses.carrier).eq("co2")
+
+        idx = n.links[mask].index
+        exclude = ["EU oil refining", "EU methanol import", "EU oil import"]
+        idx = idx[~np.isin(idx, exclude)]
+        idx = idx[idx.isin(country.index)]
+        grouping = country.loc[idx]
+
+        if not grouping.isnull().all():
+            expr = (
+                (p.loc[:, idx] * efficiency[idx])
+                .groupby(grouping, axis=1)
+                .sum()
+                * n.snapshot_weightings.generators
+            ).sum(dims="snapshot")
+            lhs.append(expr)
+
+    lhs = sum(lhs)  # dimension: (country)
+    dim = list(lhs.dims)[0]
+    price = pd.Series(co2_price_countries)
+    # align with lhs countries
+    price = price.reindex(lhs.indexes[dim]).fillna(0.0)
+    price_da = xr.DataArray(price, dims=[dim])
+    # total CO2 cost
+    co2_cost = (lhs * price_da * nyears).sum(dim=dim)
+    n.model.objective = n.model.objective + co2_cost
+
+    logger.info("CO2 pricing successfully added to objective.")
+    
+    
 def extra_functionality(
     n: pypsa.Network, snapshots: pd.DatetimeIndex, planning_horizons: str | None = None
 ) -> None:
@@ -1233,6 +1666,26 @@ def extra_functionality(
 
     if config["sector"]["imports"]["enable"]:
         add_import_limit_constraint(n, snapshots)
+    if config["self_sufficiency"]["self_sufficiency_constraint"]:
+            level = config["self_sufficiency"]["level"]
+            add_selfsufficiency_constraints(n, level)
+    if n.config["co2_budget_national"]:
+        # prepare co2 constraint
+        nhours = n.snapshot_weightings.generators.sum()
+        nyears = nhours / 8760
+        investment_year = int(snakemake.wildcards.planning_horizons[-4:])
+        limit_countries = snakemake.config["budget_national"][investment_year]
+        # add co2 constraint for each country
+        add_co2limit_country(n, limit_countries, nyears)
+        
+    if n.config["co2_price_national"]:
+        # prepare co2 constraint
+        nhours = n.snapshot_weightings.generators.sum()
+        nyears = nhours / 8760
+        investment_year = int(snakemake.wildcards.planning_horizons[-4:])
+        co2_price_countries = snakemake.config["price_national"][investment_year]
+        # add co2 constraint for each country
+        add_co2price_country(n,co2_price_countries,nyears)
 
     if n.params.custom_extra_functionality:
         source_path = n.params.custom_extra_functionality
@@ -1409,6 +1862,45 @@ def create_optimization_model(
     logger.info("Adding extra functionality (custom constraints)...")
     extra_functionality(n, n.snapshots, planning_horizons)
 
+def add_adjust_caps(
+    n: pypsa.Network,
+) -> None:
+    investment_year = int(snakemake.wildcards.planning_horizons[-4:])
+    n.generators.loc["DE 0 onwind", "p_nom"] = 68000
+    n.generators.loc["DE 0 onwind", "p_nom_min"] = 68000
+    n.generators.loc["DE 0 offwind-ac", "p_nom"] = 10000
+    n.generators.loc["DE 0 offwind-ac", "p_nom_min"] = 10000
+    n.generators.loc["FR 0 offwind-ac", "p_nom"] = 1600
+    n.generators.loc["FR 0 offwind-ac", "p_nom_min"] = 1600
+    n.generators.loc["GB 0 onwind", "p_nom"] = 15000
+    n.generators.loc["GB 0 onwind", "p_nom_min"] = 15000
+    n.generators.loc["FR 0 onwind", "p_nom"] = 24000
+    n.generators.loc["FR 0 onwind", "p_nom_min"] = 24000
+    n.generators.loc["NL 0 offwind-ac", "p_nom"] = 4700
+    n.generators.loc["NL 0 offwind-ac", "p_nom_min"] = 4700
+    n.generators.loc["GB 0 offwind-ac", "p_nom"] = 16000
+    n.generators.loc["GB 0 offwind-ac", "p_nom_min"] = 16000
+    n.generators.loc["FR nuclear", "p_nom_min"] = 62907.02
+    n.generators.loc["FR nuclear", "p_nom"] = 62907.02
+    n.generators.loc["NL nuclear", "p_nom_min"] = 485
+    n.generators.loc["NL nuclear", "p_nom"] = 485
+    n.generators.loc["GB nuclear", "p_nom_min"] = 5510
+    n.generators.loc["GB nuclear", "p_nom"] = 5510
+    # if investment_year == 2025:
+    n.generators.loc["BEWAL nuclear", "p_nom_min"] = 1980
+    n.generators.loc["BEWAL nuclear", "p_nom"] = 1980
+    n.generators.loc["BEVLG nuclear", "p_nom_min"] = 1980
+    n.generators.loc["BEVLG nuclear", "p_nom"] = 1980
+    # elif investment_year > 2025:
+    #   n.generators.loc["BEWAL nuclear", "p_nom_min"] = 1000
+    #   n.generators.loc["BEWAL nuclear", "p_nom"] = 1000
+    #   n.generators.loc["BEVLG nuclear", "p_nom_min"] = 1000
+    #   n.generators.loc["BEVLG nuclear", "p_nom"] = 1000
+    # else:
+    #  n.generators.loc["BEWAL nuclear", "p_nom_min"] = 0
+    #  n.generators.loc["BEWAL nuclear", "p_nom"] = 0
+    #  n.generators.loc["BEVLG nuclear", "p_nom_min"] = 0
+    #  n.generators.loc["BEVLG nuclear", "p_nom"] = 0
 
 if __name__ == "__main__":
     if "snakemake" not in globals():
@@ -1425,16 +1917,17 @@ if __name__ == "__main__":
     configure_logging(snakemake)
     set_scenario_config(snakemake)
     update_config_from_wildcards(snakemake.config, snakemake.wildcards)
-
+    options = snakemake.params.sector
     solve_opts = snakemake.params.solving["options"]
     cf_solving = snakemake.params.solving["options"]
-
+    config = snakemake.config
+    suff_demand = config.get("sector", {}).get("suff_demand", False)
     np.random.seed(solve_opts.get("seed", 123))
 
     # Load network
     n = pypsa.Network(snakemake.input.network)
     planning_horizons = snakemake.wildcards.get("planning_horizons", None)
-
+    foresight=snakemake.params.foresight
     # Prepare network (settings before solving)
     prepare_network(
         n,
@@ -1444,7 +1937,8 @@ if __name__ == "__main__":
         co2_sequestration_potential=snakemake.params["co2_sequestration_potential"],
         limit_max_growth=snakemake.params.get("sector", {}).get("limit_max_growth"),
     )
-
+    if foresight == "overnight":
+        add_adjust_caps(n)
     # Determine solve mode
     rolling_horizon = cf_solving.get("rolling_horizon", False)
     skip_iterations = cf_solving.get("skip_iterations", False)

@@ -17,6 +17,9 @@ import powerplantmatching as pm
 import pypsa
 import xarray as xr
 
+from scripts.walloon_scripts.nuclear_helper import add_BEWAL_nuclear
+from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
+
 from scripts._helpers import (
     configure_logging,
     load_costs,
@@ -28,6 +31,7 @@ from scripts.add_electricity import sanitize_carriers
 from scripts.build_energy_totals import cartesian
 from scripts.definitions.heat_system import HeatSystem
 from scripts.prepare_sector_network import cluster_heat_buses, define_spatial
+
 
 logger = logging.getLogger(__name__)
 cc = coco.CountryConverter()
@@ -222,7 +226,7 @@ def add_power_capacities_installed_before_baseyear(
     df_agg.drop(df_agg.index[df_agg.Fueltype.isin(fueltype_to_drop)], inplace=True)
     df_agg.drop(df_agg.index[df_agg.Technology.isin(technology_to_drop)], inplace=True)
     df_agg.Fueltype = df_agg.Fueltype.map(rename_fuel)
-
+    
     # Fill missing DateIn
     df_agg["DateIn"] = df_agg.groupby("Fueltype")["DateIn"].transform(
         lambda x: x.fillna(x.mean() // 1)
@@ -257,13 +261,9 @@ def add_power_capacities_installed_before_baseyear(
         to_drop = df_agg[df_agg.DateIn > max(grouping_years)].index
         df_agg.drop(to_drop, inplace=True)
 
-    df_agg["grouping_year"] = pd.cut(
-        df_agg.DateIn,
-        bins=grouping_years,
-        labels=grouping_years[1:],
-        right=True,
-        include_lowest=True,
-    ).astype(int)
+    df_agg["grouping_year"] = np.take(
+        grouping_years, np.digitize(df_agg.DateIn, grouping_years, right=True)
+    )
 
     # calculate (adjusted) remaining lifetime before phase-out (+1 because assuming
     # phase out date at the end of the year)
@@ -434,6 +434,16 @@ def add_power_capacities_installed_before_baseyear(
             )
             n.generators.loc[existing_large, "p_nom_max"] = n.generators.loc[
                 existing_large, "p_nom_min"
+            ]
+        # check if existing link capacities are larger than technical potential
+        link_existing_large = n.links[n.links["p_nom_min"] > n.links["p_nom_max"]].index
+        if len(link_existing_large):
+            logger.warning(
+                "Existing link capacities larger than technical potential for "
+                f"{link_existing_large}, adjust technical potential to existing capacities",
+            )
+            n.links.loc[link_existing_large, "p_nom_max"] = n.links.loc[
+                link_existing_large, "p_nom_min"
             ]
 
 
@@ -717,11 +727,12 @@ def add_heating_capacities_installed_before_baseyear(
                 ].sum()
                 > 0
             ):
+                bus0 = spatial.biomass.nodes[0] if isinstance(spatial.biomass.nodes, pd.Index) else spatial.biomass.nodes
                 n.add(
                     "Link",
                     nodes,
                     suffix=f" {heat_system} biomass boiler-{grouping_year}",
-                    bus0=spatial.biomass.nodes,
+                    bus0=bus0,
                     bus1=nodes + " " + heat_system.value + " heat",
                     carrier=heat_system.value + " biomass boiler",
                     efficiency=efficiency,
@@ -845,4 +856,19 @@ if __name__ == "__main__":
 
     sanitize_custom_columns(n)
     sanitize_carriers(n, snakemake.config)
+    add_BEWAL_nuclear(
+        n=n,
+        planning_horizon=int(snakemake.wildcards.planning_horizons),
+        extendable_nuclear_nodes=(
+            snakemake.config["electricity"]["extendable_carriers"]
+            .get("extendable_nuclear_links", {})
+        ),
+    )
+
+
+    update_BEWAL_potentials(
+        n=n,
+        planning_horizons=int(snakemake.wildcards.planning_horizons),
+        walloon_potentials=snakemake.config["electricity"].get("walloon_potentials", None),
+    )
     n.export_to_netcdf(snakemake.output[0])

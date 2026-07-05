@@ -129,16 +129,12 @@ class _EstimateRenewableCapacitiesConfig(BaseModel):
         True,
         description="Activate routine to estimate renewable capacities in rule `add_electricity`. This option should not be used in combination with pathway planning `foresight: myopic` or `foresight: perfect` as renewable capacities are added differently in `add_existing_baseyear`.",
     )
-    from_powerplantmatching: bool = Field(
+    from_gem: bool = Field(
         True,
-        description="Add renewable capacities from powerplantmatching dataset.",
-    )
-    from_irenastat: bool = Field(
-        False,
-        description="Supplement powerplantmatching dataset with heuristics based on country-level renewable capacities from IRENA (IRENASTAT).",
+        description="Add renewable capacities from `Global Energy Monitor's Global Solar Power Tracker <https://globalenergymonitor.org/projects/global-solar-power-tracker/>`_ and `Global Energy Monitor's Global Wind Power Tracker <https://globalenergymonitor.org/projects/global-wind-power-tracker/>`_.",
     )
     year: int = Field(
-        2024,
+        2020,
         description="Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
     )
     expansion_limit: float | bool = Field(
@@ -208,7 +204,7 @@ class ElectricityConfig(BaseModel):
         description="Defines which carriers are extendable during optimization.",
     )
     powerplants_filter: str | bool = Field(
-        "(DateOut > 2025 or DateOut != DateOut) and (DateIn < 2026 or DateIn != DateIn)",
+        "(DateOut >= 2024 or DateOut != DateOut) and not (Country == 'Germany' and Fueltype == 'Nuclear')",
         description="Filter query for the default powerplant database.",
     )
     custom_powerplants: str | bool = Field(
@@ -228,7 +224,6 @@ class ElectricityConfig(BaseModel):
             "coal",
             "lignite",
             "geothermal",
-            "waste",
             "biomass",
         ],
         description="List of conventional power plants to include in the model from `resources/powerplants_s_{clusters}.csv`. If an included carrier is also listed in `extendable_carriers`, the capacity is taken as a lower bound.",
@@ -256,6 +251,17 @@ class ElectricityConfig(BaseModel):
     transmission_limit: str = Field(
         "vopt",
         description="Limit on transmission expansion. The first part can be `v` (for setting a limit on line volume) or `c` (for setting a limit on line cost). The second part can be `opt` or a float bigger than one (e.g. 1.25). If `opt` is chosen line expansion is optimised according to its capital cost (where the choice `v` only considers overhead costs for HVDC transmission lines, while `c` uses more accurate costs distinguishing between overhead and underwater sections and including inverter pairs). The setting `v1.25` will limit the total volume of line expansion to 25% of currently installed capacities weighted by individual line lengths. The setting `c1.25` will allow to build a transmission network that costs no more than 25 % more than the current system.",
+    )
+    transmission_limit_myopic: dict[int, str] = Field(
+        default_factory=lambda: {
+            2025: "v1.05",
+            2030: "v1.05",
+            2035: "v1.05",
+            2040: "v1.05",
+            2045: "v1.05",
+            2050: "v1.05",
+        },
+        description="Limit on transmission expansion. The first part can be ``v`` (for setting a limit on line volume) or ``c`` (for setting a limit on line cost). The second part can be ``opt`` or a float bigger than one (e.g. 1.25). If ``opt`` is chosen line expansion is optimised according to its capital cost (where the choice ``v`` only considers overhead costs for HVDC transmission lines, while ``c`` uses more accurate costs distinguishing between overhead and underwater sections and including inverter pairs). The setting ``v1.25`` will limit the total volume of line expansion to 25% of currently installed capacities weighted by individual line lengths. The setting ``c1.25`` will allow to build a transmission network that costs no more than 25 % more than the current system.",
     )
 
     model_config = ConfigDict(populate_by_name=True)

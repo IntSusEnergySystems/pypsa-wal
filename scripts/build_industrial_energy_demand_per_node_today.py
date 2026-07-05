@@ -84,7 +84,8 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "build_industrial_energy_demand_per_node_today",
-            clusters=48,
+            clusters="48",
+            planning_horizons="2030",
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)
