@@ -108,3 +108,7 @@ data/walloon/*.vd
 
 # DS_Store
 .DS_Store
+
+cluster/logs/*.log
+cluster/.last_jobs
+cluster/logs/orchestrate.pid

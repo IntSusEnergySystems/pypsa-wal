@@ -167,6 +167,7 @@ costs:
   custom_cost_fn: data/walloon/custom_costs_rc.csv
 
 solving:
+  mem_mb: 32000
   agg_p_nom_limits:
     agg_offwind: true
     agg_solar: true
