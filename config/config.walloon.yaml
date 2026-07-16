@@ -125,7 +125,8 @@ sector:
     potential: 0.3
 
 co2_budget_national: true
-co2_budget_national:
+co2_price_national: false
+budget_national:
   2025:
     BEBRU: 0.64
     BEVLG: 0.64
@@ -162,7 +163,10 @@ co2_budget_national:
     GB: 0.05
     NL: 0.05
     LU: 0.05
-    
+
+self_sufficiency:
+  self_sufficiency_constraint: false
+  level: 0.7   
 costs:
   custom_cost_fn: data/walloon/custom_costs_rc.csv
 
