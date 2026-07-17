@@ -24,6 +24,7 @@
 #   ./cluster/nic5.sh wait        # block until jobs finish
 #   ./cluster/nic5.sh pull        # rsync solved results back
 #   ./cluster/nic5.sh postprocess # LOCAL: touch solve outputs, rebuild summaries
+#   ./cluster/nic5.sh upload      # publish results/ to Intervectoriel S3 (test/)
 ###############################################################################
 set -euo pipefail
 
@@ -350,6 +351,20 @@ cmd_postprocess() {
         -- $targets 2>&1 | tee -a "$log"
 
     msg "Post-processing complete (log: $log)."
+    cmd_upload_s3
+}
+
+cmd_upload_s3() {
+    if [ "${AUTO_UPLOAD_S3:-1}" != "1" ]; then
+        msg "AUTO_UPLOAD_S3!=1 — skipping S3 upload (run: $0 upload)"
+        return 0
+    fi
+    msg "Publishing results to Intervectoriel S3 ($S3_ENV/)"
+    bash "$HERE/upload_s3.sh" 2>&1 | tee -a "$HERE/logs/upload_s3.log"
+}
+
+cmd_upload() {
+    bash "$HERE/upload_s3.sh" "$@"
 }
 
 cmd_setup() {
@@ -383,6 +398,7 @@ case "${1:-}" in
     wait)        shift; cmd_wait "$@";;
     pull)        shift; cmd_pull "$@";;
     postprocess) shift; cmd_postprocess "$@";;
+    upload)      shift; cmd_upload "$@";;
     run)         shift; cmd_run "$@";;
     shell)       shift; cmd_shell "$@";;
     *) cat <<EOF
@@ -395,8 +411,9 @@ Usage: $0 <command> [args...]
   status        show queue and orchestrator logs
   wait          block until the submitted orchestrator finishes
   pull          rsync solved results back into ./results
-  postprocess   LOCAL (after pull): --touch solve outputs, rebuild summaries/plots
-  run           prepare + push + solve + wait + pull + postprocess
+  postprocess   LOCAL (after pull): --touch solve outputs, rebuild summaries/plots, upload S3
+  upload        publish results/ to Intervectoriel S3 (test/ by default; see upload_s3.sh)
+  run           prepare + push + solve + wait + pull + postprocess (+ S3 upload)
   shell         open an interactive shell in the cluster repo
 
   Examples:

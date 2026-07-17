@@ -175,6 +175,10 @@ Re-enabling horizons or resolution changes re-triggers upstream build rules.
 | `results/walloon-model/logs/*_python.log` | Python-side solve logs |
 | `.snakemake/log/` | Master Snakemake run log |
 
+After a successful local solve, publish results to the Wallonie Explorer with
+`./cluster/nic5.sh upload` (raw results) followed by the ClimAct CSV extraction
+described in [Publishing to Wallonie Explorer (S3)](#publishing-to-wallonie-explorer-s3).
+
 ---
 
 ## Running the optimisation on NIC5 / CÉCI
@@ -232,7 +236,8 @@ Or step by step:
 | `./cluster/nic5.sh status` | `squeue`, orchestrator log tail |
 | `./cluster/nic5.sh wait` | Block until the orchestrator finishes |
 | `./cluster/nic5.sh pull` | `rsync` solved `results/` and cluster logs back |
-| `./cluster/nic5.sh postprocess` | **Local**: `--touch` solve outputs, rebuild summary CSVs and `costs.svg` |
+| `./cluster/nic5.sh postprocess` | **Local**: `--touch` solve outputs, rebuild summary CSVs and `costs.svg`, upload to S3 (test) |
+| `./cluster/nic5.sh upload` | Publish `results/` to Intervectoriel S3 (`test/` by default) |
 | `./cluster/nic5.sh shell` | Interactive shell in the cluster checkout |
 
 **Progress during `prepare`:** output is streamed to the terminal and logged in
@@ -256,6 +261,11 @@ The script:
    files only (does not re-run Gurobi).
 3. Runs summary targets: `results/walloon-model/csvs/costs.csv`,
    `results/walloon-model/graphs/costs.svg`, `results/walloon-model/csvs/cumulative_costs.csv`.
+4. Uploads to S3: the full `results/walloon-model/` tree to `pypsa_raw_results/`, and
+   `results/walloon-model/explorer/` CSVs to `scenarios/` when that folder is populated
+   (see [Publishing to Wallonie Explorer (S3)](#publishing-to-wallonie-explorer-s3)).
+
+To skip the S3 step: `SKIP_S3_UPLOAD=1 ./cluster/nic5.sh postprocess`
 
 > **Warning — `--touch`**: updates modification times only; it does **not**
 > verify file contents. Use only after a successful cluster solve and `pull`.
@@ -308,6 +318,244 @@ hmem node memory limit (~1 000 000 MB on NIC5).
 
 ---
 
+## Publishing to Wallonie Explorer (S3)
+
+Solved PyPSA results are published to the **Intervectoriel** S3 bucket so the
+[Wallonie Explorer](https://explorer.test.wallonie.climact.com/) Streamlit app
+can display them. This is **separate from SEPIA** (the in-repo HTML/visualisation
+tool under `SEPIA/`); Explorer uses its own CSV format produced by the ClimAct
+extraction tool.
+
+Operational reference (credentials, contacts, console login): `project-intervectoriel.md`
+in the `llm` notes repository.
+
+### End-to-end workflow
+
+```
+1. Run PyPSA-Wal (local Snakemake or cluster nic5.sh run)
+      ↓  results/walloon-model/networks/*.nc + csvs/ + graphs/
+2. Upload raw results → s3://intervectoriel/test/pypsa_raw_results/YYYYMMDD_walloon-model/
+      ↓  ./cluster/nic5.sh upload   (automatic after postprocess)
+3. Extract Explorer CSVs (ClimAct tool, datapypsa env)
+      ↓  49 pypsa/*.csv + strategy/*.csv
+4. Copy CSVs to results/walloon-model/explorer/ and re-upload
+      ↓  ./cluster/nic5.sh upload   (syncs explorer/ → scenarios/ on S3)
+5. Open Explorer test site, pick scenario, click "Clear cache" if needed
+```
+
+Steps 2 and 4 can be combined: run step 3 first, copy CSVs into
+`results/walloon-model/explorer/`, then run `./cluster/nic5.sh upload` once.
+
+### S3 layout and naming
+
+Bucket: `intervectoriel` (region `eu-central-1`). The Explorer test site reads
+from the `test/` prefix.
+
+```
+s3://intervectoriel/test/
+├── pypsa_raw_results/                         ← full Snakemake results/ tree
+│   └── YYYYMMDD_<run_name>/                   e.g. 20260717_walloon-model/
+│       ├── csvs/ graphs/ networks/ logs/ maps/ configs/
+│       └── run.json
+├── scenarios/                                 ← Explorer scenario picker
+│   └── <type>__<scenario>__YYYYMMDD/          e.g. pypsa__walloon-model__20260717
+│       ├── pypsa/                             ← 49 Streamlit CSVs
+│       └── strategy/                          ← strategy_metrics*.csv
+├── archive_pypsa/
+└── fallback_pypsa/
+```
+
+**Naming rules** (must match exactly — Explorer ignores folders with the wrong shape):
+
+| S3 destination | Pattern | Walloon example |
+|----------------|---------|-----------------|
+| Raw results | `YYYYMMDD_<run_name>` | `20260717_walloon-model` |
+| Scenario folder | `<type>__<scenario>__YYYYMMDD` | `pypsa__walloon-model__20260717` |
+| Explorer display label | `{scenario} ({type}) - DD/MM/YYYY` | `walloon-model (pypsa) - 17/07/2026` |
+
+The `<type>` prefix comes from the extraction config `run_nickname`
+(`20260717_pypsa` → type `pypsa`). Other projects use `times-pypsa`, `sensibilité`, etc.
+
+### Prerequisites
+
+- AWS CLI with profile `intervectoriel` (see `project-intervectoriel.md`):
+
+  ```bash
+  export PATH="$HOME/.local/bin:$PATH"
+  export AWS_PROFILE=intervectoriel
+  aws sts get-caller-identity --region eu-central-1
+  ```
+
+- Solved results under `results/walloon-model/` (four `.nc` networks, solver logs with
+  `Optimal objective`).
+
+### Step 1 — Upload raw results
+
+Runs automatically at the end of `./cluster/nic5.sh postprocess` and `./cluster/nic5.sh run`.
+Disable with `SKIP_S3_UPLOAD=1` or `AUTO_UPLOAD_S3=0` in [`cluster/config.sh`](cluster/config.sh).
+
+```bash
+./cluster/nic5.sh upload              # manual
+./cluster/nic5.sh upload --dry-run    # preview
+./cluster/upload_s3.sh                # standalone (same behaviour)
+```
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `S3_ENV` | `test` | `test` or `prod` prefix |
+| `UPLOAD_ID` | `YYYYMMDD_<RUN_NAME>` | Folder under `pypsa_raw_results/` |
+| `SCENARIO_ID` | `pypsa__<RUN_NAME>__YYYYMMDD` | Folder under `scenarios/` |
+| `UPLOAD_SKIP_NETWORKS` | `0` | Set `1` to omit large `.nc` files |
+| `SKIP_S3_UPLOAD` | `0` | Set `1` to skip upload in `postprocess` |
+| `AUTO_UPLOAD_S3` | `1` | Set `0` to never auto-upload from `postprocess` |
+
+Implementation note: upload uses [`cluster/upload_s3.sh`](cluster/upload_s3.sh) (bash,
+not Snakemake) — same pattern as `nic5.sh push`/`pull`, keeps AWS credentials and
+network access on the local machine.
+
+### Step 2 — Extract Explorer CSVs (ClimAct tool)
+
+Snakemake postprocess produces summary CSVs (`costs.csv`, `energy.csv`, …) under
+`results/walloon-model/csvs/`. The **Streamlit Explorer expects a different set**
+of 49 CSV files (`balancing_capacities.csv`, `load_temporal_2025.csv`, …) generated
+by the ClimAct extraction repo:
+
+```
+/path/to/climact-pypsa-eur_results_extraction-88d352b59aa4
+```
+
+#### One-time setup
+
+```bash
+# Separate conda env — pypsa 0.35.x required (pypsa-eur uses pypsa 1.x and will fail)
+conda create -n datapypsa -c conda-forge -y python=3.11 pypsa=0.35.2 pandas \
+  matplotlib plotly pyyaml openpyxl cloudpathlib boto3 s3fs dask joblib
+```
+
+#### Per-run extraction
+
+Set `UPLOAD_DATE=$(date +%Y%m%d)` and `UPLOAD_ID="${UPLOAD_DATE}_walloon-model"`.
+
+1. **Symlink** local results into the extraction repo (folder name = `UPLOAD_ID`):
+
+   ```bash
+   EXTRA=/path/to/climact-pypsa-eur_results_extraction-88d352b59aa4
+   mkdir -p "$EXTRA/results"
+   ln -sfn /path/to/pypsa-wal/results/walloon-model \
+     "$EXTRA/results/${UPLOAD_ID}"
+   ```
+
+2. **Edit** `config_extraction_walloon.yaml` in the extraction repo:
+
+   ```yaml
+   scenario_extraction:
+     run:
+       "20260717_walloon-model":          # must match UPLOAD_ID / symlink name
+         scenario_nickname: "walloon-model"
+         run_nickname: "20260717_pypsa"   # YYYYMMDD_<type> → scenario folder prefix
+         config_file: "config.base_s_adm___2050.yaml"
+   ```
+
+   Set `download_networks: False` when using the local symlink (or `True` to read
+   networks from `s3://intervectoriel/test/pypsa_raw_results/` instead).
+
+3. **Run** extraction (point `graph_extraction_main.py` at `config_extraction_walloon.yaml`):
+
+   ```bash
+   cd "$EXTRA"
+   export PYTHONPATH=.
+   conda run -n datapypsa python -m scripts.graph_extraction_main
+   ```
+
+   Output:
+
+   ```
+   analysis/graph_extraction_st/v6/pypsa__walloon-model__20260717/   ← 49 pypsa CSVs
+   analysis/strategy/v6/pypsa__walloon-model__20260717/               ← strategy CSVs
+   ```
+
+4. **Stage** for upload via pypsa-wal:
+
+   ```bash
+   LABEL=pypsa__walloon-model__20260717   # from run_nickname + scenario_nickname + date
+   mkdir -p /path/to/pypsa-wal/results/walloon-model/explorer/pypsa
+   mkdir -p /path/to/pypsa-wal/results/walloon-model/explorer/strategy
+   cp "$EXTRA/analysis/graph_extraction_st/v6/${LABEL}/"*.csv \
+      /path/to/pypsa-wal/results/walloon-model/explorer/pypsa/
+   cp "$EXTRA/analysis/strategy/v6/${LABEL}/"*.csv \
+      /path/to/pypsa-wal/results/walloon-model/explorer/strategy/
+   ```
+
+   Alternatively, upload directly with `aws s3 sync` (see below).
+
+### Step 3 — Upload Explorer CSVs to S3
+
+**Option A** — via pypsa-wal upload script (after staging into `explorer/`):
+
+```bash
+cd /path/to/pypsa-wal
+SCENARIO_ID=pypsa__walloon-model__20260717 ./cluster/nic5.sh upload
+```
+
+**Option B** — direct `aws s3 sync` from extraction output:
+
+```bash
+SCENARIO=pypsa__walloon-model__20260717
+LABEL="$SCENARIO"
+EXTRA=/path/to/climact-pypsa-eur_results_extraction-88d352b59aa4
+
+aws s3 sync "$EXTRA/analysis/graph_extraction_st/v6/${LABEL}/" \
+  "s3://intervectoriel/test/scenarios/${SCENARIO}/pypsa/" \
+  --profile intervectoriel --region eu-central-1
+
+aws s3 sync "$EXTRA/analysis/strategy/v6/${LABEL}/" \
+  "s3://intervectoriel/test/scenarios/${SCENARIO}/strategy/" \
+  --profile intervectoriel --region eu-central-1
+```
+
+**Option C** — enable built-in upload in the extraction tool (`upload_results: True`
+in `config_extraction_walloon.yaml`); it writes directly to the scenario prefix
+using the same folder label.
+
+### Step 4 — Verify in Explorer
+
+```bash
+export AWS_PROFILE=intervectoriel
+aws s3 ls s3://intervectoriel/test/pypsa_raw_results/20260717_walloon-model/
+aws s3 ls s3://intervectoriel/test/scenarios/pypsa__walloon-model__20260717/pypsa/ | wc -l
+# expect 49
+```
+
+Open [https://explorer.test.wallonie.climact.com/](https://explorer.test.wallonie.climact.com/),
+select **`walloon-model (pypsa) - 17/07/2026`**, and click **Clear cache** if the
+new scenario does not appear immediately.
+
+### Troubleshooting Explorer
+
+| Symptom | Likely cause / fix |
+|---------|-------------------|
+| Scenario missing from dropdown | Folder name must be **three parts** separated by `__`: `<type>__<scenario>__YYYYMMDD`. A two-part name like `walloon-model__20260717` is ignored. |
+| Wrong display label | Check `run_nickname` in `config_extraction_walloon.yaml` — the part after `YYYYMMDD_` becomes the `(type)` label (e.g. `20260717_pypsa` → `(pypsa)`). |
+| Upload OK but Explorer empty | Click **Clear cache** on the test site; confirm 49 files under `.../scenarios/<id>/pypsa/`. |
+| Extraction fails with pypsa import error | Use the `datapypsa` env (pypsa 0.35.x), not `pypsa-eur` (pypsa 1.x). |
+| Only raw results on S3 | Run ClimAct extraction, copy CSVs to `results/walloon-model/explorer/`, then `./cluster/nic5.sh upload`. |
+
+### Production promotion
+
+| Item | Value |
+|------|-------|
+| Prod Explorer URL | [https://explorer.wallonie.climact.com/](https://explorer.wallonie.climact.com/) |
+| Prod S3 prefix | `prod/` |
+| Write access to `prod/` | <!-- TODO: confirm with Laurent (lco@climact.com) before first prod upload --> |
+
+```bash
+# After validation on test — only when prod write is confirmed:
+S3_ENV=prod ./cluster/nic5.sh upload
+# Re-run extraction upload with s3_scenario_folder_path: s3://intervectoriel/prod/scenarios/
+```
+
+---
+
 ## Repository layout (workflow-relevant)
 
 ```
@@ -318,6 +566,7 @@ hmem node memory limit (~1 000 000 MB on NIC5).
 │   └── config.walloon.yaml        # Walloon study configuration
 ├── cluster/
 │   ├── nic5.sh                    # Local ↔ cluster orchestration
+│   ├── upload_s3.sh               # Publish results/ to Intervectoriel S3
 │   ├── cluster_setup.sh           # One-time remote env install
 │   ├── config.sh                  # SSH paths, Slurm defaults
 │   └── config_cluster.yaml        # Solver/memory overrides on NIC5
@@ -328,6 +577,7 @@ hmem node memory limit (~1 000 000 MB on NIC5).
 ├── cutouts/                       # Atlite weather cutouts (downloaded)
 ├── resources/walloon-model/       # Intermediate build artefacts
 └── results/walloon-model/         # Solved networks, CSVs, plots
+    └── explorer/                  # Staged ClimAct CSVs for S3 (pypsa/, strategy/)
 ```
 
 ---
@@ -353,6 +603,8 @@ hmem node memory limit (~1 000 000 MB on NIC5).
 | Gurobi / solve OOM on cluster | Raise `solving.mem_mb` in `cluster/config_cluster.yaml` (max ~1 000 000 MB on hmem); ensure `SOLVE_PARTITION=hmem` in `cluster/config.sh` |
 | Snakemake rebuilds everything after `pull` | Re-run `./cluster/nic5.sh postprocess` (touch + summaries); do not delete `.snakemake/metadata` locally |
 | Missing `config/scenarios.yaml` | Not required unless you set `run.scenarios.enable: true` in config |
+| S3 upload fails after postprocess | Check `cluster/logs/upload_s3.log`; verify `aws sts get-caller-identity --profile intervectoriel`; use `SKIP_S3_UPLOAD=1` to postprocess without upload |
+| Explorer scenario not in dropdown | See **Troubleshooting Explorer** under Publishing to Wallonie Explorer (S3) |
 | First run hangs on Zenodo cutout download | Symlink `cutouts/europe-2013-sarah3-era5.nc` from `~/.cache/snakemake-pypsa-eur/...` if you already retrieved it for pypsa-eur; or wait for the download to finish |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
 

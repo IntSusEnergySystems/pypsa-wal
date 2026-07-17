@@ -62,3 +62,18 @@ SECTOR_OPTS="${SECTOR_OPTS:-}"
 # --no-capture-output: stream Snakemake progress to the terminal (conda run buffers by default).
 LOCAL_RUN="${LOCAL_RUN:-conda run --no-capture-output -n pypsa-eur}"
 LOCAL_CORES="${LOCAL_CORES:-16}"
+
+# --- Intervectoriel S3 (Wallonie Explorer) -----------------------------------
+# Used by cluster/upload_s3.sh (called automatically after postprocess).
+# Credentials: AWS profile [intervectoriel] in ~/.aws/credentials (see instructions.md).
+AWS_PROFILE="${AWS_PROFILE:-intervectoriel}"
+AWS_REGION="${AWS_REGION:-eu-central-1}"
+S3_BUCKET="${S3_BUCKET:-intervectoriel}"
+S3_ENV="${S3_ENV:-test}"                       # test → explorer.test… ; prod → explorer…
+AUTO_UPLOAD_S3="${AUTO_UPLOAD_S3:-1}"           # 1 = upload after nic5.sh postprocess/run
+SKIP_S3_UPLOAD="${SKIP_S3_UPLOAD:-0}"          # 1 = skip upload even when AUTO_UPLOAD_S3=1
+UPLOAD_SKIP_NETWORKS="${UPLOAD_SKIP_NETWORKS:-0}"  # 1 = omit large .nc files
+# Optional overrides (defaults: YYYYMMDD_<RUN_NAME> and <RUN_NAME>__YYYYMMDD):
+# UPLOAD_ID=20260717_walloon-model
+# SCENARIO_ID=pypsa__walloon-model__20260717
+# EXPLORER_SRC=results/walloon-model/explorer/pypsa
