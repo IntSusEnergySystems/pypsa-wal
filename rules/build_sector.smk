@@ -841,6 +841,36 @@ rule build_swiss_energy_balances:
         scripts("build_swiss_energy_balances.py")
 
 
+def input_clever_sufficiency(w) -> dict[str, str]:
+    """Optional negaWatt CLEVER sufficiency CSVs (only when sector.suff_demand is enabled)."""
+    if not config.get("sector", {}).get("suff_demand", False):
+        return {}
+    ph = w.planning_horizons
+    prefix = "data/sufficiency"
+    return {
+        "clever_residential": f"{prefix}/clever_residential_{ph}.csv",
+        "clever_Transport": f"{prefix}/clever_Transport_{ph}.csv",
+        "clever_Agriculture": f"{prefix}/clever_Agriculture_{ph}.csv",
+        "clever_Tertairy": f"{prefix}/clever_Tertairy_{ph}.csv",
+        "clever_AFOLUB": f"{prefix}/clever_AFOLUB_{ph}.csv",
+        "clever_Macro": f"{prefix}/clever_Macro_{ph}.csv",
+    }
+
+
+def input_clever_industry(w) -> dict[str, str]:
+    if not config.get("sector", {}).get("suff_demand", False):
+        return {}
+    ph = w.planning_horizons
+    return {"clever_industry": f"data/sufficiency/clever_Industry_{ph}.csv"}
+
+
+def input_clever_transport(w) -> dict[str, str]:
+    if not config.get("sector", {}).get("suff_demand", False):
+        return {}
+    ph = w.planning_horizons
+    return {"clever_Transport": f"data/sufficiency/clever_Transport_{ph}.csv"}
+
+
 rule build_energy_totals:
     message:
         "Building energy totals"
@@ -851,6 +881,7 @@ rule build_energy_totals:
         planning_horizons=config_provider("scenario", "planning_horizons"),
         energy_totals_year=config_provider("energy", "energy_totals_year"),
     input:
+        unpack(input_clever_sufficiency),
         nuts3_shapes=resources("nuts3_shapes.geojson"),
         co2=rules.retrieve_ghg_emissions.output["csv"],
         swiss=resources("switzerland_energy_balances.csv"),
@@ -860,12 +891,6 @@ rule build_energy_totals:
         eurostat=resources("eurostat_energy_balances.csv"),
         eurostat_households=rules.retrieve_eurostat_household_balances.output["csv"],
         clustered_pop_layout=resources("pop_layout_base_s_{clusters}.csv"),
-        clever_residential = "data/sufficiency/clever_residential_{planning_horizons}.csv",
-        clever_Transport = "data/sufficiency/clever_Transport_{planning_horizons}.csv",
-        clever_Agriculture = "data/sufficiency/clever_Agriculture_{planning_horizons}.csv",
-        clever_Tertairy = "data/sufficiency/clever_Tertairy_{planning_horizons}.csv",
-        clever_AFOLUB = "data/sufficiency/clever_AFOLUB_{planning_horizons}.csv",
-        clever_Macro = "data/sufficiency/clever_Macro_{planning_horizons}.csv",
     output:
         transformation_output_coke=resources("transformation_output_coke_{clusters}_{planning_horizons}.csv"),
         energy_name=resources("energy_totals_raw_{clusters}_{planning_horizons}.csv"),
@@ -892,7 +917,7 @@ rule update_nW_BE:
         planning_horizons=config_provider("scenario", "planning_horizons"),
         energy_totals_year=config_provider("energy", "energy_totals_year"),
     input:
-        clever_Transport = "data/sufficiency/clever_Transport_{planning_horizons}.csv",
+        unpack(input_clever_transport),
         energy_totals=resources("energy_totals_raw_{clusters}_{planning_horizons}.csv"),
     output:
         energy_name=resources("energy_totals_{clusters}_{planning_horizons}.csv"),
@@ -1253,6 +1278,7 @@ rule build_industrial_energy_demand_per_node:
     message:
         "Building industrial energy demand per network node for {wildcards.clusters} clusters and {wildcards.planning_horizons} planning horizon"
     input:
+        unpack(input_clever_industry),
         industry_sector_ratios=resources(
             "industry_sector_ratios_{clusters}_{planning_horizons}.csv"
         ),
@@ -1263,7 +1289,6 @@ rule build_industrial_energy_demand_per_node:
             "industrial_energy_demand_today_base_s_{clusters}_{planning_horizons}.csv"
         ),
         wallon_demands = resources("wallon_demands_{planning_horizons}.csv"),
-        clever_industry = "data/sufficiency/clever_Industry_{planning_horizons}.csv",
         clustered_pop_layout=resources("pop_layout_base_s_{clusters}.csv"),
     output:
         industrial_energy_demand_per_node=resources(
@@ -1787,7 +1812,11 @@ rule prepare_sector_network:
             else []
         ),
         ntc_csv="data/walloon/ntc_{planning_horizons}.csv",
-        clever_transport = resources("clever_Transport_{clusters}_{planning_horizons}.csv"),
+        clever_transport=lambda w: (
+            resources("clever_Transport_{clusters}_{planning_horizons}.csv")
+            if config.get("sector", {}).get("suff_demand", False)
+            else []
+        ),
     output:
         resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"

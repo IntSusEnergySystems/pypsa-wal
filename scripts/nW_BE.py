@@ -1493,9 +1493,9 @@ if __name__ == "__main__":
     year=snakemake.params.energy_totals_year
     country = 'BE'
     planning_horizon = int(snakemake.wildcards.planning_horizons)
-    clever_totals = pd.read_csv(snakemake.input.clever_Transport, index_col=0)
     energy_totals = pd.read_csv(snakemake.input.energy_totals, index_col=0)
     if suff_demand:
+        clever_totals = pd.read_csv(snakemake.input.clever_Transport, index_col=0)
         results = transport()
 
         def split_powertrains(df):
@@ -1601,6 +1601,6 @@ if __name__ == "__main__":
         clever_totals.to_csv(snakemake.output.clever_name)
     else:
         energy_totals.to_csv(snakemake.output.energy_name)
-        clever_totals.to_csv(snakemake.output.clever_name)
+        pd.DataFrame(index=["BE"]).to_csv(snakemake.output.clever_name)
 
 

@@ -82,14 +82,15 @@ if __name__ == "__main__":
     nodal_df["current electricity"] = nodal_today["electricity"]
     countries = ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'NL', 'GB', 'LU']
     pop_layout = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0)
-    def clever_industry_data():
-        fn = snakemake.input.clever_industry
-        df= pd.read_csv(fn ,index_col=0)
-        return df
-    clever_Industry = clever_industry_data()
-    clever_totals = clever_Industry.loc[pop_layout.ct].fillna(0.0)
-    clever_totals.index = pop_layout.index
-    clever_totals = clever_totals.multiply(pop_layout.fraction, axis=0)
+    if suff_demand:
+        def clever_industry_data():
+            fn = snakemake.input.clever_industry
+            df= pd.read_csv(fn ,index_col=0)
+            return df
+        clever_Industry = clever_industry_data()
+        clever_totals = clever_Industry.loc[pop_layout.ct].fillna(0.0)
+        clever_totals.index = pop_layout.index
+        clever_totals = clever_totals.multiply(pop_layout.fraction, axis=0)
     nodal_df.index.name = "TWh/a (MtCO2/a)"
     if times_demand:
        wallon_node = config["run"]["wallon_node"]

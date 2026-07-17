@@ -80,6 +80,10 @@ def plot_energy_balance_timeseries(
     if time is not None:
         df = df.loc[time]
 
+    if df.empty:
+        logger.warning("Empty balance time series for %s — skipping plot.", ylabel)
+        return
+
     # Handle small values and renaming
     techs_below_threshold = df.columns[
         (df.abs().max() < max_threshold) & (df.abs().mean() < mean_threshold)

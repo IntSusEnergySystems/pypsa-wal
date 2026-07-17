@@ -257,7 +257,11 @@ cmd_wait() {
         sleep 60
     done
     printf '\n'
-    if rssh "grep -qE 'Nothing to be done|steps \(100%\) done|Complete log' '$REMOTE_DIR/cluster/logs/orchestrate.log'" 2>/dev/null; then
+    if rssh "grep -qE 'steps \(100%\) done' '$REMOTE_DIR/cluster/logs/orchestrate.log'" 2>/dev/null; then
+        msg "Orchestrator: OK"
+    elif rssh "grep -q 'WorkflowError' '$REMOTE_DIR/cluster/logs/orchestrate.log'" 2>/dev/null; then
+        warn "Orchestrator: FAILED (cluster/logs/orchestrate.log)"
+    elif rssh "grep -qE 'Nothing to be done|Complete log' '$REMOTE_DIR/cluster/logs/orchestrate.log'" 2>/dev/null; then
         msg "Orchestrator: OK"
     else
         warn "Orchestrator: CHECK LOG (cluster/logs/orchestrate.log) — may have errors"

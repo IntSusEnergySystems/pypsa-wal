@@ -3,6 +3,8 @@
 Sector-coupled energy system optimisation for Belgium with emphasis on the
 Wallonia region (`BEWAL`), built on [PyPSA-Eur](https://github.com/PyPSA/pypsa-eur).
 
+**Repository:** [https://github.com/IntSusEnergySystems/pypsa-wal](https://github.com/IntSusEnergySystems/pypsa-wal)
+
 These instructions describe how to install the environment, run the Snakemake
 workflow **locally**, and offload the LP solve to the **NIC5 / CÉCI** cluster
 using the helper scripts in [`cluster/`](cluster/). The main [`README.md`](README.md)

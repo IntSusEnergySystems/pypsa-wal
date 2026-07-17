@@ -1,6 +1,6 @@
 # Discount rates in PyPSA-Wal
 
-This note reviews how **financial discount rates** (WACC) and **social discount rates** are used in PyPSA-Wal (a soft-fork of PyPSA-Eur / PyPSA-Eur-Sec), based on the configuration files, cost pipeline, and source code. It answers whether different technologies can have different discount rates, what is already supported, and what it would take to extend the workflow.
+This note reviews how **financial discount rates** (WACC / hurdle rates) and **social discount rates** are used in PyPSA-Wal (a soft-fork of PyPSA-Eur / PyPSA-Eur-Sec), based on the configuration files, cost pipeline, and source code. It also summarises harmonisation discussions with the **TIMES** demand model (§9). It answers whether different technologies can have different discount rates, what is already supported, and what it would take to extend the workflow.
 
 Default values below come from `config/config.default.yaml` plus `config/config.walloon.yaml` overrides where noted. Cost assumptions are from **PyPSA `technology-data` v0.13.3** (`costs.year: 2050`), processed by `scripts/process_cost_data.py`.
 
@@ -15,7 +15,9 @@ Two distinct discount-rate concepts appear in the workflow. They must not be con
 | **Financial discount rate** (WACC) | `costs.fill_values."discount rate"` | **7%** | Annualise overnight CAPEX into `capital_cost` (€/MW/a) |
 | **Social discount rate** | `costs.social_discountrate` | **2%** | Weight costs across investment periods in perfect-foresight runs |
 
-The financial rate reflects **project financing** (cost of capital over an asset's economic lifetime). The social rate reflects **societal time preference** when comparing welfare across planning horizons — it is not technology-specific and is unrelated to WACC.
+The financial rate reflects **project financing** (cost of capital over an asset's economic lifetime).
+
+In cost–benefit analysis and public policy appraisal, the **social discount rate (SDR)** is the rate used to convert future costs and benefits into present-value terms, so that alternatives with different time profiles can be compared on a consistent basis. Unlike WACC, which reflects an investor's cost of capital, the SDR reflects **society's time preference** — how policy-makers and citizens collectively trade off well-being today against well-being in the future. A higher SDR means that distant effects count for less in today's decisions; for long-horizon problems such as climate change or energy infrastructure, even small changes in the SDR can materially shift present-value rankings. Many governments estimate the SDR using the **Ramsey rule**, \(r = \rho + \mu g\), where \(\rho\) is pure time preference, \(\mu\) is the elasticity of marginal utility of consumption, and \(g\) is expected per-capita consumption growth (see e.g. [HM Treasury Green Book](https://www.gov.uk/government/publications/the-green-book) guidance). Typical values in developed countries are often in the range of 2–7%. In PyPSA-Wal, this concept appears as the single global parameter `costs.social_discountrate` (default 2%): it weights costs across investment periods in perfect-foresight runs and is not technology-specific — it does not enter per-technology CAPEX annualisation.
 
 PyPSA-Wal does **not** propagate `discount_rate` onto network components. Instead, the financial discount rate is applied **upstream** when building the processed cost table; components receive pre-annualised `capital_cost` values.
 
@@ -218,7 +220,117 @@ If `capital_cost` is set directly in `custom_costs.csv`, it bypasses the annuity
 
 ---
 
-## 9. Key code locations
+## 9. TIMES–PyPSA harmonisation (ICEDD / Climact discussion, July 2026)
+
+This section summarises email exchanges (Julien Simon, ICEDD; Dimitri Krings, Climact; July 2026) on aligning discount-rate assumptions between **TIMES** (demand-side, perfect foresight) and **PyPSA-Wal** (electricity supply, myopic). The goal is consistent input data and comparable results across the coupled modelling workflow.
+
+### 9.1 Three distinct concepts — do not conflate
+
+| Concept | Role | In TIMES | In PyPSA-Wal |
+|---------|------|----------|--------------|
+| **Social discount rate (SDR)** | Weights **all cost flows** across investment periods (society's time preference) | **3.5%** — aligned with the Belgian OLO rate, defended at project start | **`costs.social_discountrate` = 2%** (PyPSA-Eur default); applies only in **perfect-foresight** runs via `investment_period_weightings` |
+| **Hurdle rate / financial discount rate** | Annualises **overnight CAPEX** into fixed annual cost; reflects perceived cost of capital + decision/behavioural risk | Sector-specific (7.5–12%); see §9.3 | Per-technology `discount rate` in cost pipeline → `capital_cost`; default **7%**, **4%** for eight decentral/residential technologies in technology-data |
+| **Administrative / non-financial barriers** | Permits, renovation pace, works disruption, etc. | **Not** in hurdle rates — captured in **rate constraints** (e.g. renovation ceiling in high-demand scenario) | Same principle: not part of `discount rate`; use constraints or exogenous capacity paths |
+
+**Hurdle rates** in the TIMES setup combine **financing cost** with **decision-making and behavioural barriers linked to perceived risk** (current investment frictions). They do **not** include administrative barriers, which are modelled separately.
+
+### 9.2 How each rate enters each model
+
+```mermaid
+flowchart LR
+    subgraph TIMES["TIMES (perfect foresight)"]
+        T1["SDR 3.5%"] --> T2["Discount all cost flows between periods"]
+        T3["Hurdle rate per sector"] --> T4["Annuity: overnight CAPEX → annual cost"]
+    end
+    subgraph PyPSA["PyPSA-Wal (myopic, Walloon config)"]
+        P1["SDR 2%"] --> P2["Only if perfect-foresight; no inter-period weighting in myopic solve"]
+        P3["discount rate per technology"] --> P4["process_cost_data: annuity → capital_cost"]
+    end
+```
+
+**TIMES** uses two rates throughout the trajectory:
+
+1. **SDR (3.5%)** — discounts the full stream of costs (and benefits) from one investment period to the next across the whole pathway.
+2. **Hurdle rates** — sector-specific rates in the annuity formula that converts investment cost into an annualised charge in the objective; higher hurdle rates make CAPEX-heavy options less attractive relative to OPEX-heavy ones.
+
+**PyPSA-Wal** maps as follows:
+
+1. **SDR** — parameter `costs.social_discountrate`. In the **Walloon project** (`foresight: myopic` in `config/config.walloon.yaml`), the optimiser does **not** discount between planning horizons; each myopic step optimises within a single period. SDR then matters mainly for **perfect-foresight** experiments and **post-processing** (present-value summaries). Julien's initial reading — that 3.5% has no direct equivalent in myopic PyPSA — is therefore largely correct for the operational solve, but **harmonisation to 3.5%** may still be needed for PF runs and for cumulative-cost reporting if results are compared with TIMES on a present-value basis.
+2. **Hurdle rate** — direct transposition to PyPSA's per-technology **`discount rate`** column (via `custom_costs.csv` / `data/walloon/custom_costs_rc.csv`), which feeds the annuity in `process_cost_data.py` (§2.2). This is **not** the same config key as `social_discountrate`.
+
+### 9.3 Proposed TIMES hurdle rates and PyPSA mapping
+
+TIMES hurdle rates by investor sector (Julien, July 2026):
+
+| Hurdle rate | TIMES sector | Representative technologies |
+|-------------|--------------|----------------------------|
+| **7.5%** | Electricity production, cogen, PV, upstream energy, all transport | On/offshore wind, hydro, nuclear, gas plants, PV, cogen, electricity storage, grids, district heating, DAC; EV charging and vehicles |
+| **10%** | Industry | Industrial heat pumps, electric/gas/biomass boilers, process CO₂ capture, feedstock |
+| **11%** | Tertiary and agriculture | Tertiary heat pumps, gas boilers, solar thermal, tertiary retrofit |
+| **12%** | Residential | Residential heat pumps (air/geothermal), gas boilers, decentral thermal storage, residential retrofit |
+
+**Transposition rule for PyPSA:** assign each PyPSA technology the hurdle rate of the **sector that owns the investment decision**. Technologies that TIMES treats on the **supply / production** side — **utility PV, domestic batteries, district heating networks** — should use **7.5%**, not the residential (12%) or tertiary (11%) rate, even when they serve households.
+
+**Current PyPSA-Wal defaults (misalignment):**
+
+| | TIMES logic | PyPSA-Wal default |
+|---|-------------|-------------------|
+| Residential / decentral heat | **Higher** hurdle (12%) → favours OPEX over CAPEX | **Lower** rate (4%) for eight decentral technologies |
+| Utility-scale generation | **Lower** hurdle (7.5%) | **7%** fill value (close, but not identical) |
+
+Dimitri noted that a December test with higher uniform rates had a **strong impact** (sharp drop in renewables). Re-aligning to TIMES sectoral hurdles — and reversing the decentral preferential rate — needs to be re-evaluated once input data are harmonised.
+
+**Implementation in PyPSA (no code changes):** add rows to the custom costs file, e.g.:
+
+```csv
+planning_horizon,technology,parameter,value,unit,source,further description
+all,onwind,discount rate,0.075,per unit,TIMES hurdle — production,
+all,solar,discount rate,0.075,per unit,TIMES hurdle — production,
+all,solar-rooftop,discount rate,0.075,per unit,TIMES hurdle — production (supply-side),
+all,decentral air-sourced heat pump,discount rate,0.12,per unit,TIMES hurdle — residential,
+```
+
+Then re-run `process_cost_data` and downstream network rules (§5).
+
+### 9.4 Optimisation scope — who invests in what
+
+A separate but linked harmonisation issue: **which model builds which capacity**.
+
+| Model | Intended scope | Foresight |
+|-------|----------------|-----------|
+| **TIMES** | **Demand** — vector choice, consumption technologies (heat pumps, boilers, EVs, district heating), renovation | Perfect foresight on vector arbitrage |
+| **PyPSA** | **Electricity supply** — utility PV (incl. rooftop where in scope), wind, batteries, nuclear, grids, etc. | Myopic within the electricity vector; tri-hourly dispatch, interconnectors |
+
+**Agreed division (as presented to stakeholders):** TIMES optimises demand-side investment and fuel/vector switching; **decentral heating capacities and electrification levels are imposed on PyPSA** from TIMES outputs. PyPSA retains **operational flexibility** (dispatch) of those capacities but should **not** independently re-optimise the same demand-side build-out — otherwise the two models would reconstruct different fleets and demand results would no longer be consistent.
+
+At the time of writing, PyPSA's current setup **can** still invest in decentral heat pumps, boilers, and solar thermal; this boundary needs explicit verification and, if necessary, constraint or exogenous-capacity wiring from TIMES.
+
+### 9.5 Scenario design — when to apply hurdle rates
+
+Two scenarios define a **technology range** for network operators rather than a single point estimate:
+
+| Scenario | Demand assumption | Hurdle rates |
+|----------|-------------------|--------------|
+| **Demande maîtrisée / transition PACE** | Full implementation of demand-side policies | **None** in either model — behavioural and financial barriers assumed removed by policy |
+| **Trajectoire réaliste** | High demand | **Applied** in both models — prudent trajectory reflecting capital cost and perceived risk |
+
+The **gap between scenarios** serves two purposes: (1) a **min–max range per technology** (power / number of installations) for grid planners; (2) a quantification of **upside potential** from de-risking mechanisms (e.g. CfDs from work package 2).
+
+Administrative pace limits (e.g. renovation cap in high-demand scenario) remain in **constraints**, not in hurdle rates.
+
+### 9.6 Open harmonisation checklist
+
+| Item | Status / action |
+|------|-----------------|
+| Shared input assumptions (CAPEX, OPEX, potentials) | Work in progress (Raphaël Capart — single assumptions file) |
+| **SDR: 3.5% (TIMES) vs 2% (PyPSA)** | To harmonise; clarify impact in myopic vs PF / post-processing |
+| **Hurdle rates: sectoral (TIMES) vs 7%/4% (PyPSA)** | To harmonise via `custom_costs.csv`; fix inverted decentral logic |
+| **Optimisation perimeter** | Confirm PyPSA does not re-optimise TIMES-owned demand investments |
+| **Sensitivity ranges** | Use PACE vs realistic trajectory pair; allow capacity updates through February |
+
+---
+
+## 10. Key code locations
 
 | Topic | File |
 |-------|------|
@@ -235,7 +347,7 @@ If `capital_cost` is set directly in `custom_costs.csv`, it bypasses the annuity
 
 ---
 
-## 10. Bottom line
+## 11. Bottom line
 
 - **PyPSA core** supports per-component `discount_rate` when using the `overnight_cost` API; **PyPSA-Wal does not use that path** and instead bakes financing assumptions into `capital_cost` during `process_cost_data`.
 
@@ -243,6 +355,8 @@ If `capital_cost` is set directly in `custom_costs.csv`, it bypasses the annuity
 
 - **Setting different WACC per technology requires no code changes** — add `discount rate` entries to `custom_costs.csv` (or the Walloon custom costs file) and re-run the cost and network rules.
 
-- **Social discount rate** (`social_discountrate`, default 2%) is a **single global** parameter for multi-period welfare weighting and is separate from technology financing.
+- **Social discount rate** (`social_discountrate`, default 2%) is a **single global** parameter for multi-period welfare weighting and is separate from technology financing. The TIMES coupled workflow uses **3.5%**; harmonisation and the limited role of SDR in **myopic** PyPSA runs are discussed in §9.
+
+- **TIMES–PyPSA alignment** (§9): hurdle rates in TIMES map to PyPSA's per-technology `discount rate`; current defaults **invert** the intended sectoral logic (4% decentral vs 12% residential in TIMES). Shared assumptions, SDR, hurdle rates, model scope, and scenario pairs (PACE vs realistic) remain open.
 
 - The main gap for full per-technology consistency is the **EGS cost function**, which still reads the global fill value; switching to PyPSA-native component-level `discount_rate` attributes would be a broader refactor with moderate effort but clearer traceability on the network object.
