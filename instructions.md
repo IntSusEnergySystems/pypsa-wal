@@ -338,7 +338,7 @@ in the `llm` notes repository.
       ↓  ./cluster/nic5.sh upload   (automatic after postprocess)
 3. Extract Explorer CSVs (ClimAct tool, datapypsa env)
       ↓  49 pypsa/*.csv + strategy/*.csv
-4. Copy CSVs to results/walloon-model/explorer/ and re-upload
+4. Copy CSVs to results/walloon-model/explorer/ and stage TIMES .vd in explorer/times/
       ↓  ./cluster/nic5.sh upload   (syncs explorer/ → scenarios/ on S3)
 5. Open Explorer test site, pick scenario, click "Clear cache" if needed
 ```
@@ -360,7 +360,8 @@ s3://intervectoriel/test/
 ├── scenarios/                                 ← Explorer scenario picker
 │   └── <type>__<scenario>__YYYYMMDD/          e.g. pypsa__walloon-model__20260717
 │       ├── pypsa/                             ← 49 Streamlit CSVs
-│       └── strategy/                          ← strategy_metrics*.csv
+│       ├── strategy/                          ← strategy_metrics*.csv
+│       └── times/                             ← TIMES .vd file(s) — see times_data_extraction.md
 ├── archive_pypsa/
 └── fallback_pypsa/
 ```
@@ -517,6 +518,21 @@ aws s3 sync "$EXTRA/analysis/strategy/v6/${LABEL}/" \
 in `config_extraction_walloon.yaml`); it writes directly to the scenario prefix
 using the same folder label.
 
+### Step 3b — Publish TIMES data (`.vd`)
+
+If the run used TIMES demand coupling (`sector.times_demand: true`), upload the
+source `.vd` file so Explorer can show TIMES charts. See
+[`times_data_extraction.md`](times_data_extraction.md) for the full procedure.
+
+Quick version:
+
+```bash
+VD=data/walloon/scen_base_coherence_3110.vd   # must match sector.times_file in config
+mkdir -p results/walloon-model/explorer/times
+cp -L "$VD" "results/walloon-model/explorer/times/$(basename "$VD")"
+SCENARIO_ID=pypsa__walloon-model__20260717 ./cluster/nic5.sh upload
+```
+
 ### Step 4 — Verify in Explorer
 
 ```bash
@@ -539,6 +555,7 @@ new scenario does not appear immediately.
 | Upload OK but Explorer empty | Click **Clear cache** on the test site; confirm 49 files under `.../scenarios/<id>/pypsa/`. |
 | Extraction fails with pypsa import error | Use the `datapypsa` env (pypsa 0.35.x), not `pypsa-eur` (pypsa 1.x). |
 | Only raw results on S3 | Run ClimAct extraction, copy CSVs to `results/walloon-model/explorer/`, then `./cluster/nic5.sh upload`. |
+| TIMES tab empty | Upload the `.vd` to `explorer/times/` — see [`times_data_extraction.md`](times_data_extraction.md) |
 
 ### Production promotion
 
@@ -577,7 +594,7 @@ S3_ENV=prod ./cluster/nic5.sh upload
 ├── cutouts/                       # Atlite weather cutouts (downloaded)
 ├── resources/walloon-model/       # Intermediate build artefacts
 └── results/walloon-model/         # Solved networks, CSVs, plots
-    └── explorer/                  # Staged ClimAct CSVs for S3 (pypsa/, strategy/)
+    └── explorer/                  # Staged ClimAct CSVs + TIMES .vd for S3 (pypsa/, strategy/, times/)
 ```
 
 ---

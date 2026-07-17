@@ -48,6 +48,7 @@ UPLOAD_ID="${UPLOAD_ID:-${UPLOAD_DATE}_${RUN_NAME}}"
 SCENARIO_ID="${SCENARIO_ID:-pypsa__${RUN_NAME}__${UPLOAD_DATE}}"
 EXPLORER_SRC="${EXPLORER_SRC:-$RESULTS_DIR/explorer/pypsa}"
 EXPLORER_STRATEGY_SRC="${EXPLORER_STRATEGY_SRC:-$RESULTS_DIR/explorer/strategy}"
+EXPLORER_TIMES_SRC="${EXPLORER_TIMES_SRC:-$RESULTS_DIR/explorer/times}"
 
 aws_cmd() {
     export PATH="${HOME}/.local/bin:${PATH}"
@@ -139,6 +140,12 @@ cmd_upload() {
         local strategy_dest="${S3_ENV}/scenarios/${SCENARIO_ID}/strategy/"
         sync_results "$EXPLORER_STRATEGY_SRC/" "$strategy_dest"
         msg "Strategy CSVs uploaded to s3://${S3_BUCKET}/${strategy_dest}"
+    fi
+
+    if [ -d "$EXPLORER_TIMES_SRC" ] && [ -n "$(find "$EXPLORER_TIMES_SRC" -maxdepth 1 -type f -name '*.vd' -print -quit 2>/dev/null)" ]; then
+        local times_dest="${S3_ENV}/scenarios/${SCENARIO_ID}/times/"
+        sync_results "$EXPLORER_TIMES_SRC/" "$times_dest"
+        msg "TIMES .vd uploaded to s3://${S3_BUCKET}/${times_dest}"
     fi
 
     if [ "$DRY_RUN" -eq 1 ]; then
