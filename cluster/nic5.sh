@@ -9,9 +9,9 @@
 # back for post-processing.
 #
 # pypsa-wal uses a single scenario (config/config.walloon.yaml, run name
-# "walloon-model"). Temporal resolution is fixed in that config
-# (clustering.temporal.resolution_sector: 3000h) — there is no sector_opts
-# resolution switch like in pypsa-eur_negawatt.
+# "walloon-model"). Temporal resolution is set in that config
+# (clustering.temporal.resolution_sector, e.g. 6h) — there is no sector_opts
+# resolution switch like in pypsa-eur_negawatt. Solves run on NIC5 `hmem`.
 #
 #   ./cluster/nic5.sh setup       # one-time: install env on the cluster
 #   ./cluster/nic5.sh run         # full test: prepare+push+solve+wait+pull+postprocess
@@ -172,14 +172,18 @@ cmd_push() {
     msg "Push complete."
 }
 
-REMOTE_ENV='source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate '"$ENV_NAME"' && unset PYTHONPATH && export GRB_LICENSE_FILE=$HOME/gurobi.lic'
+# Keep Snakemake/Gurobi caches off $HOME — CÉCI home has a 200k-file quota and
+# Miniforge alone exceeds it; scratch (BeeGFS) has ~100+ TB free and no such limit.
+REMOTE_ENV='source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate '"$ENV_NAME"' && unset PYTHONPATH && export GRB_LICENSE_FILE=$HOME/gurobi.lic && export XDG_CACHE_HOME='"$REMOTE_DIR"'/.cache && export TMPDIR='"$REMOTE_DIR"'/tmp && mkdir -p "$XDG_CACHE_HOME" "$TMPDIR"'
 
 cmd_solve() {
-    local solve_cpus targets log pidf pid
+    local solve_cpus targets log pidf pid cache_dir
     solve_cpus=$(cluster_cpus)
     [ -n "$solve_cpus" ] || die "solving.cpus not set in cluster/config_cluster.yaml"
+    cache_dir="$REMOTE_DIR/.cache/snakemake-runtime-cache"
     : > "$JOBFILE"
-    msg "Launching Slurm orchestrator on the login node (cpus=$solve_cpus)"
+    msg "Launching Slurm orchestrator on the login node (partition=$SOLVE_PARTITION, cpus=$solve_cpus)"
+    msg "  scratch caches: XDG_CACHE_HOME=$REMOTE_DIR/.cache  TMPDIR=$REMOTE_DIR/tmp"
     targets=$(solved_targets | tr '\n' ' ')
     log="cluster/logs/orchestrate.log"
     pidf="cluster/logs/orchestrate.pid"
@@ -188,6 +192,8 @@ cmd_solve() {
             --configfile $CONFIGFILE \
             --executor slurm --jobs $MAX_SLURM_JOBS \
             --rerun-triggers mtime --keep-going --printshellcmds \
+            --runtime-source-cache-path '$cache_dir' \
+            --envvars XDG_CACHE_HOME TMPDIR GRB_LICENSE_FILE \
             --default-resources slurm_partition=$SOLVE_PARTITION runtime=$SOLVE_RUNTIME mem_mb=$DEFAULT_MEM_MB slurm_account=ceci \
             --set-resources solve_sector_network_myopic:cpus_per_task=$solve_cpus \
             --set-threads solve_sector_network_myopic=$solve_cpus \
@@ -224,9 +230,46 @@ done <<< "$running"
 REMOTE
 }
 
+status_hmem_queue() {
+    rssh "bash -s" "$SOLVE_PARTITION" <<'REMOTE'
+set -uo pipefail
+partition="${1:-hmem}"
+echo "=== partition $partition (sinfo) ==="
+sinfo -p "$partition" -o '%P %a %D %t %C %m' 2>/dev/null || { echo "(partition not found)"; exit 0; }
+echo
+echo "=== $partition jobs by state ==="
+squeue -p "$partition" -h -o '%T' 2>/dev/null | sort | uniq -c | sort -rn || true
+echo
+echo "=== $partition jobs by user (running + pending) ==="
+squeue -p "$partition" -h -t RUNNING,PENDING -o '%u' 2>/dev/null \
+    | sort | uniq -c | sort -rn | head -10 || echo "(none)"
+echo
+running=$(squeue -p "$partition" -h -t RUNNING -o '%.10u %.18i %.10M %j' 2>/dev/null || true)
+if [ -n "$running" ]; then
+    echo "=== $partition running (all users) ==="
+    echo "$running" | head -10
+    [ "$(echo "$running" | wc -l)" -gt 10 ] && echo "... ($(echo "$running" | wc -l) total running)"
+else
+    echo "=== $partition running (all users) ==="
+    echo "(none)"
+fi
+pending=$(squeue -p "$partition" -h -t PENDING -o '%.10u %.18i %.10M %R' 2>/dev/null || true)
+if [ -n "$pending" ]; then
+    echo
+    echo "=== $partition pending (first 10) ==="
+    echo "$pending" | head -10
+    n_pending=$(echo "$pending" | wc -l)
+    [ "$n_pending" -gt 10 ] && echo "... ($n_pending total pending)"
+fi
+REMOTE
+}
+
 cmd_status() {
     msg "Slurm queue on $REMOTE (squeue --me):"
     rssh "squeue --me --format='%.18i %.10P %.26j %.8T %.10M %R'" 2>/dev/null
+    echo
+    msg "Partition queue ($SOLVE_PARTITION):"
+    status_hmem_queue
     echo
     msg "Live jobs:"
     status_job_usage

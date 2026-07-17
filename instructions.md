@@ -26,7 +26,7 @@ memory-intensive Gurobi solve is optionally delegated to the cluster.
 | Foresight | Myopic (2025 → 2030 → 2040 → 2050) |
 | Countries | BE, FR, GB, NL, DE, LU |
 | Spatial clustering | Custom 3-node Belgium (`adm` + `custom_busmap_BE`) |
-| Temporal resolution | Coarse sector snapshots (`resolution_sector: 3000h`) |
+| Temporal resolution | Sector snapshots (`resolution_sector: 6h` in default Walloon config) |
 | Solver | Gurobi (`gurobi-default`) |
 
 Walloon-specific settings (nuclear expansion, custom potentials/costs, NTC
@@ -149,9 +149,8 @@ and Gurobi `threads`; it does not change model physics.)
 
 ### Reducing runtime for testing
 
-The default Walloon config already uses a **coarse** sector time aggregation
-(`clustering.temporal.resolution_sector: 3000h`), which keeps solve times short.
-For even faster checks during development:
+The default Walloon config already uses a **6h** sector time aggregation
+(`clustering.temporal.resolution_sector: 6h`). For even faster checks during development:
 
 1. Reduce planning horizons in `config/config.walloon.yaml`, e.g. keep only `2050`.
 2. Or run a subset of targets explicitly:
@@ -181,8 +180,9 @@ Re-enabling horizons or resolution changes re-triggers upstream build rules.
 ## Running the optimisation on NIC5 / CÉCI
 
 The LP solve is the most memory- and CPU-intensive step. The scripts in
-[`cluster/`](cluster/) run **only the myopic solve chain** on NIC5, while data
-retrieval, network preparation, and post-processing stay on your machine.
+[`cluster/`](cluster/) run **only the myopic solve chain** on NIC5 **`hmem`**
+(~1 TB RAM per node), while data retrieval, network preparation, and
+post-processing stay on your machine.
 
 ### Rationale
 
@@ -291,19 +291,20 @@ CECI expects allocations to match actual usage — see the
 
 | What | Value | Where |
 |------|-------|-------|
-| Slurm `--cpus-per-task` (solve) | **30** | `solving.cpus` in [`cluster/config_cluster.yaml`](cluster/config_cluster.yaml) |
-| Gurobi threads | **30** | `solving.solver_options.gurobi-default.threads` (same file) |
-| Slurm memory (solve) | **32 GB** | `solving.mem_mb` in `cluster/config_cluster.yaml` |
-| Partition | **`hmem`** (default) | `SOLVE_PARTITION` in [`cluster/config.sh`](cluster/config.sh) |
+| Slurm `--cpus-per-task` (solve) | **16** | `solving.cpus` in [`cluster/config_cluster.yaml`](cluster/config_cluster.yaml) |
+| Gurobi threads | **16** | `solving.solver_options.gurobi-default.threads` (same file) |
+| Slurm memory (solve) | **~1 TB** (`1000000` MB) | `solving.mem_mb` in `cluster/config_cluster.yaml` |
+| Partition | **`hmem`** | `SOLVE_PARTITION` in [`cluster/config.sh`](cluster/config.sh) |
 | Light rules (`add_brownfield`) | 1 CPU, 16 GB | `--default-resources` in `nic5.sh solve` |
 
-PyPSA-Wal’s default model is **much lighter** than pypsa-eur_negawatt (coarse
-3000h sector snapshots, 3-node BE clustering). The `hmem` partition defaults are
-conservative; after inspecting `sacct` / `./cluster/nic5.sh status`, consider a
-smaller partition and lower `mem_mb` if your jobs use far less than requested.
+Fine temporal resolution (e.g. `resolution_sector: 6h`) makes sector-coupled
+PyPSA models memory-hungry during Gurobi model generation — **`hmem` is required**
+for production solves on NIC5. Do not use the `batch` partition for these jobs unless
+you also coarsen the time resolution substantially.
 
 To change solve CPUs or memory, edit `cluster/config_cluster.yaml` (`solving.cpus`,
-`solving.mem_mb`) and keep Gurobi `threads` in sync with `cpus`.
+`solving.mem_mb`) and keep Gurobi `threads` in sync with `cpus`. Do not exceed the
+hmem node memory limit (~1 000 000 MB on NIC5).
 
 ---
 
@@ -338,7 +339,7 @@ To change solve CPUs or memory, edit `cluster/config_cluster.yaml` (`solving.cpu
 | RAM | ≥ 16 GB (peak ~8 GB observed for default config) |
 | CPU | 16 cores for comfortable build parallelism; 30 threads for Gurobi if using cluster overlay locally |
 | Disk | ~30 GB |
-| Solve time | Minutes per horizon (default 3000h resolution), vs. hours for high-resolution sector models |
+| Solve time | Minutes to hours per horizon depending on `resolution_sector` |
 
 ---
 
@@ -348,7 +349,8 @@ To change solve CPUs or memory, edit `cluster/config_cluster.yaml` (`solving.cpu
 |---------|-------------------|
 | `Directory cannot be locked` | Another Snakemake instance is running, or a stale lock in `.snakemake/locks/` after a crash — stop the other run or remove the lock if no process is active |
 | Gurobi `No Gurobi license` | Set `GRB_LICENSE_FILE` or install `~/gurobi.lic` |
-| Cluster job pending on `hmem` | Partition busy or allocation too large — try a standard partition and lower `mem_mb` in `config_cluster.yaml` |
+| Cluster job pending on `hmem` | Partition busy (3 nodes, ~1 TB each) — check `squeue -p hmem`; wait for a slot or `./cluster/nic5.sh status` |
+| Gurobi / solve OOM on cluster | Raise `solving.mem_mb` in `cluster/config_cluster.yaml` (max ~1 000 000 MB on hmem); ensure `SOLVE_PARTITION=hmem` in `cluster/config.sh` |
 | Snakemake rebuilds everything after `pull` | Re-run `./cluster/nic5.sh postprocess` (touch + summaries); do not delete `.snakemake/metadata` locally |
 | Missing `config/scenarios.yaml` | Not required unless you set `run.scenarios.enable: true` in config |
 | First run hangs on Zenodo cutout download | Symlink `cutouts/europe-2013-sarah3-era5.nc` from `~/.cache/snakemake-pypsa-eur/...` if you already retrieved it for pypsa-eur; or wait for the download to finish |

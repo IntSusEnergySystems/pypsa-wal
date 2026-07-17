@@ -31,19 +31,15 @@ GUROBI_LIC="${GUROBI_LIC:-\$HOME/gurobi.lic}"
 GUROBI_MODULE_LIC="${GUROBI_MODULE_LIC:-/opt/cecisw/arch/easybuild/2023b/software/Gurobi/13.0.0-GCCcore-13.2.0/gurobi.lic}"
 
 # --- Slurm resources ----------------------------------------------------------
-# NOTE: pypsa-wal's default config (config/config.walloon.yaml) is much
-# lighter than pypsa-eur_negawatt's (coarse `clustering.temporal.resolution_sector:
-# 3000h`, "adm" clustering) -- the observed local footprint is on the order of a
-# few GB RAM and minutes per horizon (see instructions.md). `hmem` is carried
-# over from pypsa-eur_negawatt as a known-good CECI partition, but is very
-# likely overkill here. Check `sinfo` / CECI docs for a smaller partition
-# appropriate to your account before running real jobs, and right-size
-# DEFAULT_MEM_MB / cluster/config_cluster.yaml accordingly -- CECI expects
-# Slurm allocations to match actual usage, see
-# https://support.ceci-hpc.be/doc/SubmittingJobs/JobEfficiency/
-SOLVE_PARTITION="${SOLVE_PARTITION:-batch}"
-SOLVE_RUNTIME="${SOLVE_RUNTIME:-240}"     # minutes
-DEFAULT_PARTITION="${DEFAULT_PARTITION:-batch}"
+# Sector-coupled PyPSA solves at fine temporal resolution (e.g. 6h) need large
+# RAM for Gurobi model generation. Use the `hmem` partition on NIC5 (~1 TB per
+# node). Memory for solve jobs is set in cluster/config_cluster.yaml
+# (`solving.mem_mb`); keep it aligned with the hmem node limit (~1 000 000 MB).
+# Light rules (add_brownfield) share the same partition but use DEFAULT_MEM_MB.
+# CECI job-efficiency guidance: https://support.ceci-hpc.be/doc/SubmittingJobs/JobEfficiency/
+SOLVE_PARTITION="${SOLVE_PARTITION:-hmem}"
+SOLVE_RUNTIME="${SOLVE_RUNTIME:-360}"     # minutes (fine resolution needs longer solves)
+DEFAULT_PARTITION="${DEFAULT_PARTITION:-hmem}"
 DEFAULT_MEM_MB="${DEFAULT_MEM_MB:-16000}"      # light rules (add_brownfield)
 DEFAULT_RUNTIME="${DEFAULT_RUNTIME:-120}"
 DEFAULT_CPUS="${DEFAULT_CPUS:-1}"              # light rules only; never set globally for solve

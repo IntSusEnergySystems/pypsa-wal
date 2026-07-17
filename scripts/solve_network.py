@@ -1666,24 +1666,24 @@ def extra_functionality(
 
     if config["sector"]["imports"]["enable"]:
         add_import_limit_constraint(n, snapshots)
-    if config.get("self_sufficiency", {}).get("self_sufficiency_constraint", False):
+    if config["self_sufficiency"]["self_sufficiency_constraint"]:
         level = config["self_sufficiency"]["level"]
         add_selfsufficiency_constraints(n, level)
-    if snakemake.config.get("co2_budget_national"):
+    if n.config["co2_budget_national"]:
         # prepare co2 constraint
         nhours = n.snapshot_weightings.generators.sum()
         nyears = nhours / 8760
         investment_year = int(snakemake.wildcards.planning_horizons[-4:])
-        limit_countries = snakemake.config["co2_budget_national"][investment_year]
+        limit_countries = snakemake.config["budget_national"][investment_year]
         # add co2 constraint for each country
         add_co2limit_country(n, limit_countries, nyears)
 
-    if snakemake.config.get("co2_price_national"):
+    if n.config["co2_price_national"]:
         # prepare co2 constraint
         nhours = n.snapshot_weightings.generators.sum()
         nyears = nhours / 8760
         investment_year = int(snakemake.wildcards.planning_horizons[-4:])
-        co2_price_countries = snakemake.config["co2_price_national"][investment_year]
+        co2_price_countries = snakemake.config["price_national"][investment_year]
         # add co2 constraint for each country
         add_co2price_country(n,co2_price_countries,nyears)
 

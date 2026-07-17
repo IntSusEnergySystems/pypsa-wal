@@ -1812,11 +1812,7 @@ rule prepare_sector_network:
             else []
         ),
         ntc_csv="data/walloon/ntc_{planning_horizons}.csv",
-        clever_transport=lambda w: (
-            resources("clever_Transport_{clusters}_{planning_horizons}.csv")
-            if config.get("sector", {}).get("suff_demand", False)
-            else []
-        ),
+        clever_transport=resources("clever_Transport_{clusters}_{planning_horizons}.csv"),
     output:
         resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"

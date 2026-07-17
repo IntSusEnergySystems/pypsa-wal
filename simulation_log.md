@@ -173,6 +173,7 @@ Orchestration: `./cluster/nic5.sh run` (or step-by-step: `prepare`, `push`, `sol
 | Dual `--configfile` order dropped myopic rules | Use `cluster/config_cluster.yaml` **before** `config/config.walloon.yaml` |
 | Slurm jobs requested 125 GB / 32 CPUs | Set `solving.mem_mb: 32000` in `config.walloon.yaml`; cluster overlay uses 8 threads via `--set-threads` |
 | `hmem` partition draining | Default partition switched to `batch` in `cluster/config.sh` |
+| Fine-resolution solves need `hmem` | Restored `SOLVE_PARTITION=hmem`, `solving.mem_mb: 1000000` (~1 TB) for 6h sector runs (2026-07-17) |
 | Slurm queue congested (Priority pending) | Successful run executed on NIC5 login node with local Snakemake executor (`--cores 8`) after `push`; Slurm path remains available via `./cluster/nic5.sh solve` |
 
 ### Verification (NIC5, 2026-07-02)
