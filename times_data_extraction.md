@@ -7,6 +7,20 @@ TIMES-side charts for a coupled run.
 This complements the PyPSA CSV extraction documented in
 [`instructions.md`](instructions.md) § Publishing to Wallonie Explorer (S3).
 
+For **validating soft-link extraction rules** (multi-level Sankey with
+pypsa-wal export highlighting, energy-balance tests), use the sibling
+`TIMES_PyPSA` package:
+
+```bash
+times-pypsa qa \
+  --vd TIMES_data/scen_corrige_251129_0112.vd \
+  --vdt TIMES_data/scen_corrige_251129_0112.vdt \
+  --year 2050 \
+  --out-dir /tmp/times_qa_2050/
+```
+
+See `TIMES_PyPSA/EXTRACTION_QA.md`.
+
 ---
 
 ## What Explorer expects
