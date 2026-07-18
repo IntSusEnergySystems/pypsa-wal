@@ -30,6 +30,8 @@ rule build_wallon_demands:
         "Export TIMES .vd Walloon demands for {wildcards.planning_horizons} (times_pypsa)"
     params:
         mappings_dir=config_provider("sector", "times_mappings_dir", default="data/walloon"),
+        coupling_dir=config_provider("coupling_dir", default=None),
+        times_use_preexported=config_provider("sector", "times_use_preexported", default=False),
     input:
         times_file=config_provider("sector", "times_file"),
     output:

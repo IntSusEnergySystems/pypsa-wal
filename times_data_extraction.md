@@ -142,7 +142,7 @@ the TIMES section.
 | **ClimAct extraction** (`climact-pypsa-eur_results_extraction-88d352b59aa4`) | Reads solved PyPSA `.nc` networks | `pypsa/`, `strategy/` |
 | **TIMES `.vd` export** | VEDA/TIMES scenario output | `times/` (upload as-is) |
 | **TIMES_PyPSA** (`/home/sylvain/svn/TIMES_PyPSA`) | Parses `.vd` → PyPSA demand CSVs during Snakemake build | Not uploaded to Explorer directly |
-| **PyPSA-Wal** `build_wallon_demands.py` | In-workflow `.vd` parser (duplicate of TIMES_PyPSA logic) | Not uploaded |
+| **PyPSA-Wal** `build_wallon_demands.py` | Thin Snakemake wrapper around `times_pypsa` (or copies from `coupling_dir/pypsa_inputs/`) | Not uploaded |
 
 The ClimAct extraction repo does **not** contain a script that converts `.vd` →
 Explorer CSVs. TIMES data reaches Explorer as the **raw `.vd` file** in the

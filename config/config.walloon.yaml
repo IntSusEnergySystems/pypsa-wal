@@ -10,6 +10,8 @@ run:
   scenarios:
     file: config/scenarios.yaml
 
+# coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
+
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight
 foresight: myopic
 
@@ -92,6 +94,7 @@ sector:
   times_demand: true
   times_file: data/walloon/scen_base_coherence_3110.vd
   times_mappings_dir: data/walloon
+  # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
   oil_boilers: true
   solid_biomass_import:
     enable: true
