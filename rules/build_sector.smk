@@ -26,17 +26,15 @@ rule build_population_layouts:
 
 
 rule build_wallon_demands:
+    message:
+        "Export TIMES .vd Walloon demands for {wildcards.planning_horizons} (times_pypsa)"
     params:
-        study=lambda w: getattr(w, "run", config.get("run", {}).get("name", "")),
+        mappings_dir=config_provider("sector", "times_mappings_dir", default="data/walloon"),
     input:
-        pop_layout_rural=resources("pop_layout_rural.nc"),
         times_file=config_provider("sector", "times_file"),
-        process_mapping_file="data/walloon/mapping_processes.csv",
-        mapping_file="data/walloon/mapping_commodities.csv",
-        extraction_rules_file = "data/walloon/extraction_rules.csv",
     output:
-        heating_capacities =resources("heating_capacities_{planning_horizons}.csv"), 
-        wallon_demands=resources("wallon_demands_{planning_horizons}.csv"), 
+        heating_capacities=resources("heating_capacities_{planning_horizons}.csv"),
+        wallon_demands=resources("wallon_demands_{planning_horizons}.csv"),
     log:
         logs("build_wallon_demands_{planning_horizons}.log"),
     resources:
@@ -47,7 +45,7 @@ rule build_wallon_demands:
     conda:
         "../envs/environment.yaml"
     script:
-        "../scripts/build_wallon_demands.py"
+        scripts("build_wallon_demands.py")
         
         
 rule build_clustered_population_layouts:

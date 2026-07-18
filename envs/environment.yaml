@@ -71,3 +71,6 @@ dependencies:
 - snakemake-logger-plugin-pypsa >=0.1.0
 - pydeflate >=2.3.4
 - snakemake-executor-plugin-slurm >=1.9.2
+  # TIMES → PyPSA soft-linking (sibling checkout: svn/TIMES_PyPSA next to pypsa-wal)
+  - pip:
+    - -e ../TIMES_PyPSA
