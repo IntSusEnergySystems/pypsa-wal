@@ -41,6 +41,11 @@ walloon-model = """bash -c '
 	' --
 """
 
+times-pypsa = """bash -c '
+	snakemake -call --configfile config/config.times-pypsa.yaml "$@"
+	' --
+"""
+
 [dependencies]
 atlite = ">=0.3"
 bokeh = ">=3.8.0"
