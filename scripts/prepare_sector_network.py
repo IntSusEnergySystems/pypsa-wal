@@ -3876,6 +3876,21 @@ def add_heat(
                 )
 
 
+def times_demand_twh(demands: pd.DataFrame, categories: list[str]) -> pd.Series:
+    """TWh of TIMES soft-link categories, 0 TWh for any the export does not hold.
+
+    Missing rows are warned about instead of raising, so an older
+    ``wallon_demands_*.csv`` — or a scenario whose extraction rules dropped a
+    category — does not break the build.
+    """
+    missing = [c for c in categories if c not in demands.index]
+    if missing:
+        logger.warning(
+            "TIMES categories %s absent from wallon_demands; treated as 0 TWh.", missing
+        )
+    return demands["TWh"].reindex(categories).fillna(0.0)
+
+
 def write_wallon_heat_demands(
     n: pypsa.Network,
 ):
@@ -3902,8 +3917,36 @@ def write_wallon_heat_demands(
     "BEWAL residential urban decentral heat",
     "BEWAL residential rural heat",
     "BEWAL services urban decentral heat"]
+    heat_targets = times_demand_twh(wallon_heat, heat_categories)
+
+    # Cooking and tertiary "other energy" fuel have no bus of their own in
+    # PyPSA-Eur (heat is built from space + water only, and `total services
+    # cooking` is written by build_energy_totals but read by nothing). The
+    # decentral heat load is the only non-electric residential/tertiary sink in
+    # the model, so these TIMES categories are served there or they leave the
+    # Walloon energy balance altogether.
+    services_fuel = times_demand_twh(wallon_heat, ["services other fuel"]).sum()
+    residential_cooking_fuel = (
+        times_demand_twh(wallon_heat, ["residential cooking"]).sum()
+        - times_demand_twh(wallon_heat, ["residential cooking electricity"]).sum()
+    )
+    residential_categories = heat_categories[:2]
+    residential_share = heat_targets[residential_categories]
+    if residential_share.sum() > 0:
+        # TIMES gives cooking no urban/rural split: allocate pro rata to heat.
+        heat_targets[residential_categories] += (
+            residential_cooking_fuel * residential_share / residential_share.sum()
+        )
+    heat_targets["BEWAL services urban decentral heat"] += services_fuel
+    logger.info(
+        "Walloon decentral heat also carries %.3f TWh of non-electric cooking fuel "
+        "and %.3f TWh of tertiary other-energy fuel.",
+        residential_cooking_fuel,
+        services_fuel,
+    )
+
     for heat_demand in heat_categories:
-       target_heat = wallon_heat.loc[[heat_demand], "TWh"].sum()
+       target_heat = heat_targets[heat_demand]
        target_heat = target_heat/weights
        factor = target_heat / (n.loads_t.p_set[heat_demand].sum() / 1e6)
         # Consider the shape or timeseries profile to conert annual heat demand for wallon in hourly timeseries
@@ -3913,7 +3956,7 @@ def write_wallon_heat_demands(
     "residential district heating",
     "services district heating"]
     #Adjust district heating demand from TIMES
-    total_district_heat = wallon_heat.loc[dist_categories, "TWh"].sum()
+    total_district_heat = times_demand_twh(wallon_heat, dist_categories).sum()
     total_district_heat = total_district_heat/weights
     factor = total_district_heat / (n.loads_t.p_set["BEWAL urban central heat"].sum() / 1e6)
     n.loads_t.p_set["BEWAL urban central heat"] *= factor
@@ -5273,9 +5316,20 @@ def add_industry(
         n.loads_t.p_set[loads_i] *= factor
         #Changing wallon electricity and residential demands with TIMES value
         wallon_elec = pd.read_csv(snakemake.input.wallon_demands,index_col=0)[["TWh"]]
-        sum_result = wallon_elec.loc[
-                   ['total electricity residential', 'total electricity services', 'total rail'], 'TWh'
-                   ].sum()
+        # `residential cooking electricity` sits outside `total electricity
+        # residential` since the RCOK* stoves were relabelled in TIMES_PyPSA, so it
+        # has to be added here or the Walloon load loses ~0.5 TWh. `services data
+        # centre electricity` is a *child* of `total electricity services` and must
+        # stay out of this sum.
+        sum_result = times_demand_twh(
+            wallon_elec,
+            [
+                'total electricity residential',
+                'total electricity services',
+                'total rail',
+                'residential cooking electricity',
+            ],
+        ).sum()
         factor_wal = ((sum_result)
                     / (n.loads_t.p_set[wallon_node].sum()/1e6)
                     )

@@ -1,6 +1,8 @@
-# TIMES data for Wallonie Explorer
+# TIMES data in pypsa-wal
 
-How to publish the TIMES scenario file (`.vd`) alongside PyPSA results so the
+Two things: **how the TIMES soft-link demands enter the PyPSA network**
+([below](#how-times-demands-enter-the-pypsa-network)), and how to publish the
+TIMES scenario file (`.vd`) alongside PyPSA results so the
 [Wallonie Explorer](https://explorer.test.wallonie.climact.com/) can display
 TIMES-side charts for a coupled run.
 
@@ -9,17 +11,132 @@ This complements the PyPSA CSV extraction documented in
 
 For **validating soft-link extraction rules** (multi-level Sankey with
 pypsa-wal export highlighting, energy-balance tests), use the sibling
-`TIMES_PyPSA` package:
+`TIMES_PyPSA` package. Always use `--agg-level custom` when testing or
+troubleshooting:
 
 ```bash
 times-pypsa qa \
-  --vd TIMES_data/scen_corrige_251129_0112.vd \
-  --vdt TIMES_data/scen_corrige_251129_0112.vdt \
+  --vd ../TIMES_PyPSA/data/scen_corrige_251129_0112.vd \
+  --vdt ../TIMES_PyPSA/data/scen_corrige_251129_0112.vdt \
   --year 2050 \
+  --agg-level custom \
   --out-dir /tmp/times_qa_2050/
 ```
 
-See `TIMES_PyPSA/EXTRACTION_QA.md`.
+See `TIMES_PyPSA/README.md` (extraction QA, rule schema, rule-change log) and
+`TIMES_PyPSA/aggregation.md` (aggregation levels, Sankey colouring, open points).
+
+---
+
+## How TIMES demands enter the PyPSA network
+
+`build_wallon_demands` writes `resources/<run>/wallon_demands_<year>.csv`, one row
+per TIMES_PyPSA extraction category (58 as of 2026-07-25) with `TWh` and `PJ`.
+Those rows reach the network by three different mechanisms, and knowing which one
+applies matters: **two of them are silent name matches**, so a renamed category
+stops being used without any error.
+
+1. **Name match against `energy_totals`** —
+   `build_population_weighted_energy_totals.py` replaces the Walloon row of every
+   column whose name equals a category
+   (`nodal_totals.columns.intersection(wallon_demands.index)`). 12 categories:
+   `total road`, `electricity road`, `total rail`, `electricity rail`,
+   `total {domestic,international} aviation`, `total domestic navigation`,
+   `total international navigation`, `total agriculture{, electricity, heat,
+   machinery}`.
+2. **Name match against the industry frame** —
+   `build_industrial_energy_demand_per_node.py`, same idiom. 10 categories:
+   `electricity`, `coal`, `coke`, `methane`, `hydrogen`, `naphtha`,
+   `solid biomass`, `low-temperature heat`, `ammonia`, `methanol`.
+3. **Explicit reads in `prepare_sector_network.py`** — the categories whose names
+   are *not* pypsa-eur keys:
+
+   | Where | Categories |
+   |---|---|
+   | `add_industry`: factor that rescales the whole Walloon electricity load | `total electricity residential` + `total electricity services` + `total rail` + **`residential cooking electricity`** |
+   | `add_land_transport`: Walloon engine shares | `total road`, `electricity road`, `hydrogen road` |
+   | `write_wallon_heat_demands`: rescales the decentral heat loads | `BEWAL residential urban decentral heat`, `BEWAL residential rural heat`, `BEWAL services urban decentral heat`, plus **`services other fuel`** and the non-electric part of **`residential cooking`** |
+   | `write_wallon_heat_demands`: rescales `BEWAL urban central heat` | `residential district heating` + `services district heating` |
+
+30 of the 58 categories declare a `parent`, so they are **subsets** and must never
+be added to their parent. The ones that are deliberately read by nothing:
+
+- `services data centre electricity` — a child of `total electricity services`,
+  informational only;
+- the 23 residential/services boiler, heat-pump, geothermal, solar-thermal and
+  electric-heater categories — children of the three `BEWAL … heat` parents;
+- `total agriculture` — the parent of the three agriculture children that
+  `add_agriculture` does read;
+- `retro` — informational: retrofitting is a PyPSA decision variable
+  (`sector.retrofitting.retro_endogen`), not a demand to impose.
+
+`electricity road` / `electricity rail` are children too, but they are used as
+*shares* of their parent (engine mix, rail electrification) rather than added to
+it, which is legitimate. `residential cooking` is a parent whose electric child
+feeds the electricity load and whose non-electric remainder feeds the heat load —
+so the parent is used exactly once, as a difference (see below).
+
+### Changes of 2026-07-25 — closing the last unserved soft-links
+
+Three soft-linked categories were being exported by TIMES_PyPSA and read by
+nothing, so their energy silently left the Walloon balance. All three are now
+served, in `scripts/prepare_sector_network.py`:
+
+| Category | Now added to | 2050 |
+|---|---|---:|
+| `residential cooking electricity` | the Walloon electricity-load factor in `add_industry` | +0.43 TWh |
+| `residential cooking` minus its electric child | `BEWAL residential {urban decentral,rural} heat`, pro rata to their heat | +0.84 TWh |
+| `services other fuel` | `BEWAL services urban decentral heat` | +0.24 TWh |
+
+Why each was missing:
+
+- **`residential cooking electricity`** left `total electricity residential` when
+  TIMES_PyPSA relabelled the `RCOK*` stoves (`RCOKELC100` had been carrying
+  `residential other`). The electricity-load sum had not followed, so the Walloon
+  load was ~0.5 TWh short.
+- **Cooking and tertiary "other energy" fuel have no bus in PyPSA-Eur.** Both
+  residential and tertiary heat are built from *space* + *water* only
+  (`build_hourly_heat_demand.py`: `uses = ["water", "space"]`). The obvious route
+  — writing the `total services cooking` / `total residential cooking`
+  `energy_totals` columns — is a **dead end**: those columns are produced by
+  `build_energy_totals.py` and read by no script in `scripts/` or `rules/`, so
+  substituting them would have made the TIMES coverage table read 100% while the
+  energy stayed outside the model. The decentral heat load is the only
+  non-electric residential/tertiary sink there is, so that is where they go.
+
+Two caveats, deliberate and reversible (delete the `services_fuel` /
+`residential_cooking_fuel` terms in `write_wallon_heat_demands` to revert):
+
+- PyPSA-Eur discards this bucket for every other node, so the Walloon node is now
+  more *complete* than its neighbours rather than consistent with them.
+- On the heat bus a heat pump may serve the fuel at COP 3 — a reasonable
+  electrification story for cooking and miscellaneous building energy, less so for
+  the 0.005 PJ of commercial gasoline inside `services other fuel`. The stricter
+  alternative is a dedicated inelastic Load on the gas/oil buses (as pypsa-eur
+  does for `gas for industry` and `agriculture machinery oil`), which preserves
+  the fuel and its CO₂ exactly but needs new components.
+
+A new `times_demand_twh()` helper performs every explicit read and **warns
+instead of raising** when a category is absent, so an older
+`wallon_demands_*.csv` — or a scenario whose extraction rules dropped a category —
+no longer breaks the build.
+
+### Still not consumed: `heating_capacities_*.csv`
+
+`build_wallon_demands` also writes `resources/<run>/heating_capacities_<year>.csv`
+(the TIMES heating stock in MW per technology), but **no rule takes it as an
+input** — `add_existing_baseyear` still uses pypsa-eur's own
+`build_existing_heating_distribution` from
+`data/existing_infrastructure/existing_heating_raw.csv`. So the Walloon heating
+*demands* come from TIMES while the Walloon existing heating *capacities* do not.
+That is the one remaining unconsumed soft-link output; wiring it means replacing
+the existing-heating distribution for the Walloon node, which is a modelling
+change rather than a plumbing one.
+
+For the TIMES side of these categories — composition, why `ammonia`/`methanol`
+stay zero, and the full rule-change log — see
+`TIMES_PyPSA/aggregation.md` § *Audit 2026-07-25* and § *Which demand keys
+pypsa-wal actually reads*.
 
 ---
 
