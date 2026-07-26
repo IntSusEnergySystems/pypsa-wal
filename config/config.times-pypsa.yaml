@@ -186,7 +186,7 @@ self_sufficiency:
   self_sufficiency_constraint: false
   level: 0.7   
 costs:
-  custom_cost_fn: data/walloon/custom_costs_rc.csv
+  custom_cost_fn: data/walloon/custom_costs.csv
 
 solving:
   agg_p_nom_limits:

@@ -1,10 +1,15 @@
+# Scenario overrides for config/config.times-pypsa.yaml (run.scenarios.enable: true).
+#
+# Costs and potentials come from the single pair of files patched by
+# scripts/build_common_parameters.py:
+#   data/walloon/custom_costs.csv
+#   data/walloon/custom_potentials.csv
+# so a scenario only lists what it *changes*. Do not copy a cost file to vary
+# one number — use `costs: overwrites:` (see scen_nuc* below).
+
 scen_base:
   sector:
     times_file: data/walloon/scen_base_251129_0112.vd
-  electricity:
-    walloon_potentials: data/walloon/custom_potentials_corrige.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_corrige.csv
   solving:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_base.csv
@@ -12,32 +17,34 @@ scen_base:
 scen_corrige:
   sector:
     times_file: data/walloon/scen_corrige_251129_0112.vd
-  electricity:
-    walloon_potentials: data/walloon/custom_potentials_corrige.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_corrige.csv
   solving:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_corrige.csv
 
-scen_nuc13500:
+# Nuclear CAPEX sensitivities. `costs: overwrites: {<parameter>: {<technology>: value}}`
+# is applied in scripts/process_cost_data.py on top of the custom-costs file, before
+# the annuity is computed, so capital_cost follows. Units are EUR/MW_e (the cost table
+# has already been converted from /kW at that point), and must be written as a plain
+# number: PyYAML follows YAML 1.1, where `11.5e6` is a *string* (the exponent needs a sign).
+# Baseline for reference: 9500 EUR/kW_e in data/walloon/custom_costs.csv.
+scen_nuc11500:
   sector:
-    times_file: data/walloon/scen_corrige_nuc13500_251205_0512.vd
-  electricity:
-    walloon_potentials: data/walloon/custom_potentials_corrige.csv
+    times_file: data/walloon/scen_corrige_nuc11500_251205_0512.vd
   costs:
-    custom_cost_fn: data/walloon/custom_costs_nuc13500.csv
+    overwrites:
+      investment:
+        nuclear: 11500000   # = 11500 EUR/kW_e
   solving:
     agg_p_nom_limits:
       file: data/agg_p_nom_minmax.csv
 
-scen_nuc11500:
+scen_nuc13500:
   sector:
-    times_file: data/walloon/scen_corrige_nuc11500_251205_0512.vd
-  electricity:
-    walloon_potentials: data/walloon/custom_potentials_corrige.csv
+    times_file: data/walloon/scen_corrige_nuc13500_251205_0512.vd
   costs:
-    custom_cost_fn: data/walloon/custom_costs_nuc11500.csv
+    overwrites:
+      investment:
+        nuclear: 13500000   # = 13500 EUR/kW_e
   solving:
     agg_p_nom_limits:
       file: data/agg_p_nom_minmax.csv
@@ -47,8 +54,6 @@ scen_imppel:
     times_file: data/walloon/scen_corrige_imppel_251130_0412.vd
   electricity:
     walloon_potentials: data/walloon/custom_potentials_imppel.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_corrige.csv
   solving:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_corrige.csv
@@ -56,10 +61,6 @@ scen_imppel:
 scen_data:
   sector:
     times_file: data/walloon/scen_corrige_data_251130_0412.vd
-  electricity:
-    walloon_potentials: data/walloon/custom_potentials_corrige.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_corrige.csv
   solving:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_corrige.csv

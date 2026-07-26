@@ -423,7 +423,7 @@ if __name__ == "__main__":
     update_BEWAL_potentials(
         n=n,
         planning_horizons=int(snakemake.wildcards.planning_horizons),
-        walloon_potentials=snakemake.config["electricity"].get("walloon_potentials", None),
+        walloon_potentials=snakemake.input.get("walloon_potentials"),
     )
 
     kind = snakemake.params.transmission_limit[planning_horizon][0]

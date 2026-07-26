@@ -57,31 +57,70 @@ lifetimes, fuel prices, Walloon RES potentials, CO₂ trajectory, NTCs, …) liv
 Monetary values are on an **EUR2025** base. Full design, audit, and modeller
 decisions: [`common_parameters.md`](common_parameters.md).
 
-**Editing the CSV alone does not change a PyPSA run.** The workflow never reads
-that table at solve time. Values reach the model only through the artefacts the
-pipeline already consumes:
+**Editing the CSV alone does not change a PyPSA run.** Push the values into the
+input files the workflow already reads:
 
-| Family | Applied via |
-|--------|-------------|
-| Costs / lifetimes / fuel prices | `data/walloon/custom_costs_*.csv` → `costs: custom_cost_fn` → `scripts/process_cost_data.py` |
-| Walloon RES / biomass potentials | `data/walloon/custom_potentials_*.csv` → `electricity: walloon_potentials` → `BEWAL_potentials.py` |
-| Cross-border NTCs | `data/walloon/ntc_<year>.csv` → `set_NTCs.py` |
-| CO₂ budget, discount rate, imports, BEV flexibility | keys in `config/config.walloon.yaml` (over `config.default.yaml`) |
+```bash
+python scripts/build_common_parameters.py --write --dry-run   # preview
+python scripts/build_common_parameters.py --write
+```
 
-Intended workflow (see [`common_parameters.md`](common_parameters.md) §5):
+`--write` **patches values in place**; it never generates a file. The structure,
+sources and comments of each input file are hand-maintained and survive, so
+`git diff` after a `--write` shows exactly what the shared table changed.
 
-1. Edit `config/input_parameters_for_models.csv` (set `status=active` and a
-   `pypsa_wal_target`).
-2. Run `python scripts/build_common_parameters.py --write` to regenerate the
-   artefacts above (and `config/config.common_parameters.yaml`).
-3. Commit the regenerated files so `git diff` shows what the model will see.
-4. Run Snakemake as usual — no change to runtime scripts.
+| Family | Master-CSV target | File patched in place |
+|--------|-------------------|-----------------------|
+| Costs / lifetimes / fuel prices | `cost:<tech>:<param>` | `data/walloon/custom_costs.csv` |
+| Walloon RES / biomass potentials | `potential:<bus>:<tech>:<attr>` | `data/walloon/custom_potentials.csv` |
+| Cross-border NTCs | `ntc:<A>-<B>` | `data/walloon/ntc_<year>.csv` |
+| CO₂ trajectory | `config:budget_national` | `config/config.walloon.yaml` |
 
-Until `--write` is fully wired, keep the existing `custom_costs_*` /
-`custom_potentials_*` / NTC / config overrides in sync by hand, or the shared
-CSV and the solved model will drift. Use
-`python scripts/build_common_parameters.py --check` to validate EUR2025 tagging
-and the technology-data pin in `config/common_parameters_meta.yaml`.
+There is no overlay config file and no load-order requirement — the ordinary run
+command already picks the shared values up:
+
+```bash
+snakemake --configfile config/config.walloon.yaml --cores 16 -call
+```
+
+**Failsafe.** A patch may only rewrite the `value` cell of a row that already
+exists. If a row would have to be added or removed, or a `planning_horizon: all`
+row would have to hold a value that varies by horizon, or the units disagree on
+scale (`/kW` vs `/MW`), `--write` aborts and tells you which file needs a manual
+edit. Nothing is written for a file that fails.
+
+`--check` re-runs the whole patch as a dry run and fails if any file has drifted
+out of sync — wire it into CI or run it before a solve:
+
+```bash
+python scripts/build_common_parameters.py --check
+python scripts/build_common_parameters.py --report   # + summary of the master CSV
+```
+
+`--check` also reports **technology-data drift**: rows tagged
+`data_origin_choice: PyPSA` that carry no override row take their value straight
+from the pinned archive, so if the archive disagrees with the negotiated figure
+TIMES and PyPSA silently diverge.
+
+### Sensitivity runs
+
+Do **not** copy `custom_costs.csv` to vary one number. Override the cost table
+from the scenario file instead — see `scen_nuc11500` / `scen_nuc13500` in
+[`config/scenarios.walloon.yaml`](config/scenarios.walloon.yaml):
+
+```yaml
+scen_nuc13500:
+  costs:
+    overwrites:
+      investment:
+        nuclear: 13500000   # EUR/MW_e (= 13500 EUR/kW_e)
+```
+
+`costs.overwrites` is applied by `scripts/process_cost_data.py` on top of the
+custom-costs file and *before* the annuity, so `capital_cost` follows. Values are
+in **EUR/MW** (the table is already converted from `/kW` at that point) and must
+be written as plain numbers: PyYAML follows YAML 1.1, where `13.5e6` parses as a
+string, not a float.
 
 Soft-linked **demands** (TIMES → PyPSA) are a separate path — see
 [`times_data_extraction.md`](times_data_extraction.md), not the common-parameters CSV.

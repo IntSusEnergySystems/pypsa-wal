@@ -8,16 +8,27 @@ drivers.
 
 **Status (2026-07-26):** currency rebase to **EUR2025** is done (§4), including HICP
 inflation of EUR2023 literature/TIMES prices and Valbiom EUR2020 CAPEX (§8.8–8.9).
-Modeller decisions §8.1–8.7 are in `pypsa_wal_target` / `year_rule` / `status`.
-Artefact `--write` is **not** done yet.
+Modeller decisions are recorded. The application path works:
+`python scripts/build_common_parameters.py --write` (see §5 and
+[`instructions.md`](instructions.md)).
 
 ```
-shared CSV (monetary values in EUR2025; year in the unit)   ← DONE for currency
+shared CSV (monetary values in EUR2025; year in the unit)
         │
         ├─► TIMES-WAL  (EUR2025; TIMES-only prices rebased by TIMES team)
-        └─► pypsa-wal  (CSV → custom_costs override; else technology-data fallback)
-                         ↑ artefact generation NOT wired yet
+        └─► pypsa-wal  via build_common_parameters.py --write, which patches
+                       values IN PLACE in
+                         data/walloon/custom_costs.csv
+                         data/walloon/custom_potentials.csv
+                         data/walloon/ntc_<year>.csv
+                         config/config.walloon.yaml  (budget_national)
 ```
+
+The script does not *generate* input files. Each file stays hand-maintained —
+its rows, order, `source` and `further_description` are the modeller's — and
+`--write` only rewrites the `value` cells of rows the shared table covers. That
+is what keeps the two roles separable: the file says *which* PyPSA-Eur defaults
+Wallonia overrides, the shared CSV says *what* the negotiated number is.
 
 ---
 
@@ -59,11 +70,24 @@ channels match on free-text labels.
 | aggregate capacity limits per country | 6 | `solving: agg_p_nom_limits: file` | `scripts/solve_network.py` |
 | TIMES activity drivers | 11 | — | stay in TIMES; demands cross via soft-link |
 
-Still true and still a problem for later migration steps:
+Two properties of these channels drive the whole design and are easy to forget:
 
-* Cost/potential files are **duplicated per scenario** (`scenarios.walloon.yaml` →
-  `custom_costs_*.csv`, `custom_potentials_*.csv`).
-* `BEWAL_potentials.py` silently drops unknown `(technology, parameter)` pairs.
+* **Neither cost nor potential overrides interpolate.** `process_cost_data.py`
+  matches `planning_horizon` against the wildcard as a string (or `all`);
+  `BEWAL_potentials.py` matches `year` exactly. A horizon with no row silently
+  falls back to the PyPSA-Eur default. Hold/interp therefore has to be baked in
+  at `--write` time, and `--check` fails if a managed potential is missing a
+  horizon.
+* **A cost row whose value equals the technology-data value is redundant.** Rows
+  tagged `data_origin_choice: PyPSA` normally need no override at all; only
+  genuine Walloon figures (`Revue de littérature`, `TIMES`) must appear in
+  `custom_costs.csv`. `--check` enforces this in both directions — a non-PyPSA
+  target with no row is an error, and a PyPSA target with no row is compared
+  against the pinned archive and reported if it has drifted.
+
+Residual quirk (pre-existing, not addressed here): `BEWAL_potentials.py` handles
+`CCGT` in a second `if` chain that logs neither success nor failure, and warns
+`… is currently not a supported or valid technology` for carriers it *did* apply.
 
 ---
 
@@ -83,50 +107,71 @@ fuel prices (TYNDP 2024). Non-PyPSA overrides (IEA PVPS solar, Edora onwind, Mec
 Valbiom biogas, CLIMA.A / TIMES fuels, H₂ import) were **retagged** to EUR2025 without rescaling
 (§4.4) — they remain recent market/consultation figures, not inflated from 2020.
 
-### 3.2 CO₂ trajectory offset by one horizon — OPEN
+### 3.2 CO₂ trajectory — CLOSED
 
-Table: 64.8 % (2030), 45 % (2040), 5 % (2050).
-`budget_national` in `config.walloon.yaml`: 0.64 (2025), 0.45 (2030), 0.25 (2040), 0.05 (2050).
+The CSV anchors are authoritative: **64.8 / 45 / 5 %** of 1990 on **2030 / 2040 /
+2050**, `year_rule=interp` (§8.1). `--write` renders them as fractions into the
+`budget_national:` block of `config.walloon.yaml`; horizons outside the anchor
+range hold the nearest anchor, so 2025 = 0.648.
 
-### 3.3 Nuclear-SMR override lands on steam methane reforming — OPEN
+> An earlier pass had this backwards — it rewrote the CSV to match the
+> `config.walloon.yaml` block then in place (64 / 45 / 25 / 5 on 2025 / 2030 / 2040 /
+> 2050) and dropped the `% d'émission tolérées vs 1990` description. Reverted
+> 2026-07-26: the direction of authority is CSV → config, never the reverse.
+> **This changes the trajectory** relative to that pass: 2030 goes 0.45 → 0.648
+> and 2040 goes 0.25 → 0.45, i.e. a looser budget in the middle horizons.
 
-`custom_costs_*.csv` has `SMR` investment 11400 EUR/kW (meant *small modular reactor*).
-In pypsa-eur, `SMR` is *steam methane reforming*. Extendable nuclear uses `nuclear`.
+### 3.3 Nuclear-SMR override — CLOSED
 
-### 3.4 Two Walloon potentials read and thrown away — OPEN
+No nuclear-SMR carrier in pypsa-wal. New-nuclear CAPEX =
+`min(Nuclear advanced, Nuclear SMR)` = **9500** EUR2025/kW_e. Nuclear (SMR) stays
+`status=none`. The two `SMR` rows (investment 11400 EUR/kW_e, lifetime 60 y) were
+**deleted** from `custom_costs.csv`, so `SMR` now takes its real steam-methane-reforming
+value from technology-data (659 EUR/kW_e in 2030, verified in
+`costs_2030_processed.csv`) instead of a nuclear CAPEX 17× too high. `--check`
+fails if a `SMR` row or an active `cost:SMR:*` target reappears.
 
-`waste heat` and `deep geothermal energy potential` in `custom_potentials*.csv` have no
-branch in `BEWAL_potentials.py`.
+### 3.4 Two Walloon potentials read and thrown away — CLOSED (documented)
 
-### 3.5 Potentials used by scenarios ≠ table — OPEN
+`waste heat` / `deep geothermal` kept in CSV with `status=none` and explanatory notes.
 
-Scenarios use `custom_potentials_corrige.csv` (biogas 7800, solid biomass 11956, pellet
-imports 0), not the table (biogas 8300 Valbiom, solid biomass 6000, non-zero pellet imports).
+### 3.5 Potentials used by scenarios ≠ table — CLOSED
 
-### 3.6 Discount rate — OPEN
+`custom_potentials.csv` is the only potentials file the base config and all but one
+scenario use, and `--write` patches it from the CSV (biogas 8300, solid biomass 6000,
+non-zero non-EU pellet imports). `custom_potentials_corrige.csv` is deleted.
 
-Table 4 %. Model: `fill_values: discount rate` = 0.07, `social_discountrate` = 0.02,
-rooftop PV tech-data rate 0.04.
+Three managed rows existed only for 2030 and were therefore inert in 2025/2040/2050
+(`BEWAL solid biomass p_nom`, `BEWAL biogas p_nom`, `BEWAL CCGT p_nom_min`); they are
+now present for every horizon, and `--check` fails if a horizon goes missing again.
 
-### 3.7 Lifetimes — OPEN
+> **Decision needed:** back-filling `BEWAL CCGT p_nom_min` (first anchor 2030) to
+> 2025 puts a 1740 MW_el floor on *new-build* CCGT in the base year — 3052.6 MW of
+> link capacity after the `/efficiency` conversion, on top of ~2900 MW of existing
+> CCGT links. That matches `hold` semantics and what `custom_potentials_corrige.csv`
+> did, but it is a new constraint for runs that used `custom_potentials.csv`.
 
-36 lifetime rows differ (onwind, solar utility, electrolysis, battery, nuclear, CCGT/OCGT, …).
+### 3.6 Discount rate — DEFERRED
+
+Leave 7 % / 2 % social / 4 % rooftop until the dedicated discount-rate task
+(`status=pending` on the CSV rows).
+
+### 3.7 Lifetimes — CLOSED
+
+CSV values win; notes record superseded Walloon custom_costs figures.
 
 ### 3.8 Grid costs / DEA vintage — CLOSED by §4.3
 
-PyPSA-origin HVDC/HVAC/offshore rows refreshed from v0.14.0 (e.g. HVDC inverter pair
-investment 2030 → **640 EUR2025/kW**).
+### 3.9 Agreed prices the model ignores — CLOSED
 
-### 3.9 Agreed prices the model ignores — partially closed
-
-* **Uranium:** PyPSA-origin row refreshed 3.41 → **7.4536 EUR2025/MWh_th** (§4.3).
-* **H₂ import price** (97/88/79): still unused (`sector: imports: enable` false; default 74). OPEN.
+* Uranium refreshed (§4.3).
+* RoW H₂ imports: `sector.imports.enable` is already `false` in
+  `config.default.yaml`, so nothing needs emitting; `--write` leaves it alone.
 
 ### 3.10 Smaller items
 
-* **Haber-Bosch unit labels — CLOSED** by §4.3 (investment `EUR2025/kW_NH3`, VOM `EUR2025/MWh_NH3`).
-* `NTC BE-offshore`, H₂ CCGT/OCGT (reuse OCGT), gas+capture flags off, imported biomethane
-  absent, empty BE/EU capacity maxima — still as audited.
+* Haber-Bosch units — CLOSED by §4.3.
+* Placeholders / NTC BE-offshore / H₂ turbines — documented `pending`/`none`.
 
 ---
 
@@ -214,49 +259,85 @@ See `config/common_parameters_meta.yaml` → `hicp_inflation`.
 
 ## 5. Design for wiring the CSV into pypsa-wal
 
-### 5.1 Principle (unchanged)
+### 5.1 Principle: patch in place, never generate
 
-Master CSV → `scripts/build_common_parameters.py --write` → committed artefacts the existing
-pipeline already reads. No new runtime injection path.
+One file per family, hand-maintained, patched in place. No `_corrige` / `_rc` /
+`_common` / `_nuc*` variants, no generated overlay config, no load-order rule.
 
 ```
-config/input_parameters_for_models.csv
-            +
-data/walloon/common/*_extra.csv          (not created yet)
-data/walloon/common/*_<scenario>.csv     (not created yet)
+config/input_parameters_for_models.csv          ← authoritative values
+config/common_parameters_meta.yaml              ← EUR_REF + technology-data pin
+config/config.walloon.yaml                      ← planning horizons
             |
-            |  scripts/build_common_parameters.py --write   ← stub only
+            |  scripts/build_common_parameters.py --write
             v
-data/walloon/custom_costs_<variant>.csv
-data/walloon/custom_potentials_<variant>.csv
-data/walloon/ntc_<year>.csv
-config/config.common_parameters.yaml
+data/walloon/custom_costs.csv        value cells of `cost:<tech>:<param>` rows
+data/walloon/custom_potentials.csv   value cells of `potential:<bus>:<tech>:<attr>` rows
+data/walloon/ntc_<year>.csv          NTC_MW of `ntc:<A>-<B>` rows (every ntc_*.csv, not
+                                     just the planning horizons)
+config/config.walloon.yaml           the `budget_national:` block
 ```
 
-### 5.2–5.3 Authority and machine-readable columns
+Planning horizons are read from `config.walloon.yaml` → `scenario.planning_horizons`
+rather than hard-coded, so changing the horizon list is picked up by `--write`.
+
+### 5.2 Failsafes
+
+`--write` refuses to do anything but rewrite the `value` cell of an existing row.
+Each condition below aborts the file (nothing is written for it) and prints the
+manual edit needed:
+
+| condition | why it matters |
+|---|---|
+| row count or column layout would change | a patch that adds/removes rows is a silent redefinition of what Wallonia overrides |
+| `planning_horizon: all` row, but the CSV value varies by horizon | the `all` row cannot express a trajectory — split it into one row per horizon |
+| active non-PyPSA `cost:` target with no row in `custom_costs.csv` | a genuine Walloon override would be silently dropped |
+| active `potential:` target missing a planning horizon | `BEWAL_potentials.py` matches the year exactly; that horizon would keep the PyPSA-Eur default |
+| unit scale disagrees (`/kW` vs `/MW`, `GWh` vs `MWh`) | `process_cost_data.py` / `BEWAL_potentials.py` rescale by 1e3 off the unit string, so a mismatch misscales the value by 1000× |
+
+### 5.3 Authority and machine-readable columns
 
 CSV wins for listed monetary / potential / lifetime rows per §8. Columns
-`pypsa_wal_target`, `year_rule`, `status` **added and filled** (2026-07-26 first pass):
-~389 active, ~63 none, ~34 pending.
-
-Sidecar **written:** `config/common_parameters_meta.yaml`
+`pypsa_wal_target`, `year_rule`, `status` are filled: ~400 active, ~63 none, ~34 pending.
+Sidecar: `config/common_parameters_meta.yaml`
 (`EUR_REF: 2025`, `technology_data: {tag: v0.14.0, eur_year: 2025}`).
 
 ### 5.4 Tool status
 
 | mode | status |
 |---|---|
-| `--check` | **works** — asserts EUR2025 on populated monetary rows + meta pin |
-| `--report` | **works** — summary + spot vs archive |
-| `--write` | **stub** — exits 2 until targets/status filled |
+| `--check` | EUR2025 tagging, target schema, no `SMR` cost rows, **every file in sync**, technology-data drift |
+| `--report` | master-CSV summary, then `--check` |
+| `--write` | patches the four destinations above; `--dry-run` previews, `-v` also lists unmanaged rows |
 
-Shared name map lives in both `refresh_common_parameters_currency.py` and
-`build_common_parameters.py` (keep in sync until folded together).
+### 5.5 Scenario sensitivities without duplicate files
 
-### 5.5–5.8
+`scenarios.walloon.yaml` overrides config keys per scenario (deep-merged in
+`rules/common.smk::scenario_config`), and `rule process_cost_data` takes the whole
+`costs` section through `config_provider`. A one-number cost sensitivity is therefore:
 
-Config load order, unit conversions, scenario consolidation, rejected alternatives —
-unchanged design; **not implemented**.
+```yaml
+scen_nuc13500:
+  costs:
+    overwrites:
+      investment:
+        nuclear: 13500000   # EUR/MW_e — plain number, YAML 1.1 reads 13.5e6 as a string
+```
+
+Applied by `process_cost_data.py` after the custom-costs file and before the
+annuity, so `capital_cost` is recomputed (verified: 9500 → 13500 EUR/kW_e moves
+nuclear `capital_cost` from 833 237 to 1 184 073 EUR/MW/a, ratio 1.421). It carries
+a `DeprecationWarning` upstream, whose suggested alternative is "use an external
+file" — i.e. exactly the duplication this replaces. The non-deprecated alternative,
+`adjustments.sector.factor`, was rejected: it edits the built network, so the
+change never appears in `costs_<year>_processed.csv` and cost accounting and the
+cost table disagree.
+
+`electricity.walloon_potentials` **did not** honour scenario overrides: the three
+consumers read `snakemake.config[...]` directly, which is the base config, so
+`scen_imppel` silently used the default potentials and the DAG did not track the
+file at all. Fixed by declaring it as a rule `input` (`rules/solve_myopic.smk`,
+`rules/build_sector.smk`) and reading `snakemake.input.get("walloon_potentials")`.
 
 ---
 
@@ -265,13 +346,13 @@ unchanged design; **not implemented**.
 1. [x] §4.3 refresh PyPSA-origin monetary rows from v0.14.0
 2. [x] §4.4 retag non-PyPSA units to EUR2025
 3. [x] `config/common_parameters_meta.yaml`
-4. [x] Decide §3 / §8 modelling questions (1–7); set `status` / notes
-5. [x] Add and fill `pypsa_wal_target`, `year_rule`, `status` (first pass 2026-07-26)
-6. [ ] Implement `--write`; consolidate scenario cost/potential files
-7. [ ] `--write`, commit artefacts, smoke-test a run
-8. [ ] Wire `--check` into tests/CI; point [`instructions.md`](instructions.md) here
+4. [x] Decide §3 / §8 modelling questions; set `status` / notes
+5. [x] Add and fill `pypsa_wal_target`, `year_rule`, `status`
+6. [x] Implement `--write`; consolidate scenario cost/potential files
+7. [x] `--write` + in-place patching with failsafes, self-tested via `--check`
+8. [ ] Wire `--check` into tests/CI
 9. [x] Decide residual currency questions §8.8–8.9 (EUR2023 / Valbiom) — both inflated
-10. [x] Document application path in `instructions.md`; rename this file to `common_parameters.md`
+10. [x] Document application path in `instructions.md`; rename to `common_parameters.md`
 
 ---
 
@@ -311,8 +392,9 @@ unchanged design; **not implemented**.
    e-methane, CO2 storage tank; Nuclear (SMR) lifetime documented at status=none only).
    Follow-up from the gap audit: also added missing non-lifetime Walloon overrides —
    `nuclear retrofit` investment/FOM/efficiency, and `solar-utility single-axis tracking`
-   investment trajectory. Scenario-only nuclear CAPEX (11500 / 13500 in
-   `custom_costs_nuc*.csv`) stays out of the master CSV for §5.7 scenario deltas.
+   investment trajectory. Scenario-only nuclear CAPEX (11500 / 13500) stays out of
+   the master CSV and is expressed as `costs: overwrites:` in
+   `scenarios.walloon.yaml` (§5.5); the `custom_costs_nuc*.csv` duplicates are deleted.
 6. **H₂ imports** — **no imports from the rest of the world** (**status=none**). Exchange
    among simulated countries remains allowed. Do not enable `sector.imports` for extra-EU H2.
 7. **Empty EUR placeholders** — left in place (**status=pending**) with a “further refined”
@@ -323,12 +405,20 @@ Script that applied targets/notes/additions: `scripts/apply_common_parameters_de
 
 ### Still open
 
-8. **EUR2023 literature/TIMES prices** — **DECIDED: inflate** (2026-07-26). Solar utility/rooftop,
-   H₂ import price (documentary; status=none), and CLIMA/TIMES coal/gas/oil prices multiplied by
-   **1.051650** (Eurostat HICP EEA 2024–2025 rates, technology-data v0.14.0 method). Old value +
-   factor recorded in `note_complementaire` (`INFLATED 2026-07-26`).
-9. **Valbiom biogas CAPEX** — **DECIDED: inflate** (2026-07-26). Biogas / biogas upgrading
-   investment × **1.257335** (HICP EEA 2021–2025). Same note convention. Factors stored in
-   `config/common_parameters_meta.yaml` under `hicp_inflation`.
-
-Until `--write` exists, do **not** treat regenerated artefacts as live scenario inputs.
+* **CCGT `p_nom_min` in 2025** — see the decision box in §3.5.
+* **27 PyPSA-origin rows disagree with technology-data v0.14.0 at an anchor year**
+  and carry no override row, so pypsa-wal uses the archive value, not the table's.
+  Listed by `--check`. Largest: `Fischer-Tropsch` efficiency (0.799 vs 0.704–0.754),
+  FOM (3 vs 6.2–6.6) and lifetime (20 vs 25); `HVDC submarine` FOM (0.35 vs 2.5);
+  `HVAC/HVDC overhead` and `HVDC inverter pair` FOM (2 vs 1.5); water-tank/pit
+  storage lifetimes. Either retag them as Walloon overrides (add a row to
+  `custom_costs.csv`) or correct the table to the archive.
+* **`solar` `investment`** is in `custom_costs.csv` with no master-CSV target, so it
+  is drifting away from `solar-utility` (500 vs 525.825). Largely harmless —
+  `process_cost_data.py` overwrites `solar`'s `capital_cost` from `solar-utility` —
+  but listed by `--check -v` as unmanaged.
+* **Discount-rate harmonisation** remains a dedicated later task (§3.6 / §8.4).
+* **`custom_potentials_imppel.csv`** is still a full copy (now genuinely in effect
+  after the scenario-override fix in §5.5). Giving it the cost-file treatment would
+  need a per-potential config override, which pypsa-eur does not have.
+* Optional: add a pytest wrapping `build_common_parameters.py --check`.

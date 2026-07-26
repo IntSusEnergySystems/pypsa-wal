@@ -63,7 +63,7 @@ All other technologies rely on the config fill value (**7%**) when `process_cost
 The function `prepare_costs()` is the central place where financial discount rates affect optimisation inputs:
 
 1. Raw cost CSV is unpivoted to one row per technology.
-2. Custom cost overrides are applied (`data/custom_costs.csv` or the Walloon variant `data/walloon/custom_costs_rc.csv`).
+2. Custom cost overrides are applied (`data/custom_costs.csv` or the Walloon variant `data/walloon/custom_costs.csv`).
 3. Missing parameters are filled from `costs.fill_values` in config (including `"discount rate": 0.07`).
 4. **`capital_cost`** is computed per technology:
 
@@ -144,7 +144,7 @@ c = c_{\text{overnight}} \cdot \text{annuity}(r, n) \cdot N_{\text{years}} + c_{
 
 ## 5. How to set per-technology financial discount rates (no code changes)
 
-Add rows to `data/custom_costs.csv` (or `data/walloon/custom_costs_rc.csv` when referenced in config):
+Add rows to `data/custom_costs.csv` (or `data/walloon/custom_costs.csv` when referenced in config):
 
 ```csv
 planning_horizon,technology,parameter,value,unit,source,further description
@@ -216,7 +216,7 @@ If `capital_cost` is set directly in `custom_costs.csv`, it bypasses the annuity
 
 - **`doc/costs.rst`** — describes technology-data sources and the annuity formula used for `capital_cost`.
 - **`docs/network-representation-analysis.md` §4** — lists grid investment costs annualised at **7%**, **40-year lifetime**, **2%/a FOM** as the default assumption for transmission and distribution components.
-- **`config/config.walloon.yaml`** — points `costs.custom_cost_fn` to `data/walloon/custom_costs_rc.csv` for fuels and selected technologies; grid cost rows are not overridden there, so grid technologies follow the global 7% fill value unless added explicitly.
+- **`config/config.walloon.yaml`** — points `costs.custom_cost_fn` to `data/walloon/custom_costs.csv` for fuels and selected technologies; grid cost rows are not overridden there, so grid technologies follow the global 7% fill value unless added explicitly.
 
 ---
 
@@ -256,7 +256,7 @@ flowchart LR
 **PyPSA-Wal** maps as follows:
 
 1. **SDR** — parameter `costs.social_discountrate`. In the **Walloon project** (`foresight: myopic` in `config/config.walloon.yaml`), the optimiser does **not** discount between planning horizons; each myopic step optimises within a single period. SDR then matters mainly for **perfect-foresight** experiments and **post-processing** (present-value summaries). Julien's initial reading — that 3.5% has no direct equivalent in myopic PyPSA — is therefore largely correct for the operational solve, but **harmonisation to 3.5%** may still be needed for PF runs and for cumulative-cost reporting if results are compared with TIMES on a present-value basis.
-2. **Hurdle rate** — direct transposition to PyPSA's per-technology **`discount rate`** column (via `custom_costs.csv` / `data/walloon/custom_costs_rc.csv`), which feeds the annuity in `process_cost_data.py` (§2.2). This is **not** the same config key as `social_discountrate`.
+2. **Hurdle rate** — direct transposition to PyPSA's per-technology **`discount rate`** column (via `custom_costs.csv` / `data/walloon/custom_costs.csv`), which feeds the annuity in `process_cost_data.py` (§2.2). This is **not** the same config key as `social_discountrate`.
 
 ### 9.3 Proposed TIMES hurdle rates and PyPSA mapping
 
@@ -336,7 +336,7 @@ Administrative pace limits (e.g. renovation cap in high-demand scenario) remain 
 |-------|------|
 | Annuity calculation | `scripts/add_electricity.py` → `calculate_annuity()` |
 | Cost processing & per-tech discount column | `scripts/process_cost_data.py` → `prepare_costs()` |
-| Custom cost overrides | `data/custom_costs.csv`, `data/walloon/custom_costs_rc.csv` |
+| Custom cost overrides | `data/custom_costs.csv`, `data/walloon/custom_costs.csv` |
 | Default & social discount config | `config/config.default.yaml` → `costs:` |
 | Technology-data download | `scripts/retrieve_cost_data.py` |
 | Generator / link cost assignment | `scripts/add_electricity.py`, `scripts/prepare_sector_network.py` |

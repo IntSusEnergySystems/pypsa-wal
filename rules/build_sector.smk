@@ -1695,6 +1695,7 @@ rule prepare_sector_network:
         snapshot_weightings=resources(
             "snapshot_weightings_base_s_{clusters}_elec_{opts}_{sector_opts}.csv"
         ),
+        walloon_potentials=config_provider("electricity", "walloon_potentials"),
         retro_cost=lambda w: (
             resources("retro_cost_base_s_{clusters}.csv")
             if config_provider("sector", "retrofitting", "retro_endogen")(w)

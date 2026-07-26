@@ -217,7 +217,7 @@ In short: **NTC defines border capacity envelopes; LOPF (linearised, not AC powe
 
 Default values below come from `config/config.default.yaml` plus `config/config.walloon.yaml` overrides where noted. Investment figures are from **PyPSA `technology-data` v0.13.3** (`costs.year: 2050`), processed by `scripts/process_cost_data.py`. Overnight CAPEX is annualised with **discount rate 7%**, **lifetime 40 years**, **FOM 2%/a** (unless overridden per technology). PyPSA `capital_cost` is in **€/MW/a** (or **€/kW/a** for per-kW technologies) for one modelled investment period (`nyears = 1` in `prepare_costs`).
 
-Walloon config uses `costs.custom_cost_fn: data/walloon/custom_costs_rc.csv` for fuels and selected technologies; **grid cost rows are not overridden there** — transmission and distribution grid costs follow `technology-data`.
+Walloon config uses `costs.custom_cost_fn: data/walloon/custom_costs.csv` for fuels and selected technologies; **grid cost rows are not overridden there** — transmission and distribution grid costs follow `technology-data`.
 
 ### 4.1 Investment costs
 

@@ -171,7 +171,7 @@ electricity:
   powerplants_filter: ((DateOut >= 2024) or (DateOut != DateOut)) and Country != 'BE'
   custom_powerplants: true
   walloon_reassignment: true
-  walloon_potentials: data/walloon/custom_potentials_corrige.csv
+  walloon_potentials: data/walloon/custom_potentials.csv
   retrofit_nuclear_once: true
   everywhere_powerplants: []
   conventional_carriers:
@@ -1115,7 +1115,7 @@ costs:
     CO2 intensity: 0
     discount rate: 0.07
     standing losses: 0
-  custom_cost_fn: data/walloon/custom_costs_corrige.csv
+  custom_cost_fn: data/walloon/custom_costs.csv
   overwrites: {}
   capital_cost: {}
   marginal_cost: {}

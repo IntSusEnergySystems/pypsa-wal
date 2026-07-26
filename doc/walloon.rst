@@ -16,7 +16,7 @@ The Walloon workflow includes several changes to the default PyPSA-Eur:
   ``config/config.walloon.yaml``.
 * **Custom cost data.** The Walloon configuration uses updated cost assumptions 
   for specified fuels and technologies. These custom values are provided in 
-  ``data/walloon/custom_costs_rc.csv`` and activated via the `costs.custom_cost_fn` 
+  ``data/walloon/custom_costs.csv`` and activated via the `costs.custom_cost_fn` 
   parameter in the Walloon configuration ``config/config.walloon.yaml``. 
 * **Custom power plants retirements.** The Walloon (BEWAL) nuclear power plant, Tihange, 
   is now defined in ``data/custom_powerplants.csv`` with as 3 separate units

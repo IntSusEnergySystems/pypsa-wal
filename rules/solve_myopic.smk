@@ -19,6 +19,7 @@ rule add_existing_baseyear:
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
         ),
         powerplants=resources("powerplants_s_{clusters}.csv"),
+        walloon_potentials=config_provider("electricity", "walloon_potentials"),
         costs=lambda w: resources(
             f"costs_{config_provider('scenario', 'planning_horizons',0)(w)}_processed.csv"
         ),
@@ -80,6 +81,7 @@ rule add_brownfield:
     input:
         unpack(input_profile_tech_brownfield),
         costs=resources("costs_{planning_horizons}_processed.csv"),
+        walloon_potentials=config_provider("electricity", "walloon_potentials"),
         network=resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
         ),
