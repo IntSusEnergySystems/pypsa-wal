@@ -33,6 +33,42 @@ memory-intensive Gurobi solve is optionally delegated to the cluster.
 Walloon-specific settings (nuclear expansion, custom potentials/costs, NTC
 constraints, cross-border flows) are documented in [`doc/walloon.rst`](doc/walloon.rst).
 
+### The TIMES-coupled multi-scenario config
+
+[`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) is the
+TIMES↔PyPSA coupled study. It differs from `config.walloon.yaml` in three ways
+that change every output path:
+
+| Item | Value |
+|------|-------|
+| `run.prefix` | `times-pypsa` |
+| `run.name` | a **list** of scenarios (`scen_base`, `scen_corrige`, …) |
+| `run.scenarios.enable` | `true`, overrides from [`config/scenarios.walloon.yaml`](config/scenarios.walloon.yaml) |
+
+With `run.scenarios.enable: true`, `get_rdir()` returns `times-pypsa/{run}/`
+instead of a fixed directory, so **`RDIR` contains a `{run}` wildcard** and
+results land in one tree per scenario:
+
+```
+resources/times-pypsa/scen_base/    results/times-pypsa/scen_base/
+resources/times-pypsa/scen_corrige/ results/times-pypsa/scen_corrige/
+```
+
+Each scenario names its own TIMES `.vd` file (`sector.times_file`). Those files
+are gitignored — symlink them next to the others before running:
+
+```bash
+ln -sfn /path/to/TIMES_PyPSA/data/scen_base_251129_0112.vd    data/walloon/
+ln -sfn /path/to/TIMES_PyPSA/data/scen_corrige_251129_0112.vd data/walloon/
+```
+
+> **Writing rules for a scenario run.** Because `RDIR` holds a wildcard, every
+> `expand()` over `RESULTS` or `resources()` needs `allow_missing=True`, or
+> Snakemake aborts at parse time with
+> `WildcardError: No values given for wildcard 'run'`. Any file name that
+> embeds the run name (the SEPIA `{study}` label) must use the `{run}` wildcard
+> — see `STUDY` / `study_dir()` in [`rules/postprocess.smk`](rules/postprocess.smk).
+
 ### Output paths
 
 Intermediate files live under `resources/walloon-model/`. Final solved networks
@@ -142,6 +178,16 @@ Observed local footprint for the default Walloon configuration (PR #3, Sep 2025)
 | Wall-clock time (full workflow) | ~19 min |
 | Peak RAM | ~8.2 GB |
 
+Observed for `config.times-pypsa.yaml` (2 scenarios × 4 horizons, 6h, 12 threads,
+24-core / 124 GB workstation, 26 Jul 2026):
+
+| Metric | Value |
+|--------|-------|
+| Wall-clock, build phase (both scenarios, cutout cached) | ~50 min |
+| Wall-clock, myopic solve + summaries + plots | ~35 min |
+| Peak RAM per solve | ~7.5 GB (well under the 100 GB cap) |
+| `results/times-pypsa/<scenario>/` on disk | ~680 MB each |
+
 ---
 
 ## Environment setup
@@ -203,6 +249,30 @@ The `-call` flag runs all rules needed for the default `all` target, including
 data retrieval from Zenodo/HTTP, network building, four myopic solves, summary
 CSVs, and plots.
 
+### Local resource settings — 12 threads, 100 GB, 6h
+
+The pypsa-eur defaults (`solving.mem_mb: 128000`, `gurobi-default.threads: 32`)
+are sized for a cluster node and **must not be used on a workstation**: 32 Gurobi
+threads on a 24-core box thrashes, and a 128 GB request on a 124 GB machine
+invites the OOM killer. Local runs use:
+
+| Setting | Value | Where |
+|---------|-------|-------|
+| Gurobi threads (= Snakemake `threads` of the solve rule) | **12** | `solving.solver_options.gurobi-default.threads` |
+| `solving.cpus` | **12** | keep in sync with the above |
+| Memory per solve | **100 GB** (`mem_mb: 100000`) | `solving.mem_mb` |
+| Sector time aggregation | **6h (suggested for testing)** | `clustering.temporal.resolution_sector` |
+
+These are set in [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml)
+(and match the 6h default of `config.walloon.yaml`). Pass matching limits on the
+command line so Snakemake never schedules two solves at once:
+
+```bash
+snakemake --configfile config/config.times-pypsa.yaml --cores 12 --resources mem_mb=100000 -call
+```
+
+A finer resolution (3h) doubles the LP and and might require running on NIC5 `hmem`, not locally (see the cluster section).
+
 ### Solve chain only
 
 If intermediate files already exist under `resources/walloon-model/`:
@@ -213,9 +283,9 @@ snakemake --configfile config/config.walloon.yaml --cores 16 -call solve_sector_
 
 ### Cluster-equivalent solver settings (local)
 
-Local runs use thread count and memory from
-[`config/config.walloon.yaml`](config/config.walloon.yaml) (inherited from
-`config.default.yaml`). To match the NIC5 allocation locally:
+`config.walloon.yaml` still inherits the thread count and memory of
+`config.default.yaml` (32 threads / 128 GB) — see the section above for the local
+values to use instead. To match the NIC5 allocation locally:
 
 ```bash
 snakemake --configfile config/config.walloon.yaml \
@@ -483,6 +553,7 @@ Disable with `SKIP_S3_UPLOAD=1` or `AUTO_UPLOAD_S3=0` in [`cluster/config.sh`](c
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `S3_ENV` | `test` | `test` or `prod` prefix |
+| `RESULTS_DIR` | `results/<RUN_NAME>` | Results tree to upload — override for a `prefix/{run}` layout |
 | `UPLOAD_ID` | `YYYYMMDD_<RUN_NAME>` | Folder under `pypsa_raw_results/` |
 | `SCENARIO_ID` | `pypsa__<RUN_NAME>__YYYYMMDD` | Folder under `scenarios/` |
 | `UPLOAD_SKIP_NETWORKS` | `0` | Set `1` to omit large `.nc` files |
@@ -493,24 +564,57 @@ Implementation note: upload uses [`cluster/upload_s3.sh`](cluster/upload_s3.sh) 
 not Snakemake) — same pattern as `nic5.sh push`/`pull`, keeps AWS credentials and
 network access on the local machine.
 
+#### Uploading a multi-scenario run
+
+`RUN_NAME` names the S3 folders and must not contain a slash, so point
+`RESULTS_DIR` at the scenario tree and set the two IDs explicitly — once per
+scenario (`--dry-run` first; ~680 MB and ~1060 files per scenario):
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+DATE=$(date +%Y%m%d)
+for s in scen_base scen_corrige; do
+  RUN_NAME="times-pypsa_$s" \
+  RESULTS_DIR="$PWD/results/times-pypsa/$s" \
+  CONFIGFILE=config/config.times-pypsa.yaml \
+  UPLOAD_ID="${DATE}_times-pypsa_$s" \
+  SCENARIO_ID="times-pypsa__${s}__${DATE}" \
+  ./cluster/upload_s3.sh
+done
+```
+
+This publishes the raw tree only. The Explorer scenario folders stay empty until
+the ClimAct CSVs are extracted per scenario (Step 2), which the upload script
+warns about.
+
 ### Step 2 — Extract Explorer CSVs (ClimAct tool)
 
 Snakemake postprocess produces summary CSVs (`costs.csv`, `energy.csv`, …) under
 `results/walloon-model/csvs/`. The **Streamlit Explorer expects a different set**
 of 49 CSV files (`balancing_capacities.csv`, `load_temporal_2025.csv`, …) generated
-by the ClimAct extraction repo:
+by the ClimAct extraction repo, which on this workstation lives at:
 
 ```
-/path/to/climact-pypsa-eur_results_extraction-88d352b59aa4
+/home/sylvain/svn/climact-pypsa-eur_results_extraction-88d352b59aa4
 ```
+
+It is **not** a git checkout (an unpacked archive), so local edits there are not
+tracked — note them somewhere when you make them.
 
 #### One-time setup
+
+The `datapypsa` env is already installed on this machine. To recreate it:
 
 ```bash
 # Separate conda env — pypsa 0.35.x required (pypsa-eur uses pypsa 1.x and will fail)
 conda create -n datapypsa -c conda-forge -y python=3.11 pypsa=0.35.2 pandas \
   matplotlib plotly pyyaml openpyxl cloudpathlib boto3 s3fs dask joblib
 ```
+
+`scripts/graph_extraction_main.py` defaults to `config_extraction_OET.yaml`;
+it reads the `EXTRACTION_CONFIG` environment variable to pick another file, so a
+Walloon run needs no source edit — see the run command below. (That one-line
+`os.environ.get` was added locally on 2026-07-26; the OET default is unchanged.)
 
 #### Per-run extraction
 
@@ -539,13 +643,16 @@ Set `UPLOAD_DATE=$(date +%Y%m%d)` and `UPLOAD_ID="${UPLOAD_DATE}_walloon-model"`
    Set `download_networks: False` when using the local symlink (or `True` to read
    networks from `s3://intervectoriel/test/pypsa_raw_results/` instead).
 
-3. **Run** extraction (point `graph_extraction_main.py` at `config_extraction_walloon.yaml`):
+3. **Run** extraction (`EXTRACTION_CONFIG` selects the Walloon config):
 
    ```bash
    cd "$EXTRA"
-   export PYTHONPATH=.
-   conda run -n datapypsa python -m scripts.graph_extraction_main
+   PYTHONPATH=. EXTRACTION_CONFIG=config_extraction_walloon.yaml MPLBACKEND=Agg \
+     conda run --no-capture-output -n datapypsa python -m scripts.graph_extraction_main
    ```
+
+   Every entry under `run:` is extracted in one pass, so a multi-scenario run
+   needs no repetition — list both scenarios and launch once.
 
    Output:
 
@@ -567,6 +674,74 @@ Set `UPLOAD_DATE=$(date +%Y%m%d)` and `UPLOAD_ID="${UPLOAD_DATE}_walloon-model"`
    ```
 
    Alternatively, upload directly with `aws s3 sync` (see below).
+
+### Steps 2+3 scripted — `nic5.sh extract` / `publish`
+
+The four manual steps above (symlink, `run:` block, extract, stage) are automated
+by [`cluster/extract_explorer.sh`](cluster/extract_explorer.sh), and the whole
+publish chain is one command:
+
+```bash
+./cluster/nic5.sh extract --dry-run   # show symlinks, run: block, staging — writes nothing
+./cluster/nic5.sh extract             # extract + stage into results/<run>/explorer/
+./cluster/nic5.sh publish             # extract + upload (all scenarios)
+```
+
+| Command | Does |
+|---------|------|
+| `nic5.sh extract` | symlinks each results tree into the extractor, regenerates the `run:` block, runs the ClimAct tool once for all scenarios, stages `explorer/{pypsa,strategy,times}/` (including each scenario's own `sector.times_file` `.vd`) |
+| `nic5.sh upload` | publishes; loops over scenarios when `EXPLORER_SCENARIOS` is set |
+| `nic5.sh publish` | `extract` + `upload` |
+
+`extract` also accepts `--skip-extract`, which re-stages from an existing
+extraction (useful after changing only a display label or a `.vd`).
+
+Extraction is **deliberately not part of `upload_s3.sh`**: upload stays cheap and
+idempotent, whereas extraction is a multi-minute job in another conda env, and a
+crash mid-way must not publish a half-written `pypsa/` folder.
+
+#### Configuration
+
+All of it is driven by [`cluster/config.sh`](cluster/config.sh) — no paths are
+baked into the scripts:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `EXTRACTOR_DIR` | `$HOME/svn/climact-pypsa-eur_results_extraction-88d352b59aa4` | Extraction tool checkout |
+| `EXTRACTOR_ENV` | `datapypsa` | Its conda env (pypsa 0.35.x) |
+| `EXTRACTOR_TAG` | `v6` | `tag` in the extraction config = output subfolder |
+| `EXTRACTOR_BASE_CONFIG` | `config_extraction_walloon.yaml` | Template, **never modified** |
+| `EXTRACTOR_GEN_CONFIG` | `config_extraction_pypsa-wal.generated.yaml` | Generated copy, selected via `EXTRACTION_CONFIG` |
+| `EXTRACTOR_CONFIG_FILE` | `config.base_s_adm___2050.yaml` | Per-horizon snapshot read from `results/<run>/configs/` |
+| `EXPLORER_TYPE` | `pypsa` | `<type>` in `<type>__<scenario>__YYYYMMDD` |
+| `RUN_PREFIX` | *(empty)* | `run.prefix`; empty = single-run layout |
+| `EXPLORER_SCENARIOS` | *(empty)* | `"<scenario>[:<label>] …"`; empty = one run named `RUN_NAME` |
+| `UPLOAD_DATE` | today | Shared by extract and upload so one `publish` stamps one date |
+
+The template config is treated as read-only: the script copies it and rewrites
+only the `run:` block, so a hand-maintained file in a directory this repo does
+not own is never clobbered. Selecting the copy relies on
+`graph_extraction_main.py` honouring `EXTRACTION_CONFIG`; `extract` checks for
+that and tells you the one-line patch if it is missing.
+
+For `config.times-pypsa.yaml`, uncomment the prepared block in `config.sh`, or
+export for a one-off:
+
+```bash
+CONFIGFILE=config/config.times-pypsa.yaml RUN_PREFIX=times-pypsa \
+EXPLORER_TYPE=times-pypsa EXPLORER_SCENARIOS="scen_base scen_corrige" \
+  ./cluster/nic5.sh publish
+```
+
+**Display labels are editorial.** `EXPLORER_SCENARIOS` accepts
+`<scenario>:<label>`; the label is what the dropdown shows and is never derived
+from the scenario name — existing entries use French names, e.g.
+`"scen_base:demande-haute scen_corrige:demande-réduite"`.
+
+Expected per scenario: **49** files in `pypsa/`, **3** in `strategy/`
+(`strategy_metrics{,_mapping,_t}.csv`), **1** `.vd` in `times/`. Some older
+scenarios also carry a `strategy/report/` subfolder of French-named CSVs; that
+comes from a separate ClimAct reporting step and is not produced here.
 
 ### Step 3 — Upload Explorer CSVs to S3
 
@@ -629,7 +804,9 @@ new scenario does not appear immediately.
 
 | Symptom | Likely cause / fix |
 |---------|-------------------|
-| Scenario missing from dropdown | Folder name must be **three parts** separated by `__`: `<type>__<scenario>__YYYYMMDD`. A two-part name like `walloon-model__20260717` is ignored. |
+| Scenario missing from dropdown | The dropdown is built from `test/scenarios/`, **never** from `pypsa_raw_results/` — a complete raw upload alone shows nothing. Check `aws s3 ls s3://intervectoriel/test/scenarios/<id>/pypsa/`: if it is empty, the ClimAct extraction (Step 2) has not been run for that scenario. |
+| Scenario folder exists but is empty | `upload_s3.sh` only syncs `explorer/{pypsa,strategy,times}/` when those folders contain files, and warns loudly when they do not — re-read the upload output. |
+| Scenario missing from dropdown (naming) | Folder name must be **three parts** separated by `__`: `<type>__<scenario>__YYYYMMDD`. A two-part name like `walloon-model__20260717` is ignored. |
 | Wrong display label | Check `run_nickname` in `config_extraction_walloon.yaml` — the part after `YYYYMMDD_` becomes the `(type)` label (e.g. `20260717_pypsa` → `(pypsa)`). |
 | Upload OK but Explorer empty | Click **Clear cache** on the test site; confirm 49 files under `.../scenarios/<id>/pypsa/`. |
 | Extraction fails with pypsa import error | Use the `datapypsa` env (pypsa 0.35.x), not `pypsa-eur` (pypsa 1.x). |
@@ -664,10 +841,11 @@ S3_ENV=prod ./cluster/nic5.sh upload
 │   └── common_parameters_meta.yaml # EUR_REF + technology-data pin
 ├── common_parameters.md            # How the shared CSV is audited and wired into pypsa-wal
 ├── cluster/
-│   ├── nic5.sh                    # Local ↔ cluster orchestration
+│   ├── nic5.sh                    # Local ↔ cluster orchestration (+ extract/publish)
 │   ├── upload_s3.sh               # Publish results/ to Intervectoriel S3
+│   ├── extract_explorer.sh        # Drive the ClimAct extraction, stage explorer/
 │   ├── cluster_setup.sh           # One-time remote env install
-│   ├── config.sh                  # SSH paths, Slurm defaults
+│   ├── config.sh                  # SSH paths, Slurm defaults, extractor + scenario config
 │   └── config_cluster.yaml        # Solver/memory overrides on NIC5
 ├── envs/environment.yaml          # Conda env `pypsa-eur`
 ├── rules/                         # Snakemake rule definitions
@@ -698,6 +876,9 @@ S3_ENV=prod ./cluster/nic5.sh upload
 |---------|-------------------|
 | `Directory cannot be locked` | Another Snakemake instance is running, or a stale lock in `.snakemake/locks/` after a crash — stop the other run or remove the lock if no process is active |
 | Gurobi `No Gurobi license` | Set `GRB_LICENSE_FILE` or install `~/gurobi.lic` |
+| Gurobi `Model too large for size-limited license` | The academic licence was not found and gurobipy fell back to its built-in demo licence. `GRB_LICENSE_FILE` is exported from `~/.bashrc`, which **non-interactive shells do not read** — export it explicitly when launching from a script, `cron`, `nohup`, or an agent: `export GRB_LICENSE_FILE=$HOME/.gurobi/gurobi.lic` |
+| `WildcardError: No values given for wildcard 'run'` | A rule `expand()`s over `RESULTS`/`resources()` without `allow_missing=True` while `run.scenarios.enable: true` — see [The TIMES-coupled multi-scenario config](#the-times-coupled-multi-scenario-config) |
+| Plot rules die with `SIGABRT` and `Could not find the Qt platform plugin` | matplotlib picked an interactive backend in a session with no usable display. Run with `MPLBACKEND=Agg` (add `QT_QPA_PLATFORM=offscreen` if Qt is still probed) |
 | Cluster job pending on `hmem` | Partition busy (3 nodes, ~1 TB each) — check `squeue -p hmem`; wait for a slot or `./cluster/nic5.sh status` |
 | Gurobi / solve OOM on cluster | Raise `solving.mem_mb` in `cluster/config_cluster.yaml` (max ~1 000 000 MB on hmem); ensure `SOLVE_PARTITION=hmem` in `cluster/config.sh` |
 | Snakemake rebuilds everything after `pull` | Re-run `./cluster/nic5.sh postprocess` (touch + summaries); do not delete `.snakemake/metadata` locally |

@@ -92,7 +92,7 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    resolution_sector: 3h
+    resolution_sector: 6h
   exclude_carriers:
     - nuclear
 
@@ -189,6 +189,16 @@ costs:
   custom_cost_fn: data/walloon/custom_costs.csv
 
 solving:
+  # Local workstation allocation: 12 Gurobi threads and 100 GB per solve
+  # (the pypsa-eur defaults, 32 threads / 128 GB, exceed a 24-core / 124 GB box).
+  # Keep cpus and gurobi-default.threads in sync. NIC5 overrides both via
+  # cluster/config_cluster.yaml.
+  mem_mb: 100000
+  cpus: &local_cpus 12
+  solver_options:
+    gurobi-default:
+      threads: *local_cpus
+
   agg_p_nom_limits:
     agg_offwind: true
     agg_solar: true

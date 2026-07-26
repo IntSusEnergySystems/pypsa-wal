@@ -42,7 +42,9 @@ msg()  { printf '\033[1;34m[upload]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[upload] WARNING:\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31m[upload] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 
-RESULTS_DIR="$REPO/results/${RUN_NAME}"
+# Override RESULTS_DIR for a run whose results directory is not results/<RUN_NAME>,
+# e.g. a run.prefix + run.scenarios layout (results/times-pypsa/scen_base).
+RESULTS_DIR="${RESULTS_DIR:-$REPO/results/${RUN_NAME}}"
 UPLOAD_DATE="${UPLOAD_DATE:-$(date +%Y%m%d)}"
 UPLOAD_ID="${UPLOAD_ID:-${UPLOAD_DATE}_${RUN_NAME}}"
 SCENARIO_ID="${SCENARIO_ID:-pypsa__${RUN_NAME}__${UPLOAD_DATE}}"

@@ -57,6 +57,27 @@ CLUSTERS="${CLUSTERS:-adm}"
 OPTS="${OPTS:-}"
 SECTOR_OPTS="${SECTOR_OPTS:-}"
 
+# --- multi-scenario runs (run.prefix + run.scenarios) --------------------------
+# Set these for a config whose RDIR is "<prefix>/{run}" -- e.g.
+# config/config.times-pypsa.yaml -- so results live in results/<prefix>/<scenario>/
+# instead of results/<RUN_NAME>/. Leave RUN_PREFIX and EXPLORER_SCENARIOS empty
+# for a single-run config; the tooling then falls back to RUN_NAME everywhere.
+RUN_PREFIX="${RUN_PREFIX:-}"                   # run.prefix, e.g. times-pypsa
+# Scenario -> Explorer display label, space-separated "<scenario>:<label>" pairs.
+# The label is what the Explorer dropdown shows and is an editorial choice (the
+# existing scenarios use French names), so set it deliberately -- it is NOT
+# derived from the scenario name. Omit ":<label>" to reuse the scenario name.
+EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS:-}"
+#
+# For config/config.times-pypsa.yaml, uncomment the four lines below (or export
+# the same variables ahead of the command for a one-off run):
+# CONFIGFILE="${CONFIGFILE:-config/config.times-pypsa.yaml}"
+# RUN_PREFIX="${RUN_PREFIX:-times-pypsa}"
+# EXPLORER_TYPE="${EXPLORER_TYPE:-times-pypsa}"
+# EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS:-scen_base scen_corrige}"
+# ...with French display labels instead of the scenario names:
+# EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS:-scen_base:demande-haute scen_corrige:demande-réduite}"
+
 # --- local conda invocation ----------------------------------------------------
 # How to run the local environment (used by `nic5.sh prepare` / `postprocess`).
 # --no-capture-output: stream Snakemake progress to the terminal (conda run buffers by default).
@@ -77,3 +98,47 @@ UPLOAD_SKIP_NETWORKS="${UPLOAD_SKIP_NETWORKS:-0}"  # 1 = omit large .nc files
 # UPLOAD_ID=20260717_walloon-model
 # SCENARIO_ID=pypsa__walloon-model__20260717
 # EXPLORER_SRC=results/walloon-model/explorer/pypsa
+# Shared by upload_s3.sh and extract_explorer.sh so a single `publish` stamps one
+# date on the raw folder, the scenario folder and the extractor run_nickname.
+UPLOAD_DATE="${UPLOAD_DATE:-$(date +%Y%m%d)}"
+
+# --- Wallonie Explorer CSV extraction (ClimAct tool) --------------------------
+# Used by cluster/extract_explorer.sh (`nic5.sh extract`). The tool lives OUTSIDE
+# this repo, is an unpacked archive rather than a git checkout, and needs its own
+# conda env (pypsa 0.35.x; the pypsa-eur env has pypsa 1.x and will fail).
+EXTRACTOR_DIR="${EXTRACTOR_DIR:-$HOME/svn/climact-pypsa-eur_results_extraction-88d352b59aa4}"
+EXTRACTOR_ENV="${EXTRACTOR_ENV:-datapypsa}"
+EXTRACTOR_TAG="${EXTRACTOR_TAG:-v6}"           # `tag` in the extraction config
+# Hand-maintained config read as the template. extract_explorer.sh never edits it:
+# it writes EXTRACTOR_GEN_CONFIG with a regenerated `run:` block and selects that
+# file through the EXTRACTION_CONFIG environment variable.
+EXTRACTOR_BASE_CONFIG="${EXTRACTOR_BASE_CONFIG:-config_extraction_walloon.yaml}"
+EXTRACTOR_GEN_CONFIG="${EXTRACTOR_GEN_CONFIG:-config_extraction_pypsa-wal.generated.yaml}"
+# Per-horizon config snapshot the extractor reads out of results/<run>/configs/.
+EXTRACTOR_CONFIG_FILE="${EXTRACTOR_CONFIG_FILE:-config.base_s_adm___2050.yaml}"
+# `<type>` in the scenario folder name <type>__<scenario>__YYYYMMDD.
+EXPLORER_TYPE="${EXPLORER_TYPE:-pypsa}"
+
+# --- derived helpers (sourced by nic5.sh, upload_s3.sh, extract_explorer.sh) ---
+# Emits one tab-separated record per Explorer scenario:
+#   <scenario> <label> <results_dir> <upload_id> <scenario_id>
+# A single-run config (EXPLORER_SCENARIOS empty) emits one record for RUN_NAME.
+explorer_targets() {
+    local spec scen label
+    if [ -z "${EXPLORER_SCENARIOS:-}" ]; then
+        printf '%s\t%s\t%s\t%s\t%s\n' \
+            "$RUN_NAME" "$RUN_NAME" "results/${RUN_NAME}" \
+            "${UPLOAD_DATE}_${RUN_NAME}" \
+            "${EXPLORER_TYPE}__${RUN_NAME}__${UPLOAD_DATE}"
+        return
+    fi
+    for spec in $EXPLORER_SCENARIOS; do
+        scen="${spec%%:*}"
+        label="${spec#*:}"
+        printf '%s\t%s\t%s\t%s\t%s\n' \
+            "$scen" "$label" \
+            "results/${RUN_PREFIX:+${RUN_PREFIX}/}${scen}" \
+            "${UPLOAD_DATE}_${RUN_PREFIX:+${RUN_PREFIX}_}${scen}" \
+            "${EXPLORER_TYPE}__${label}__${UPLOAD_DATE}"
+    done
+}

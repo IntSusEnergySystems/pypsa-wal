@@ -600,8 +600,18 @@ rule plot_heatmap_timeseries:
 countries = ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'NL', 'GB', 'LU']
 local_countries = countries.copy()
 if "EU" not in local_countries:
-    local_countries.append("EU") 
-                             
+    local_countries.append("EU")
+
+# Label of the study in SEPIA/report file names. With run.scenarios enabled RDIR
+# carries the {run} wildcard, so the label has to stay a wildcard too.
+STUDY = "{run}" if "{run}" in RDIR else config["run"]["name"]
+
+
+def study_dir(w):
+    """Run directory used by the SEPIA scripts as ``results/<study>/...``."""
+    return (RDIR.format(run=w.run) if "{run}" in RDIR else RDIR).rstrip("/")
+
+
 rule prepare_sepia:
     params:
         countries=countries,
@@ -611,18 +621,19 @@ rule prepare_sepia:
         eurostat_report_year=config_provider("energy", "eurostat_report_year"),
         plotting=config_provider("plotting"),
         scenario=config_provider("scenario"),
-        study = config_provider("run", "name"),
+        study = study_dir,
         year = config_provider("energy", "energy_totals_year"),
     input:
         networks=expand(
             RESULTS
             + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
-            **config["scenario"]
+            **config["scenario"],
+            allow_missing=True,
         ),
         costs = resources("costs_2050_processed.csv"),
         summary = RESULTS + "graphs/costs.svg",
     output:
-        excelfile=expand(RESULTS + "sepia/inputs{country}.xlsx", country=local_countries),
+        excelfile=expand(RESULTS + "sepia/inputs{country}.xlsx", country=local_countries, allow_missing=True),
     threads: 1
     resources:
         mem_mb=10000,
@@ -639,7 +650,7 @@ rule generate_sepia:
     params:
         countries=countries,
         year = config_provider("energy", "energy_totals_year"),
-        study = config_provider("run", "name"),
+        study = study_dir,
         planning_horizons=config_provider("scenario", "planning_horizons"),
         cluster=config_provider("scenario","clusters"),
     input:
@@ -647,15 +658,15 @@ rule generate_sepia:
         costs = resources("costs_2050_processed.csv"),
         sepia_config = "SEPIA/SEPIA_config.xlsx",
         template = "SEPIA/Template/pypsa.html",
-        biomass_potentials = expand(resources("biomass_potentials_s_{clusters}_{planning_horizons}.csv"),**config["scenario"]),
-        excelfile=expand(RESULTS + "sepia/inputs{country}.xlsx", country=local_countries),
+        biomass_potentials = expand(resources("biomass_potentials_s_{clusters}_{planning_horizons}.csv"),**config["scenario"], allow_missing=True),
+        excelfile=expand(RESULTS + "sepia/inputs{country}.xlsx", country=local_countries, allow_missing=True),
         plots_html = "config/plots.yaml",
-        
+
     output:
-        excelfile=expand(RESULTS + "htmls/ChartData_{country}.xlsx", country=local_countries),
-        htmlfile_emissions=expand(RESULTS + "htmls/{country}_emissions_{study}.html", country=local_countries, study=config["run"]["name"]),
-        htmlfile_sankeys=expand(RESULTS + "htmls/{country}_sankeys_{study}.html", country=local_countries, study=config["run"]["name"]),
-        htmlfile_fec=expand(RESULTS + "htmls/{country}_fec_{study}.html", country=local_countries, study=config["run"]["name"]),
+        excelfile=expand(RESULTS + "htmls/ChartData_{country}.xlsx", country=local_countries, allow_missing=True),
+        htmlfile_emissions=expand(RESULTS + "htmls/{country}_emissions_{study}.html", country=local_countries, study=STUDY, allow_missing=True),
+        htmlfile_sankeys=expand(RESULTS + "htmls/{country}_sankeys_{study}.html", country=local_countries, study=STUDY, allow_missing=True),
+        htmlfile_fec=expand(RESULTS + "htmls/{country}_fec_{study}.html", country=local_countries, study=STUDY, allow_missing=True),
     threads: 1
     resources:
         mem_mb=10000,
@@ -676,21 +687,22 @@ rule prepare_results:
         sector_opts=config_provider("scenario", "sector_opts"),
         plotting=config_provider("plotting"),
         scenario=config_provider("scenario"),
-        study = config_provider("run", "name"),
+        study = study_dir,
         foresight=config_provider("foresight"),
     input:
         networks=expand(
             RESULTS
             + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
-            **config["scenario"]
+            **config["scenario"],
+            allow_missing=True,
         ),
-        excelfile=expand(RESULTS + "htmls/ChartData_{country}.xlsx", country=local_countries),
+        excelfile=expand(RESULTS + "htmls/ChartData_{country}.xlsx", country=local_countries, allow_missing=True),
         costs = resources("costs_2050_processed.csv"),
         sepia_config = "SEPIA/SEPIA_config.xlsx",
         template = "SEPIA/Template/pypsa.html",
-        plots_html = "config/plots.yaml",       
+        plots_html = "config/plots.yaml",
     output:
-        htmlfile=expand(RESULTS + "htmls/{country}_{section}_{study}.html",study = config["run"]["name"], country=local_countries,section=["costs", "capacities", "dispatch_plots", "maps"]),
+        htmlfile=expand(RESULTS + "htmls/{country}_{section}_{study}.html",study = STUDY, country=local_countries,section=["costs", "capacities", "dispatch_plots", "maps"], allow_missing=True),
     threads: 1
     resources:
         mem_mb=10000,
@@ -710,17 +722,18 @@ rule prepare_dispatch_plots:
         sector_opts=config_provider("scenario", "sector_opts"),
         plotting=config_provider("plotting"),
         scenario=config_provider("scenario"),
-        study = config_provider("run", "name"),
+        study = study_dir,
     input:
         networks=expand(
             RESULTS
             + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
-            **config["scenario"]
+            **config["scenario"],
+            allow_missing=True,
         ),
-        htmlfile=expand(RESULTS + "htmls/{country}_maps_{study}.html",study = config["run"]["name"], country=countries),      
+        htmlfile=expand(RESULTS + "htmls/{country}_maps_{study}.html",study = STUDY, country=countries, allow_missing=True),
     output:
-        powerfile=expand(RESULTS + "htmls/raw_html/Power_Dispatch-{country}_{planning_horizons}.html", country=countries,planning_horizons=config["scenario"]["planning_horizons"],),
-        heatfile=expand(RESULTS + "htmls/raw_html/Heat_Dispatch-{country}_{planning_horizons}.html", country=countries,planning_horizons=config["scenario"]["planning_horizons"],),
+        powerfile=expand(RESULTS + "htmls/raw_html/Power_Dispatch-{country}_{planning_horizons}.html", country=countries,planning_horizons=config["scenario"]["planning_horizons"], allow_missing=True),
+        heatfile=expand(RESULTS + "htmls/raw_html/Heat_Dispatch-{country}_{planning_horizons}.html", country=countries,planning_horizons=config["scenario"]["planning_horizons"], allow_missing=True),
     threads: 1
     resources:
         mem_mb=10000,

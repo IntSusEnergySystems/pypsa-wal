@@ -24,7 +24,13 @@
 #   ./cluster/nic5.sh wait        # block until jobs finish
 #   ./cluster/nic5.sh pull        # rsync solved results back
 #   ./cluster/nic5.sh postprocess # LOCAL: touch solve outputs, rebuild summaries
+#   ./cluster/nic5.sh extract     # LOCAL: build + stage the Explorer CSVs
 #   ./cluster/nic5.sh upload      # publish results/ to Intervectoriel S3 (test/)
+#   ./cluster/nic5.sh publish     # extract + upload (Explorer needs both)
+#
+# A multi-scenario config (run.prefix + run.scenarios, e.g.
+# config/config.times-pypsa.yaml) is driven by RUN_PREFIX / EXPLORER_SCENARIOS in
+# cluster/config.sh; `extract`, `upload` and `publish` then loop over scenarios.
 ###############################################################################
 set -euo pipefail
 
@@ -364,7 +370,31 @@ cmd_upload_s3() {
 }
 
 cmd_upload() {
-    bash "$HERE/upload_s3.sh" "$@"
+    # Single-run configs upload the one results/<RUN_NAME> tree; a multi-scenario
+    # config (EXPLORER_SCENARIOS set) uploads one tree per scenario, since
+    # upload_s3.sh handles exactly one results directory per invocation.
+    if [ -z "${EXPLORER_SCENARIOS:-}" ]; then
+        bash "$HERE/upload_s3.sh" "$@"
+        return
+    fi
+    local scen label results_dir upload_id scenario_id
+    while IFS=$'\t' read -r scen label results_dir upload_id scenario_id; do
+        msg "Uploading scenario '$scen' → $scenario_id"
+        RUN_NAME="${RUN_PREFIX:+${RUN_PREFIX}_}${scen}" \
+        RESULTS_DIR="$REPO/$results_dir" \
+        UPLOAD_ID="$upload_id" \
+        SCENARIO_ID="$scenario_id" \
+            bash "$HERE/upload_s3.sh" "$@"
+    done < <(explorer_targets)
+}
+
+cmd_extract() {
+    bash "$HERE/extract_explorer.sh" "$@"
+}
+
+cmd_publish() {
+    cmd_extract
+    cmd_upload
 }
 
 cmd_setup() {
@@ -398,7 +428,9 @@ case "${1:-}" in
     wait)        shift; cmd_wait "$@";;
     pull)        shift; cmd_pull "$@";;
     postprocess) shift; cmd_postprocess "$@";;
+    extract)     shift; cmd_extract "$@";;
     upload)      shift; cmd_upload "$@";;
+    publish)     shift; cmd_publish "$@";;
     run)         shift; cmd_run "$@";;
     shell)       shift; cmd_shell "$@";;
     *) cat <<EOF
@@ -412,13 +444,16 @@ Usage: $0 <command> [args...]
   wait          block until the submitted orchestrator finishes
   pull          rsync solved results back into ./results
   postprocess   LOCAL (after pull): --touch solve outputs, rebuild summaries/plots, upload S3
+  extract       LOCAL: run the ClimAct extraction, stage Explorer CSVs + TIMES .vd
   upload        publish results/ to Intervectoriel S3 (test/ by default; see upload_s3.sh)
+  publish       extract + upload (what the Wallonie Explorer needs to list a scenario)
   run           prepare + push + solve + wait + pull + postprocess (+ S3 upload)
   shell         open an interactive shell in the cluster repo
 
   Examples:
     $0 run
     $0 solve && $0 wait && $0 pull && $0 postprocess
+    $0 extract --dry-run && $0 publish
 EOF
        exit 1;;
 esac
