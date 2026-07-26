@@ -4,20 +4,15 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "times-pypsa"
+  prefix: "climate-years"
   name:
-  - scen_base
-  - scen_corrige
-  #- scen_nuc13500
-  #- scen_nuc11500
-  #- scen_imppel
-  #- scen_data
+  - scen_base_2013
+  - scen_base_2010
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
     enable: true
     file: config/scenarios.walloon.yaml
-  shared_cutouts: true
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight
 foresight: myopic
@@ -92,7 +87,7 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    resolution_sector: 3h
+    resolution_sector: 1h
   exclude_carriers:
     - nuclear
 
