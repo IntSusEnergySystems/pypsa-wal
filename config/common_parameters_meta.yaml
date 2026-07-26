@@ -1,0 +1,29 @@
+# Sidecar for config/input_parameters_for_models.csv (common_parameters.md §5.3).
+# Project monetary reference year and the technology-data archive pin used by
+# scripts/refresh_common_parameters_currency.py (§4.3) and
+# scripts/build_common_parameters.py (§5.4).
+
+EUR_REF: 2025
+
+technology_data:
+  tag: v0.14.0
+  eur_year: 2025
+  # Relative to repository root
+  archive_dir: data/costs/archive/v0.14.0
+
+# Eurostat HICP factors used to inflate non-PyPSA rows that were still on an
+# older purchasing-power year (§8.8–8.9). Same method as technology-data v0.14.0.
+hicp_inflation:
+  source: >-
+    Eurostat HICP annual average rate of change, EEA row
+    (technology-data v0.14.0 inputs/prc_hicp_aind__custom_20097956_spreadsheet.xlsx)
+  method: technology-data scripts/_helpers.py prepare_inflation_rate / adjust_for_inflation
+  EUR_REF: 2025
+  factor_2020_to_2025: 1.257335
+  factor_2023_to_2025: 1.051650
+  rates_eea_percent:
+    2021: 2.9
+    2022: 9.2
+    2023: 6.4
+    2024: 2.6
+    2025: 2.5

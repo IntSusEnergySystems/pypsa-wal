@@ -8,7 +8,8 @@ Wallonia region (`BEWAL`), built on [PyPSA-Eur](https://github.com/PyPSA/pypsa-e
 These instructions describe how to install the environment, run the Snakemake
 workflow **locally**, and offload the LP solve to the **NIC5 / CÉCI** cluster
 using the helper scripts in [`cluster/`](cluster/). The main [`README.md`](README.md)
-is unchanged; this file is the operational guide.
+is unchanged; this file is the operational guide. Shared TIMES/PyPSA cost and
+potential assumptions are documented in [`common_parameters.md`](common_parameters.md).
 
 The workflow follows the same strategy as
 [pypsa-eur_negawatt](https://github.com/PyPSA/pypsa-eur_negawatt): data
@@ -45,6 +46,45 @@ results/walloon-model/networks/base_s_adm___2030.nc
 ```
 
 (Three underscores between `adm` and the year — both `opts` and `sector_opts` wildcards are empty strings.)
+
+---
+
+## Shared TIMES/PyPSA parameters
+
+Assumptions that both TIMES-WAL and PyPSA-WAL must share (technology costs and
+lifetimes, fuel prices, Walloon RES potentials, CO₂ trajectory, NTCs, …) live in
+[`config/input_parameters_for_models.csv`](config/input_parameters_for_models.csv).
+Monetary values are on an **EUR2025** base. Full design, audit, and modeller
+decisions: [`common_parameters.md`](common_parameters.md).
+
+**Editing the CSV alone does not change a PyPSA run.** The workflow never reads
+that table at solve time. Values reach the model only through the artefacts the
+pipeline already consumes:
+
+| Family | Applied via |
+|--------|-------------|
+| Costs / lifetimes / fuel prices | `data/walloon/custom_costs_*.csv` → `costs: custom_cost_fn` → `scripts/process_cost_data.py` |
+| Walloon RES / biomass potentials | `data/walloon/custom_potentials_*.csv` → `electricity: walloon_potentials` → `BEWAL_potentials.py` |
+| Cross-border NTCs | `data/walloon/ntc_<year>.csv` → `set_NTCs.py` |
+| CO₂ budget, discount rate, imports, BEV flexibility | keys in `config/config.walloon.yaml` (over `config.default.yaml`) |
+
+Intended workflow (see [`common_parameters.md`](common_parameters.md) §5):
+
+1. Edit `config/input_parameters_for_models.csv` (set `status=active` and a
+   `pypsa_wal_target`).
+2. Run `python scripts/build_common_parameters.py --write` to regenerate the
+   artefacts above (and `config/config.common_parameters.yaml`).
+3. Commit the regenerated files so `git diff` shows what the model will see.
+4. Run Snakemake as usual — no change to runtime scripts.
+
+Until `--write` is fully wired, keep the existing `custom_costs_*` /
+`custom_potentials_*` / NTC / config overrides in sync by hand, or the shared
+CSV and the solved model will drift. Use
+`python scripts/build_common_parameters.py --check` to validate EUR2025 tagging
+and the technology-data pin in `config/common_parameters_meta.yaml`.
+
+Soft-linked **demands** (TIMES → PyPSA) are a separate path — see
+[`times_data_extraction.md`](times_data_extraction.md), not the common-parameters CSV.
 
 ---
 
@@ -580,7 +620,10 @@ S3_ENV=prod ./cluster/nic5.sh upload
 ├── Snakefile                      # Master Snakemake workflow
 ├── config/
 │   ├── config.default.yaml        # PyPSA-Eur defaults
-│   └── config.walloon.yaml        # Walloon study configuration
+│   ├── config.walloon.yaml        # Walloon study configuration
+│   ├── input_parameters_for_models.csv  # Shared TIMES/PyPSA assumptions (EUR2025)
+│   └── common_parameters_meta.yaml # EUR_REF + technology-data pin
+├── common_parameters.md            # How the shared CSV is audited and wired into pypsa-wal
 ├── cluster/
 │   ├── nic5.sh                    # Local ↔ cluster orchestration
 │   ├── upload_s3.sh               # Publish results/ to Intervectoriel S3
