@@ -1,6 +1,37 @@
-scen_base:
+scen_base_2013:
+
+  atlite:
+    default_cutout: "europe-2013-sarah3-era5"
+    nprocesses: 4
+
+  snapshots:
+    start: "2013-01-01"
+    end: "2014-01-01"
+    inclusive: left
+
   sector:
-    times_file: data/walloon/scen_base_251129_0112.vd
+    times_file: data/walloon/scen_base_251130_0412.vd
+  electricity:
+    walloon_potentials: data/walloon/custom_potentials_corrige.csv
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_corrige.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_base.csv
+
+scen_base_2010:
+
+  atlite:
+    default_cutout: "europe-2010-sarah3-era5"
+    nprocesses: 4
+
+  snapshots:
+    start: "2010-01-01"
+    end: "2011-01-01"
+    inclusive: left
+
+  sector:
+    times_file: data/walloon/scen_base_251130_0412.vd
   electricity:
     walloon_potentials: data/walloon/custom_potentials_corrige.csv
   costs:
@@ -11,7 +42,7 @@ scen_base:
 
 scen_corrige:
   sector:
-    times_file: data/walloon/scen_corrige_251129_0112.vd
+    times_file: data/walloon/scen_corrige_251130_0312.vd
   electricity:
     walloon_potentials: data/walloon/custom_potentials_corrige.csv
   costs:
@@ -19,6 +50,7 @@ scen_corrige:
   solving:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_corrige.csv
+
 
 scen_nuc13500:
   sector:
