@@ -152,17 +152,26 @@ def bev_availability_profile(fn, snapshots, nodes, options):
     avail_max = options["bev_avail_max"]
     # average share plugged-in availability for passenger electric vehicles
     avail_mean = options["bev_avail_mean"]
+    # minimum share plugged-in availability for passenger electric vehicles
+    avail_min = options["bev_avail_min"]
+
+    if avail_min < 0:
+        logger.warning(
+            "Minimum BEV availability is negative, which may lead to infeasibility."
+        )
+    if avail_max < avail_min:
+        logger.warning(
+            "Maximum BEV availability is lower than minimum, which may "
+            "lead to infeasibility."
+        )
 
     # linear scaling, highest when traffic is lowest, decreases if traffic increases
     avail = avail_max - (avail_max - avail_mean) * (traffic - traffic.min()) / (
         traffic.mean() - traffic.min()
     )
 
-    if not avail[avail < 0].empty:
-        logger.warning(
-            "The BEV availability weekly profile has negative values which can "
-            "lead to infeasibility."
-        )
+    # floor to avail_min so the profile never drops low enough to cause infeasibility
+    avail = avail.clip(lower=avail_min)
 
     return generate_periodic_profiles(
         dt_index=snapshots,
