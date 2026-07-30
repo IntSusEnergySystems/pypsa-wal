@@ -94,6 +94,8 @@ sector:
   bev_avail_max: 0.1
   bev_avail_mean: 0.05
   bev_avail_min: 0.01
+  v2g: false
+
   times_demand: true
   times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
