@@ -4,11 +4,16 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  name: "walloon-model"
+  prefix: "bev-flexibility"
+  name:
+  - default_2010
+  - adj_bev_2010
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
-    file: config/scenarios.yaml
+    enable: true
+    file: config/scenarios.walloon.yaml
+  shared_cutouts: true
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
