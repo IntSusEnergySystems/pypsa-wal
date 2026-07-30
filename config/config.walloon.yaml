@@ -91,6 +91,9 @@ clustering:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
+  bev_avail_max: 0.1
+  bev_avail_mean: 0.05
+  bev_avail_min: 0.01
   times_demand: true
   times_file: data/walloon/scen_base_coherence_3110.vd
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
