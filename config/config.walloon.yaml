@@ -109,6 +109,8 @@ sector:
     2040: 90  # 180 * 0.5
     2045: 125  # 250 * 0.5
     2050: 125  # 250 * 0.5
+  agriculture_machinery_electric_share: 0.5
+  agriculture_machinery_oil_share: 0.5
   shipping_methanol_share:
     2020: 0
     2025: 0
@@ -127,29 +129,27 @@ sector:
     2050: 0.20
   district_heating:
     potential: 0.3
+  electrobiofuels: false
 
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#co2-budget
+co2_budget:
+  2025: 0.648
+  2030: 0.450
+  2040: 0.250
+  2050: 0.050
 co2_budget_national: true
 co2_price_national: false
 budget_national:
   2025:
-    BEBRU: 0.648
-    BEVLG: 0.648
-    BEWAL: 0.648
-    DE: 0.648
-    FR: 0.648
-    GB: 0.648
-    NL: 0.648
-    LU: 0.648
+    BEBRU: 0.64
+    BEVLG: 0.64
+    BEWAL: 0.64
+    DE: 0.64
+    FR: 0.64
+    GB: 0.64
+    NL: 0.64
+    LU: 0.64
   2030:
-    BEBRU: 0.648
-    BEVLG: 0.648
-    BEWAL: 0.648
-    DE: 0.648
-    FR: 0.648
-    GB: 0.648
-    NL: 0.648
-    LU: 0.648
-  2040:
     BEBRU: 0.45
     BEVLG: 0.45
     BEWAL: 0.45
@@ -158,6 +158,15 @@ budget_national:
     GB: 0.45
     NL: 0.45
     LU: 0.45
+  2040:
+    BEBRU: 0.25
+    BEVLG: 0.25
+    BEWAL: 0.25
+    DE: 0.25
+    FR: 0.25
+    GB: 0.25
+    NL: 0.25
+    LU: 0.25
   2050:
     BEBRU: 0.05
     BEVLG: 0.05
@@ -172,7 +181,7 @@ self_sufficiency:
   self_sufficiency_constraint: false
   level: 0.7   
 costs:
-  custom_cost_fn: data/walloon/custom_costs.csv
+  custom_cost_fn: data/walloon/custom_costs_rc.csv
 
 solving:
   agg_p_nom_limits:
