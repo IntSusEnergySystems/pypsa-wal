@@ -92,7 +92,7 @@ clustering:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
   times_demand: true
-  times_file: data/walloon/scen_base_coherence_3110.vd
+  times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
   oil_boilers: true
@@ -190,7 +190,7 @@ solving:
     agg_nuclear: true
     agg_ccgt: true
     include_existing: true
-    file: data/agg_p_nom_minmax.csv
+    file: data/walloon/agg_p_nom_minmax_base.csv
 
   constraints:
     CCL: true
