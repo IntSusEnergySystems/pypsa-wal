@@ -94,6 +94,8 @@ sector:
   bev_avail_max: 0.1
   bev_avail_mean: 0.05
   bev_avail_min: 0.01
+  bev_dsm_restriction_value: 0.8
+  bev_dsm_restriction_time: 18
   v2g: false
 
   times_demand: true
