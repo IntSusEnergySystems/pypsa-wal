@@ -19,9 +19,10 @@ technology-data **v0.14.0** (the pin in `config/common_parameters_meta.yaml`, re
 via `data/versions.csv`), `costs.year: 2050`, cost pipeline
 `scripts/process_cost_data.py`.
 
-**Status:** not yet implemented. `common_parameters.md` §3.6 defers this task, and the
-three `discount_rate` rows in `config/input_parameters_for_models.csv` carry
-`status=pending`. Part C is the plan that closes both.
+**Status:** implemented. Master CSV hurdles + SDR are `status=active`; financial-rate
+fallback is the PyPSA default fill (0.07). `config/hurdle_rate_mapping.csv` and
+generated `data/walloon/discount_rates.csv` are committed; `process_cost_data.py`
+applies the hurdle file; tests live in `test/test_discount_rates.py`.
 
 ---
 
@@ -304,9 +305,9 @@ reviewed in [`discount-rates-literature.md`](discount-rates-literature.md), whic
 
 | # | Question | Decision |
 |---|---|---|
-| D1 | The master CSV's flat 4% vs the sectoral 7.5–12% | **Retire the flat 4%.** Repurpose those three rows as the **fallback** rate at **0.075** ([S1](#s1--add-the-rates-to-the-master-csv)). Confirm the number with ICEDD, but the *mechanism* does not wait on it — the fallback only reaches unmapped technologies. |
+| D1 | The master CSV's flat 4% vs the sectoral 7.5–12% | **Retire the flat 4%.** Unmapped-technology **fallback** is the **PyPSA default** fill (`config.default.yaml` → **0.07**), not a TIMES-negotiated rate. Sector rates live only in `hurdle:<sector>` rows. |
 | D2 | **No tertiary/residential split** in the cost table — one `decentral *` family serves both | **Map all `decentral *` to `residential` (12%).** No demand-weighted blend: a blend is unauditable and cannot be reproduced from the CSV. `tertiary` stays defined in the shared table so it remains faithful to TIMES and a future split can use it. |
-| D3 | SDR 3.5% in myopic runs | **Set `costs.social_discountrate: 0.035`.** Inert in the myopic solve, and it makes cumulative-cost reporting comparable with TIMES ([S6](#s6--patch-the-sdr-and-the-fallback-into-the-configs)). |
+| D3 | SDR 3.5% in myopic runs | **Define SDR only in the master CSV** (`config:costs.social_discountrate`); `--write` syncs it into the walloon configs. Do **not** hand-edit the YAML scalar. Inert in the myopic solve; makes cumulative-cost reporting comparable with TIMES ([S6](#s6--patch-the-sdr-into-the-configs)). |
 | D4 | `sector.retrofitting.interest_rate` (4%) | **Out of scope for this plan; tracked separately.** It is not part of the cost table, so no `custom_costs.csv` or hurdle-file row can reach it ([§5.2](#52-building-retrofit-uses-its-own-rate)). Raising it to the `residential` rate needs its own change and its own impact check. |
 | D5 | Reverting the eight technology-data 0.04 rates | **Yes** — the generated file is applied after the fill and overrides them ([S8](#s8--read-the-file-in-process_cost_datapy)). Expect a visible result shift ([§8](#8-current-misalignment)); quantify it in [§14](#14-rollout-and-verification) before publishing. |
 | D6 | The rates each scenario uses | **Per-scenario CSV variants** ([§10.5](#105-scenario-variants--alternative-hurdle-rates-from-the-csv)) — no code change to add one. A rate of **0** is never used: the annuity collapses to `1/lifetime`, i.e. free capital. |
@@ -326,11 +327,11 @@ same file; a missing rate produces a loud error **and** a safe fallback.
 
 ```mermaid
 flowchart TD
-    M["config/input_parameters_for_models.csv<br/>hurdle:&lt;sector&gt; rates + SDR + fallback"] --> S[scripts/build_common_parameters.py --write]
+    M["config/input_parameters_for_models.csv<br/>hurdle:&lt;sector&gt; rates + SDR"] --> S[scripts/build_common_parameters.py --write]
     P["config/hurdle_rate_mapping.csv<br/>technology -> sector"] --> S
     U["technology universe<br/>archive + custom_costs + derived"] --> S
     S --> G["data/walloon/discount_rates.csv<br/>GENERATED, committed"]
-    S --> Y["config.walloon.yaml / config.times-pypsa.yaml<br/>costs.social_discountrate<br/>costs.fill_values.'discount rate'"]
+    S --> Y["config.walloon.yaml / config.times-pypsa.yaml<br/>costs.social_discountrate only<br/>(fill_values stay at PyPSA defaults)"]
     G --> PC[scripts/process_cost_data.py]
     PC --> R["resources/.../costs_{year}_processed.csv"]
 ```
@@ -339,7 +340,7 @@ flowchart TD
 
 | File | Owner | Holds |
 |---|---|---|
-| `config/input_parameters_for_models.csv` | **shared** with TIMES/ICEDD | the **rates** — 4 sector hurdles, the SDR, the fallback |
+| `config/input_parameters_for_models.csv` | **shared** with TIMES/ICEDD | the **rates** — 4 sector hurdles and the SDR (fallback = PyPSA default fill) |
 | `config/hurdle_rate_mapping.csv` | **pypsa-wal** | the **assignment** — one row per technology → sector |
 
 The mapping needs ~307 rows, most for technologies TIMES never models
@@ -362,8 +363,9 @@ Highest wins:
 2. **Sector rate** — `hurdle:<variant>:<sector>` when generating a named variant,
    otherwise `hurdle:<sector>`, for the technology's sector in the mapping
    ([§10.5](#105-scenario-variants--alternative-hurdle-rates-from-the-csv)).
-3. **Fallback** — `config:costs.fill_values.discount rate` (D1: 0.075). Applies only to
-   a technology absent from the mapping; it is a safety net, **not** a scenario lever.
+3. **Fallback** — PyPSA default `costs.fill_values."discount rate"` from
+   `config.default.yaml` (**0.07**). Applies only to a technology absent from the
+   mapping; it is a safety net, **not** a scenario lever and **not** a TIMES rate.
 
 `hurdle_sector: none` in the mapping means *deliberately excluded* — no row is written,
 and `process_cost_data.py`'s own `fillna` handles it. Reserved for the eight storage
@@ -481,15 +483,15 @@ and keep `year_rule=hold`. To give a scenario its own rates, add
 `hurdle:<variant>:<sector>` rows instead of editing these
 ([§10.5](#105-scenario-variants--alternative-hurdle-rates-from-the-csv)).
 
-Then **edit the three existing rows** (currently `energy_price` /
+Then **retire the three existing rows** (currently `energy_price` /
 `technology_name_pypsa = "Discount rate"` / `config:costs.fill_values.discount rate`):
-`status: pending → active`, `value: 0.04 → 0.075` (D1), and rewrite
-`note_complementaire` to say it is now the fallback.
+`status: none`, `value: 0.07` (document the PyPSA default), and rewrite
+`note_complementaire` to say walloon configs must **not** override the fill —
+fallback is the PyPSA default, TIMES rates live in `hurdle:<sector>`.
 
 > **Also update `scripts/apply_common_parameters_decisions.py`** — `NOTE_DISCOUNT`
-> (`:59-64`) and the `--- 4. Discount rate ---` block (`:219-225`) force those rows
-> back to `status=pending`. Re-running it would undo S1. Change the block to set
-> `status=active` and rewrite the note.
+> and the `--- 4. Discount rate ---` block must keep those rows at `status=none`
+> / `0.07`, not revive a walloon fill override.
 
 **Verify:** `python scripts/build_common_parameters.py --report` — the new
 `hurdle` family appears under "active target families", and `--check` no longer
@@ -591,9 +593,7 @@ def resolve_hurdle_rates(df, meta, horizons) -> HurdleResolution:
         k[0]: t for k, t in collect_targets(df, "cost", horizons, nparts=2).items()
         if k[1] == "discount rate"                                     # rule 1
     }
-    fallback_tgt = collect_targets(df, "config", horizons, nparts=1).get(
-        ("costs.fill_values.discount rate",)
-    )
+    # fallback = pypsa_default_discount_rate() from config.default.yaml
     ...
 ```
 
@@ -658,7 +658,8 @@ Add to `cmd_check` / `cmd_write` / `cmd_report`:
 | `hurdle_sector` not in `HURDLE_SECTORS ∪ {none}` | **hard error** | nothing written |
 | Mapping row for a technology **not** in the universe | **error** | file still written (a stale row is harmless but must be visible) |
 | Technology in universe, **absent** from mapping | **error, fallback applied** | file written with the fallback rate; **exit 1** |
-| No active `config:costs.fill_values.discount rate` row | **hard error** | there would be no fallback to apply |
+| `config.default.yaml` missing `fill_values."discount rate"` | **hard error** | PyPSA fallback unreadable |
+| walloon config overrides fill away from the PyPSA default | **hard error** | [§10.3](#103-precedence-and-fallback) |
 | `custom_costs.csv` contains a `discount rate` row | **hard error** | [§10.4](#104-single-authority) |
 | Sector rate outside `0 ≤ r < 0.30` | **hard error** | catches `7.5` written for `0.075` |
 | Variant name not matching `[a-z0-9_]+` | **hard error** | it becomes part of a filename |
@@ -673,7 +674,7 @@ Message format:
 
 ```
 data/walloon/discount_rates.csv: 3 technology(ies) have no row in
-config/hurdle_rate_mapping.csv — the fallback rate 0.075 was written for them:
+config/hurdle_rate_mapping.csv — the PyPSA default fallback rate 0.07 was written for them:
   - biochar pyrolysis
   - seawater RO desalination
   - Zn-Air-store
@@ -684,35 +685,31 @@ production|industry|tertiary|residential, or hurdle_sector=none if a rate is ine
 Also extend `report_patch()`/`cmd_report` to print the per-sector technology counts, so
 a bad bulk assignment is obvious at a glance.
 
-### S6 — Patch the SDR and the fallback into the configs
+### S6 — Patch the SDR into the configs (fill stays at PyPSA defaults)
 
-Add `patch_costs_scalars()` patching **both** `config/config.walloon.yaml` and
-`config/config.times-pypsa.yaml`:
+Add `patch_costs_scalars()` syncing **only** `costs.social_discountrate` from the
+master CSV into **both** `config/config.walloon.yaml` and
+`config/config.times-pypsa.yaml`. If the key is absent, **insert** it after
+`hurdle_rate_fn` (do not hand-edit the scalar — CSV is authoritative).
 
-- `costs.social_discountrate` ← `config:costs.social_discountrate` (0.035)
-- `costs.fill_values."discount rate"` ← the fallback (0.075)
+Do **not** override `costs.fill_values."discount rate"` in the walloon configs:
+unmapped technologies and `fillna` use the **PyPSA default** from
+`config.default.yaml` (0.07). `--check` fails if a walloon overlay sets a
+different fill.
 
-Follow the existing in-place philosophy: find the key with an anchored regex inside
-the `costs:` block and rewrite only the scalar. If the key is **absent**, emit an error
-telling the user the exact line to add — do not synthesise YAML structure. Both files
-currently have a two-line `costs:` block, so the keys must be added by hand once:
+Hand-maintained costs block (before / without the synced SDR key):
 
 ```yaml
 costs:
   custom_cost_fn: data/walloon/custom_costs.csv
   hurdle_rate_fn: data/walloon/discount_rates.csv
-  social_discountrate: 0.035
-  fill_values:
-    "discount rate": 0.075
 ```
 
 Do **not** edit `config/config.default.yaml` — it is generated from the pydantic model
 by `pixi run generate-config`.
 
-> **Verify the merge semantics.** A partial `fill_values` override must deep-merge with
-> the default (which supplies `FOM`, `VOM`, `lifetime`, …), not replace it. Snakemake's
-> `configfile:` directive uses a recursive update, so it should — but confirm it before
-> relying on it. Test T8 pins this.
+> Test T8 pins: SDR in the walloon configs matches the master CSV after `--write`,
+> and the merged `fill_values."discount rate"` equals the PyPSA default.
 
 ### S7 — Add the config key and regenerate the schema
 
@@ -865,7 +862,7 @@ No existing test does this — you are introducing the convention.
 |---|---|---|
 | **T6** | `test_every_mapped_sector_has_a_rate` | every sector used in the mapping has an active `hurdle:<sector>` row for every planning horizon. |
 | **T7** | `test_rates_are_fractions` | every hurdle rate, the SDR and the fallback satisfy `0 ≤ r < 0.30` and `units == "per unit"`. Guards `7.5` vs `0.075`. |
-| **T8** | `test_configs_match_master_csv` | for `config.walloon.yaml` **and** `config.times-pypsa.yaml`: `costs.social_discountrate` == the CSV SDR, `costs.fill_values."discount rate"` == the CSV fallback. Parametrise over the two files. Also load each through the pydantic config model to prove the partial `fill_values` override deep-merges ([S6](#s6--patch-the-sdr-and-the-fallback-into-the-configs)). |
+| **T8** | `test_configs_match_master_csv` | for `config.walloon.yaml` **and** `config.times-pypsa.yaml`: `costs.social_discountrate` == the CSV SDR; merged `fill_values."discount rate"` == the PyPSA default (walloon must not override it). Parametrise over the two files ([S6](#s6--patch-the-sdr-into-the-configs)). |
 | **T9** | `test_no_discount_rate_in_custom_costs` | `custom_costs.csv` has no `discount rate` row ([§10.4](#104-single-authority)). |
 | **T10** | `test_generated_file_in_sync` | regenerate into `tmp_path`, compare byte-for-byte with the committed file; on mismatch `pytest.fail` with a unified diff and *"Run `python scripts/build_common_parameters.py --write`"*. Mirrors `test_config_schema.py::_check_file_in_sync`. **`parametrize` over every variant** of [§10.5](#105-scenario-variants--alternative-hurdle-rates-from-the-csv). |
 | **T10b** | `test_variants_cover_the_same_technologies` | every variant file's `technology` set is **identical** to the base file's, so a technology cannot be priced in one variant and forgotten in another. |
@@ -879,7 +876,7 @@ No existing test does this — you are introducing the convention.
 | **T11** | `test_expected_rates_spot_check` | run `prepare_costs()` on the pinned archive with the committed mapping and check: `onwind` 0.075, `nuclear` 0.075, `solar-rooftop` **0.075** (supply-side, [§7](#7-agreed-rates)), `decentral air-sourced heat pump` **0.12** (reversal of the 4%, D5), `industrial heat pump high temperature` 0.10, `electricity distribution grid` 0.075. Requires the [§5.5](#55-prepare_costs-is-not-callable-outside-snakemake) fix. |
 | **T12** | `test_unmapped_technology_gets_fallback` | synthetic mapping missing one technology → that technology's row carries the fallback, the error names it, exit code is 1, **and the file is still written**. |
 | **T13** | `test_unknown_sector_is_hard_error` | mapping row with `hurdle_sector: bogus` → error, exit 1, **file unchanged on disk**. |
-| **T14** | `test_missing_fallback_row_is_hard_error` | master CSV with no active `config:costs.fill_values.discount rate` → hard error, nothing written. |
+| **T14** | `test_missing_fallback_row_is_hard_error` | `config.default.yaml` without `fill_values."discount rate"` → hard error, nothing written. |
 | **T15** | `test_per_technology_override_wins` | an active `cost:<tech>:discount rate` target beats the sector rate ([§10.3](#103-precedence-and-fallback) rule 1). |
 | **T16** | `test_horizon_expansion` | a yearless hurdle row yields the same rate for all four horizons; per-year anchors with `year_rule: hold` hold forward (2025 takes the 2030 anchor). `parametrize` over both shapes. |
 

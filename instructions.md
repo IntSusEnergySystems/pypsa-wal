@@ -101,13 +101,18 @@ python scripts/build_common_parameters.py --write --dry-run   # preview
 python scripts/build_common_parameters.py --write
 ```
 
-`--write` **patches values in place**; it never generates a file. The structure,
-sources and comments of each input file are hand-maintained and survive, so
+`--write` **patches values in place** for most destinations. The structure,
+sources and comments of those files are hand-maintained and survive, so
 `git diff` after a `--write` shows exactly what the shared table changed.
+The exception is `discount_rates.csv`, which is **generated wholesale** from
+`hurdle:*` rows plus `config/hurdle_rate_mapping.csv` (still committed).
 
-| Family | Master-CSV target | File patched in place |
-|--------|-------------------|-----------------------|
+| Family | Master-CSV target | File patched / generated |
+|--------|-------------------|--------------------------|
 | Costs / lifetimes / fuel prices | `cost:<tech>:<param>` | `data/walloon/custom_costs.csv` |
+| Per-technology hurdle rates | `hurdle:<sector>` (+ mapping) | `data/walloon/discount_rates.csv` (**generated**) |
+| Social discount rate (SDR) | `config:costs.social_discountrate` | `config.walloon.yaml` / `config.times-pypsa.yaml` (synced) |
+| Financial-rate fill (unmapped fallback) | — | **PyPSA default** in `config.default.yaml` (`0.07`); not overridden in walloon configs |
 | Walloon RES / biomass potentials | `potential:<bus>:<tech>:<attr>` | `data/walloon/custom_potentials.csv` |
 | Cross-border NTCs | `ntc:<A>-<B>` | `data/walloon/ntc_<year>.csv` |
 | CO₂ trajectory | `config:budget_national` | `config/config.walloon.yaml` |
