@@ -6,8 +6,9 @@
 run:
   prefix: "times-pypsa"
   name:
-  - scen_base
-  - scen_corrige
+  - scen_demande_haute
+  #- scen_base
+  #- scen_corrige
   #- scen_nuc13500
   #- scen_nuc11500
   #- scen_imppel
