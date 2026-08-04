@@ -26,6 +26,103 @@ default_2010:
     bev_avail_min: 0.0
     v2g: true
 
+  solving:
+    mem_mb: 64000
+    runtime: 3h
+
+adj_bev_dsm_false:
+
+  atlite:
+    default_cutout: "europe-2010-sarah3-era5"
+    nprocesses: 4
+
+  snapshots:
+    start: "2010-01-01"
+    end: "2011-01-01"
+    inclusive: left
+
+  sector:
+    bev_dsm: false
+    bev_dsm_restriction_value: 0.8
+    bev_dsm_restriction_time: 18
+    bev_avail_max: 0.2
+    bev_avail_mean: 0.05
+    bev_avail_min: 0.02
+    v2g: false
+
+  solving:
+    mem_mb: 64000
+    runtime: 6h
+
+adj_bev_avail:
+
+  atlite:
+    default_cutout: "europe-2010-sarah3-era5"
+    nprocesses: 4
+
+  snapshots:
+    start: "2010-01-01"
+    end: "2011-01-01"
+    inclusive: left
+
+  sector:
+    bev_dsm_restriction_value: 0.8
+    bev_dsm_restriction_time: 7
+    bev_avail_max: 0.2
+    bev_avail_mean: 0.05
+    bev_avail_min: 0.02
+    v2g: true
+
+  solving:
+    mem_mb: 64000
+    runtime: 12h
+
+adj_bev_dsm_restriction:
+
+  atlite:
+    default_cutout: "europe-2010-sarah3-era5"
+    nprocesses: 4
+
+  snapshots:
+    start: "2010-01-01"
+    end: "2011-01-01"
+    inclusive: left
+
+  sector:
+    bev_dsm_restriction_value: 0.8
+    bev_dsm_restriction_time: 18
+    bev_avail_max: 0.95
+    bev_avail_mean: 0.8
+    bev_avail_min: 0.0
+    v2g: true
+
+  solving:
+    mem_mb: 64000
+    runtime: 3h
+
+adj_bev_v2g:
+
+  atlite:
+    default_cutout: "europe-2010-sarah3-era5"
+    nprocesses: 4
+
+  snapshots:
+    start: "2010-01-01"
+    end: "2011-01-01"
+    inclusive: left
+
+  sector:
+    bev_dsm_restriction_value: 0.8
+    bev_dsm_restriction_time: 7
+    bev_avail_max: 0.95
+    bev_avail_mean: 0.8
+    bev_avail_min: 0.0
+    v2g: false
+
+  solving:
+    mem_mb: 64000
+    runtime: 3h
+
 
 adj_bev_2010:
 
@@ -41,11 +138,14 @@ adj_bev_2010:
   sector:
     bev_dsm_restriction_value: 0.8
     bev_dsm_restriction_time: 18
-    bev_avail_max: 0.1
+    bev_avail_max: 0.2
     bev_avail_mean: 0.05
-    bev_avail_min: 0.01
+    bev_avail_min: 0.02
     v2g: false
 
+  solving:
+    mem_mb: 64000
+    runtime: 12h
 
 scen_base:
   sector:

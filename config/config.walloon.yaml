@@ -6,8 +6,7 @@
 run:
   prefix: "bev-flexibility"
   name:
-  - default_2010
-  - adj_bev_2010
+  - adj_bev_dsm_false
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
@@ -90,7 +89,7 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    resolution_sector: 6h
+    resolution_sector: 1h
   exclude_carriers:
     - nuclear
 
