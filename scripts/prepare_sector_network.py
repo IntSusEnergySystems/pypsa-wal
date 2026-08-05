@@ -1607,6 +1607,9 @@ def insert_electricity_distribution_grid(
     loads = n.loads.index[n.loads.carrier.str.contains("electric")]
     n.loads.loc[loads, "bus"] += " low voltage"
 
+    inflexible_ev = n.loads.index[n.loads.carrier == "land transport EV inflexible"]
+    n.loads.loc[inflexible_ev, "bus"] += " low voltage"
+
     bevs = n.links.index[n.links.carrier == "BEV charger"]
     n.links.loc[bevs, "bus0"] += " low voltage"
 
@@ -2237,6 +2240,8 @@ def add_EVs(
     temperature: pd.DataFrame,
     spatial: SimpleNamespace,
     options: dict,
+    transport_flexible: pd.DataFrame,
+    transport_inflexible: pd.DataFrame,
 ) -> None:
     """
     Add electric vehicle (EV) infrastructure to the network.
@@ -2277,6 +2282,14 @@ def add_EVs(
         - bev_energy: float
         - bev_dsm_availability: float
         - v2g: bool
+    transport_flexible : pd.DataFrame
+        Raw transport demand share that is flexible (DSM-capable), same
+        units/shape convention as p_set, with snapshots as index and nodes
+        as columns
+    transport_inflexible : pd.DataFrame
+        Raw transport demand share that is inflexible (fixed natural
+        charging shape), same units/shape convention as p_set, with
+        snapshots as index and nodes as columns
 
     Returns
     -------
@@ -2341,18 +2354,46 @@ def add_EVs(
     else:
         profile = electric_share * p_set.div(efficiency)
 
-    # Add EV load
+    # Split final EV electricity demand into a flexible (DSM-capable) share and an inflexible (fixed natural charging shape) share
+    # using the fraction from the raw transport split so the total EV demand at each snapshot still reconstructs exactly
+    # this approach avoids distortion from the temperature-dependent efficiency correction above.
+    transport_total = transport_flexible + transport_inflexible
+    flex_frac = transport_flexible.div(transport_total)
+    profile_flexible = (profile.loc[n.snapshots] * flex_frac.loc[n.snapshots, spatial.nodes])
+    profile_inflexible = profile.loc[n.snapshots] - profile_flexible
+
+    # NOTE: saving to debug
+    debug_suffix = f"{snakemake.wildcards.clusters}_{snakemake.wildcards.planning_horizons}"
+    debug_dir = "/Users/meas/oet/pypsa-wal-intsus/dev/files"
+    transport_total.to_csv(f"{debug_dir}/transport_total_{debug_suffix}.csv")
+    flex_frac.to_csv(f"{debug_dir}/flex_frac_{debug_suffix}.csv")
+    profile_flexible.to_csv(f"{debug_dir}/profile_flexible_{debug_suffix}.csv")
+    profile_inflexible.to_csv(f"{debug_dir}/profile_inflexible_{debug_suffix}.csv")
+
+    # Add flexible EV load (DSM-capable, attached to EV battery bus)
     n.add(
         "Load",
         spatial.nodes,
         suffix=" land transport EV",
         bus=spatial.nodes + " EV battery",
         carrier="land transport EV",
-        p_set=profile.loc[n.snapshots],
+        p_set=profile_flexible,
+    )
+
+    # Add inflexible EV load (fixed natural charging shape, attached directly to the AC bus)
+    # remapped to the low-voltage bus in insert_electricity_distribution_grid() if the distribution grid is enabled
+    n.add(
+        "Load",
+        spatial.nodes,
+        suffix=" land transport EV inflexible",
+        bus=spatial.nodes,
+        carrier="land transport EV inflexible",
+        p_set=profile_inflexible,
     )
 
     # Add BEV chargers
-    p_nom = number_cars * options["bev_charge_rate"] * electric_share
+    # sized to serve only the flexible share, since the EV battery bus (and its DSM store) now only carries flexible demand
+    p_nom = (number_cars * options["bev_charge_rate"] * electric_share * options["bev_dsm_availability"])
     n.add(
         "Link",
         spatial.nodes,
@@ -2395,7 +2436,7 @@ def add_EVs(
                 suffix=" V2G",
                 bus1=spatial.nodes,
                 bus0=spatial.nodes + " EV battery",
-                p_nom=p_nom * options["bev_dsm_availability"],
+                p_nom=p_nom,
                 carrier="V2G",
                 p_max_pu=avail_profile.loc[n.snapshots, spatial.nodes],
                 lifetime=1,
@@ -2634,6 +2675,8 @@ def add_land_transport(
     transport_data_file,
     avail_profile_file,
     dsm_profile_file,
+    transport_demand_flexible_file,
+    transport_demand_inflexible_file,
     temp_air_total_file,
     cf_industry,
     options,
@@ -2657,6 +2700,12 @@ def add_land_transport(
         Path to CSV file containing availability profiles
     dsm_profile_file : str
         Path to CSV file containing demand-side management profiles
+    transport_demand_flexible_file : str
+        Path to CSV file containing the flexible (DSM-capable) share of
+        transport demand
+    transport_demand_inflexible_file : str
+        Path to CSV file containing the inflexible (fixed natural charging
+        shape) share of transport demand
     temp_air_total_file : str
         Path to netCDF file containing air temperature data
     options : dict
@@ -2689,6 +2738,12 @@ def add_land_transport(
     number_cars = pd.read_csv(transport_data_file, index_col=0)["number cars"]
     avail_profile = pd.read_csv(avail_profile_file, index_col=0, parse_dates=True)
     dsm_profile = pd.read_csv(dsm_profile_file, index_col=0, parse_dates=True)
+    transport_flexible = pd.read_csv(
+        transport_demand_flexible_file, index_col=0, parse_dates=True
+    )
+    transport_inflexible = pd.read_csv(
+        transport_demand_inflexible_file, index_col=0, parse_dates=True
+    )
 
     # exogenous share of passenger car type
     engine_types = ["fuel_cell", "electric", "ice"]
@@ -2765,6 +2820,8 @@ def add_land_transport(
             temperature,
             spatial,
             options,
+            transport_flexible[nodes],
+            transport_inflexible[nodes],
         )
     elif shares["electric"] > 0:
         add_EVs(
@@ -2777,6 +2834,8 @@ def add_land_transport(
             temperature,
             spatial,
             options,
+            transport_flexible[nodes],
+            transport_inflexible[nodes],
         )
     if (times_demand or suff_demand) and fuel_cell_share.sum() > 0:
         add_fuel_cell_cars(
@@ -6775,6 +6834,8 @@ if __name__ == "__main__":
             transport_data_file=snakemake.input.transport_data,
             avail_profile_file=snakemake.input.avail_profile,
             dsm_profile_file=snakemake.input.dsm_profile,
+            transport_demand_flexible_file=snakemake.input.transport_demand_flexible,
+            transport_demand_inflexible_file=snakemake.input.transport_demand_inflexible,
             temp_air_total_file=snakemake.input.temp_air_total,
             cf_industry=cf_industry,
             options=options,
