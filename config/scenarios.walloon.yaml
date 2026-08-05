@@ -30,6 +30,74 @@ default_2010:
     mem_mb: 64000
     runtime: 3h
 
+adj_bev:
+
+  sector:
+    bev_dsm_restriction_value: 0.7
+    bev_dsm_restriction_time: 17
+    bev_avail_max: 0.35
+    bev_avail_mean: 0.1
+    bev_avail_min: 0.02
+    bev_energy: 0.024
+    bev_charge_rate: 0.011
+    v2g: false
+
+  solving:
+    mem_mb: 64000
+    runtime: 4h
+
+adj_bev_elia:
+
+  sector:
+    bev_dsm_restriction_value: 0.7
+    bev_dsm_restriction_time: 17
+    bev_avail_max: 0.4
+    bev_avail_mean: 0.31
+    bev_avail_min: 0.2
+    bev_energy: 0.024
+    bev_charge_rate: 0.011
+    v2g: false
+
+  solving:
+    mem_mb: 64000
+    runtime: 4h
+
+adj_bev_load_shedding:
+
+  sector:
+    bev_dsm_restriction_value: 0.7
+    bev_dsm_restriction_time: 17
+    bev_avail_max: 0.35
+    bev_avail_mean: 0.1
+    bev_avail_min: 0.02
+    bev_energy: 0.024
+    bev_charge_rate: 0.011
+    v2g: false
+
+  solving:
+    options:
+      load_shedding: true
+    mem_mb: 64000
+    runtime: 4h
+
+adj_bev_elia_load_shedding:
+
+  sector:
+    bev_dsm_restriction_value: 0.7
+    bev_dsm_restriction_time: 17
+    bev_avail_max: 0.4
+    bev_avail_mean: 0.31
+    bev_avail_min: 0.2
+    bev_energy: 0.024
+    bev_charge_rate: 0.011
+    v2g: false
+
+  solving:
+    options:
+      load_shedding: true
+    mem_mb: 64000
+    runtime: 4h
+
 adj_bev_dsm_false:
 
   atlite:
@@ -122,30 +190,6 @@ adj_bev_v2g:
   solving:
     mem_mb: 64000
     runtime: 3h
-
-
-adj_bev_2010:
-
-  atlite:
-    default_cutout: "europe-2010-sarah3-era5"
-    nprocesses: 4
-
-  snapshots:
-    start: "2010-01-01"
-    end: "2011-01-01"
-    inclusive: left
-
-  sector:
-    bev_dsm_restriction_value: 0.8
-    bev_dsm_restriction_time: 18
-    bev_avail_max: 0.2
-    bev_avail_mean: 0.05
-    bev_avail_min: 0.02
-    v2g: false
-
-  solving:
-    mem_mb: 64000
-    runtime: 12h
 
 scen_base:
   sector:

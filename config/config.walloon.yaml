@@ -6,13 +6,22 @@
 run:
   prefix: "bev-flexibility"
   name:
-  - adj_bev_dsm_false
+  - adj_bev_elia_load_shedding
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
     enable: true
     file: config/scenarios.walloon.yaml
   shared_cutouts: true
+
+atlite:
+  default_cutout: "europe-2010-sarah3-era5"
+  nprocesses: 4
+
+snapshots:
+  start: "2010-01-01"
+  end: "2011-01-01"
+  inclusive: left
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
