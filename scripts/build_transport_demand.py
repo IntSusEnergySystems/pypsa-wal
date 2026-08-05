@@ -196,6 +196,48 @@ def bev_dsm_profile(snapshots, nodes, options):
     )
 
 
+def build_elia_transport_shape(fn, snapshots, nodes, year=2026):
+    """
+    Build a normalized weekly charging shape from Elia's observed hourly
+    natural (non-flexible) charging profile for a given year.
+    """
+    daily = pd.read_csv(fn)
+    daily = daily[daily["year"] == year].sort_values("hour")
+    weekly_profile = np.tile(daily["natural_charging_profile"].values, 7)
+
+    shape = generate_periodic_profiles(
+        dt_index=snapshots,
+        nodes=nodes,
+        weekly_profile=weekly_profile,
+    )
+    return shape / shape.sum()
+
+
+def split_transport_demand(transport_demand_original, elia_shape, bev_dsm_availability):
+    """
+    Split transport demand into a flexible share (same temporal shape as
+    ``transport``, scaled by ``bev_dsm_availability``) and an inflexible
+    share (reshaped in time to follow Elia's natural charging profile),
+    conserving each node's total energy.
+    """
+    # to get flexible demand, multiple total transport demand by the share of flexible demand (bev_dsm_availability)
+    transport_flexible = transport_demand_original * bev_dsm_availability
+
+    # to get inflexible demand, multiply total transport demand by the share of inflexible demand (1 - bev_dsm_availability)
+    # and then multiply by Elia's natural charging profile to reshape in time
+    inflexible_total = transport_demand_original.sum() * (1 - bev_dsm_availability)
+    transport_inflexible = elia_shape.mul(inflexible_total, axis=1)
+
+    # add check to ensure that total energy equals the sum of the split (flexible + inflexible)
+    total_orig = transport_demand_original.sum().sum()
+    total_split = transport_flexible.sum().sum() + transport_inflexible.sum().sum()
+    assert np.isclose(total_orig, total_split, rtol=1e-6), (
+        f"transport split does not match: {total_orig} vs {total_split}"
+    )
+
+    return transport_flexible, transport_inflexible
+
+
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
@@ -236,13 +278,30 @@ if __name__ == "__main__":
         nodal_transport_data,
     )
 
+    transport_demand.to_csv(f"{debug_dir}/transport_demand_{debug_suffix}.csv")
+
     avail_profile = bev_availability_profile(
         snakemake.input.traffic_data_Pkw, snapshots, nodes, options
     )
 
     dsm_profile = bev_dsm_profile(snapshots, nodes, options)
 
+    elia_transport_shape = build_elia_transport_shape(snakemake.input.elia_natural_charging_profile, snapshots, nodes, year=2026)
+
+    transport_demand_flexible, transport_demand_inflexible = split_transport_demand(transport_demand, elia_transport_shape, options["bev_dsm_availability"])
+
+    # NOTE: saving to debug
+    debug_suffix = f"{snakemake.wildcards.clusters}_{snakemake.wildcards.planning_horizons}"
+    debug_dir = "/Users/meas/oet/pypsa-wal-intsus/dev/files"
+    avail_profile.to_csv(f"{debug_dir}/avail_profile_{debug_suffix}.csv")
+    dsm_profile.to_csv(f"{debug_dir}/dsm_profile_{debug_suffix}.csv")
+    elia_transport_shape.to_csv(f"{debug_dir}/elia_transport_shape_{debug_suffix}.csv")
+    transport_demand_flexible.to_csv(f"{debug_dir}/transport_demand_flexible_{debug_suffix}.csv")
+    transport_demand_inflexible.to_csv(f"{debug_dir}/transport_demand_inflexible_{debug_suffix}.csv")
+
     nodal_transport_data.to_csv(snakemake.output.transport_data)
     transport_demand.to_csv(snakemake.output.transport_demand)
     avail_profile.to_csv(snakemake.output.avail_profile)
     dsm_profile.to_csv(snakemake.output.dsm_profile)
+    transport_demand_flexible.to_csv(snakemake.output.transport_demand_flexible)
+    transport_demand_inflexible.to_csv(snakemake.output.transport_demand_inflexible)
