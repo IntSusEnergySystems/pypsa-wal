@@ -91,12 +91,15 @@ clustering:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  bev_avail_max: 0.1
-  bev_avail_mean: 0.05
-  bev_avail_min: 0.01
-  bev_dsm_restriction_value: 0.8
-  bev_dsm_restriction_time: 18
-  v2g: false
+  bev_dsm_availability: 0.01 # Elia assumes 1% flexible demand in 2026
+  bev_dsm_restriction_value: 0.7 # based on NREL paper
+  bev_dsm_restriction_time: 17 # based on NREL paper
+  bev_avail_max: 0.4 # based on Elia values
+  bev_avail_mean: 0.32 # based on Elia values
+  bev_avail_min: 0.2 # based on Elia values
+  bev_energy: 0.06 # Elia assumes 60 kWh
+  bev_charge_rate: 0.011 # aligned with Elia
+  v2g: false # turn off v2g
 
   times_demand: true
   times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
