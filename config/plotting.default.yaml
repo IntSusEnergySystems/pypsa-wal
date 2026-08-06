@@ -529,6 +529,7 @@ plotting:
     BEV charger: '#baf238'
     V2G: '#e5ffa8'
     land transport EV: '#baf238'
+    land transport EV inflexible: '#6d8d20'
     land transport demand: '#38baf2'
     EV battery: '#baf238'
     # all battery variation:
