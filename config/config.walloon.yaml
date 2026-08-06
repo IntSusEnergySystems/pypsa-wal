@@ -182,6 +182,10 @@ self_sufficiency:
   level: 0.7   
 costs:
   custom_cost_fn: data/walloon/custom_costs.csv
+  hurdle_rate_fn: data/walloon/discount_rates.csv
+  # Synced from input_parameters_for_models.csv by build_common_parameters.py --write.
+  # Do not hand-edit. fill_values stay at config.default.yaml (PyPSA defaults).
+  social_discountrate: 0.035
 
 solving:
   agg_p_nom_limits:

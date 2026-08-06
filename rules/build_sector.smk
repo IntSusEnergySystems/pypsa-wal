@@ -25,6 +25,30 @@ rule build_population_layouts:
         scripts("build_population_layouts.py")
 
 
+def times_mapping_files(w):
+    """The times_pypsa mapping CSVs the extraction actually reads.
+
+    Declared as rule inputs so that editing a mapping invalidates
+    `wallon_demands_*.csv`. Without them a label fix (e.g. adding a heating
+    process that no extraction rule could match) leaves stale demands on disk and
+    Snakemake reuses them silently — how the 2026 Walloon heat leak stayed in the
+    solved networks after it had been fixed upstream. See
+    `docs/times-heating-softlink-options.md` §10.6.
+    """
+    from times_pypsa import default_mappings_dir
+
+    d = config_provider("sector", "times_mappings_dir", default=None)(w)
+    d = Path(d) if d else Path(default_mappings_dir())
+    return [
+        str(d / name)
+        for name in (
+            "mapping_processes.csv",
+            "mapping_commodities.csv",
+            "extraction_rules.csv",
+        )
+    ]
+
+
 rule build_wallon_demands:
     message:
         "Export TIMES .vd Walloon demands for {wildcards.planning_horizons} (times_pypsa)"
@@ -34,6 +58,7 @@ rule build_wallon_demands:
         times_use_preexported=config_provider("sector", "times_use_preexported", default=False),
     input:
         times_file=config_provider("sector", "times_file"),
+        times_mappings=times_mapping_files,
     output:
         heating_capacities=resources("heating_capacities_{planning_horizons}.csv"),
         wallon_demands=resources("wallon_demands_{planning_horizons}.csv"),

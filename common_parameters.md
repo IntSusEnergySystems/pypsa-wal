@@ -21,14 +21,16 @@ shared CSV (monetary values in EUR2025; year in the unit)
                          data/walloon/custom_costs.csv
                          data/walloon/custom_potentials.csv
                          data/walloon/ntc_<year>.csv
-                         config/config.walloon.yaml  (budget_national)
+                         config/config.walloon.yaml  (budget_national + cost scalars)
+                         config/config.times-pypsa.yaml  (cost scalars)
+                       and GENERATES
+                         data/walloon/discount_rates.csv  (hurdle rates; see §5.1)
 ```
 
-The script does not *generate* input files. Each file stays hand-maintained —
-its rows, order, `source` and `further_description` are the modeller's — and
-`--write` only rewrites the `value` cells of rows the shared table covers. That
-is what keeps the two roles separable: the file says *which* PyPSA-Eur defaults
-Wallonia overrides, the shared CSV says *what* the negotiated number is.
+The script mostly does not *generate* input files. Each patched file stays
+hand-maintained — its rows, order, `source` and `further_description` are the
+modeller's — and `--write` only rewrites the `value` cells of rows the shared
+table covers. The one exception is `discount_rates.csv` (§3.6 / §5.1).
 
 ---
 
@@ -64,9 +66,12 @@ channels match on free-text labels.
 |---|---:|---|---|
 | technology `investment`/`FOM`/`VOM`/`lifetime`/`efficiency` | 362 | `data/costs/archive/v0.14.0/costs_<year>.csv`, overridden by `costs: custom_cost_fn` | `scripts/process_cost_data.py` |
 | fossil fuel prices (oil, gas, coal) | 9 | same custom-costs file, `parameter = fuel` | idem |
+| per-technology financial discount (hurdle) rates | ~297 | `costs: hurdle_rate_fn` → `data/walloon/discount_rates.csv` (generated from CSV) | `scripts/process_cost_data.py` |
+| social discount rate (SDR) | 1 | master CSV → `--write` syncs `costs.social_discountrate` | perfect-foresight / PV post-processing |
+| financial-rate fill (unmapped fallback) | — | **PyPSA default** `config.default.yaml` (`0.07`) — not overridden in walloon configs | `scripts/process_cost_data.py` `fillna` |
 | Walloon RES potentials, biomass, biogas | 12 | `electricity: walloon_potentials` | `scripts/walloon_scripts/BEWAL_potentials.py` |
 | cross-border NTCs | 18 | `data/walloon/ntc_<year>.csv` | `scripts/walloon_scripts/set_NTCs.py` |
-| CO₂ trajectory, CO₂ storage, imports, BEV flexibility, discount rate | 25 | `config.walloon.yaml` over `config.default.yaml` | scripts that read the keys |
+| CO₂ trajectory, CO₂ storage, imports, BEV flexibility | ~24 | `config.walloon.yaml` over `config.default.yaml` | scripts that read the keys |
 | aggregate capacity limits per country | 6 | `solving: agg_p_nom_limits: file` | `scripts/solve_network.py` |
 | TIMES activity drivers | 11 | — | stay in TIMES; demands cross via soft-link |
 
@@ -151,10 +156,19 @@ now present for every horizon, and `--check` fails if a horizon goes missing aga
 > CCGT links. That matches `hold` semantics and what `custom_potentials_corrige.csv`
 > did, but it is a new constraint for runs that used `custom_potentials.csv`.
 
-### 3.6 Discount rate — DEFERRED
+### 3.6 Discount / hurdle rates — CLOSED
 
-Leave 7 % / 2 % social / 4 % rooftop until the dedicated discount-rate task
-(`status=pending` on the CSV rows).
+Sectoral TIMES hurdle rates (production 7.5 %, industry 10 %, tertiary 11 %,
+residential 12 %) and SDR 3.5 % are defined **only** in the master CSV
+(`hurdle:<sector>`, `config:costs.social_discountrate`). Assignment technology →
+sector lives in `config/hurdle_rate_mapping.csv`; `--write` generates
+`data/walloon/discount_rates.csv` and syncs `costs.social_discountrate` into the
+walloon configs. The financial-rate **fallback** for unmapped technologies is the
+**PyPSA default** (`config.default.yaml` → `0.07`); walloon overlays must not
+override `costs.fill_values."discount rate"`. Full design:
+[`docs/discount-rates-analysis.md`](docs/discount-rates-analysis.md).
+Building-retrofit `sector.retrofitting.interest_rate` remains a separate lever
+(out of scope of the cost-table path).
 
 ### 3.7 Lifetimes — CLOSED
 
@@ -259,13 +273,21 @@ See `config/common_parameters_meta.yaml` → `hicp_inflation`.
 
 ## 5. Design for wiring the CSV into pypsa-wal
 
-### 5.1 Principle: patch in place, never generate
+### 5.1 Principle: patch in place (with one generated exception)
 
 One file per family, hand-maintained, patched in place. No `_corrige` / `_rc` /
 `_common` / `_nuc*` variants, no generated overlay config, no load-order rule.
 
+**Exception:** `data/walloon/discount_rates.csv` (and any
+`discount_rates_<variant>.csv`) is **generated wholesale** from
+`hurdle:*` rows plus `config/hurdle_rate_mapping.csv`. It is still committed so
+`git diff` shows what changed and a run works without re-running the script.
+Never hand-edit a generated discount-rates file — edit the master CSV or the
+mapping and re-run `--write`.
+
 ```
 config/input_parameters_for_models.csv          ← authoritative values
+config/hurdle_rate_mapping.csv                  ← technology → hurdle sector
 config/common_parameters_meta.yaml              ← EUR_REF + technology-data pin
 config/config.walloon.yaml                      ← planning horizons
             |
@@ -275,7 +297,10 @@ data/walloon/custom_costs.csv        value cells of `cost:<tech>:<param>` rows
 data/walloon/custom_potentials.csv   value cells of `potential:<bus>:<tech>:<attr>` rows
 data/walloon/ntc_<year>.csv          NTC_MW of `ntc:<A>-<B>` rows (every ntc_*.csv, not
                                      just the planning horizons)
-config/config.walloon.yaml           the `budget_national:` block
+data/walloon/discount_rates.csv     GENERATED per-technology hurdle rates
+config/config.walloon.yaml           budget_national + costs.social_discountrate
+                                     (SDR synced from CSV; fill_values stay PyPSA)
+config/config.times-pypsa.yaml       costs.social_discountrate (same)
 ```
 
 Planning horizons are read from `config.walloon.yaml` → `scenario.planning_horizons`
@@ -283,9 +308,9 @@ rather than hard-coded, so changing the horizon list is picked up by `--write`.
 
 ### 5.2 Failsafes
 
-`--write` refuses to do anything but rewrite the `value` cell of an existing row.
-Each condition below aborts the file (nothing is written for it) and prints the
-manual edit needed:
+For patched files, `--write` refuses to do anything but rewrite the `value` cell
+of an existing row. Each condition below aborts the file (nothing is written for
+it) and prints the manual edit needed:
 
 | condition | why it matters |
 |---|---|
@@ -294,6 +319,10 @@ manual edit needed:
 | active non-PyPSA `cost:` target with no row in `custom_costs.csv` | a genuine Walloon override would be silently dropped |
 | active `potential:` target missing a planning horizon | `BEWAL_potentials.py` matches the year exactly; that horizon would keep the PyPSA-Eur default |
 | unit scale disagrees (`/kW` vs `/MW`, `GWh` vs `MWh`) | `process_cost_data.py` / `BEWAL_potentials.py` rescale by 1e3 off the unit string, so a mismatch misscales the value by 1000× |
+| `custom_costs.csv` contains a `discount rate` row | two sources of truth would fight the generated hurdle file |
+| walloon config overrides `fill_values."discount rate"` away from the PyPSA default | fallback must stay the PyPSA 7 % fill — TIMES rates live in `discount_rates.csv` |
+| technology missing from `hurdle_rate_mapping.csv` | PyPSA default fill is written, but `--check` / `--write` exit 1 so CI fails |
+| mapping sector has no active `hurdle:<sector>` rate | hard error — nothing written |
 
 ### 5.3 Authority and machine-readable columns
 
@@ -308,7 +337,7 @@ Sidecar: `config/common_parameters_meta.yaml`
 |---|---|
 | `--check` | EUR2025 tagging, target schema, no `SMR` cost rows, **every file in sync**, technology-data drift |
 | `--report` | master-CSV summary, then `--check` |
-| `--write` | patches the four destinations above; `--dry-run` previews, `-v` also lists unmanaged rows |
+| `--write` | patches the destinations above and regenerates `discount_rates.csv`; `--dry-run` previews, `-v` also lists unmanaged rows |
 
 ### 5.5 Scenario sensitivities without duplicate files
 
@@ -350,9 +379,10 @@ file at all. Fixed by declaring it as a rule `input` (`rules/solve_myopic.smk`,
 5. [x] Add and fill `pypsa_wal_target`, `year_rule`, `status`
 6. [x] Implement `--write`; consolidate scenario cost/potential files
 7. [x] `--write` + in-place patching with failsafes, self-tested via `--check`
-8. [ ] Wire `--check` into tests/CI
+8. [x] Wire `--check` into tests/CI (`test/test_discount_rates.py` T20)
 9. [x] Decide residual currency questions §8.8–8.9 (EUR2023 / Valbiom) — both inflated
 10. [x] Document application path in `instructions.md`; rename to `common_parameters.md`
+11. [x] Discount/hurdle-rate harmonisation (§3.6 / `docs/discount-rates-analysis.md`)
 
 ---
 
@@ -363,7 +393,7 @@ file at all. Fixed by declaring it as a rule `input` (`rules/solve_myopic.smk`,
 * Rebase of TIMES-only prices beyond the unit retag (TIMES team if any residual).
 * Fixing technology-data’s `currency_year` column upstream.
 * Activity drivers (`type = demand_driver`).
-* Full discount-rate harmonisation (dedicated later task; see §8.4).
+* Building-retrofit interest rate (`sector.retrofitting.interest_rate`) — separate from the cost-table hurdle path.
 
 ---
 
@@ -382,9 +412,10 @@ file at all. Fixed by declaring it as a rule `input` (`rules/solve_myopic.smk`,
    non-EU pellet imports). Supersedes `custom_potentials_corrige.csv`. Waste heat / deep
    geothermal kept as **status=none** (not applied in pypsa-wal). Walloon-only rows missing
    from the CSV were added with notes: `CCGT p_nom_min`, `nuclear p_nom_max (BE nodes)`.
-4. **Discount rate** — CSV keeps 4 % as the agreed figure (**status=pending**). Until a
-   dedicated discount-rate task, pypsa-wal may keep 7 % / 2 % social / 4 % rooftop. Do not
-   overwrite from this row yet.
+4. **Discount / hurdle rates** — sectoral TIMES hurdles (7.5 / 10 / 11 / 12 %) and
+   SDR 3.5 % in the master CSV (**status=active**); financial-rate fallback is the
+   PyPSA default 7 %. See §3.6 and
+   [`docs/discount-rates-analysis.md`](docs/discount-rates-analysis.md).
 5. **Lifetimes** — CSV authoritative. Where Walloon `custom_costs` had a *different* value,
    the CSV value wins and a note records the superseded Walloon figure. Where Walloon had a
    lifetime **absent** from the CSV, it was **added** (nuclear retrofit, solar, rooftop
@@ -417,8 +448,8 @@ Script that applied targets/notes/additions: `scripts/apply_common_parameters_de
   is drifting away from `solar-utility` (500 vs 525.825). Largely harmless —
   `process_cost_data.py` overwrites `solar`'s `capital_cost` from `solar-utility` —
   but listed by `--check -v` as unmanaged.
-* **Discount-rate harmonisation** remains a dedicated later task (§3.6 / §8.4).
 * **`custom_potentials_imppel.csv`** is still a full copy (now genuinely in effect
   after the scenario-override fix in §5.5). Giving it the cost-file treatment would
   need a per-potential config override, which pypsa-eur does not have.
-* Optional: add a pytest wrapping `build_common_parameters.py --check`.
+* **Building-retrofit interest rate** (`sector.retrofitting.interest_rate`, still 4 %)
+  is outside the cost-table hurdle path — tracked separately.

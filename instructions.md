@@ -101,13 +101,18 @@ python scripts/build_common_parameters.py --write --dry-run   # preview
 python scripts/build_common_parameters.py --write
 ```
 
-`--write` **patches values in place**; it never generates a file. The structure,
-sources and comments of each input file are hand-maintained and survive, so
+`--write` **patches values in place** for most destinations. The structure,
+sources and comments of those files are hand-maintained and survive, so
 `git diff` after a `--write` shows exactly what the shared table changed.
+The exception is `discount_rates.csv`, which is **generated wholesale** from
+`hurdle:*` rows plus `config/hurdle_rate_mapping.csv` (still committed).
 
-| Family | Master-CSV target | File patched in place |
-|--------|-------------------|-----------------------|
+| Family | Master-CSV target | File patched / generated |
+|--------|-------------------|--------------------------|
 | Costs / lifetimes / fuel prices | `cost:<tech>:<param>` | `data/walloon/custom_costs.csv` |
+| Per-technology hurdle rates | `hurdle:<sector>` (+ mapping) | `data/walloon/discount_rates.csv` (**generated**) |
+| Social discount rate (SDR) | `config:costs.social_discountrate` | `config.walloon.yaml` / `config.times-pypsa.yaml` (synced) |
+| Financial-rate fill (unmapped fallback) | — | **PyPSA default** in `config.default.yaml` (`0.07`); not overridden in walloon configs |
 | Walloon RES / biomass potentials | `potential:<bus>:<tech>:<attr>` | `data/walloon/custom_potentials.csv` |
 | Cross-border NTCs | `ntc:<A>-<B>` | `data/walloon/ntc_<year>.csv` |
 | CO₂ trajectory | `config:budget_national` | `config/config.walloon.yaml` |
@@ -467,13 +472,166 @@ hmem node memory limit (~1 000 000 MB on NIC5).
 
 ---
 
+## HTML report (pypsa2html)
+
+[`pypsa2html`](https://github.com/squoilin/pypsa2html) turns the solved networks
+into a navigable HTML report — Sankey diagrams, emissions, energy balances,
+costs, capacities, dispatch and maps, with a region selector and a scenario
+switcher. It is the successor to the in-repo `SEPIA/` scripts, rewritten as a
+standalone library: regions and planning horizons are **detected from the
+networks** rather than hardcoded, so it needs no edits when the clustering or
+the horizon list changes.
+
+### Install
+
+`pypsa2html` needs much less than PyPSA-Eur, and the `pypsa-eur` environment is
+a strict superset — install it there with `--no-deps` so conda's solve is not
+disturbed:
+
+```bash
+conda activate pypsa-eur
+pip install -e /home/sylvain/svn/pypsa2html --no-deps
+```
+
+Check it loaded:
+
+```bash
+python -c "import pypsa2html; print(pypsa2html.__version__)"
+```
+
+To run it without PyPSA-Eur (e.g. on a machine that only has the results),
+`pypsa2html/environment.yaml` defines a standalone `pypsa2html` env.
+
+### Configuration
+
+The project config is
+[`/home/sylvain/svn/pypsa2html/config/pypsa-wal.yaml`](https://github.com/squoilin/pypsa2html/blob/main/config/pypsa-wal.yaml).
+It sets Wallonia as the region of interest and the most recently solved
+scenario as the landing page:
+
+```yaml
+root: /home/sylvain/svn/pypsa-wal
+
+nodes:
+  detect: true            # reads n.buses.location from the first solved network
+  focus: BEWAL            # region the report opens on
+  labels: {BEWAL: Wallonia, BEVLG: Flanders, BEBRU: Brussels, …}
+
+scenarios:
+  - {name: scen_demande_haute, label: High demand, results_dir: results/times-pypsa/scen_demande_haute}
+  - {name: scen_corrige,       label: Corrected,   results_dir: results/times-pypsa/scen_corrige}
+  - {name: scen_base,          label: Base,        results_dir: results/times-pypsa/scen_base}
+
+landing:
+  scenario: scen_demande_haute
+  node: BEWAL
+  page: overview
+
+output:
+  dir: results/times-pypsa/{scenario}/html
+```
+
+Nothing lists the horizons or the eight nodes — both are read from the
+networks. Add a scenario by appending three lines to `scenarios:`.
+
+### Where the output goes
+
+`output.dir` contains `{scenario}`, so each scenario's pages land **inside that
+scenario's own results tree**, next to `csvs/`, `graphs/` and `networks/`:
+
+```
+results/times-pypsa/
+├── index.html                          ← site entry point
+├── scen_demande_haute/
+│   ├── csvs/  graphs/  maps/  networks/  explorer/  logs/
+│   └── html/                           ← the report
+│       ├── index.html
+│       ├── BEWAL_overview_scen_demande_haute.html
+│       ├── BEWAL_sankeys_scen_demande_haute.html
+│       ├── …  (one set per region: BEBRU BEVLG BEWAL DE FR GB LU NL ALL)
+│       └── maps_scen_demande_haute.html   ← shared, no region prefix
+├── scen_corrige/html/
+└── scen_base/html/
+```
+
+This means `./cluster/nic5.sh upload` publishes the report along with
+everything else — `RESULTS_DIR` already points at the scenario tree, so no
+change to `upload_s3.sh` is needed. The scenario switcher uses relative links
+(`../../scen_base/html/…`), so the site works from a `file://` path, a web
+server or an S3 prefix without modification.
+
+### Commands
+
+```bash
+conda activate pypsa-eur
+cd /home/sylvain/svn/pypsa-wal
+```
+
+Check what would be built — reads one network per scenario, takes a few
+seconds, writes nothing:
+
+```bash
+pypsa2html inspect --config /home/sylvain/svn/pypsa2html/config/pypsa-wal.yaml
+```
+
+Build the report for the most recent scenario:
+
+```bash
+pypsa2html build --config /home/sylvain/svn/pypsa2html/config/pypsa-wal.yaml --scenario scen_demande_haute
+```
+
+Build all three scenarios, including the cross-scenario overview page:
+
+```bash
+pypsa2html build --config /home/sylvain/svn/pypsa2html/config/pypsa-wal.yaml
+```
+
+Open it:
+
+```bash
+xdg-open results/times-pypsa/index.html
+```
+
+Other useful invocations:
+
+| Command | Purpose |
+|---------|---------|
+| `pypsa2html pages` | List the section ids you can switch off under `plots:` |
+| `pypsa2html build -c <cfg> -o /tmp/report` | Write elsewhere without editing the config |
+| `pypsa2html build -c <cfg> -v` | Debug logging |
+
+`-c` / `-s` / `-o` / `-v` are short forms of `--config` / `--scenario` /
+`--output` / `--verbose`.
+
+### Snakemake integration
+
+`pypsa2html` is an ordinary library, so the workflow can use it when installed
+and skip it otherwise. Copy
+[`examples/snakemake/pypsa2html.smk`](https://github.com/squoilin/pypsa2html/blob/main/examples/snakemake/pypsa2html.smk)
+into `rules/`, add `include: "rules/pypsa2html.smk"` to the `Snakefile`, and the
+report is built at the end of the workflow. If the library is not importable
+the rule is never defined and the workflow is unaffected.
+
+### Troubleshooting
+
+| Symptom | Likely cause / fix |
+|---------|-------------------|
+| `pypsa2html: command not found` | The `pip install -e` step was skipped, or you are not in the `pypsa-eur` env. `python -m pypsa2html.cli` works as a fallback. |
+| `no networks matching …` | `model.clusters` / `opts` / `sector_opts` in the config do not match the file names. pypsa-wal uses `base_s_adm___<year>.nc` — `adm` with **three** underscores, both `opts` and `sector_opts` empty. |
+| `nodes.focus='BEWAL' is not one of [...]` | The clustering changed. Run `inspect` to see the detected nodes. |
+| `aggregate node code 'X' collides with a real model node` | `nodes.aggregate.code` clashes with a detected location. Note `EU` is a real PyPSA-Eur bus location (the global oil/gas buses), which is why the default aggregate is `ALL`. |
+| Sections render as “Not available” | Expected while the chart layer is being ported; also happens when an optional input (a summary CSV) is missing. The run continues and the end-of-run summary lists which sections were affected. |
+| Maps page missing | Needs the optional extras: `pip install -e /home/sylvain/svn/pypsa2html".[maps]" --no-deps` (matplotlib, geopandas, cartopy). |
+
+---
+
 ## Publishing to Wallonie Explorer (S3)
 
 Solved PyPSA results are published to the **Intervectoriel** S3 bucket so the
 [Wallonie Explorer](https://explorer.test.wallonie.climact.com/) Streamlit app
-can display them. This is **separate from SEPIA** (the in-repo HTML/visualisation
-tool under `SEPIA/`); Explorer uses its own CSV format produced by the ClimAct
-extraction tool.
+can display them. This is **separate from the HTML report** described above:
+Explorer uses its own CSV format produced by the ClimAct extraction tool, while
+pypsa2html writes self-contained HTML pages into each scenario's `html/` folder.
 
 Operational reference (credentials, contacts, console login): `project-intervectoriel.md`
 in the `llm` notes repository.
@@ -854,8 +1012,13 @@ S3_ENV=prod ./cluster/nic5.sh upload
 ├── cutouts/                       # Atlite weather cutouts (downloaded)
 ├── resources/walloon-model/       # Intermediate build artefacts
 └── results/walloon-model/         # Solved networks, CSVs, plots
-    └── explorer/                  # Staged ClimAct CSVs + TIMES .vd for S3 (pypsa/, strategy/, times/)
+    ├── explorer/                  # Staged ClimAct CSVs + TIMES .vd for S3 (pypsa/, strategy/, times/)
+    └── html/                      # pypsa2html report (see HTML report section)
 ```
+
+`SEPIA/` still exists in the tree but is superseded by the external
+[`pypsa2html`](https://github.com/squoilin/pypsa2html) library and will be
+removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 
 ---
 
@@ -875,6 +1038,7 @@ S3_ENV=prod ./cluster/nic5.sh upload
 | Symptom | Likely cause / fix |
 |---------|-------------------|
 | `Directory cannot be locked` | Another Snakemake instance is running, or a stale lock in `.snakemake/locks/` after a crash — stop the other run or remove the lock if no process is active |
+| `Config file must be given as JSON or YAML with keys at top level` | **Not a config problem.** `--configfile` takes `nargs="+"`, so any target written *immediately after* it is swallowed as an extra config file and Snakemake then tries to parse your `.csv`/`.nc` as YAML. Put a flag between them: `snakemake --configfile config/config.walloon.yaml --cores 4 <targets>`, never `--configfile <cfg> <targets> --cores 4` |
 | Gurobi `No Gurobi license` | Set `GRB_LICENSE_FILE` or install `~/gurobi.lic` |
 | Gurobi `Model too large for size-limited license` | The academic licence was not found and gurobipy fell back to its built-in demo licence. `GRB_LICENSE_FILE` is exported from `~/.bashrc`, which **non-interactive shells do not read** — export it explicitly when launching from a script, `cron`, `nohup`, or an agent: `export GRB_LICENSE_FILE=$HOME/.gurobi/gurobi.lic` |
 | `WildcardError: No values given for wildcard 'run'` | A rule `expand()`s over `RESULTS`/`resources()` without `allow_missing=True` while `run.scenarios.enable: true` — see [The TIMES-coupled multi-scenario config](#the-times-coupled-multi-scenario-config) |
@@ -885,6 +1049,7 @@ S3_ENV=prod ./cluster/nic5.sh upload
 | Missing `config/scenarios.yaml` | Not required unless you set `run.scenarios.enable: true` in config |
 | S3 upload fails after postprocess | Check `cluster/logs/upload_s3.log`; verify `aws sts get-caller-identity --profile intervectoriel`; use `SKIP_S3_UPLOAD=1` to postprocess without upload |
 | Explorer scenario not in dropdown | See **Troubleshooting Explorer** under Publishing to Wallonie Explorer (S3) |
+| `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
 | First run hangs on Zenodo cutout download | Symlink `cutouts/europe-2013-sarah3-era5.nc` from `~/.cache/snakemake-pypsa-eur/...` if you already retrieved it for pypsa-eur; or wait for the download to finish |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
 
