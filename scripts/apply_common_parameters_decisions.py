@@ -57,10 +57,12 @@ NOTE_PLACEHOLDER = (
 )
 
 NOTE_DISCOUNT = (
-    "CSV agreed value is 4%. Dedicated discount-rate task later. "
-    "Until then pypsa-wal keeps costs.fill_values 'discount rate'=0.07, "
-    "costs.social_discountrate=0.02, and technology-data rooftop PV 0.04. "
-    "Do not overwrite those from this row yet (status=pending)."
+    "Fallback financial discount rate is the PyPSA default "
+    "(config.default.yaml costs.fill_values 'discount rate'=0.07). "
+    "Do not override it in config.walloon.yaml / config.times-pypsa.yaml. "
+    "TIMES sector hurdles live in hurdle:<sector> rows → "
+    "data/walloon/discount_rates.csv; SDR in config:costs.social_discountrate. "
+    "status=none — not patched into walloon configs."
 )
 
 NOTE_H2_ROW = (
@@ -216,11 +218,12 @@ def main() -> None:
     df.loc[empty_pot & df["status"].isna(), "year_rule"] = "hold"
     df.loc[empty_pot & df["status"].isna(), "status"] = "none"
 
-    # --- 4. Discount rate ---
+    # --- 4. Discount rate (PyPSA fill fallback; not a walloon override) ---
     disc = df["technology_name_pypsa"] == "Discount rate"
     df.loc[disc, "pypsa_wal_target"] = "config:costs.fill_values.discount rate"
     df.loc[disc, "year_rule"] = "hold"
-    df.loc[disc, "status"] = "pending"
+    df.loc[disc, "status"] = "none"
+    df.loc[disc, "value"] = 0.07
     for idx in df.index[disc]:
         df.at[idx, "note_complementaire"] = NOTE_DISCOUNT
 

@@ -6389,11 +6389,10 @@ def add_enhanced_geothermal(
     egs_potentials = pd.read_csv(egs_potentials, index_col=0)
 
     Nyears = n.snapshot_weightings.generators.sum() / 8760
-    dr = costs_config["fill_values"]["discount rate"]
     lt = costs.at["geothermal", "lifetime"]
     FOM = costs.at["geothermal", "FOM"]
 
-    egs_annuity = calculate_annuity(lt, dr)
+    egs_annuity = calculate_annuity(lt, costs.at["geothermal", "discount rate"])
 
     # under egs optimism, the expected cost reductions also cover costs for ORC
     # hence, the ORC costs are no longer taken from technology-data
@@ -6413,7 +6412,10 @@ def add_enhanced_geothermal(
         "Error in EGS cost, negative values found."
     )
 
-    orc_annuity = calculate_annuity(costs.at["organic rankine cycle", "lifetime"], dr)
+    orc_annuity = calculate_annuity(
+        costs.at["organic rankine cycle", "lifetime"],
+        costs.at["organic rankine cycle", "discount rate"],
+    )
     orc_capital_cost = (orc_annuity + FOM / (1 + FOM)) * orc_capex * Nyears
 
     efficiency_orc = costs.at["organic rankine cycle", "efficiency"]

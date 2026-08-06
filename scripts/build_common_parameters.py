@@ -2,26 +2,36 @@
 """Apply config/input_parameters_for_models.csv to the pypsa-wal input files.
 
 The shared TIMES/PyPSA table is authoritative for the parameters it covers
-(see common_parameters.md). This script does not *generate* input files: it
-**patches values in place** in the files the workflow already reads, so the
-hand-written structure, sources and comments of those files survive and
-`git diff` shows exactly what the shared table changed.
+(see common_parameters.md). This script mostly **patches values in place** in
+the files the workflow already reads, so the hand-written structure, sources
+and comments of those files survive and ``git diff`` shows exactly what the
+shared table changed.
+
+Exception: ``data/walloon/discount_rates.csv`` (and any
+``discount_rates_<variant>.csv``) is **generated wholesale** from the
+``hurdle:*`` rows plus ``config/hurdle_rate_mapping.csv`` — it is still
+committed, but row count may change when the technology universe moves.
 
     config/input_parameters_for_models.csv        (authoritative values)
                 │
                 ├─► data/walloon/custom_costs.csv          cost:<tech>:<param>
                 ├─► data/walloon/custom_potentials.csv     potential:<bus>:<tech>:<attr>
                 ├─► data/walloon/ntc_<year>.csv            ntc:<A>-<B>
-                └─► config/config.walloon.yaml             config:budget_national
+                ├─► data/walloon/discount_rates.csv        hurdle:<sector>  [generated]
+                ├─► config/config.walloon.yaml             config:budget_national
+                │                                          + costs.social_discountrate (from CSV)
+                └─► config/config.times-pypsa.yaml         costs.social_discountrate (from CSV)
+                                                           fill_values stay at PyPSA defaults
 
-Failsafe: a patch may only rewrite the ``value`` cell of an existing row. If the
-row count or the row keys change, or a row would have to be added or removed,
-the run aborts and reports what needs a manual edit instead.
+Failsafe (patched files only): a patch may only rewrite the ``value`` cell of
+an existing row. If the row count or the row keys change, or a row would have
+to be added or removed, the run aborts and reports what needs a manual edit
+instead.
 
 Modes:
     --check   validate the master CSV and verify the input files are in sync
     --report  summarise the master CSV
-    --write   patch the input files (use --dry-run to preview)
+    --write   patch / generate the input files (use --dry-run to preview)
 """
 
 from __future__ import annotations
@@ -39,9 +49,19 @@ ROOT = Path(__file__).resolve().parents[1]
 CSV_PATH = ROOT / "config" / "input_parameters_for_models.csv"
 META_PATH = ROOT / "config" / "common_parameters_meta.yaml"
 WALLOON_CONFIG = ROOT / "config" / "config.walloon.yaml"
+TIMES_PYPSA_CONFIG = ROOT / "config" / "config.times-pypsa.yaml"
+DEFAULT_CONFIG = ROOT / "config" / "config.default.yaml"
 COSTS_FILE = ROOT / "data" / "walloon" / "custom_costs.csv"
 POTENTIALS_FILE = ROOT / "data" / "walloon" / "custom_potentials.csv"
 NTC_GLOB = "ntc_*.csv"
+COST_ARCHIVE_GLOB = "costs_*.csv"
+COST_TABLE_RENAMES = {"solar-utility single-axis tracking": "solar-hsat"}
+COST_TABLE_CLONES = {"waste": "waste CHP"}
+HURDLE_MAPPING_FILE = ROOT / "config" / "hurdle_rate_mapping.csv"
+DISCOUNT_RATES_FILE = ROOT / "data" / "walloon" / "discount_rates.csv"
+HURDLE_SECTORS = ("production", "industry", "tertiary", "residential")
+VARIANT_NAME_RE = re.compile(r"^[a-z0-9_]+$")
+COST_CONFIG_FILES = (WALLOON_CONFIG, TIMES_PYPSA_CONFIG)
 
 BUDGET_REGIONS = ("BEBRU", "BEVLG", "BEWAL", "DE", "FR", "GB", "NL", "LU")
 
@@ -218,6 +238,7 @@ class Patch:
     path: Path
     changes: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    soft_errors: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     managed: int = 0
     rows: int = 0
@@ -505,6 +526,559 @@ def patch_walloon_config(budget: dict[int, dict[str, float]], dry_run: bool) -> 
 
 
 # --------------------------------------------------------------------------- #
+# discount / hurdle rates (generated file)
+# --------------------------------------------------------------------------- #
+def _default_max_hours() -> dict:
+    """electricity.max_hours from config.default.yaml (walloon config omits it)."""
+    cfg = yaml.safe_load(DEFAULT_CONFIG.read_text())
+    return dict(cfg["electricity"]["max_hours"])
+
+
+def pypsa_default_discount_rate() -> float:
+    """Financial discount-rate fill from config.default.yaml (PyPSA default, 0.07)."""
+    cfg = yaml.safe_load(DEFAULT_CONFIG.read_text())
+    return float(cfg["costs"]["fill_values"]["discount rate"])
+
+
+def pypsa_default_social_discountrate() -> float:
+    """Social discount rate from config.default.yaml (PyPSA default, 0.02)."""
+    cfg = yaml.safe_load(DEFAULT_CONFIG.read_text())
+    return float(cfg["costs"]["social_discountrate"])
+
+
+def _store_lookup_keys() -> set[str]:
+    """Top-level keys of STORE_LOOKUP without importing add_electricity (heavy)."""
+    text = (ROOT / "scripts" / "add_electricity.py").read_text()
+    m = re.search(r"^STORE_LOOKUP\s*=\s*\{(.*?)^\}", text, flags=re.M | re.S)
+    if not m:
+        raise RuntimeError("STORE_LOOKUP not found in scripts/add_electricity.py")
+    # Only top-level entries (value is a dict); skip nested "store"/"bicharger"/…
+    return set(re.findall(r'^\s*"([^"]+)"\s*:\s*\{', m.group(1), flags=re.M))
+
+
+def cost_table_technologies(meta: dict) -> set[str]:
+    """Every technology key the processed cost table will contain.
+
+    Mirrors the transformations in process_cost_data.py — keep in sync; test T1
+    cross-checks against a real processed CSV when one exists.
+    """
+    archive = ROOT / meta["technology_data"]["archive_dir"]
+    techs: set[str] = set()
+    for path in sorted(archive.glob(COST_ARCHIVE_GLOB)):
+        techs |= set(pd.read_csv(path)["technology"].dropna().unique())
+
+    # custom_costs.csv may add technologies (process_cost_data.py:62-64)
+    techs |= set(_read_str(COSTS_FILE)["technology"]) - {"all"}
+
+    for old, new in COST_TABLE_RENAMES.items():
+        techs.discard(old)
+        techs.add(new)
+    techs |= set(COST_TABLE_CLONES)
+
+    cfg = yaml.safe_load(WALLOON_CONFIG.read_text())
+    max_hours = cfg.get("electricity", {}).get("max_hours") or _default_max_hours()
+    techs |= {k for k in max_hours if k in _store_lookup_keys()}
+    return techs
+
+
+@dataclass
+class HurdleResolution:
+    rates: dict[str, dict[int, float]]  # technology -> {horizon: rate}
+    sectors: dict[str, str]  # technology -> sector (or "none" / "fallback")
+    unmapped: list[str]  # in universe, absent from mapping
+    unknown_sector: list[str]  # mapping names a sector with no rate
+    stale: list[str]  # mapping row for tech not in universe
+    fallback: dict[int, float]
+
+
+def hurdle_variants(
+    df: pd.DataFrame, horizons: tuple[int, ...]
+) -> dict[str | None, dict[str, Target]]:
+    """Sector rates per variant. Key None is the base; a variant inherits any
+    sector it does not override."""
+    base = collect_targets(df, "hurdle", horizons, nparts=1)  # hurdle:<sector>
+    out: dict[str | None, dict[str, Target]] = {
+        None: {k[0]: v for k, v in base.items()}
+    }
+    for (variant, sector), tgt in collect_targets(
+        df, "hurdle", horizons, nparts=2  # hurdle:<var>:<sector>
+    ).items():
+        out.setdefault(variant, dict(out[None]))[sector] = tgt
+    return out
+
+
+def variant_path(variant: str | None) -> Path:
+    return (
+        DISCOUNT_RATES_FILE
+        if variant is None
+        else DISCOUNT_RATES_FILE.with_name(f"discount_rates_{variant}.csv")
+    )
+
+
+def resolve_hurdle_rates(
+    df: pd.DataFrame,
+    meta: dict,
+    horizons: tuple[int, ...],
+    sector_rates: dict[str, Target],
+) -> HurdleResolution:
+    """Resolve per-technology rates for one variant's sector_rates map."""
+    per_tech = {
+        k[0]: t
+        for k, t in collect_targets(df, "cost", horizons, nparts=2).items()
+        if k[1] == "discount rate"
+    }
+    # Unmapped techs fall back to the PyPSA default fill (config.default.yaml),
+    # not a TIMES-negotiated rate — that lives only in hurdle:<sector> rows.
+    fb = pypsa_default_discount_rate()
+    fallback = {h: fb for h in horizons}
+
+    mapping = pd.read_csv(HURDLE_MAPPING_FILE, dtype=str, keep_default_na=False)
+    universe = cost_table_technologies(meta)
+    mapped = set(mapping["technology"])
+
+    unmapped = sorted(universe - mapped)
+    stale = sorted(mapped - universe)
+
+    rates: dict[str, dict[int, float]] = {}
+    sectors: dict[str, str] = {}
+    unknown_sector: list[str] = []
+
+    for _, row in mapping.iterrows():
+        tech = row["technology"]
+        sector = row["hurdle_sector"]
+        if tech not in universe:
+            continue
+        if sector == "none":
+            sectors[tech] = "none"
+            continue
+        if tech in per_tech:
+            rates[tech] = dict(per_tech[tech].values)
+            sectors[tech] = f"override/{sector}"
+            continue
+        tgt = sector_rates.get(sector)
+        if tgt is None:
+            unknown_sector.append(tech)
+            sectors[tech] = sector
+            continue
+        rates[tech] = dict(tgt.values)
+        sectors[tech] = sector
+
+    # Unmapped technologies get the PyPSA default (soft error); still emit a row.
+    for tech in unmapped:
+        rates[tech] = dict(fallback)
+        sectors[tech] = "fallback"
+
+    # Per-tech overrides for technologies not in the mapping still apply.
+    for tech, tgt in per_tech.items():
+        if tech in rates:
+            continue
+        if tech not in universe:
+            continue
+        rates[tech] = dict(tgt.values)
+        sectors[tech] = "override"
+
+    return HurdleResolution(
+        rates=rates,
+        sectors=sectors,
+        unmapped=unmapped,
+        unknown_sector=sorted(unknown_sector),
+        stale=stale,
+        fallback=fallback,
+    )
+
+
+def _rates_frame(resolution: HurdleResolution) -> pd.DataFrame:
+    """Build the discount_rates.csv body from a resolution (sorted by tech)."""
+    rows: list[dict[str, str]] = []
+    for tech in sorted(resolution.rates):
+        sector = resolution.sectors.get(tech, "")
+        if sector == "none":
+            continue
+        values = resolution.rates[tech]
+        if sector.startswith("override"):
+            banner = "master CSV cost:<tech>:discount rate override"
+        elif sector == "fallback":
+            banner = "fallback (unmapped; PyPSA default fill_values discount rate)"
+        else:
+            banner = f"TIMES hurdle: {sector}"
+        constant = all(abs(v - next(iter(values.values()))) < 1e-9 for v in values.values())
+        if constant:
+            horizons_iter: list[tuple[str, float]] = [
+                ("all", next(iter(values.values())))
+            ]
+        else:
+            horizons_iter = [(str(y), values[y]) for y in sorted(values)]
+        for ph, val in horizons_iter:
+            rows.append(
+                {
+                    "planning_horizon": ph,
+                    "technology": tech,
+                    "parameter": "discount rate",
+                    "value": fmt_value(val),
+                    "unit": "per unit",
+                    "source": "input_parameters_for_models.csv",
+                    "further_description": banner,
+                }
+            )
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "planning_horizon",
+            "technology",
+            "parameter",
+            "value",
+            "unit",
+            "source",
+            "further_description",
+        ],
+    )
+
+
+def _write_generated(path: Path, frame: pd.DataFrame) -> None:
+    """Wholesale write of a generated CSV (row count may change)."""
+    nl = _newline(path) if path.exists() else "\n"
+    frame.to_csv(path, index=False, lineterminator=nl)
+
+
+def _frame_csv_text(frame: pd.DataFrame, newline: str = "\n") -> str:
+    return frame.to_csv(index=False, lineterminator=newline)
+
+
+def _validate_hurdle_prerequisites(
+    df: pd.DataFrame, horizons: tuple[int, ...]
+) -> list[str]:
+    """Hard-error checks that block any discount_rates write."""
+    hard: list[str] = []
+
+    try:
+        fb = pypsa_default_discount_rate()
+    except (KeyError, TypeError, ValueError) as exc:
+        hard.append(
+            f"{DEFAULT_CONFIG.relative_to(ROOT)}: cannot read "
+            f"costs.fill_values.'discount rate' (PyPSA fallback): {exc}"
+        )
+        fb = None
+    else:
+        if not (0.0 <= fb < 0.30):
+            hard.append(
+                f"{DEFAULT_CONFIG.relative_to(ROOT)}: costs.fill_values."
+                f"'discount rate'={fb} outside 0 ≤ r < 0.30"
+            )
+
+    if COSTS_FILE.exists():
+        costs = _read_str(COSTS_FILE)
+        if (costs["parameter"] == "discount rate").any():
+            hard.append(
+                f"{COSTS_FILE.relative_to(ROOT)}: contains a 'discount rate' row — "
+                "per-technology rates must live only in discount_rates.csv "
+                "(remove the custom_costs row)"
+            )
+
+    if not HURDLE_MAPPING_FILE.exists():
+        hard.append(f"missing mapping file: {HURDLE_MAPPING_FILE.relative_to(ROOT)}")
+        return hard
+
+    mapping = pd.read_csv(HURDLE_MAPPING_FILE, dtype=str, keep_default_na=False)
+    if mapping["technology"].duplicated().any():
+        dups = sorted(mapping.loc[mapping["technology"].duplicated(), "technology"].unique())
+        hard.append(
+            f"{HURDLE_MAPPING_FILE.relative_to(ROOT)}: duplicate technology row(s): "
+            + ", ".join(dups)
+        )
+
+    allowed = set(HURDLE_SECTORS) | {"none"}
+    bad_sector = sorted(
+        {s for s in mapping["hurdle_sector"] if s not in allowed}
+    )
+    if bad_sector:
+        hard.append(
+            f"{HURDLE_MAPPING_FILE.relative_to(ROOT)}: invalid hurdle_sector "
+            f"(not in {'|'.join(sorted(allowed))}): {', '.join(bad_sector)}"
+        )
+
+    variants = hurdle_variants(df, horizons)
+    base_sectors = variants[None]
+    for sector, tgt in base_sectors.items():
+        if sector not in HURDLE_SECTORS:
+            hard.append(f"hurdle:{sector}: sector not in {HURDLE_SECTORS}")
+            continue
+        for y, r in tgt.values.items():
+            if not (0.0 <= r < 0.30):
+                hard.append(
+                    f"hurdle:{sector} @ {y}: rate {r} outside 0 ≤ r < 0.30 "
+                    "(did you mean a fraction, e.g. 0.075 not 7.5?)"
+                )
+
+    for variant, sectors in variants.items():
+        if variant is None:
+            continue
+        if not VARIANT_NAME_RE.fullmatch(variant):
+            hard.append(
+                f"hurdle variant {variant!r}: name must match [a-z0-9_]+ "
+                "(it becomes part of the filename)"
+            )
+        for sector, tgt in sectors.items():
+            if sector not in HURDLE_SECTORS:
+                hard.append(
+                    f"hurdle:{variant}:{sector}: sector not in {HURDLE_SECTORS}"
+                )
+            for y, r in tgt.values.items():
+                if not (0.0 <= r < 0.30):
+                    hard.append(
+                        f"hurdle:{variant}:{sector} @ {y}: rate {r} outside "
+                        "0 ≤ r < 0.30"
+                    )
+
+    # Mapping names a sector that has no active hurdle rate in the base.
+    used = set(mapping["hurdle_sector"]) - {"none"}
+    missing_rates = sorted(used - set(base_sectors))
+    if missing_rates:
+        hard.append(
+            "mapping names hurdle_sector(s) with no active hurdle:<sector> row: "
+            + ", ".join(missing_rates)
+        )
+
+    return hard
+
+
+def patch_discount_rates(
+    df: pd.DataFrame, meta: dict, horizons: tuple[int, ...], dry_run: bool
+) -> list[Patch]:
+    """Validate, generate, and optionally write discount_rates.csv (+ variants)."""
+    hard = _validate_hurdle_prerequisites(df, horizons)
+    variants = hurdle_variants(df, horizons)
+    patches: list[Patch] = []
+
+    # One Patch per variant file; hard prerequisites attach to the base path.
+    if hard:
+        patch = Patch(path=DISCOUNT_RATES_FILE)
+        patch.errors.extend(hard)
+        patches.append(patch)
+        return patches
+
+    soft_shared: list[str] = []
+    for variant, sector_rates in variants.items():
+        path = variant_path(variant)
+        patch = Patch(path=path)
+        resolution = resolve_hurdle_rates(df, meta, horizons, sector_rates)
+
+        if resolution.unknown_sector:
+            patch.errors.append(
+                f"{path.relative_to(ROOT)}: mapping names sector(s) with no "
+                f"active rate for: {', '.join(resolution.unknown_sector)}"
+            )
+
+        # Soft: unmapped → still write fallback rows, but fail the run.
+        if resolution.unmapped:
+            fb = next(iter(resolution.fallback.values())) if resolution.fallback else float("nan")
+            msg = (
+                f"{path.relative_to(ROOT)}: {len(resolution.unmapped)} technology(ies) "
+                f"have no row in {HURDLE_MAPPING_FILE.relative_to(ROOT)} — the fallback "
+                f"rate {fmt_value(fb)} was written for them:\n"
+                + "\n".join(f"  - {t}" for t in resolution.unmapped)
+                + "\nAdd each to config/hurdle_rate_mapping.csv with one of "
+                "production|industry|tertiary|residential, or hurdle_sector=none "
+                "if a rate is inert."
+            )
+            soft_shared.append(msg)
+            patch.notes.append(msg)
+
+        if resolution.stale:
+            msg = (
+                f"{path.relative_to(ROOT)}: {len(resolution.stale)} mapping row(s) "
+                f"for technolog(ies) not in the cost-table universe:\n"
+                + "\n".join(f"  - {t}" for t in resolution.stale)
+                + "\nRemove them from config/hurdle_rate_mapping.csv or fix the name."
+            )
+            soft_shared.append(msg)
+            patch.notes.append(msg)
+
+        if patch.errors:
+            patches.append(patch)
+            continue
+
+        frame = _rates_frame(resolution)
+        patch.rows = len(frame)
+        patch.managed = len(frame)
+
+        # Sector counts for the report.
+        counts: dict[str, int] = {}
+        for tech, sector in resolution.sectors.items():
+            if sector == "none" or tech not in resolution.rates:
+                if sector == "none":
+                    counts["none"] = counts.get("none", 0) + 1
+                continue
+            key = sector.split("/")[-1] if sector.startswith("override/") else sector
+            counts[key] = counts.get(key, 0) + 1
+        patch.notes.append(
+            "sector counts: "
+            + ", ".join(f"{k}={counts[k]}" for k in sorted(counts))
+        )
+
+        expected = _frame_csv_text(frame)
+        if path.exists():
+            current = path.read_text()
+            # Normalise line endings for comparison.
+            cur_norm = current.replace("\r\n", "\n")
+            exp_norm = expected.replace("\r\n", "\n")
+            if cur_norm != exp_norm:
+                patch.changes.append(
+                    f"regenerated content differs from committed file "
+                    f"({len(frame)} row(s))"
+                )
+        else:
+            patch.changes.append(f"file missing — would write {len(frame)} row(s)")
+
+        if not dry_run and patch.ok:
+            _write_generated(path, frame)
+            # After a successful write, clear "out of sync" changes for write mode
+            # reporting: still record that we wrote.
+            if patch.changes:
+                patch.changes = [f"wrote {len(frame)} row(s)"]
+
+        patches.append(patch)
+
+    # Soft errors are attached once (same list for every variant); surface on
+    # the base patch so --check / --write exit 1 without blocking the write.
+    if soft_shared and patches:
+        seen: set[str] = set()
+        for msg in soft_shared:
+            key = msg.split(": ", 1)[-1]
+            if key in seen:
+                continue
+            seen.add(key)
+            patches[0].soft_errors.append(msg)
+
+    return patches
+
+
+def _costs_block_span(text: str) -> tuple[int, int] | None:
+    """Return [start, end) of the top-level `costs:` block in a YAML file."""
+    m = re.search(r"^costs:\n(?:[ \t].*\n|\n)*", text, flags=re.MULTILINE)
+    if not m:
+        return None
+    return m.start(), m.end()
+
+
+def _patch_yaml_scalar(
+    text: str, block: tuple[int, int], pattern: str, new_value: str, key_hint: str
+) -> tuple[str, str | None, str | None]:
+    """Rewrite one scalar inside a YAML block. Returns (text, change, error).
+
+    ``pattern`` must have group 1 = line prefix through the colon/space and
+    group 2 = the value token to replace.
+    """
+    start, end = block
+    body = text[start:end]
+    m = re.search(pattern, body, flags=re.MULTILINE)
+    if not m:
+        return text, None, f"missing key {key_hint}"
+    old = m.group(0)
+    rebuilt = old[: m.start(2) - m.start()] + new_value + old[m.end(2) - m.start() :]
+    if rebuilt == old:
+        return text, None, None
+    new_body = body[: m.start()] + rebuilt + body[m.end() :]
+    return (
+        text[:start] + new_body + text[end:],
+        f"{key_hint}: {m.group(2)} -> {new_value}",
+        None,
+    )
+
+
+def _insert_social_discountrate(text: str, span: tuple[int, int], sdr: str) -> str:
+    """Insert ``social_discountrate:`` into the costs block (after hurdle_rate_fn)."""
+    start, end = span
+    body = text[start:end]
+    line = f"  social_discountrate: {sdr}\n"
+    m = re.search(r"^[ \t]*hurdle_rate_fn:[^\n]*\n", body, flags=re.MULTILINE)
+    if m:
+        body = body[: m.end()] + line + body[m.end() :]
+    else:
+        # After the `costs:` line.
+        nl = body.find("\n")
+        body = body[: nl + 1] + line + body[nl + 1 :]
+    return text[:start] + body + text[end:]
+
+
+def patch_costs_scalars(
+    df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool
+) -> list[Patch]:
+    """Sync ``costs.social_discountrate`` from the master CSV into walloon configs.
+
+    ``fill_values`` (including the financial discount-rate fallback) stay at the
+    PyPSA defaults in ``config.default.yaml`` — walloon overlays must not override
+    them. TIMES-negotiated financial rates live only in ``discount_rates.csv``.
+    """
+    sdr_tgt = collect_targets(df, "config", horizons, nparts=1).get(
+        ("costs.social_discountrate",)
+    )
+    pypsa_fb = pypsa_default_discount_rate()
+
+    patches: list[Patch] = []
+    for path in COST_CONFIG_FILES:
+        patch = Patch(path=path)
+        text = path.read_text()
+        span = _costs_block_span(text)
+        if span is None:
+            patch.errors.append(f"{path.name}: no top-level `costs:` block found")
+            patches.append(patch)
+            continue
+
+        block = text[span[0] : span[1]]
+        if "hurdle_rate_fn:" not in block:
+            patch.errors.append(
+                f"{path.name}: costs block is missing hurdle_rate_fn — add:\n"
+                "  hurdle_rate_fn: data/walloon/discount_rates.csv"
+            )
+
+        # Walloon overlays must not override the PyPSA fill_values discount rate.
+        cfg = yaml.safe_load(text)
+        ov = (cfg.get("costs") or {}).get("fill_values") or {}
+        if "discount rate" in ov and float(ov["discount rate"]) != pypsa_fb:
+            patch.errors.append(
+                f"{path.name}: costs.fill_values.'discount rate'="
+                f"{ov['discount rate']} overrides the PyPSA default {pypsa_fb}. "
+                "Remove the override — unmapped technologies use the PyPSA fill, "
+                "and TIMES hurdles live in data/walloon/discount_rates.csv."
+            )
+
+        if sdr_tgt is None:
+            patch.errors.append(
+                "master CSV has no active config:costs.social_discountrate row"
+            )
+        elif not sdr_tgt.constant:
+            patch.errors.append(
+                "config:costs.social_discountrate varies by horizon; "
+                "the YAML scalar can only hold a single value"
+            )
+        else:
+            sdr = fmt_value(next(iter(sdr_tgt.values.values())))
+            text2, change, err = _patch_yaml_scalar(
+                text,
+                span,
+                r"^([ \t]*social_discountrate:\s*)([^\s#]+)",
+                sdr,
+                "costs.social_discountrate",
+            )
+            if err:
+                text = _insert_social_discountrate(text, span, sdr)
+                span = _costs_block_span(text) or span
+                patch.changes.append(f"costs.social_discountrate: (inserted) {sdr}")
+            else:
+                text = text2
+                span = _costs_block_span(text) or span
+                if change:
+                    patch.changes.append(change)
+                else:
+                    patch.notes.append("social_discountrate already in sync")
+
+        if not dry_run and patch.ok and patch.changes:
+            path.write_text(text)
+        patches.append(patch)
+    return patches
+
+
+# --------------------------------------------------------------------------- #
 # validation
 # --------------------------------------------------------------------------- #
 def check_currency(df: pd.DataFrame, meta: dict) -> list[str]:
@@ -604,15 +1178,28 @@ def check_archive_drift(df: pd.DataFrame, meta: dict) -> list[str]:
 # --------------------------------------------------------------------------- #
 def report_patch(patch: Patch, verbose: bool) -> None:
     rel = patch.path.relative_to(ROOT)
-    state = "FAIL" if patch.errors else ("update" if patch.changes else "in sync")
+    if patch.errors:
+        state = "FAIL"
+    elif patch.soft_errors:
+        state = "WARN"
+    elif patch.changes:
+        state = "update"
+    else:
+        state = "in sync"
     print(f"  {rel}  [{state}]  rows={patch.rows} managed={patch.managed}")
     for c in patch.changes:
         print(f"      ~ {c}")
     for e in patch.errors:
         print(f"      ✗ {e}")
+    for e in patch.soft_errors:
+        print(f"      ! {e}")
     if verbose:
         for n in patch.notes:
             print(f"      · {n}")
+    elif any(n.startswith("sector counts:") for n in patch.notes):
+        for n in patch.notes:
+            if n.startswith("sector counts:"):
+                print(f"      · {n}")
 
 
 def cmd_check(df: pd.DataFrame, meta: dict, verbose: bool = False) -> int:
@@ -628,11 +1215,14 @@ def cmd_check(df: pd.DataFrame, meta: dict, verbose: bool = False) -> int:
         patch_potentials(df, horizons, dry_run=True),
         *patch_ntc(df, horizons, dry_run=True),
         patch_walloon_config(build_budget_national(df, horizons), dry_run=True),
+        *patch_costs_scalars(df, horizons, dry_run=True),
+        *patch_discount_rates(df, meta, horizons, dry_run=True),
     ]
     print(f"input files (planning horizons {list(horizons)}):")
     for p in patches:
         report_patch(p, verbose)
         fails.extend(p.errors)
+        fails.extend(p.soft_errors)
         fails.extend(f"{p.path.name} out of sync: {c}" for c in p.changes)
 
     drift = check_archive_drift(df, meta)
@@ -663,11 +1253,14 @@ def cmd_write(df: pd.DataFrame, meta: dict, dry_run: bool, verbose: bool) -> int
         patch_potentials(df, horizons, dry_run),
         *patch_ntc(df, horizons, dry_run),
         patch_walloon_config(build_budget_national(df, horizons), dry_run),
+        *patch_costs_scalars(df, horizons, dry_run),
+        *patch_discount_rates(df, meta, horizons, dry_run),
     ]
     for p in patches:
         report_patch(p, verbose)
 
     broken = [p for p in patches if not p.ok]
+    soft = [p for p in patches if p.soft_errors]
     if broken:
         print(
             f"\nFAILED: {sum(len(p.errors) for p in broken)} problem(s) in "
@@ -677,8 +1270,18 @@ def cmd_write(df: pd.DataFrame, meta: dict, dry_run: bool, verbose: bool) -> int
 
     n = sum(len(p.changes) for p in patches)
     print(f"\n{'Would patch' if dry_run else 'Patched'} {n} value(s).")
+    if soft:
+        n_soft = sum(len(p.soft_errors) for p in soft)
+        print(
+            f"WARNING: {n_soft} soft error(s) — discount_rates written with "
+            "fallback where needed; fix mapping and re-run."
+        )
+        return 1
     if not dry_run:
-        print("Review with: git diff data/walloon config/config.walloon.yaml")
+        print(
+            "Review with: git diff data/walloon config/config.walloon.yaml "
+            "config/config.times-pypsa.yaml"
+        )
     return 0
 
 
@@ -702,12 +1305,24 @@ def cmd_report(df: pd.DataFrame, meta: dict, verbose: bool) -> int:
         .value_counts()
         .to_string()
     )
-    for prefix, nparts in (("cost", 2), ("potential", 3), ("ntc", 1)):
+    for prefix, nparts in (("cost", 2), ("potential", 3), ("ntc", 1), ("hurdle", 1)):
         targets = collect_targets(df, prefix, horizons, nparts=nparts)
         by_origin: dict[str, int] = {}
         for t in targets.values():
             by_origin[t.origin] = by_origin.get(t.origin, 0) + 1
         print(f"\n{prefix}: {len(targets)} distinct targets  {by_origin}")
+
+    # Hurdle mapping sector counts (technology universe).
+    if HURDLE_MAPPING_FILE.exists():
+        mapping = pd.read_csv(HURDLE_MAPPING_FILE, dtype=str, keep_default_na=False)
+        print("\nhurdle mapping sector counts:")
+        print(mapping["hurdle_sector"].value_counts().to_string())
+        universe = cost_table_technologies(meta)
+        print(
+            f"\ncost-table universe: {len(universe)} technologies  "
+            f"mapping: {len(mapping)} row(s)"
+        )
+
     return cmd_check(df, meta, verbose)
 
 

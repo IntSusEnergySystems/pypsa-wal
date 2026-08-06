@@ -81,7 +81,9 @@ def prepare_costs(
     config: dict,
     max_hours: dict = None,
     nyears: float = 1.0,
-    custom_costs_fn: str = None,
+    custom_costs_fn: str | None = None,
+    planning_horizon: str | None = None,
+    hurdle_rate_fn: str | None = None,
 ) -> pd.DataFrame:
     """
     Standardize and prepare extended costs data.
@@ -98,6 +100,10 @@ def prepare_costs(
         Number of years for investment, by default 1.0
     custom_costs_fn : str, optional
         Custom cost modifications file path (default None).
+    planning_horizon : str, optional
+        Planning horizon for filtering custom and hurdle rate rows.
+    hurdle_rate_fn : str, optional
+        Per-technology hurdle rate CSV path (default None).
 
     Returns
     -------
@@ -115,12 +121,17 @@ def prepare_costs(
         cost_df.unit = cost_df.unit.str.replace("/GW", "/MW")
         return cost_df
 
+    if planning_horizon is None and "snakemake" in globals():
+        planning_horizon = str(snakemake.wildcards.planning_horizons)
+
     # Load custom costs and categorize into two sets:
     # - Raw attributes: overwritten before cost preparation
     # - Prepared attributes: overwritten after cost preparation
+    custom_raw = pd.DataFrame()
+    custom_prepared = pd.DataFrame()
     if custom_costs_fn is not None:
         custom_costs = pd.read_csv(
-            snakemake.input.custom_costs,
+            custom_costs_fn,
             dtype={"planning_horizon": "str"},
             index_col=["technology", "parameter"],
         ).query("planning_horizon in [@planning_horizon, 'all']")
@@ -167,6 +178,39 @@ def prepare_costs(
                 DeprecationWarning,
             )
             logger.info(f"Overwriting {attr} with:\n{overwrites}")
+
+    # Per-technology hurdle rates (config/input_parameters_for_models.csv via
+    # build_common_parameters.py). Authoritative: applied after the fill_values
+    # fallback and before the annuity, so it wins over technology-data too.
+    if hurdle_rate_fn is not None:
+        hurdle = pd.read_csv(
+            hurdle_rate_fn, dtype={"planning_horizon": "str"}
+        ).query("planning_horizon in [@planning_horizon, 'all']")
+        rates = hurdle.set_index("technology")["value"]
+        unknown = rates.index.difference(costs.index)
+        if len(unknown):
+            logger.warning(
+                "%s lists %d technology(ies) absent from the cost table, ignored: %s",
+                hurdle_rate_fn,
+                len(unknown),
+                sorted(unknown),
+            )
+        known = rates.index.intersection(costs.index)
+        costs.loc[known, "discount rate"] = rates.loc[known].astype(float)
+        missing = costs.index.difference(rates.index)
+        if len(missing):
+            logger.warning(
+                "%d technology(ies) have no hurdle rate and keep the "
+                "costs.fill_values fallback %.4g: %s",
+                len(missing),
+                config["fill_values"]["discount rate"],
+                sorted(missing),
+            )
+
+    assert costs["discount rate"].notna().all(), (
+        "NaN discount rate would silently produce NaN capital_cost for: "
+        f"{sorted(costs.index[costs['discount rate'].isna()])}"
+    )
 
     annuity_factor = calculate_annuity(costs["lifetime"], costs["discount rate"])
     annuity_factor_fom = annuity_factor + costs["FOM"] / 100.0
@@ -271,7 +315,9 @@ if __name__ == "__main__":
         cost_params,
         snakemake.params.max_hours,
         nyears,
-        snakemake.input.custom_costs,
+        custom_costs_fn=snakemake.input.get("custom_costs"),
+        planning_horizon=planning_horizon,
+        hurdle_rate_fn=snakemake.input.get("hurdle_rates"),
     )
 
     costs_processed.to_csv(snakemake.output[0])
