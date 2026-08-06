@@ -12,6 +12,17 @@ run:
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
+snapshots:
+  start: "2010-01-01"
+  end: "2011-01-01"
+  inclusive: left
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
+atlite:
+  default_cutout: "europe-2010-sarah3-era5"
+  nprocesses: 4
+
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight
 foresight: myopic
 
