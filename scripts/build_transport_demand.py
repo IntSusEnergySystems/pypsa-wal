@@ -288,14 +288,6 @@ if __name__ == "__main__":
 
     elia_transport_shape = build_elia_transport_shape(snakemake.input.elia_natural_charging_profile, snapshots, nodes, year=2026)
 
-    # NOTE: saving to debug
-    debug_suffix = f"{snakemake.wildcards.clusters}_{snakemake.wildcards.planning_horizons}"
-    debug_dir = "/Users/meas/oet/pypsa-wal-intsus/dev/files"
-    transport_demand.to_csv(f"{debug_dir}/transport_demand_{debug_suffix}.csv")
-    avail_profile.to_csv(f"{debug_dir}/avail_profile_{debug_suffix}.csv")
-    dsm_profile.to_csv(f"{debug_dir}/dsm_profile_{debug_suffix}.csv")
-    elia_transport_shape.to_csv(f"{debug_dir}/elia_transport_shape_{debug_suffix}.csv")
-
     nodal_transport_data.to_csv(snakemake.output.transport_data)
     transport_demand.to_csv(snakemake.output.transport_demand)
     avail_profile.to_csv(snakemake.output.avail_profile)

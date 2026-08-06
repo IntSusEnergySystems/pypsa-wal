@@ -2355,12 +2355,6 @@ def add_EVs(
         options["bev_dsm_availability"],
     )
 
-    # NOTE: saving to debug
-    debug_suffix = f"{snakemake.wildcards.clusters}_{snakemake.wildcards.planning_horizons}"
-    debug_dir = "/Users/meas/oet/pypsa-wal-intsus/dev/files"
-    profile_flexible.to_csv(f"{debug_dir}/profile_flexible_{debug_suffix}.csv")
-    profile_inflexible.to_csv(f"{debug_dir}/profile_inflexible_{debug_suffix}.csv")
-
     # Add flexible EV load (DSM-capable, attached to EV battery bus)
     n.add(
         "Load",
@@ -2383,7 +2377,7 @@ def add_EVs(
     )
 
     # Add BEV chargers
-    # NOTE: sized to serve only the flexible share, since the EV battery bus (and its DSM store) now only carries flexible demand
+    # NOTE: p_nom is multiplied by electric_share and bev_dsm_availability, since the EV battery bus (and its DSM store) now only carries flexible demand
     p_nom = (number_cars * options["bev_charge_rate"] * electric_share * options["bev_dsm_availability"])
     n.add(
         "Link",
