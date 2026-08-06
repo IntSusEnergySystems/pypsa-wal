@@ -41,7 +41,7 @@ from scripts.build_energy_totals import (
     build_eea_co2,
     build_eurostat_co2,
 )
-from scripts.build_transport_demand import transport_degree_factor
+from scripts.build_transport_demand import split_transport_demand, transport_degree_factor
 from scripts.definitions.heat_sector import HeatSector
 from scripts.definitions.heat_system import HeatSystem
 from scripts.prepare_network import maybe_adjust_costs_and_potentials
@@ -2240,8 +2240,7 @@ def add_EVs(
     temperature: pd.DataFrame,
     spatial: SimpleNamespace,
     options: dict,
-    transport_flexible: pd.DataFrame,
-    transport_inflexible: pd.DataFrame,
+    elia_shape: pd.DataFrame,
 ) -> None:
     """
     Add electric vehicle (EV) infrastructure to the network.
@@ -2282,14 +2281,9 @@ def add_EVs(
         - bev_energy: float
         - bev_dsm_availability: float
         - v2g: bool
-    transport_flexible : pd.DataFrame
-        Raw transport demand share that is flexible (DSM-capable), same
-        units/shape convention as p_set, with snapshots as index and nodes
-        as columns
-    transport_inflexible : pd.DataFrame
-        Raw transport demand share that is inflexible (fixed natural
-        charging shape), same units/shape convention as p_set, with
-        snapshots as index and nodes as columns
+    elia_shape : pd.DataFrame
+        Day-invariant normalized Elia natural-charging shape (columns sum to
+        1 per node), with snapshots as index and nodes as columns
 
     Returns
     -------
@@ -2354,19 +2348,20 @@ def add_EVs(
     else:
         profile = electric_share * p_set.div(efficiency)
 
-    # Split final EV electricity demand into a flexible (DSM-capable) share and an inflexible (fixed natural charging shape) share
-    # using the fraction from the raw transport split so the total EV demand at each snapshot still reconstructs exactly
-    # this approach avoids distortion from the temperature-dependent efficiency correction above.
-    transport_total = transport_flexible + transport_inflexible
-    flex_frac = transport_flexible.div(transport_total)
-    profile_flexible = (profile.loc[n.snapshots] * flex_frac.loc[n.snapshots, spatial.nodes])
-    profile_inflexible = profile.loc[n.snapshots] - profile_flexible
+    # split final EV electricity demand into a flexible (DSM-capable) share and an
+    # inflexible (fixed elia natural-charging shape) share. splitting `profile`
+    # directly (rather than the raw transport demand) means the inflexible share
+    # is built straight from `elia_shape`, so it actually follows elia's curve
+    # instead of inheriting profile's own traffic-based shape.
+    profile_flexible, profile_inflexible = split_transport_demand(
+        profile.loc[n.snapshots],
+        elia_shape.loc[n.snapshots, spatial.nodes],
+        options["bev_dsm_availability"],
+    )
 
     # NOTE: saving to debug
     debug_suffix = f"{snakemake.wildcards.clusters}_{snakemake.wildcards.planning_horizons}"
     debug_dir = "/Users/meas/oet/pypsa-wal-intsus/dev/files"
-    transport_total.to_csv(f"{debug_dir}/transport_total_{debug_suffix}.csv")
-    flex_frac.to_csv(f"{debug_dir}/flex_frac_{debug_suffix}.csv")
     profile_flexible.to_csv(f"{debug_dir}/profile_flexible_{debug_suffix}.csv")
     profile_inflexible.to_csv(f"{debug_dir}/profile_inflexible_{debug_suffix}.csv")
 
@@ -2675,8 +2670,7 @@ def add_land_transport(
     transport_data_file,
     avail_profile_file,
     dsm_profile_file,
-    transport_demand_flexible_file,
-    transport_demand_inflexible_file,
+    elia_charging_shape_file,
     temp_air_total_file,
     cf_industry,
     options,
@@ -2700,12 +2694,9 @@ def add_land_transport(
         Path to CSV file containing availability profiles
     dsm_profile_file : str
         Path to CSV file containing demand-side management profiles
-    transport_demand_flexible_file : str
-        Path to CSV file containing the flexible (DSM-capable) share of
-        transport demand
-    transport_demand_inflexible_file : str
-        Path to CSV file containing the inflexible (fixed natural charging
-        shape) share of transport demand
+    elia_charging_shape_file : str
+        Path to CSV file containing the day-invariant normalized Elia
+        natural-charging shape
     temp_air_total_file : str
         Path to netCDF file containing air temperature data
     options : dict
@@ -2738,12 +2729,7 @@ def add_land_transport(
     number_cars = pd.read_csv(transport_data_file, index_col=0)["number cars"]
     avail_profile = pd.read_csv(avail_profile_file, index_col=0, parse_dates=True)
     dsm_profile = pd.read_csv(dsm_profile_file, index_col=0, parse_dates=True)
-    transport_flexible = pd.read_csv(
-        transport_demand_flexible_file, index_col=0, parse_dates=True
-    )
-    transport_inflexible = pd.read_csv(
-        transport_demand_inflexible_file, index_col=0, parse_dates=True
-    )
+    elia_shape = pd.read_csv(elia_charging_shape_file, index_col=0, parse_dates=True)
 
     # exogenous share of passenger car type
     engine_types = ["fuel_cell", "electric", "ice"]
@@ -2820,8 +2806,7 @@ def add_land_transport(
             temperature,
             spatial,
             options,
-            transport_flexible[nodes],
-            transport_inflexible[nodes],
+            elia_shape[nodes],
         )
     elif shares["electric"] > 0:
         add_EVs(
@@ -2834,8 +2819,7 @@ def add_land_transport(
             temperature,
             spatial,
             options,
-            transport_flexible[nodes],
-            transport_inflexible[nodes],
+            elia_shape[nodes],
         )
     if (times_demand or suff_demand) and fuel_cell_share.sum() > 0:
         add_fuel_cell_cars(
@@ -6834,8 +6818,7 @@ if __name__ == "__main__":
             transport_data_file=snakemake.input.transport_data,
             avail_profile_file=snakemake.input.avail_profile,
             dsm_profile_file=snakemake.input.dsm_profile,
-            transport_demand_flexible_file=snakemake.input.transport_demand_flexible,
-            transport_demand_inflexible_file=snakemake.input.transport_demand_inflexible,
+            elia_charging_shape_file=snakemake.input.elia_charging_shape,
             temp_air_total_file=snakemake.input.temp_air_total,
             cf_industry=cf_industry,
             options=options,
