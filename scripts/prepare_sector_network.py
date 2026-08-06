@@ -2348,11 +2348,7 @@ def add_EVs(
     else:
         profile = electric_share * p_set.div(efficiency)
 
-    # split final EV electricity demand into a flexible (DSM-capable) share and an
-    # inflexible (fixed elia natural-charging shape) share. splitting `profile`
-    # directly (rather than the raw transport demand) means the inflexible share
-    # is built straight from `elia_shape`, so it actually follows elia's curve
-    # instead of inheriting profile's own traffic-based shape.
+    # Split final EV electricity demand into a flexible share and an inflexible (fixed elia natural-charging shape) share
     profile_flexible, profile_inflexible = split_transport_demand(
         profile.loc[n.snapshots],
         elia_shape.loc[n.snapshots, spatial.nodes],
@@ -2387,7 +2383,7 @@ def add_EVs(
     )
 
     # Add BEV chargers
-    # sized to serve only the flexible share, since the EV battery bus (and its DSM store) now only carries flexible demand
+    # NOTE: sized to serve only the flexible share, since the EV battery bus (and its DSM store) now only carries flexible demand
     p_nom = (number_cars * options["bev_charge_rate"] * electric_share * options["bev_dsm_availability"])
     n.add(
         "Link",

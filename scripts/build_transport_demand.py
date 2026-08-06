@@ -200,6 +200,8 @@ def build_elia_transport_shape(fn, snapshots, nodes, year=2026):
     """
     Build a normalized weekly charging shape from Elia's observed hourly
     natural (non-flexible) charging profile for a given year.
+
+    The year refers to the year of data to use from the CSV file, not the year of the snapshots.
     """
     daily = pd.read_csv(fn)
     daily = daily[daily["year"] == year].sort_values("hour")
@@ -215,10 +217,10 @@ def build_elia_transport_shape(fn, snapshots, nodes, year=2026):
 
 def split_transport_demand(transport_demand_original, elia_shape, bev_dsm_availability):
     """
-    Split transport demand into a flexible share (same temporal shape as
-    ``transport``, scaled by ``bev_dsm_availability``) and an inflexible
-    share (reshaped in time to follow Elia's natural charging profile),
-    conserving each node's total energy.
+    Split transport demand into a flexible and inflexible demand.
+
+    FLexible demand has the same temporal shape as ``transport``, scaled by ``bev_dsm_availability`` and the inflexible
+    demand is reshaped to follow Elia's natural charging profile), conserving each node's total energy.
     """
     # to get flexible demand, multiple total transport demand by the share of flexible demand (bev_dsm_availability)
     transport_flexible = transport_demand_original * bev_dsm_availability
