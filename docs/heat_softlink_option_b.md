@@ -128,7 +128,7 @@ not TIMES's ±5 %.
 
 ### 1.2 The constraint
 
-For every group except one (§1.3) and every decentral bus:
+For every group and every decentral bus (the absorber's variant is in §1.3):
 
 ```
 Σ_{c ∈ g,b}  κ_c · x_c(t)   +   (rhs_g,b(t) / E_g) · u_g   ==   rhs_g,b(t)
@@ -353,9 +353,9 @@ Milestones, with status. **This section is updated as work lands.**
 | M4 | Pre-solve budget report and the infeasibility guards (§1.6, §6) | ✅ 2026-08-07 |
 | M5 | Tests: closure, shares, sign conventions, solar feasibility, vintages, relaxation, absorber — `test/test_times_heat_profiles.py`, **30 passed**; option C's 42 and the library's 151 still green | ✅ 2026-08-07 |
 | M6 | Single-horizon 2025 solve at full resolution, all constraints | ✅ 2026-08-07, §5.1 |
-| M7 | Full myopic chain 2025 → 2050 | ✅ 2026-08-07, §5.2 — **first run exposed the absorber flaw of §1.3; re-run after the fix** |
-| M8 | Comparison document, B′ vs C vs legacy — [`heat_softlink_option_comparison.md`](heat_softlink_option_comparison.md) | ☐ |
-| M9 | Push both branches | ☐ |
+| M7 | Full myopic chain 2025 → 2050 — **all four `Optimal`** | ✅ 2026-08-07, §5.2 — the first run exposed the absorber flaw of §1.3 and was re-run after the fix |
+| M8 | Comparison document, B′ vs C vs legacy — [`heat_softlink_option_comparison.md`](heat_softlink_option_comparison.md) | ✅ 2026-08-07 |
+| M9 | Push both branches, in both repos, with `master`/`main` untouched | ✅ 2026-08-07 |
 
 Two bugs the chain found that the tests could not, both recorded because they are
 the kind that come back:
@@ -472,6 +472,69 @@ Two things this establishes and no unit test could:
 
 **No relaxation was needed in 2025**: every group delivered its full profile, so
 `TimesHeatProfile-unmet` is zero throughout.
+
+### 5.2 Full myopic chain, 2025 → 2050
+
+`run_heat_softlink_comparison.sh scen_demande_haute option_b`, all four horizons,
+full 6 h resolution, every constraint. **All four solves `Optimal`.**
+
+| | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| objective, bn EUR/a | 334.086 | 359.037 | 291.257 | 281.773 |
+| barrier, s | 131 | 142 | 166 | 147 |
+| **mean \|share error\| vs TIMES, pp** | **0.00** | **0.00** | **0.64** | **0.00** |
+| BEWAL CO₂, Mt | 21.982 | 15.456 | 8.587 | 1.717 |
+
+**Profile fidelity across the whole chain.** Total absolute annual gap over four
+horizons × six groups × two buses: **0.923 TWh — and every MWh of it is the single
+2040 relaxation.** 2025, 2030 and 2050 reproduce their profiles to solver
+tolerance on every group and both buses.
+
+| 2040, TWh_th | pinned | realised | gap |
+|---|---:|---:|---:|
+| biomass boiler, rural | 2.28710 | 2.07350 | −0.21360 |
+| biomass boiler, urban decentral | 2.65248 | 2.40475 | −0.24773 |
+| heat pump *(absorber)*, rural | 2.59482 | 2.80842 | **+0.21360** |
+| heat pump *(absorber)*, urban decentral | 3.00936 | 3.25708 | **+0.24773** |
+| gas / oil / resistive / solar, both buses | — | — | 0.00000 |
+
+The absorber picks up exactly what biomass dropped, to five decimals, on each bus
+*independently* — which is the arithmetic of §1.3 confirmed on a 1.2 M-row model
+rather than on a toy. The pre-solve budget report predicted it:
+
+```
+biomass boiler profile needs ~5.777 TWh of solid biomass at BEWAL solid biomass,
+whose own supply caps at 8.250 TWh (imports excepted) and is shared with
+solid biomass for industry, solid biomass for industry CC
+WARNING The biomass-boiler profile alone claims 70 % of the solid biomass
+BEWAL solid biomass can produce, and industry draws on the same bus.
+```
+
+**The finding, stated plainly:** the TIMES 2040 Walloon heating mix needs more
+solid biomass than PyPSA's Wallonia can obtain. That is a shared-assumption
+problem for `config/input_parameters_for_models.csv`, not a soft-link problem, and
+option C reached the same conclusion from a looser bound
+(`heat_soft_linking.md` §8.7). Surfacing exactly this kind of disagreement is what
+the coupling is for.
+
+### 5.3 Two results worth checking by hand
+
+**The DAC loophole is closed.** 2050, decentral heat buses: DAC withdraws
+**0.0 TWh** on 0.0004 MW of capacity, against 3.811 TWh on 262.6 MW before the
+absorber was pinned. All Walloon DAC is back on the urban-central bus where option
+C also puts it.
+
+**The decentral fleet comes out at exactly the peak load.** 2050:
+
+| | MW_th |
+|---|---:|
+| option B′ total decentral heat capacity | **7 542.2** |
+| peak decentral heat load | **7 542.2** |
+
+Every technology is sized for its own share of the peak and the shares sum to one,
+so the fleet is neither over- nor under-built. Option C's 2050 fleet is 7 794.6 MW
+and the legacy one 7 899.5 MW, because both can run one technology flat and cover
+the peak with another. A reader can check this number against the load in one line.
 
 ---
 
