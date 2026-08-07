@@ -61,23 +61,59 @@ The structural expectation, before any numbers:
 
 ---
 
-## 3. What it costs
+## 3. What it costs — and how precisely that can be said
 
 *(objective table; TABLES-PENDING)*
+
+### 3.0 Read this before reading any objective difference
+
+**The solver's own noise floor on these runs is ≈ 190 MEUR/a, ≈ 0.06 % of the
+objective**, and it was measured rather than assumed.
+
+`config.default.yaml` runs Gurobi with `Method 2` (barrier), **`Crossover 0`** and
+**`BarConvTol 1e-5`**, so every reported objective is an interior point, not a
+vertex. While fixing the absorber (`heat_softlink_option_b.md` §1.3), the same
+2025 network was solved twice with the *only* difference being two extra
+constraint blocks — a strict restriction, whose optimum cannot be lower:
+
+| 2025, option B′ | reported objective |
+|---|---:|
+| absorber **unpinned** (fewer constraints) | 334.275 bn |
+| absorber **pinned** (strictly more constraints) | **334.086 bn** |
+| difference | **−189 MEUR (−0.057 %)** — the wrong sign |
+
+A strict restriction cannot reduce the optimum, so at least one of those two
+figures is ≥ 189 MEUR away from its true value. Nominal `BarConvTol 1e-5` would
+suggest only 3.3 MEUR; the realised spread is ~57× that, which is what
+crossover-free barrier on a 1.2 M-row degenerate LP looks like.
+
+**Consequences for this document, and for `heat_soft_linking.md`:**
+
+* an objective difference **below ~200 MEUR/a is not a result**. Option C's
+  reported +64 MEUR/a against legacy in 2025 (`heat_soft_linking.md` §8.6) is in
+  that band and should not be quoted;
+* differences of several hundred MEUR are real in sign but not in magnitude;
+* the **physical** comparisons — mix fidelity, fuel and CO₂, installed capacity —
+  do not depend on the barrier's last digits and are what the recommendation
+  rests on;
+* if a precise cost of each mechanism is ever needed, re-run the two variants with
+  `crossover: 1`. That is expensive on this model and was not done here.
+
+### 3.1 The objectives
 
 2025, same stock, same split, same everything except the mechanism:
 
 | | objective | vs legacy |
 |---|---:|---:|
 | legacy (demand-only transfer) | 333.472 bn | — |
-| option C | 333.536 bn | +64 MEUR/a (+0.019 %) |
-| **option B′** | **334.275 bn** | **+803 MEUR/a (+0.24 %)** |
+| option C | 333.536 bn | +64 MEUR/a — **below the noise floor** |
+| **option B′** | **334.086 bn** | **+614 MEUR/a (+0.18 %)** — ~3× the noise floor |
 
-Option B′ costs roughly **12× more** than option C to impose the same annual mix.
-That is not a defect in either — it is the price of the hourly freedom option C
-keeps and option B′ removes, and it is the single most useful number in this
-document because it *quantifies* the freedom. §5 argues about whether that
-freedom is real.
+So the defensible statement is: **option B′ costs a few hundred MEUR/a more than
+either the legacy transfer or option C, and option C's own cost against the legacy
+transfer cannot be resolved by these runs at all.** That difference is the price of
+the hourly freedom option C keeps and option B′ removes; §5 argues about whether
+that freedom is real.
 
 ---
 
