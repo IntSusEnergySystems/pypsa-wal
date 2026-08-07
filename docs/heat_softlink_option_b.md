@@ -181,7 +181,7 @@ Three escape hatches, in increasing order of how much they give away:
 | # | Knob | Effect |
 |---|---|---|
 | 1 | `penalty` (default **1000 EUR/MWh_th**) | the group relaxes *proportionally over the whole year* — "TIMES's biomass fleet is 5 % smaller than TIMES says" — and `u_g` reports how much. Set `0` for hard constraints and no relaxation variables at all. |
-| 2 | `free_groups: [gas boiler, biomass boiler]` | those groups are not pinned; they pool with the absorber and split their combined residual freely. This is an option-C-style degree of freedom, restricted to the groups that need it. |
+| 2 | `free_groups: [gas boiler, biomass boiler]` | those groups get no row; the heat-bus balance leaves them their combined residual to split freely. This is an option-C-style degree of freedom, restricted to the groups that need it. **Use two or more**: a single free group is determined by the balance anyway, and it re-opens the sink loophole of §1.3 for itself (it would have to pay for its own fuel to feed a sink, which is why this is a documented opt-in rather than the default). |
 | 3 | `enable: false` | back to the legacy demand-only transfer. |
 
 and one guard that is not a knob: a **pre-solve budget report** (§1.6) that prints
@@ -242,9 +242,17 @@ the whole of decentral Wallonia. The decentral heat vent is **exactly 0.000 TWh*
 in all eight solves and decentral DAC is 1 × 10⁻⁵ TWh.
 
 **Conclusion:** on the decentral buses there is no storage flexibility to lose.
-The user's prior was right, and it is confirmed in both the free and the
+This was the prior going in and it is confirmed in both the free and the
 constrained chains. The flexibility that must survive is the district-heating pit
 store — and B′ does not touch the urban-central bus at all.
+
+**What B′ takes here, precisely.** Because every group is pinned (§1.3), the total
+decentral supply equals the heat load at every snapshot, so the water tanks have
+nothing to arbitrage and the decentral heat vent and DAC link are forced to zero.
+That is the **0.008–0.017 TWh_th a year in the table above, on stores the model
+sizes at 130 kWh** — plus the 1 × 10⁻⁵ TWh of decentral DAC. It is the smallest
+thing in the Walloon heat system that could have been given up, and the attempt to
+keep even that (an unpinned absorber) is what let 3.8 TWh_th of DAC onto the bus.
 
 ### 2.2 The hourly *mix* does move — and that is the thing worth arguing about
 
@@ -318,9 +326,26 @@ Milestones, with status. **This section is updated as work lands.**
 | M4 | Pre-solve budget report and the infeasibility guards (§1.6, §6) | ✅ 2026-08-07 |
 | M5 | Tests: closure, shares, sign conventions, solar feasibility, vintages, relaxation, absorber — `test/test_times_heat_profiles.py`, **30 passed**; option C's 42 and the library's 151 still green | ✅ 2026-08-07 |
 | M6 | Single-horizon 2025 solve at full resolution, all constraints | ✅ 2026-08-07, §5.1 |
-| M7 | Full myopic chain 2025 → 2050 | ☐ |
-| M8 | Comparison document, B′ vs C vs legacy | ☐ |
+| M7 | Full myopic chain 2025 → 2050 | ✅ 2026-08-07, §5.2 — **first run exposed the absorber flaw of §1.3; re-run after the fix** |
+| M8 | Comparison document, B′ vs C vs legacy — [`heat_softlink_option_comparison.md`](heat_softlink_option_comparison.md) | ☐ |
 | M9 | Push both branches | ☐ |
+
+Two bugs the chain found that the tests could not, both recorded because they are
+the kind that come back:
+
+1. **An unpinned absorber is an uncapped heat source** (§1.3). Found only in 2050,
+   only at full scale, and only by comparing the realised dispatch against the
+   exported profiles. Regression test added.
+2. **Editing a constraint module did not invalidate the solved networks.**
+   `custom_extra_functionality` is a Snakemake *param*, and a param retriggers a
+   rule only when its *value* changes — a path does not change when the file
+   behind it does. So the chain re-run after the absorber fix reported "Nothing to
+   be done" and the driver re-archived the **previous** answer as if it were the
+   new one. `rules/common.smk` now declares the two `walloon_scripts` constraint
+   modules as inputs of `solve_sector_network_myopic`. This is the same class of
+   bug as the mapping CSVs not invalidating `wallon_demands_*.csv`
+   (`times-heating-softlink-options.md` §10.8), and it is worth checking for
+   whenever a comparison run produces suspiciously identical numbers.
 
 ### What landed, and where
 
