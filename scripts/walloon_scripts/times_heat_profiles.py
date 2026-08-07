@@ -199,6 +199,10 @@ def reconstruct_profiles(
                     "snapshots per day (docs/heat_soft_linking.md §8.5)."
                 )
             solar[bus] = s_solar * annual[bus] * avail / denominator
+    if SOLAR_GROUP in shares.index:
+        # Kept even when the share is zero, so the group is pinned to zero rather
+        # than left free — the `zero_target: forbid` behaviour of option C, which
+        # every *other* group gets automatically from a zero share.
         profiles[SOLAR_GROUP] = solar
 
     residual = load - solar

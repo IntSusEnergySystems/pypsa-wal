@@ -377,6 +377,20 @@ def test_a_zero_share_gives_a_zero_profile(reconstruction):
     assert float(profiles["resistive heater"].abs().to_numpy().max()) == 0.0
 
 
+def test_a_zero_solar_share_is_still_pinned_to_zero(reconstruction):
+    """Solar is built by a different branch, so its zero case needs its own test.
+
+    Left out of the profile set it would be *unconstrained*, free to produce, and
+    the extra heat would have to be vented — quietly breaking both the closure and
+    the mix.
+    """
+    _n, load, avail, w, _profiles = reconstruction
+    shares = pd.Series({**SHARES, SOLAR_GROUP: 0.0, "gas boiler": 0.65})
+    profiles = reconstruct_profiles(load, shares, avail, w)
+    assert SOLAR_GROUP in profiles
+    assert float(profiles[SOLAR_GROUP].abs().to_numpy().max()) == 0.0
+
+
 def test_shares_that_do_not_sum_to_one_are_refused(reconstruction):
     _n, load, avail, w, _profiles = reconstruction
     with pytest.raises(ValueError, match="sum to"):
