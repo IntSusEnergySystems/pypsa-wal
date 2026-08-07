@@ -43,21 +43,54 @@ Everything below follows from that single difference.
 
 ## 2. Mix fidelity — what each option actually delivers
 
-*(tables from `compare_heat_softlink.py`; TABLES-PENDING)*
+The headline measure is the **mean absolute error of the realised share against
+the TIMES share**, in percentage points, over the six technology groups. It is
+the only fidelity number the two mechanisms can be compared on: option C reports
+its slack against its own *tolerance bound*, option B′ against its *profile*, and
+those two bounds are not the same thing — but the realised share against TIMES is.
 
-The structural expectation, before any numbers:
+| mean \|share error\|, pp | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| legacy transfer | 15.88 | 20.54 | 17.51 | *(TABLES-PENDING)* |
+| option C | 1.28 | 1.40 | 1.92 | *(TABLES-PENDING)* |
+| **option B′** | *(TABLES-PENDING)* | | | |
+
+| worst group, pp | 2025 | 2030 | 2040 |
+|---|---|---|---|
+| legacy | heat pump +47.64 | heat pump +55.44 | heat pump +49.75 |
+| option C | gas boiler −2.75 | resistive heater +3.57 | resistive heater +3.48 |
+
+Two structural points behind those numbers:
 
 * **Option C cannot deliver the TIMES mix, by construction.** Its senses are `≥`
-  on what TIMES keeps and `≤` on heat pumps, with a 5 % tolerance, so the best
-  case is 5 % away and the groups that are not binding float wherever the
-  economics put them. In the 2025 chain that showed up as the resistive heater at
-  **8.77 %** against a TIMES **6.06 %** — a 2.7 pp, 45 % relative error on a group
-  nothing was wrong with — while gas, oil, heat pump and solar sat exactly on
-  their tolerance bounds.
-* **Option B′ delivers it to machine precision.** Verified on the real 2025
-  network per group, per bus and per snapshot: total absolute annual gap
-  **0.00029 TWh** over six groups and two buses, all of it in the deliberately
-  unpinned absorber.
+  on what TIMES keeps and `≤` on heat pumps, with a 5 % tolerance, so a binding
+  group lands 5 % away and a non-binding one floats wherever the economics put it.
+  The **resistive heater is the group it misses most in every horizon** (+2.7 to
+  +3.6 pp, i.e. 45–145 % in relative terms): once gas and oil sit on their floors
+  and heat pumps on their cap, resistive heat is the cheapest way to close the
+  balance and nothing stops it.
+* **Option B′ delivers it to solver tolerance — wherever Wallonia physically
+  can.** Verified on the real networks per group, per bus and per snapshot
+  (`check_heat_profile_fidelity.py`): in 2025 the total absolute annual gap is
+  **0.00029 TWh** over six groups and two buses. Where the mix is *not* physically
+  deliverable it says so, exactly and only in the group concerned — 2040:
+
+  | 2040, TWh_th | pinned | realised | gap |
+  |---|---:|---:|---:|
+  | biomass boiler | 4.9396 | 4.4782 | **−0.4613** |
+  | heat pump (absorber) | 5.6042 | 6.0655 | **+0.4613** |
+  | gas / oil / resistive / solar | — | — | 0.00000 |
+
+  The relaxation is a single scalar, it lands only on the group that hit a
+  physical limit, and the absorber picks up exactly the same quantity — the two
+  agree to five decimals on both buses independently.
+
+> **B′ relaxes *more* than option C in 2040 (0.461 vs 0.215 TWh_th), and that is
+> not a defect.** Option C's `≥` floor for biomass is 0.95 × its TIMES share of
+> the *realised* supply; B′ asks for the exact share of the *load*, which is a
+> larger number. Both hit the same wall — the EU solid-biomass limit and BEWAL's
+> own 8.25 TWh supply, with industry on the same bus — and both report the
+> shortfall. B′ asks for more, so it reports more.
 
 ---
 
