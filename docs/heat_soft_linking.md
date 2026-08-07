@@ -6,6 +6,17 @@ is the *analysis* — why options A and B were rejected and C recommended. This
 file is the *implementation*: what was built, every choice that had to be made,
 and the numbers behind each one.
 
+> **Read on the `heat-softlink-option-b` branch.** An alternative mechanism,
+> option B′ (reconstructed hourly profiles, pinned dispatch), was built afterwards
+> and is compared against this one in
+> [`heat_softlink_option_comparison.md`](heat_softlink_option_comparison.md).
+> That document also carries **one correction that applies to every objective
+> figure below**: Gurobi runs here with `Crossover 0` and `BarConvTol 1e-5`, and
+> the measured noise floor on the reported objective is **≈ 190 MEUR/a (0.06 %)**.
+> Differences smaller than that — including the "+63.6 MEUR" for 2025 in §8.6 —
+> are not resolvable by these runs. The §8.3 figure of +444.7 MEUR is ~2.3× the
+> noise floor, so its sign stands but not its precision.
+
 **Reference scenario:** `scen_demande_haute_v01_260727_fix_nuc_2807.vd`,
 `config/config.times-pypsa.yaml`, 6 h sector snapshots (a testing resolution;
 the target is 1 h — nothing here depends on the resolution).
