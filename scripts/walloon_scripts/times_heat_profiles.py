@@ -391,12 +391,13 @@ def add_times_heat_profile_constraints(n, snapshots, snakemake) -> None:
                 f"The absorber group {absorber!r} has no component on {bus!r}; it "
                 "cannot take the bus residual."
             )
-        if group in free:
+        wanted = float((profiles[group][bus] * weightings).sum())
+        if group in free or wanted <= 0:
+            # A group TIMES has retired needs no component to deliver nothing.
             continue
         raise ValueError(
             f"TIMES heat group {group!r} has no {constrained.at[group, 'pypsa_component']} "
-            f"on {bus!r}, so its reconstructed profile "
-            f"({float((profiles[group][bus] * weightings).sum()) / 1e6:.4f} TWh) "
+            f"on {bus!r}, so its reconstructed profile ({wanted / 1e6:.4f} TWh) "
             "cannot be delivered. Add it to `profile.free_groups` if that is "
             "intended, or check the carrier naming."
         )
