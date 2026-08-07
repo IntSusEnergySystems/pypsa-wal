@@ -233,6 +233,22 @@ the heating mix, this recommendation inverts. Keeping both mechanisms behind one
 config block — which is what the `option-b` branch already does — costs nothing
 and makes that switch a one-line change rather than a revert.
 
+### If option C is merged instead, do these next
+
+1. **Backport the Snakemake fix.** `heat-softlink-option-c` does not have the
+   `CUSTOM_EXTRA_FUNCTIONALITY_MODULES` input of `rules/common.smk`, so editing
+   `times_heat_softlink.py` there leaves every solved network looking up to date
+   and a comparison run silently re-archives the previous answer. It cost an hour
+   here and it produces plausible numbers, which is the worst kind of failure.
+2. **Fix the resistive-heater drift.** It is the group option C misses by the most
+   in every horizon (+2.7 to +3.6 pp), because once gas and oil sit on their `≥`
+   floors and heat pumps on their `≤` cap, resistive heat is the cheapest way to
+   close the balance and nothing stops it. A two-sided band on that group, or
+   moving it to `==`, would cost nothing.
+3. **Export the per-group shadow prices.** They are option C's single best output —
+   "what it costs PyPSA to accept the TIMES mix" — and they currently need
+   `solving.options.store_model: true` plus a manual read.
+
 ### If option B′ is merged, do these next
 
 1. Delete `docs/heat_softlink_option_comparison.md`'s "pending" markers and keep
