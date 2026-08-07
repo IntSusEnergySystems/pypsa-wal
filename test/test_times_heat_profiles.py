@@ -442,45 +442,74 @@ def test_pinned_profiles_deliver_the_times_mix_at_every_snapshot(tmp_path):
 
     realised = _realised(n)
 
-    # Every *pinned* group tracks its reconstructed profile exactly, snapshot by
-    # snapshot. This is the claim option B' exists to make.
+    # Every group, absorber included, tracks its reconstructed profile exactly,
+    # snapshot by snapshot. This is the claim option B' exists to make.
     for group in SHARES:
-        if group == "heat pump":
-            continue  # the absorber — see below and the dedicated test
         assert np.allclose(
             realised[group].to_numpy(),
             _reference_profile(n, group).to_numpy(),
             atol=1e-6,
         ), f"{group}: realised dispatch strays from its reconstructed profile"
 
-    # The absorber is pinned in *energy* by the bus balance, not by a row, so it
-    # may still shift within the horizon through the water tank.
-    annual = realised.mul(w, axis=0).sum()
-    reference = _reference_profile(n, "heat pump").mul(w).sum()
-    assert annual["heat pump"] == pytest.approx(reference, rel=1e-6)
-
     # Annually the mix is TIMES's exactly — no tolerance, unlike option C.
+    annual = realised.mul(w, axis=0).sum()
     for group, want in SHARES.items():
         assert annual[group] / annual.sum() == pytest.approx(want, rel=1e-6)
 
-    # Hourly, the *pinned non-solar* groups hold a constant ratio to one another,
-    # because solar necessarily follows the sun and the rest share the residual.
-    pinned = realised[["gas boiler", "resistive heater"]]
-    ratio = (pinned["gas boiler"] / pinned["resistive heater"]).round(9)
+    # Hourly, the non-solar groups hold a constant ratio to one another, because
+    # solar necessarily follows the sun and the rest share the residual.
+    ratio = (realised["gas boiler"] / realised["resistive heater"]).round(9)
     assert ratio.nunique() == 1
 
     assert n.objective > free.objective, "the TIMES mix must cost more than the optimum"
 
 
-def test_the_absorber_keeps_the_decentral_storage_degree_of_freedom(tmp_path):
-    """B' pins the mix, not the total: the unpinned group may still use the tank.
+def test_a_sink_on_the_heat_bus_cannot_inflate_the_absorber(tmp_path):
+    """Regression: an unpinned absorber is an uncapped heat source for anything.
 
-    In the real network this is worth almost nothing — the optimised decentral
-    water tanks are 0.13 MWh for the whole of rural Wallonia and cycle 0.008-0.017
-    TWh a year, against 0.2-2.7 TWh in the district-heating pit store, which B'
-    does not touch. The toy tank is lossless and free, so it is used, which is
-    what makes the degree of freedom visible here.
+    The first implementation left the absorber to the bus balance, on the
+    argument that the balance determines it anyway. It does not: the balance
+    also carries the heat vent, the water tanks and **DAC**. In the 2050 chain the
+    model built 263 MW of DAC on ``BEWAL urban decentral heat`` and served its
+    3.8 TWh_th with heat pumps, taking the reported heat-pump share from the
+    intended 37.9 % to 57 %.
+
+    Here the same trap is set with a cheap sink that is *paid* to consume heat,
+    so an unpinned absorber would certainly feed it.
     """
+    n = _toy_network()
+    n.add("Bus", f"{NODE} sink", carrier="sink")
+    n.add("Link", f"{NODE} greedy sink-2025", bus0=f"{NODE} urban decentral heat",
+          bus1=f"{NODE} sink", carrier="greedy sink", efficiency=1.0,
+          p_nom_extendable=True, capital_cost=1e-6, marginal_cost=-500.0)
+    n.add("Load", f"{NODE} sink load", bus=f"{NODE} sink", p_set=0.0)
+    n.add("Store", f"{NODE} sink store", bus=f"{NODE} sink", e_nom_extendable=True,
+          e_nom_max=1e6, capital_cost=1e-6)
+
+    snakemake = _mock_snakemake(tmp_path, _targets_frame(SHARES))
+    status, condition = n.optimize(
+        solver_name="highs",
+        extra_functionality=lambda net, sns: add_times_heat_profile_constraints(
+            net, sns, snakemake
+        ),
+    )
+    assert (status, condition) == ("ok", "optimal")
+
+    drawn = float(n.links_t.p0[f"{NODE} greedy sink-2025"].sum())
+    assert drawn == pytest.approx(0.0, abs=1e-6), (
+        "a sink on the decentral heat bus must not be able to draw heat: the "
+        "pinned groups already supply exactly the load"
+    )
+    realised = _realised(n)
+    assert np.allclose(
+        realised["heat pump"].to_numpy(),
+        _reference_profile(n, "heat pump").to_numpy(),
+        atol=1e-6,
+    )
+
+
+def test_total_decentral_supply_equals_the_load_at_every_snapshot(tmp_path):
+    """The identity that closes the loophole, asserted on a solved network."""
     n = _toy_network()
     snakemake = _mock_snakemake(tmp_path, _targets_frame(SHARES))
     n.optimize(
@@ -489,19 +518,9 @@ def test_the_absorber_keeps_the_decentral_storage_degree_of_freedom(tmp_path):
             net, sns, snakemake
         ),
     )
-    charged = sum(
-        float(n.links_t.p0[name].sum())
-        for name in n.links.index
-        if "water tanks charger" in name
-    )
-    assert charged > 0, "the absorber should still be able to use the tank"
-
-    realised = _realised(n)
-    deviation = realised["heat pump"] - _reference_profile(n, "heat pump")
-    assert float(deviation.abs().max()) > 0, "absorber is free within the horizon"
-    # …but only within it: over the whole horizon the storage nets out.
-    w = n.snapshot_weightings.generators
-    assert float((deviation * w).sum()) == pytest.approx(0.0, abs=1e-3)
+    supply = _realised(n).sum(axis=1)
+    load = decentral_heat_load(n, decentral_heat_buses(n, NODE), n.snapshots).sum(axis=1)
+    assert np.allclose(supply.to_numpy(), load.to_numpy(), atol=1e-6)
 
 
 def test_every_vintage_of_a_carrier_counts_towards_the_profile(tmp_path):
@@ -527,15 +546,15 @@ def test_every_vintage_of_a_carrier_counts_towards_the_profile(tmp_path):
     assert len(gas_links) == 2
 
 
-def test_the_absorber_is_not_pinned(tmp_path):
+def test_every_group_including_the_absorber_gets_a_row(tmp_path):
     n = _toy_network()
     snakemake = _mock_snakemake(tmp_path, _targets_frame(SHARES))
     n.optimize.create_model()
     add_times_heat_profile_constraints(n, n.snapshots, snakemake)
     names = set(n.model.constraints)
     for bus in BUSES:
-        assert f"times_heat_profile_heat pump_{bus}" not in names
-        assert f"times_heat_profile_gas boiler_{bus}" in names
+        for group in SHARES:
+            assert f"times_heat_profile_{group}_{bus}" in names
 
 
 def test_free_groups_are_not_pinned(tmp_path):

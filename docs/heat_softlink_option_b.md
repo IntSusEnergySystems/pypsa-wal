@@ -123,30 +123,43 @@ objective  +=  penalty · Σ_g u_g
 
 ### 1.3 The absorber
 
-One group is deliberately **not** pinned. The heat-bus balance then determines it:
+One group is nominated as the **absorber**: it is pinned like every other, but its
+right-hand side additionally carries whatever the others could not deliver.
 
 ```
-heat_abs,b(t) = L_b(t) − Σ_{g≠abs} heat_g,b(t)  (+ vent, DAC and net tank charge)
-              = rhs_abs,b(t) + Σ_{g≠abs} (rhs_g,b(t)/E_g)·u_g  (+ the same terms)
+pinned    heat_g,b(t) + (rhs_g,b(t)/E_g)·u_g            ==  rhs_g,b(t)
+absorber  heat_a,b(t) − Σ_{g≠a} (rhs_g,b(t)/E_g)·u_g    ==  rhs_a,b(t)
 ```
 
-so with `u = 0` it is pinned by arithmetic rather than by a row. This is not
-cosmetic:
-
-* it removes a linearly-redundant equality from the LP (the six pinned rows would
-  sum to the bus balance minus the vent/DAC/storage terms), which is exactly the
-  degeneracy a barrier solver handles worst;
-* it leaves the heat vent, the DAC link and the water tanks with their degrees of
-  freedom intact rather than forcing them to net zero, so B′ does not *forbid*
-  decentral storage — it just gives it nothing to arbitrage (§2);
-* it gives the relaxation somewhere physical to go: heat TIMES's fuel mix cannot
-  supply is electrified instead, which is both the direction PyPSA prefers and a
-  statement a reader can check.
+Summed over the groups the relaxation cancels exactly, so
+`Σ_g heat_g,b(t) = L_b(t)` whether or not anything relaxed.
 
 **The absorber is the `heat pump` group by default.** It is the only group with
-no fuel-supply or CO₂ limit upstream of it — a free `gas boiler` group would be
-squeezed by the Walloon CO₂ cap and then could not close the residual, which is
-the infeasibility we are trying to design out.
+no fuel-supply or CO₂ limit upstream of it — a `gas boiler` absorber would be
+squeezed by the Walloon CO₂ cap and then could not take what the others dropped,
+which is the infeasibility we are trying to design out. Putting the relaxation
+there also means it reads physically: heat TIMES's fuel mix cannot supply is
+**electrified** instead, which is the direction PyPSA prefers anyway and shows up
+as a visible extra heat-pump share rather than as a crash.
+
+> **This is a correction.** The first implementation left the absorber
+> **unpinned**, arguing that the heat-bus balance would determine it anyway, that
+> this removed a linearly redundant equality, and that it preserved the (tiny)
+> decentral storage freedom. **The middle claim was wrong and it broke the
+> result.** The bus balance does not only carry the loads and the six supply
+> groups — it also carries the heat vent, the water tanks and **DAC**. An unpinned
+> absorber is therefore an *uncapped heat source for anything else that can attach
+> to the bus*, and the 2050 chain duly exploited it: the model built **263 MW of
+> DAC on `BEWAL urban decentral heat`** and served its **3.811 TWh_th with heat
+> pumps**, moving DAC off the urban-central bus where option C put all 5.642 TWh
+> of it. The reported decentral heat-pump share went from the intended 37.9 % to
+> 57 %.
+>
+> Pinning every group makes total decentral supply equal the heat *load* exactly,
+> so DAC has to source its heat where it did before. What that costs is the
+> decentral water-tank freedom — 0.008–0.021 TWh_th a year, 0.03–0.08 % of
+> decentral heat, on stores optimised to 0.13 MWh (§2.1). Regression test:
+> `test_a_sink_on_the_heat_bus_cannot_inflate_the_absorber`.
 
 ### 1.4 Feasibility, and where it can still fail
 
@@ -283,7 +296,7 @@ from the comparison document.
 | **A2** | The shape is **PyPSA's own heat load profile**, identical for every group | a per-technology shape | TIMES has no sub-annual heat data whatsoever, so any per-technology shape would be invented. The one exception is forced by physics — see A3 |
 | **A3** | **Solar thermal follows its own `p_max_pu`**, and the other groups share the *residual* `L_b(t) − rhs_solar,b(t)` | give solar the load shape like everything else | a load-shaped solar profile peaks in January when the collector delivers nothing: instantly and trivially infeasible. Checked on the 2050 network: `min_t (L_b(t) − rhs_solar,b(t)) = +218 MW`, so the residual is always positive |
 | **A4** | The TIMES shares are applied to the **whole decentral load**, including the ~4 % that is cooking fuel, tertiary other-energy and re-bussed agriculture heat | apply the TIMES absolute energies and leave the residual free | identical to option C's `share` mode and for the same reason (`heat_soft_linking.md` §3.1): absolute targets hand that residual to whichever technology is cheapest and corrupt the mix. Keeping the convention also makes B and C directly comparable |
-| **A5** | **One group (the heat pump) is left unpinned** and absorbs the bus residual | pin all six | removes a linearly-redundant equality, keeps vent/DAC/storage degrees of freedom, and gives the relaxation a physical destination. Heat pumps because they are the only group with no fuel or CO₂ limit upstream |
+| **A5** | **Every group is pinned**, and one of them (the heat pump) additionally absorbs whatever the others could not deliver | leave the absorber unpinned and let the bus balance determine it | **tried, and it broke the 2050 result** (§1.3): the bus balance carries DAC and the heat vent as well as the load, so an unpinned absorber is an uncapped heat source — 263 MW of DAC appeared on the decentral heat bus and took 3.8 TWh_th of heat-pump output. Cost of pinning: the decentral water-tank freedom, 0.03–0.08 % of decentral heat, on stores optimised to 0.13 MWh. Heat pumps are the absorber because they are the only group with no fuel or CO₂ limit upstream |
 | **A6** | Relaxation is **one scalar per group**, spread over the year in proportion to the profile, priced at 1000 EUR/MWh_th | per-snapshot slack; or hard constraints only | a per-snapshot slack is 2 × 6 × T variables and would let the model relax exactly in the expensive hours — i.e. re-create the substitution freedom B′ exists to remove. A scalar says "TIMES's biomass fleet is 5 % smaller than TIMES says", which is a statement about the fleet, not about a Tuesday. Hard constraints are still available (`penalty: 0`) and are correct when you *want* the run to stop on a disagreement |
 | **A7** | District heating keeps its full hourly freedom | pin it too | §2.1: 27–157× more storage cycling than the decentral buses, and the four structural objections of `heat_soft_linking.md` §7 are unchanged. If the DH supply mix is ever transferred it should be with option C's annual constraint, not with a pinned profile |
 | **A8** | Option C's code stays in the branch, defaulting to **off**, and enabling both at once raises | delete option C from the B branch | the comparison in §5 needs `legacy` / `option C` / `option B′` from one checkout and one set of built resources. Branch-switching mid-chain is how stale `resources/` gets mixed into a comparison |

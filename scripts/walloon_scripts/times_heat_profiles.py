@@ -34,10 +34,24 @@ are asserted rather than assumed:
 * ``sum_t w_t rhs_g,b(t) == s_g * E_b`` — so the annual mix is TIMES's exactly,
   not TIMES's within a tolerance.
 
-One group (``profile.absorber``, the heat pump by default) is deliberately left
-unpinned: the bus balance then determines it, which removes a linearly redundant
-equality from the LP, keeps the heat vent / DAC / water tanks free, and gives the
-relaxation somewhere physical to go.
+Every group is pinned, including ``profile.absorber`` (the heat pump by default),
+whose right-hand side additionally carries whatever the other groups could not
+deliver. The absorber therefore gives the relaxation somewhere physical to go —
+heat TIMES's fuel mix cannot supply is electrified instead — without being a hole
+in the constraint set.
+
+.. warning::
+
+   An earlier version left the absorber **unpinned**, on the argument that the
+   bus balance would determine it anyway and that this preserved the (tiny)
+   decentral storage freedom. It does not determine it: the bus balance also
+   carries the heat vent, the water tanks and **DAC**, so an unpinned absorber is
+   an uncapped heat source for anything else that can attach to the bus. In the
+   2050 chain the model duly built 263 MW of DAC on ``BEWAL urban decentral
+   heat`` and served its 3.8 TWh_th with heat pumps, taking the reported heat-pump
+   share from the intended 37.9 % to 57 %. Pinning every group makes the total
+   decentral supply equal the heat load exactly, so DAC has to source its heat
+   where it did before. ``docs/heat_softlink_option_b.md`` arbitrage A5.
 
 Feasibility on the heat bus is structural — ``rhs`` is itself a feasible point,
 because every pinned technology is extendable with no dispatch ceiling except
@@ -307,9 +321,11 @@ def group_heat_expression(n, index: pd.Index, coeffs: pd.Series, snapshots):
 def add_times_heat_profile_constraints(n, snapshots, snakemake) -> None:
     """Pin the Walloon decentral heat dispatch to the reconstructed TIMES mix.
 
-    For every group except the absorber, and every decentral heat bus::
+    For every group and every decentral heat bus::
 
-        sum_c kappa_c * x_c(t)  +  (rhs_g,b(t) / E_g) * u_g  ==  rhs_g,b(t)
+        pinned    sum_c kappa_c * x_c(t)  +  (rhs_g,b(t)/E_g) * u_g  ==  rhs_g,b(t)
+        absorber  sum_c kappa_c * x_c(t)  -  sum_g (rhs_g,b(t)/E_g) * u_g
+                                                                    ==  rhs_a,b(t)
         objective += penalty * sum_g u_g
 
     ``u_g`` is one scalar per group: the annual heat, in MWh_th, the group could
@@ -319,6 +335,12 @@ def add_times_heat_profile_constraints(n, snapshots, snakemake) -> None:
     exists to remove. A group whose TIMES share is zero gets ``rhs == 0`` and no
     relaxation variable, which is the ``zero_target: forbid`` behaviour of option
     C for free.
+
+    Summed over the groups, the two forms cancel the relaxation exactly, so the
+    total decentral heat supply equals the heat load at every snapshot whether or
+    not anything relaxed. That is what stops another consumer of the heat bus
+    (DAC) helping itself to an unconstrained heat source — see the module
+    docstring.
     """
     options = times_heat_options(snakemake.config)
     settings = options["profile"]
@@ -402,13 +424,13 @@ def add_times_heat_profile_constraints(n, snapshots, snakemake) -> None:
             "intended, or check the carrier naming."
         )
 
-    pinned = [g for g in profiles if g != absorber and g not in free]
+    pinned = [g for g in profiles if g not in free]
     energies = {
         g: float(profiles[g].mul(weightings, axis=0).sum().sum()) for g in profiles
     }
 
     penalty = settings["penalty"]
-    relaxable = [g for g in pinned if energies[g] > 0]
+    relaxable = [g for g in pinned if g != absorber and energies[g] > 0]
     unmet = None
     if penalty > 0 and relaxable:
         # `upper` as an explicit DataArray: a bare pandas Series arrives with a
@@ -428,10 +450,21 @@ def add_times_heat_profile_constraints(n, snapshots, snakemake) -> None:
         for bus in buses:
             index, coeffs = terms[(group, bus)]
             if not len(index):
-                continue  # free group with no component; already vetted above
+                continue  # retired or free group with no component; vetted above
             rhs = profiles[group][bus]
             lhs = group_heat_expression(n, index, coeffs, snapshots)
-            if unmet is not None and group in relaxable:
+            if unmet is None:
+                pass
+            elif group == absorber:
+                # The absorber picks up whatever the other groups could not
+                # deliver, on this bus and at this snapshot. Summed over the
+                # groups, the constraint set then still gives total decentral
+                # supply == the heat load exactly, relaxation or not.
+                for other in relaxable:
+                    lhs = lhs - unmet.sel(times_heat_group=other) * _snapshot_da(
+                        profiles[other][bus] / energies[other], snapshots
+                    )
+            elif group in relaxable:
                 lhs = lhs + unmet.sel(times_heat_group=group) * _snapshot_da(
                     rhs / energies[group], snapshots
                 )
