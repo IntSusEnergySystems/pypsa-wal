@@ -574,27 +574,33 @@ def _biomass_report(n, energies, weightings, node: str) -> None:
             cap = cap * hours if np.isfinite(cap) else np.inf
         supply += cap
     demand = energies[group] / 0.855  # decentral biomass boilers run 0.84-0.87
-    other = sum(
-        float((n.links_t.p0[name] * weightings).sum())
-        for name in n.links.index[n.links.bus0.eq(bus)]
-        if name in n.links_t.p0.columns and "biomass boiler" not in n.links.at[name, "carrier"]
+    # The bus's other consumers (industry, industry CC) cannot be quantified here:
+    # this runs at model-build time, so there is no dispatch to read. Only their
+    # existence is reported, because it is what turns a comfortable-looking
+    # headroom into a binding one.
+    others = sorted(
+        {
+            n.links.at[name, "carrier"]
+            for name in n.links.index[n.links.bus0.eq(bus)]
+            if "biomass boiler" not in str(n.links.at[name, "carrier"])
+        }
     )
     logger.info(
         "  biomass boiler profile needs ~%.3f TWh of solid biomass at %s, whose "
-        "own supply caps at %.3f TWh (imports excepted); other users of that bus "
-        "took %.3f TWh in the previous solve.",
+        "own supply caps at %.3f TWh (imports excepted) and is shared with %s.",
         demand / 1e6,
         bus,
         supply / 1e6,
-        other / 1e6,
+        ", ".join(others) or "nothing else",
     )
-    if np.isfinite(supply) and demand + other > supply:
+    if np.isfinite(supply) and demand > 0.5 * supply:
         logger.warning(
-            "The biomass-boiler profile plus the existing users of %s exceed its "
-            "own supply by %.3f TWh; the balance must be imported, and the EU "
-            "solid-biomass limit binds in 2040 and 2050.",
+            "The biomass-boiler profile alone claims %.0f %% of the solid biomass "
+            "%s can produce, and industry draws on the same bus. Expect the "
+            "profile to relax (TimesHeatProfile-unmet) unless imports can cover "
+            "the balance; the EU solid-biomass limit binds in 2040 and 2050.",
+            100 * demand / supply,
             bus,
-            (demand + other - supply) / 1e6,
         )
 
 

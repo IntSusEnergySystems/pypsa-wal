@@ -55,7 +55,7 @@ resources/times-pypsa/scen_corrige/ results/times-pypsa/scen_corrige/
 ```
 
 This config is also where the **heating soft-link** is switched on — see
-[The heating soft-link (option C)](#the-heating-soft-link-option-c).
+[The heating soft-link](#the-heating-soft-link).
 
 Each scenario names its own TIMES `.vd` file (`sector.times_file`). Those files
 are gitignored — symlink them next to the others before running:
@@ -171,17 +171,26 @@ Soft-linked **demands** (TIMES → PyPSA) are a separate path — see
 
 ---
 
-## The heating soft-link (option C)
+## The heating soft-link
 
 The demand transfer hands PyPSA the Walloon **annual heat totals** and lets it
 re-optimise the appliance fleet from scratch — which in 2025 meant 51 % of Walloon
-heat from new heat pumps where TIMES has 8 %. Option C also transfers the
-**appliance energy mix**, as an annual constraint on the two decentral heat buses,
-and replaces PyPSA's EU-2012 base-year heating stock with the TIMES one. Full
-decision record, discrepancy tables and verification log:
-[`docs/heat_soft_linking.md`](docs/heat_soft_linking.md).
+heat from new heat pumps where TIMES has 8 %. The heating soft-link also transfers
+the **appliance energy mix**, and replaces PyPSA's EU-2012 base-year heating stock
+with the TIMES one.
 
-Three independent switches, all in
+> **This branch (`heat-softlink-option-b`) carries two alternative mix
+> mechanisms.** They are mutually exclusive and enabling both raises.
+>
+> | | switch | what it does | record |
+> |---|---|---|---|
+> | **option B′** *(on by default here)* | `profile.enable` | reconstructs an hourly heat profile per technology group (TIMES share × PyPSA's heat-load shape) and **pins the dispatch to it** | [`docs/heat_softlink_option_b.md`](docs/heat_softlink_option_b.md) |
+> | **option C** *(off here; the default on `heat-softlink-option-c`)* | `energy_mix.enable` | constrains each group's **annual** heat, `≥` on what TIMES keeps and `≤` on heat pumps, ±5 % | [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) |
+>
+> Which to merge to `master` is the subject of
+> [`docs/heat_softlink_option_comparison.md`](docs/heat_softlink_option_comparison.md).
+
+All switches live in
 [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) (present but off
 in `config.walloon.yaml`):
 
@@ -191,41 +200,68 @@ sector:
     node: BEWAL
     urban_rural_split: times_base_year   # times | times_base_year | pypsa
     base_year_capacities: true           # TIMES 2025 stock instead of the EU 2012 row
-    energy_mix:
+    profile:                             # option B'
       enable: true
+      absorber: heat pump                # group left unpinned; takes the bus residual
+      penalty: 1000.0                    # EUR/MWh_th undelivered; 0 = hard constraints
+      free_groups: []                    # groups not pinned at all
+      export: true
+    energy_mix:                          # option C — mutually exclusive with the above
+      enable: false
       mode: share                        # share | absolute
       tolerance: 0.05
-      slack_groups: []                   # groups to leave unconstrained
+      slack_groups: []
       zero_target: forbid                # forbid | free
+      penalty: 1000.0
 ```
 
 | Switch | What it changes |
 |--------|-----------------|
-| `energy_mix.enable` | Adds one constraint per technology group in `custom_extra_functionality` — `≥` on what TIMES keeps, `≤` on heat pumps, `≤ 0` on what TIMES has retired. Reads `heating_targets_{year}.csv` |
+| `profile.enable` | Adds one constraint per (group, bus, snapshot) in `custom_extra_functionality`, pinning each group to its reconstructed profile. Reads `heating_targets_{year}.csv`; writes the profiles it pinned to `results/<run>/heating_profiles/*.csv` |
+| `energy_mix.enable` | Adds one **annual** constraint per group instead — `≥` on what TIMES keeps, `≤` on heat pumps, `≤ 0` on what TIMES has retired |
 | `urban_rural_split` | How the TIMES residential decentral heat is divided between `rural` and `urban decentral`. TIMES has no urban/rural dimension; its archetype labelling drifts the rural share from 59 % (2025) to 37 % (2050), so `times_base_year` freezes it at the first horizon |
 | `base_year_capacities` | Overwrites the BEWAL row of `existing_heating_distribution` with TIMES `VAR_Cap`. Both sides are MW **thermal output**, so it is a substitution, not a conversion |
 
 **Every switch defaults to the pre-2026-08 behaviour**, so deleting the
 `times_heat` block reproduces the older results exactly.
 
-New intermediate files, both written by `build_wallon_demands`:
+New intermediate files, the first two written by `build_wallon_demands` and the
+third by the solve itself:
 
 ```
-resources/<run>/heating_targets_{year}.csv     # constraint right-hand sides
-resources/<run>/heating_capacities_{year}.csv  # base-year stock, MW_th (schema changed)
+resources/<run>/heating_targets_{year}.csv        # the TIMES shares, both options
+resources/<run>/heating_capacities_{year}.csv     # base-year stock, MW_th
+results/<run>/heating_profiles/base_s_*.csv       # option B': the pinned profiles
 ```
 
-Both come from the `times_pypsa` library
+The first two come from the `times_pypsa` library
 (`TIMES_PyPSA/times_pypsa/heat_softlink.py`, groups defined in
 `TIMES_PyPSA/data/heat_softlink_groups.csv`), so editing the group definition
 invalidates the exports — it is declared as a rule input alongside the other
-mapping CSVs.
+mapping CSVs. **`times_pypsa` is identical on both option branches**: the same
+`share` column feeds both mechanisms.
 
-> Measured on `scen_demande_haute`, 2025, 6 h: the mix constraints cost
-> **+445 MEUR/a (+0.13 %)** of the system objective and bring the gas/oil/heat-pump
-> shares from 40 / 0 / 51 % to 52 / 21 / 8 % against TIMES's 55 / 22 / 8 %.
-> 2030-2050 have **not** yet been re-solved as a myopic chain — see §9 of
-> [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md).
+### Checking a heating soft-link run
+
+```bash
+python scripts/walloon_scripts/check_heat_profile_fidelity.py scen_demande_haute live
+```
+
+Compares the exported profiles against the realised dispatch, per group, per bus,
+per snapshot. Every pinned group should match to solver tolerance; only the
+absorber may deviate, and only within the horizon. This is the check that catches
+a wrong sign convention or a dropped vintage — both of which produce a perfectly
+feasible LP whose answer is silently *not* the TIMES mix.
+
+```bash
+bash scripts/walloon_scripts/run_heat_softlink_comparison.sh scen_demande_haute
+```
+
+Re-solves the whole myopic chain once per mechanism (`before` = legacy,
+`after` = option C, `option_b` = option B′), archives each tree under
+`results/_heat_softlink_comparison/`, and is idempotent per phase. Then
+`python scripts/walloon_scripts/compare_heat_softlink.py scen_demande_haute`
+prints the three-way tables.
 
 ---
 
@@ -1168,6 +1204,9 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
 | `--resources mem_mb=... <target>` fails with `dictionary update sequence element #1 has length 1` | Same `nargs="+"` trap as `--configfile`: the target after `--resources` is parsed as another resource. Put `--cores` (or any flag) between them |
 | Solve is infeasible right after enabling `sector.times_heat.energy_mix` | Check which group binds in the solve log line `TIMES heat-mix constraints (…)`, then either raise `tolerance` or move that group to `slack_groups`. `solar thermal` is the usual suspect — it is the only group with a dispatch upper bound. See [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) §3.3 |
+| `energy_mix.enable and profile.enable are both true` | The two mix mechanisms are alternatives, not layers. Enable exactly one — see [`docs/heat_softlink_option_comparison.md`](docs/heat_softlink_option_comparison.md) |
+| Solve is infeasible right after enabling `sector.times_heat.profile` | With the default `penalty: 1000` it cannot be the heat-mix constraints — the reconstructed profiles close on the heat load exactly and every pinned technology is extendable. Read the `TIMES heat profile budget` lines in the solve log: they print the fuel and CO₂ the profiles imply against the node's cap *before* the solver runs. If a group genuinely cannot be supplied, it relaxes instead, and the gap shows up in `check_heat_profile_fidelity.py`. Last resorts: `profile.free_groups: [gas boiler, biomass boiler]`, then `profile.enable: false` |
+| Option B′ solve much slower than option C | Expected: B′ adds ≈ 14 600 equality rows at 6 h (≈ 87 600 at 1 h) against option C's 6. It also *removes* degrees of freedom, so the net effect is not one-signed — measure rather than assume |
 
 ---
 
