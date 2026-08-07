@@ -2,21 +2,37 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Before/after report for the TIMES heating soft-link (option C).
+"""Three-way report for the TIMES heating soft-link.
 
-Reads the two archives written by ``run_heat_softlink_comparison.sh`` and prints
-Markdown tables ready to paste into ``docs/heat_soft_linking.md``:
+Reads the archives written by ``run_heat_softlink_comparison.sh`` and prints
+Markdown tables ready to paste into the decision documents:
 
-* the decentral heat mix per horizon, against the TIMES target;
+===========  ================================================================
+``before``   legacy transfer — annual heat demand only, PyPSA re-optimises the
+             appliance fleet from scratch
+``after``    **option C** — annual energy-mix constraints
+             (``docs/heat_soft_linking.md``)
+``option_b`` **option B'** — reconstructed hourly profiles, pinned dispatch
+             (``docs/heat_softlink_option_b.md``)
+===========  ================================================================
+
+Tables:
+
+* decentral heat mix per horizon against the TIMES target, with the mix error
+  each mechanism leaves behind;
+* the **hourly** mix deviation and the decentral / district-heating storage
+  cycling — the flexibility question, measured rather than argued;
 * installed decentral heat capacity;
 * system objective and Walloon CO₂;
-* the knock-on effects outside heating (electricity demand, gas and biomass use)
-  — the part a mix constraint is *not* supposed to touch, and therefore the part
-  worth checking.
+* fuel and electricity drawn by decentral heating — the knock-on effects a mix
+  transfer is *not* supposed to touch, and therefore the part worth checking.
 
 Usage::
 
-    python scripts/walloon_scripts/compare_heat_softlink.py [scenario]
+    python scripts/walloon_scripts/compare_heat_softlink.py [scenario] [phase...]
+
+Any phase whose archive is missing is skipped with a note, so the script is
+useful before the third chain has finished.
 """
 
 from __future__ import annotations
@@ -24,6 +40,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pypsa
 
@@ -34,59 +51,97 @@ from scripts.walloon_scripts.times_heat_softlink import (  # noqa: E402
     heat_injection_terms,
 )
 
-SCENARIO = sys.argv[1] if len(sys.argv) > 1 else "scen_demande_haute"
+ARGV = sys.argv[1:]
+SCENARIO = ARGV[0] if ARGV else "scen_demande_haute"
 ARCHIVE = Path("results/_heat_softlink_comparison")
 RESOURCES = Path("resources/times-pypsa") / SCENARIO
 HORIZONS = [2025, 2030, 2040, 2050]
 NODE = "BEWAL"
-PHASES = ["before", "after"]
+
+ALL_PHASES = ["before", "after", "option_b"]
+LABEL = {"before": "legacy", "after": "option C", "option_b": "option B'"}
+PHASES = ARGV[1:] or ALL_PHASES
+
+_CACHE: dict[tuple[str, int], pypsa.Network] = {}
 
 
 def load(phase: str, year: int) -> pypsa.Network:
-    return pypsa.Network(ARCHIVE / phase / "networks" / f"base_s_adm___{year}.nc")
+    key = (phase, year)
+    if key not in _CACHE:
+        _CACHE[key] = pypsa.Network(
+            ARCHIVE / phase / "networks" / f"base_s_adm___{year}.nc"
+        )
+    return _CACHE[key]
 
 
 def targets(year: int) -> pd.DataFrame:
     return pd.read_csv(RESOURCES / f"heating_targets_{year}.csv")
 
 
-def heat_mix(n: pypsa.Network, tgt: pd.DataFrame) -> pd.Series:
-    """Annual heat delivered to the decentral buses per constraint group, TWh_th."""
+def group_dispatch(n: pypsa.Network, tgt: pd.DataFrame) -> pd.DataFrame:
+    """Heat delivered per constraint group and snapshot, MW_th."""
     buses = decentral_heat_buses(n, NODE)
-    w = n.snapshot_weightings.generators
     out = {}
     for _, row in tgt[tgt["constrained"]].iterrows():
         carriers = [c.strip() for c in str(row["pypsa_carriers"]).split(";") if c.strip()]
         index, coeffs = heat_injection_terms(n, buses, carriers, row["pypsa_component"])
         p = n.links_t.p0 if row["pypsa_component"] == "Link" else n.generators_t.p
-        out[row["group"]] = float((p[index] * coeffs).mul(w, axis=0).to_numpy().sum()) / 1e6
-    return pd.Series(out)
+        out[row["group"]] = (p[index] * coeffs).sum(axis=1)
+    return pd.DataFrame(out)
 
 
-def unmet_mix(realised: pd.Series, tgt: pd.DataFrame, tolerance: float = 0.05) -> pd.Series:
-    """TWh_th by which the realised mix misses its constraint bound.
+def heat_mix(n: pypsa.Network, tgt: pd.DataFrame) -> pd.Series:
+    """Annual heat delivered to the decentral buses per group, TWh_th."""
+    w = n.snapshot_weightings.generators
+    return group_dispatch(n, tgt).mul(w, axis=0).sum() / 1e6
 
-    The penalty slack variable (`TimesHeatMix-slack`) is a bare linopy variable, so
-    PyPSA cannot map it to a component and it is **not written to the netCDF** — the
-    number has to be reconstructed. That is straightforward and in fact more robust
-    than reading the solver's own value: in `share` mode the bound is
-    ``(1 ∓ tol) · share_g · Σ_h supply_h`` on the *realised* total, so the shortfall
-    is just the signed distance from it. A non-zero entry here is the honest
-    statement "TIMES asks for this much more than Wallonia could deliver".
+
+def mix_error(realised: pd.Series, tgt: pd.DataFrame) -> pd.Series:
+    """Percentage points by which each group's realised share misses TIMES.
+
+    This is the number that makes the two mechanisms directly comparable and
+    that no per-mechanism diagnostic can give: option C reports its slack against
+    its own *tolerance bound*, option B' against its *profile*, and the two
+    bounds are not the same thing. The realised share against the TIMES share is.
     """
-    total = realised.sum()
-    out = {}
-    for group, value in realised.items():
-        row = tgt.loc[group]
-        share = float(row["share"])
-        sense = str(row["sense"])
-        if share <= 0:
-            out[group] = max(0.0, value) if sense != ">=" else 0.0
-            continue
-        factor = (1 - tolerance) if sense == ">=" else (1 + tolerance)
-        bound = factor * share * total
-        out[group] = max(0.0, bound - value) if sense == ">=" else max(0.0, value - bound)
-    return pd.Series(out)
+    shares = 100 * realised / realised.sum()
+    return shares - 100 * tgt.loc[shares.index, "share"]
+
+
+def hourly_mix_deviation(n: pypsa.Network, tgt: pd.DataFrame) -> float:
+    """Energy-weighted mean |hourly share − annual share|, aggregated, in %.
+
+    0 % means the technology mix is already constant through the year, i.e. the
+    hourly substitution freedom option B' removes is worth nothing. The larger
+    it is, the more option B' gives up — and the more of what PyPSA is doing is
+    the single-bus perfect-substitutability artefact discussed in
+    ``docs/heat_softlink_option_b.md`` §2.2.
+    """
+    supply = group_dispatch(n, tgt)
+    w = n.snapshot_weightings.generators
+    total = supply.sum(axis=1)
+    annual = supply.mul(w, axis=0).sum()
+    annual_share = annual / annual.sum()
+    hourly = supply.div(total.where(total > 0), axis=0).fillna(0.0)
+    deviation = hourly.sub(annual_share, axis=1).abs()
+    weighted = (deviation.mul(total * w, axis=0)).sum() / float((total * w).sum())
+    return float(weighted.sum() / 2 * 100)
+
+
+def storage_cycling(n: pypsa.Network, buses: set[str], pattern: str) -> float:
+    """TWh_th cycled through the thermal stores on ``buses`` (charge = discharge)."""
+    w = n.snapshot_weightings.generators
+    links = n.links[
+        n.links.carrier.str.contains(pattern, na=False)
+        & (n.links.bus0.isin(buses) | n.links.bus1.isin(buses))
+        & n.links.index.str.startswith(NODE)
+    ]
+    total = 0.0
+    for name, row in links.iterrows():
+        column = "p0" if row.bus0 in buses else "p1"
+        if name in getattr(n.links_t, column).columns:
+            total += abs(float((getattr(n.links_t, column)[name] * w).sum()))
+    return total / 2 / 1e6
 
 
 def decentral_capacity(n: pypsa.Network) -> pd.Series:
@@ -102,35 +157,6 @@ def decentral_capacity(n: pypsa.Network) -> pd.Series:
         for _, row in links.iterrows()
     ]
     return links.assign(MW_th=mw).groupby("carrier")["MW_th"].sum()
-
-
-def _link_port_flow(n: pypsa.Network, bus: str) -> float:
-    """MWh withdrawn from ``bus`` by links, summed over every port.
-
-    PyPSA defines ``p_i`` as the power *withdrawn from* ``bus_i``, so the sum over
-    all ports touching a bus is the withdrawal regardless of link orientation.
-    Looping over ports matters here: a heat pump is a reversed link whose
-    electricity consumption appears on **bus1**, so a ``bus0``-only sum silently
-    drops the entire heat-pump electricity demand — which is exactly the quantity
-    this comparison is meant to show moving.
-    """
-    total = 0.0
-    for port in range(0, 6):
-        bus_col, p_col = f"bus{port}", f"p{port}"
-        if bus_col not in n.links.columns or p_col not in n.links_t:
-            continue
-        sel = n.links.index[n.links[bus_col] == bus].intersection(
-            n.links_t[p_col].columns
-        )
-        if not len(sel):
-            continue
-        total += float(
-            n.links_t[p_col][sel]
-            .mul(n.snapshot_weightings.generators, axis=0)
-            .to_numpy()
-            .sum()
-        )
-    return total
 
 
 def walloon_co2(n: pypsa.Network) -> float:
@@ -217,60 +243,91 @@ def md(df: pd.DataFrame, floatfmt: str = "{:.3f}") -> str:
     body = df.copy()
     for c in body.columns:
         if pd.api.types.is_numeric_dtype(body[c]):
-            body[c] = body[c].map(lambda v: floatfmt.format(v))
+            body[c] = body[c].map(
+                lambda v: "—" if pd.isna(v) else floatfmt.format(v)
+            )
     head = "| " + " | ".join([body.index.name or ""] + list(body.columns)) + " |"
     rule = "|" + "|".join(["---"] * (len(body.columns) + 1)) + "|"
-    rows = [
-        "| " + " | ".join([str(i)] + list(r)) + " |" for i, r in body.iterrows()
-    ]
+    rows = ["| " + " | ".join([str(i)] + list(r)) + " |" for i, r in body.iterrows()]
     return "\n".join([head, rule, *rows])
 
 
-def main() -> None:
-    missing = [
-        p for p in PHASES if not (ARCHIVE / p / "networks").is_dir()
-    ]
+def available_phases() -> list[str]:
+    present, missing = [], []
+    for phase in PHASES:
+        (present if (ARCHIVE / phase / "networks").is_dir() else missing).append(phase)
     if missing:
-        raise SystemExit(
-            f"Archive incomplete: {missing}. Run "
-            "scripts/walloon_scripts/run_heat_softlink_comparison.sh first."
+        print(
+            f"> Archives missing for {missing} — those columns are omitted. Run "
+            "`bash scripts/walloon_scripts/run_heat_softlink_comparison.sh "
+            f"{SCENARIO} {' '.join(missing)}` to produce them.\n"
         )
+    if not present:
+        raise SystemExit("No archive found at all.")
+    return present
 
-    print(f"# Heating soft-link before/after — {SCENARIO}\n")
+
+def main() -> None:
+    print(f"# Heating soft-link comparison — {SCENARIO}\n")
+    phases = available_phases()
 
     print("## Decentral heat mix, share of supply\n")
     for year in HORIZONS:
         tgt = targets(year).set_index("group")
         rows = {}
-        for phase in PHASES:
+        for phase in phases:
             s = heat_mix(load(phase, year), targets(year))
-            rows[f"{phase} TWh"] = s
-            rows[f"{phase} %"] = 100 * s / s.sum()
+            rows[f"{LABEL[phase]} TWh"] = s
+            rows[f"{LABEL[phase]} %"] = 100 * s / s.sum()
+            rows[f"{LABEL[phase]} err pp"] = mix_error(s, tgt)
         tbl = pd.DataFrame(rows)
         tbl.insert(0, "TIMES %", 100 * tgt.loc[tbl.index, "share"])
         tbl.insert(0, "TIMES TWh", tgt.loc[tbl.index, "TWh"])
-        tbl["unmet TWh"] = unmet_mix(rows["after TWh"], tgt)
         tbl.index.name = f"{year}"
         print(md(tbl, "{:.2f}"))
-        unmet = tbl["unmet TWh"].sum()
-        if unmet > 1e-3:
+        for phase in phases:
+            err = tbl[f"{LABEL[phase]} err pp"].abs()
             print(
-                f"\n> **{year}: {unmet:.3f} TWh_th of the TIMES mix could not be "
-                "delivered** — the constraint relaxed at "
-                "`energy_mix.penalty` rather than making the LP infeasible. "
-                "See §3.3.1 and §8.7.\n"
+                f"\n> {LABEL[phase]}: mean |share error| "
+                f"{err.mean():.2f} pp, worst {err.max():.2f} pp "
+                f"({err.idxmax()})."
             )
         print()
 
+    print("## Hourly flexibility actually used\n")
+    rows = []
+    for year in HORIZONS:
+        entry = {"horizon": year}
+        for phase in phases:
+            n = load(phase, year)
+            tgt = targets(year)
+            decentral = set(decentral_heat_buses(n, NODE))
+            central = {f"{NODE} urban central heat"}
+            entry[f"{LABEL[phase]} mix dev %"] = hourly_mix_deviation(n, tgt)
+            entry[f"{LABEL[phase]} dec. store TWh"] = storage_cycling(
+                n, decentral, "water tanks"
+            )
+            entry[f"{LABEL[phase]} DH store TWh"] = storage_cycling(
+                n, central, "water tanks|water pits"
+            )
+        rows.append(entry)
+    tbl = pd.DataFrame(rows).set_index("horizon")
+    tbl.index.name = "horizon"
+    print(md(tbl, "{:.4f}"))
+    print(
+        "\n> `mix dev` is the energy-weighted mean |hourly share − annual share|, "
+        "aggregated: 0 % means the mix is already constant, so option B' removes "
+        "nothing. `dec. store` is the decentral water-tank cycling option B' "
+        "leaves to the absorber; `DH store` is the district-heating pit store, "
+        "which neither option touches.\n"
+    )
+
     print("## Installed decentral heat capacity, MW_th\n")
     for year in HORIZONS:
-        rows = {p: decentral_capacity(load(p, year)) for p in PHASES}
-        tbl = pd.DataFrame(rows).fillna(0.0)
-        tbl["change %"] = 100 * (tbl["after"] / tbl["before"].where(tbl["before"] > 0) - 1)
+        tbl = pd.DataFrame(
+            {LABEL[p]: decentral_capacity(load(p, year)) for p in phases}
+        ).fillna(0.0)
         tbl.loc["TOTAL"] = tbl.sum()
-        tbl.loc["TOTAL", "change %"] = 100 * (
-            tbl.loc["TOTAL", "after"] / tbl.loc["TOTAL", "before"] - 1
-        )
         tbl.index.name = f"{year}"
         print(md(tbl, "{:.1f}"))
         print()
@@ -278,31 +335,26 @@ def main() -> None:
     print("## System totals\n")
     rows = []
     for year in HORIZONS:
-        nb, na = load("before", year), load("after", year)
-        rows.append(
-            {
-                "horizon": year,
-                "objective before (bn)": nb.objective / 1e9,
-                "objective after (bn)": na.objective / 1e9,
-                "delta (MEUR)": (na.objective - nb.objective) / 1e6,
-                "delta %": 100 * (na.objective / nb.objective - 1),
-                "BEWAL CO2 before (Mt)": walloon_co2(nb),
-                "BEWAL CO2 after (Mt)": walloon_co2(na),
-            }
-        )
+        entry = {"horizon": year}
+        base = load(phases[0], year).objective
+        for phase in phases:
+            n = load(phase, year)
+            entry[f"{LABEL[phase]} obj (bn)"] = n.objective / 1e9
+            entry[f"{LABEL[phase]} d (MEUR)"] = (n.objective - base) / 1e6
+            entry[f"{LABEL[phase]} CO2 (Mt)"] = walloon_co2(n)
+        rows.append(entry)
     tbl = pd.DataFrame(rows).set_index("horizon")
     tbl.index.name = "horizon"
     print(md(tbl, "{:.3f}"))
-    print()
+    print(f"\n> `d (MEUR)` is against **{LABEL[phases[0]]}**.\n")
 
     print("## Fuel and electricity drawn by decentral heating, TWh\n")
     rows = []
     for year in HORIZONS:
         entry = {"horizon": year}
-        for phase in PHASES:
-            s = heat_inputs(load(phase, year))
-            for label, value in s.items():
-                entry[f"{label} {phase}"] = value
+        for phase in phases:
+            for label, value in heat_inputs(load(phase, year)).items():
+                entry[f"{label} {LABEL[phase]}"] = value
         rows.append(entry)
     tbl = pd.DataFrame(rows).set_index("horizon")
     tbl.index.name = "horizon"

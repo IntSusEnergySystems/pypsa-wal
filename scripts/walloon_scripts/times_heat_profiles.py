@@ -487,19 +487,30 @@ def budget_report(n, profiles, terms, energies, weightings, node: str) -> None:
     diagnostic.
     """
     try:
+        heat_carriers = {f"{s} heat" for s in DECENTRAL_HEAT_SYSTEMS}
         fuels: dict[str, list[float]] = {}
         for (group, _bus), (index, coeffs) in terms.items():
             links = index[index.isin(n.links.index)]
             for name in links:
                 source = n.links.at[name, "bus0"]
-                if source in n.buses.index and n.buses.at[source, "carrier"] in (
-                    "rural heat",
-                    "urban decentral heat",
-                ):
-                    source = n.links.at[name, "bus1"]  # reversed heat-pump link
+                reversed_link = (
+                    source in n.buses.index
+                    and n.buses.at[source, "carrier"] in heat_carriers
+                )
+                if reversed_link:
+                    # Heat pump: the heat bus is bus0, so the input is on bus1 and
+                    # the heat-injection coefficient is -1, not an efficiency. The
+                    # electricity drawn is heat / COP = heat * efficiency, and the
+                    # efficiency is hourly.
+                    source = n.links.at[name, "bus1"]
+                    if name in n.links_t.efficiency.columns:
+                        ratio = 1.0 / float(n.links_t.efficiency[name].mean())
+                    else:
+                        ratio = 1.0 / float(n.links.at[name, "efficiency"])
+                else:
+                    ratio = abs(float(coeffs.loc[name])) or 1.0
                 carrier = n.buses.at[source, "carrier"] if source in n.buses.index else "?"
-                efficiency = abs(float(coeffs.loc[name])) or 1.0
-                fuels.setdefault(f"{group}|{carrier}", []).append(efficiency)
+                fuels.setdefault(f"{group}|{carrier}", []).append(ratio)
 
         lines = []
         co2 = 0.0

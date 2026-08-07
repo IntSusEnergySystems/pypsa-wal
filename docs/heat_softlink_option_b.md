@@ -88,6 +88,17 @@ The first makes the heat-bus balance close by construction, so nothing on the bu
 has to absorb a mismatch. The second means the annual mix is TIMES's exactly —
 not TIMES's ±5 %.
 
+> **One nuance about "the mix is TIMES's at every hour".** It is, in the sense
+> that every group's dispatch is a fixed multiple of a known profile. It is not,
+> in the sense of "every group holds a constant *share* at every hour": solar
+> thermal necessarily follows the sun, so its share swings between 0 at night and
+> a few per cent at midday, and the other groups' shares move by the same small
+> amount in the opposite direction (`s_g/(1−s_solar)` of the residual, a constant
+> ratio *among themselves*). At a TIMES solar share of 0.3–0.5 % this is a
+> sub-percentage-point effect, but the honest statement is *"each group's hourly
+> dispatch is its TIMES share of the residual load"*, not *"each group's hourly
+> share is constant"*.
+
 ### 1.2 The constraint
 
 For every group except one (§1.3) and every decentral bus:
@@ -290,13 +301,32 @@ Milestones, with status. **This section is updated as work lands.**
 | M0 | Branches: `heat-softlink-option-c` (current tree committed) and `heat-softlink-option-b` from it, in both repos; `master`/`main` untouched | ✅ 2026-08-07 |
 | M1 | Evidence: flexibility audit (§2), network census, payload check | ✅ 2026-08-07 |
 | M2 | Design document (this file) | ✅ 2026-08-07 |
-| M3 | `times_heat_profiles.py`: profile reconstruction + constraints + relaxation + CSV export | ☐ |
-| M4 | Pre-solve budget report and the infeasibility guards (§1.6, §6) | ☐ |
-| M5 | Tests: closure, shares, sign conventions, solar feasibility, vintages, relaxation, absorber | ☐ |
-| M6 | Single-horizon 2025 solve at full resolution, all constraints | ☐ |
+| M3 | `times_heat_profiles.py`: profile reconstruction + constraints + relaxation + CSV export | ✅ 2026-08-07 |
+| M4 | Pre-solve budget report and the infeasibility guards (§1.6, §6) | ✅ 2026-08-07 |
+| M5 | Tests: closure, shares, sign conventions, solar feasibility, vintages, relaxation, absorber — `test/test_times_heat_profiles.py`, **30 passed**; option C's 42 and the library's 151 still green | ✅ 2026-08-07 |
+| M6 | Single-horizon 2025 solve at full resolution, all constraints | ✅ 2026-08-07, §5.1 |
 | M7 | Full myopic chain 2025 → 2050 | ☐ |
 | M8 | Comparison document, B′ vs C vs legacy | ☐ |
 | M9 | Push both branches | ☐ |
+
+### What landed, and where
+
+| Piece | File | New / changed |
+|---|---|---|
+| Profile reconstruction, constraints, relaxation, budget report, CSV export | `scripts/walloon_scripts/times_heat_profiles.py` | **new**, ~470 lines |
+| `profile` option block, validation, mutual exclusion with `energy_mix` | `scripts/walloon_scripts/times_heat_softlink.py` | changed (additive) |
+| Dispatch to whichever mechanism is on | `data/custom_extra_functionality.py` | changed |
+| `heating_profiles` declared output (shadow-safe) | `rules/solve_myopic.smk` | changed |
+| Config blocks | `config/config.times-pypsa.yaml` (B′ **on**, C off), `config/config.walloon.yaml` (both off) | changed |
+| Three-phase driver: `before` / `after` / `option_b`, one overlay each | `scripts/walloon_scripts/run_heat_softlink_comparison.sh` | changed |
+| Three-way report + the hourly-flexibility table | `scripts/walloon_scripts/compare_heat_softlink.py` | changed |
+| Tests | `test/test_times_heat_profiles.py` | **new**, 30 tests |
+
+**`TIMES_PyPSA` needs no change for option B′.** `heating_targets_{year}.csv` already
+carries the `share` column, which is the entire payload B′ consumes; the
+`heat-softlink-option-b` branch there is identical to `heat-softlink-option-c` and
+exists so the two model branches each have a matching library branch to pin
+against.
 
 ### Step-by-step (M3–M5)
 
@@ -323,7 +353,60 @@ Milestones, with status. **This section is updated as work lands.**
 
 ## 5. Verification log
 
-*(filled in as each milestone lands)*
+### 5.1 Full 2025 solve — the authoritative check
+
+`config/config.times-pypsa.yaml` with `profile.enable: true`, 6 h resolution, all
+six countries, **every** `extra_functionality` constraint including the national
+CO₂ budgets, Gurobi barrier. `Optimal`, objective **334.275 bn**.
+
+**The pre-solve budget report fired as designed** (from the solve log):
+
+```
+TIMES heat profiles: 5 of 6 groups pinned on
+  ['BEWAL rural heat', 'BEWAL urban decentral heat']
+  (absorber 'heat pump', penalty 1000 EUR/MWh_th):
+  solar thermal 0.1347 TWh (0.48%), heat pump 2.2032 TWh (7.93%, absorber),
+  gas boiler 15.2674 TWh (54.94%), oil boiler 5.9993 TWh (21.59%),
+  biomass boiler 2.5014 TWh (9.00%), resistive heater 1.6855 TWh (6.06%)
+TIMES heat profile budget: biomass boiler: 2.501 TWh_th -> 2.978-3.333 TWh of
+  solid biomass; gas boiler: 15.267 TWh_th -> 15.659-20.578 TWh of gas,
+  4.074 Mt CO2; oil boiler: 5.999 TWh_th -> 6.666-9.179 TWh of oil, 2.360 Mt CO2
+  decentral heating CO2 (upper estimate) 6.434 Mt against the BEWAL cap of
+  21.982 Mt = 29.3 % of the whole node's budget.
+```
+
+Every realised share equals the TIMES share to the digit printed — 7.93 / 54.94 /
+21.59 / 9.00 / 6.06 / 0.48 % — because they are shares of the profile, not of a
+tolerance bound.
+
+**Profile fidelity, checked per group, per bus, per snapshot** against the
+exported `heating_profiles/base_s_adm___2025.csv`
+(`scripts/walloon_scripts/check_heat_profile_fidelity.py`):
+
+| group | pinned TWh | realised TWh | annual gap TWh | peak \|gap\| MW | as % of profile peak |
+|---|---:|---:|---:|---:|---:|
+| gas boiler | 15.2674 | 15.2674 | −0.0000 | 0.0009 | 0.00002 % |
+| oil boiler | 5.9993 | 5.9993 | −0.0000 | 0.0001 | 0.00001 % |
+| biomass boiler | 2.5014 | 2.5014 | 0.0000 | 0.0000 | 0 % |
+| resistive heater | 1.6855 | 1.6855 | −0.0000 | 0.0001 | 0.00001 % |
+| solar thermal | 0.1347 | 0.1347 | −0.0000 | 0.0000 | 0 % |
+| **heat pump** *(absorber)* | 2.2032 | 2.2035 | **+0.0003** | **24.7** | **3.0 %** |
+
+Total absolute annual gap over all six groups and both buses: **0.00029 TWh**.
+
+Two things this establishes and no unit test could:
+
+1. **The sign conventions, carrier selection and vintage aggregation are right on
+   the real network.** A wrong sign, a dropped vintage or a mis-matched carrier
+   all produce a feasible LP whose answer is quietly not the TIMES mix; here the
+   realised dispatch reproduces the pinned profile to solver tolerance.
+2. **The absorber behaves exactly as §1.3 predicts.** It is the only group that
+   deviates, it deviates by ±25 MW within the horizon (3 % of its own peak) and
+   by +0.0003 TWh over it — that is the decentral water tank being used, and it
+   nets out annually. Every *pinned* group is exact.
+
+**No relaxation was needed in 2025**: every group delivered its full profile, so
+`TimesHeatProfile-unmet` is zero throughout.
 
 ---
 
