@@ -125,6 +125,11 @@ rule solve_sector_network_myopic:
         ),
         co2_totals_name=resources("co2_totals_{clusters}_{planning_horizons}.csv"),
         heating_targets=input_times_heating_targets,
+        # Not read by the script — declared so that editing a constraint
+        # implementation invalidates the solved networks. Without it Snakemake
+        # sees an up-to-date network, skips the solve, and a comparison run
+        # silently re-archives the *previous* answer.
+        custom_extra_functionality_modules=input_custom_extra_functionality_modules,
     output:
         network=RESULTS
         + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
