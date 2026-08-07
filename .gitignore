@@ -102,9 +102,11 @@ CLAUDE.local.md
 .pixi/*
 !.pixi/config.toml
 
-# track all files in /data/walloon/ except .vd files
+# track all files in /data/walloon/ except the TIMES result files, which are
+# symlinks into the TIMES_PyPSA checkout (see instructions.md)
 !data/walloon/
 data/walloon/*.vd
+data/walloon/*.vdt
 
 # DS_Store
 .DS_Store

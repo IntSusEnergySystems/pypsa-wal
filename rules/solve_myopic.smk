@@ -124,6 +124,7 @@ rule solve_sector_network_myopic:
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}_brownfield.nc"
         ),
         co2_totals_name=resources("co2_totals_{clusters}_{planning_horizons}.csv"),
+        heating_targets=input_times_heating_targets,
     output:
         network=RESULTS
         + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",

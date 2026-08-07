@@ -193,6 +193,44 @@ def input_custom_extra_functionality(w):
     return []
 
 
+def input_times_heating_targets(w):
+    """TIMES per-technology heat targets, only for a TIMES-coupled run.
+
+    Option C (``sector.times_heat.energy_mix``) reads them in
+    ``custom_extra_functionality``; without ``sector.times_demand`` there is no
+    ``.vd`` to extract them from, so the input must not be declared at all.
+    """
+    if config_provider("sector", "times_demand", default=False)(w):
+        return resources("heating_targets_{planning_horizons}.csv")
+    return []
+
+
+def input_times_heating_capacities(w):
+    """TIMES base-year heat stock, only when it replaces the EU-dataset row."""
+    if config_provider(
+        "sector", "times_heat", "base_year_capacities", default=False
+    )(w):
+        return resources("heating_capacities_{planning_horizons}.csv")
+    return []
+
+
+def input_times_wallon_demands_baseyear(w):
+    """Base-year ``wallon_demands``, only for the ``times_base_year`` split.
+
+    The TIMES archetype urban/rural split drifts across horizons (59 % rural in
+    2025 → 37 % in 2050), which moves dwellings between PyPSA heat buses. Freezing
+    the split at the first planning horizon needs that horizon's export as well as
+    the current one.
+    """
+    if (
+        config_provider("sector", "times_heat", "urban_rural_split", default="times")(w)
+        == "times_base_year"
+    ):
+        baseyear = config_provider("scenario", "planning_horizons", 0)(w)
+        return resources(f"wallon_demands_{baseyear}.csv")
+    return []
+
+
 def output_model(path_template):
     def _output_model(w):
         if config_provider("solving", "options", "store_model")(w):

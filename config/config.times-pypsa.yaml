@@ -101,6 +101,37 @@ clustering:
 sector:
   times_demand: true
   times_file: data/walloon/scen_base_coherence_3110.vd
+  # TIMES heating soft-link, option C. Every switch defaults to the pre-2026-08
+  # behaviour, so removing this block reproduces the old results.
+  # Full rationale and the discrepancy tables: docs/heat_soft_linking.md
+  times_heat:
+    node: BEWAL
+    # times | times_base_year | pypsa — how the TIMES residential decentral heat
+    # is divided between the rural and urban decentral buses. `times` (the old
+    # behaviour) lets the TIMES archetype labelling drift the rural share from
+    # 59 % (2025) to 37 % (2050), i.e. dwellings move between PyPSA buses.
+    urban_rural_split: times_base_year
+    # Replace the BEWAL row of existing_heating_distribution (EU 2012 dataset,
+    # population-scaled) with the TIMES base-year stock. Both are in MW_th.
+    base_year_capacities: true
+    energy_mix:
+      enable: true
+      # share | absolute. `share` constrains each technology group against the
+      # realised decentral heat supply, so the ~4 % of the load that is cooking
+      # fuel / tertiary other-energy / agriculture heat cannot distort the mix,
+      # and the constraint set cannot over-determine the LP.
+      mode: share
+      tolerance: 0.05
+      slack_groups: []
+      # forbid | free — a technology TIMES has fully retired (oil boilers in
+      # 2050) is forbidden rather than left free, which is where the mix
+      # constraint would otherwise leak worst.
+      zero_target: forbid
+      # EUR/MWh_th of unmet TIMES mix. A finite penalty makes the constraints
+      # SOFT, so a mix Wallonia physically cannot deliver (2040: the gas floor
+      # against a binding CO2 cap) relaxes at a price instead of making the LP
+      # infeasible and hanging the myopic chain. 0 = hard constraints.
+      penalty: 1000.0
   oil_boilers: true
   solid_biomass_import:
     enable: true

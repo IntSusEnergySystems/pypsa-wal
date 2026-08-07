@@ -150,7 +150,49 @@ def build_existing_heating():
     ]:
         nodal_heat_name_tech[("urban central", f"{heat_pump_source} heat pump")] = 0.0
 
+    # Optionally replace the Walloon row with the TIMES base-year stock. The EU
+    # 2012 dataset above gives BEWAL a stock whose *composition* is broadly right
+    # but whose vintage structure lets PyPSA greenfield 2.5 GW_th of heat pumps in
+    # the base year against 74 MW_th inherited; TIMES has 929 MW_th. Both sides
+    # are in MW thermal output, so this is a substitution, not a conversion.
+    # See docs/heat_soft_linking.md.
+    nodal_heat_name_tech = maybe_apply_times_base_year_stock(
+        nodal_heat_name_tech, urban_fraction
+    )
+
     nodal_heat_name_tech.to_csv(snakemake.output.existing_heating_distribution)
+
+
+def maybe_apply_times_base_year_stock(
+    nodal_heat_name_tech: pd.DataFrame, urban_fraction: pd.Series
+) -> pd.DataFrame:
+    """Overwrite the TIMES-coupled node's stock, if the option is on."""
+    from scripts.walloon_scripts.times_heat_softlink import (
+        apply_times_base_year_stock,
+        load_heat_capacities,
+        times_heat_options,
+        times_heat_stock_capacities,
+    )
+
+    options = times_heat_options(snakemake.config)
+    if not options["base_year_capacities"]:
+        return nodal_heat_name_tech
+    path = snakemake.input.get("times_heating_capacities")
+    if not path:
+        raise ValueError(
+            "sector.times_heat.base_year_capacities is true but the rule has no "
+            "`times_heating_capacities` input (see rules/build_sector.smk)."
+        )
+    node = options["node"]
+    stock = times_heat_stock_capacities(
+        load_heat_capacities(path),
+        options["urban_rural_split"],
+        # PyPSA's own stock split: `1 - urban fraction` to rural, the rest to
+        # urban decentral (the block above uses exactly this, ignoring the
+        # district-heating share).
+        pypsa_rural_fraction=float(1 - urban_fraction.loc[node]),
+    )
+    return apply_times_base_year_stock(nodal_heat_name_tech, stock, node)
 
 
 if __name__ == "__main__":

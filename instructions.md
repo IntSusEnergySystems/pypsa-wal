@@ -54,6 +54,9 @@ resources/times-pypsa/scen_base/    results/times-pypsa/scen_base/
 resources/times-pypsa/scen_corrige/ results/times-pypsa/scen_corrige/
 ```
 
+This config is also where the **heating soft-link** is switched on — see
+[The heating soft-link (option C)](#the-heating-soft-link-option-c).
+
 Each scenario names its own TIMES `.vd` file (`sector.times_file`). Those files
 are gitignored — symlink them next to the others before running:
 
@@ -165,6 +168,64 @@ string, not a float.
 
 Soft-linked **demands** (TIMES → PyPSA) are a separate path — see
 [`times_data_extraction.md`](times_data_extraction.md), not the common-parameters CSV.
+
+---
+
+## The heating soft-link (option C)
+
+The demand transfer hands PyPSA the Walloon **annual heat totals** and lets it
+re-optimise the appliance fleet from scratch — which in 2025 meant 51 % of Walloon
+heat from new heat pumps where TIMES has 8 %. Option C also transfers the
+**appliance energy mix**, as an annual constraint on the two decentral heat buses,
+and replaces PyPSA's EU-2012 base-year heating stock with the TIMES one. Full
+decision record, discrepancy tables and verification log:
+[`docs/heat_soft_linking.md`](docs/heat_soft_linking.md).
+
+Three independent switches, all in
+[`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) (present but off
+in `config.walloon.yaml`):
+
+```yaml
+sector:
+  times_heat:
+    node: BEWAL
+    urban_rural_split: times_base_year   # times | times_base_year | pypsa
+    base_year_capacities: true           # TIMES 2025 stock instead of the EU 2012 row
+    energy_mix:
+      enable: true
+      mode: share                        # share | absolute
+      tolerance: 0.05
+      slack_groups: []                   # groups to leave unconstrained
+      zero_target: forbid                # forbid | free
+```
+
+| Switch | What it changes |
+|--------|-----------------|
+| `energy_mix.enable` | Adds one constraint per technology group in `custom_extra_functionality` — `≥` on what TIMES keeps, `≤` on heat pumps, `≤ 0` on what TIMES has retired. Reads `heating_targets_{year}.csv` |
+| `urban_rural_split` | How the TIMES residential decentral heat is divided between `rural` and `urban decentral`. TIMES has no urban/rural dimension; its archetype labelling drifts the rural share from 59 % (2025) to 37 % (2050), so `times_base_year` freezes it at the first horizon |
+| `base_year_capacities` | Overwrites the BEWAL row of `existing_heating_distribution` with TIMES `VAR_Cap`. Both sides are MW **thermal output**, so it is a substitution, not a conversion |
+
+**Every switch defaults to the pre-2026-08 behaviour**, so deleting the
+`times_heat` block reproduces the older results exactly.
+
+New intermediate files, both written by `build_wallon_demands`:
+
+```
+resources/<run>/heating_targets_{year}.csv     # constraint right-hand sides
+resources/<run>/heating_capacities_{year}.csv  # base-year stock, MW_th (schema changed)
+```
+
+Both come from the `times_pypsa` library
+(`TIMES_PyPSA/times_pypsa/heat_softlink.py`, groups defined in
+`TIMES_PyPSA/data/heat_softlink_groups.csv`), so editing the group definition
+invalidates the exports — it is declared as a rule input alongside the other
+mapping CSVs.
+
+> Measured on `scen_demande_haute`, 2025, 6 h: the mix constraints cost
+> **+445 MEUR/a (+0.13 %)** of the system objective and bring the gas/oil/heat-pump
+> shares from 40 / 0 / 51 % to 52 / 21 / 8 % against TIMES's 55 / 22 / 8 %.
+> 2030-2050 have **not** yet been re-solved as a myopic chain — see §9 of
+> [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md).
 
 ---
 
@@ -320,6 +381,57 @@ The default Walloon config already uses a **6h** sector time aggregation
 
 Re-enabling horizons or resolution changes re-triggers upstream build rules.
 
+### Long runs in the background — and how not to leave zombies
+
+A myopic chain is tens of minutes, so it is normally launched detached. Two
+failure modes leave processes behind that look alive but do nothing; both have
+bitten this repo.
+
+**1. A killed Snakemake leaves its children running.** `snakemake` spawns each
+rule as a child process (and some scripts spawn their own multiprocessing pool).
+Killing the parent does not reap them, and a plot rule that crash-loops on the Qt
+backend will sit there at ~0 % CPU. Always kill the group and then verify:
+
+```bash
+pkill -f 'snakemake .*config.times-pypsa'      # the orchestrator
+pkill -f '\.snakemake/scripts/tmp'             # any rule script still running
+pgrep -af 'snakemake|gurobi|\.snakemake/scripts' || echo "clean"
+rm -f .snakemake/locks/*.lock                  # only once nothing is running
+```
+
+`./cluster/nic5.sh stop` does the equivalent for cluster jobs.
+
+**2. A `wait for it to finish` loop with no exit condition.** The tempting
+
+```bash
+until grep -q "Optimal objective" run.log; do sleep 20; done   # ← never exits if the run dies
+```
+
+spins forever when the job it watches is killed or crashes before writing the
+marker — one `sleep` per cycle, no CPU, no end. **Always bound the wait and check
+the job is still alive:**
+
+```bash
+snakemake … > run.log 2>&1 &                     # remember the PID
+PID=$!
+for _ in $(seq 1 180); do                        # hard ceiling: 180 × 20 s = 1 h
+  kill -0 "$PID" 2>/dev/null || break            # job gone → stop waiting
+  grep -q "Optimal objective" run.log && break
+  sleep 20
+done
+wait "$PID"; echo "exit=$?"                      # always report an exit status
+```
+
+The general rule: **a watcher must terminate when the watched process does.** If
+you write the marker with `echo DONE` at the end of a command, remember a `kill`
+skips it — which is exactly how the marker never arrives.
+
+For long unattended chains prefer a driver script that logs each phase and prints
+one unambiguous final marker, e.g.
+[`scripts/walloon_scripts/run_heat_softlink_comparison.sh`](scripts/walloon_scripts/run_heat_softlink_comparison.sh)
+(ends with `ALL_PHASES_DONE`); then a single `tail -f` is enough and there is
+nothing to poll.
+
 ### Logs
 
 | Location | Contents |
@@ -328,6 +440,7 @@ Re-enabling horizons or resolution changes re-triggers upstream build rules.
 | `results/walloon-model/logs/*_solver.log` | Gurobi solver output per horizon |
 | `results/walloon-model/logs/*_python.log` | Python-side solve logs |
 | `.snakemake/log/` | Master Snakemake run log |
+| `results/_heat_softlink_comparison/logs/` | `before.log` / `after.log` of the heating soft-link comparison run |
 
 After a successful local solve, publish results to the Wallonie Explorer with
 `./cluster/nic5.sh upload` (raw results) followed by the ClimAct CSV extraction
@@ -1039,6 +1152,7 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 |---------|-------------------|
 | `Directory cannot be locked` | Another Snakemake instance is running, or a stale lock in `.snakemake/locks/` after a crash — stop the other run or remove the lock if no process is active |
 | `Config file must be given as JSON or YAML with keys at top level` | **Not a config problem.** `--configfile` takes `nargs="+"`, so any target written *immediately after* it is swallowed as an extra config file and Snakemake then tries to parse your `.csv`/`.nc` as YAML. Put a flag between them: `snakemake --configfile config/config.walloon.yaml --cores 4 <targets>`, never `--configfile <cfg> <targets> --cores 4` |
+| Snakemake silently runs the **whole `all` target** instead of the file you asked for | Same `nargs="+"` trap on a different flag — `--forcerun`, `--omit-from`, `--until`, `--allowed-rules` and `--resources` all swallow a following target, leaving no target at all so the default rule runs. **Safest habit: put targets first**, `snakemake <targets> --configfile ... --cores 12` |
 | Gurobi `No Gurobi license` | Set `GRB_LICENSE_FILE` or install `~/gurobi.lic` |
 | Gurobi `Model too large for size-limited license` | The academic licence was not found and gurobipy fell back to its built-in demo licence. `GRB_LICENSE_FILE` is exported from `~/.bashrc`, which **non-interactive shells do not read** — export it explicitly when launching from a script, `cron`, `nohup`, or an agent: `export GRB_LICENSE_FILE=$HOME/.gurobi/gurobi.lic` |
 | `WildcardError: No values given for wildcard 'run'` | A rule `expand()`s over `RESULTS`/`resources()` without `allow_missing=True` while `run.scenarios.enable: true` — see [The TIMES-coupled multi-scenario config](#the-times-coupled-multi-scenario-config) |
@@ -1052,6 +1166,8 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
 | First run hangs on Zenodo cutout download | Symlink `cutouts/europe-2013-sarah3-era5.nc` from `~/.cache/snakemake-pypsa-eur/...` if you already retrieved it for pypsa-eur; or wait for the download to finish |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
+| `--resources mem_mb=... <target>` fails with `dictionary update sequence element #1 has length 1` | Same `nargs="+"` trap as `--configfile`: the target after `--resources` is parsed as another resource. Put `--cores` (or any flag) between them |
+| Solve is infeasible right after enabling `sector.times_heat.energy_mix` | Check which group binds in the solve log line `TIMES heat-mix constraints (…)`, then either raise `tolerance` or move that group to `slack_groups`. `solar thermal` is the usual suspect — it is the only group with a dispatch upper bound. See [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) §3.3 |
 
 ---
 
