@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
-# Re-solve the Walloon myopic chain twice — legacy soft-link and option C — and
-# archive both result trees so the heating soft-link can be compared before/after.
+# Re-solve the Walloon myopic chain once per heating soft-link mechanism and
+# archive each result tree so they can be compared.
 #
-#   ./scripts/walloon_scripts/run_heat_softlink_comparison.sh [scenario]
+#   ./scripts/walloon_scripts/run_heat_softlink_comparison.sh [scenario] [phase...]
 #
-# Writes results/_heat_softlink_comparison/{before,after}/ and a per-phase log.
-# `before` is the legacy transfer (demand only); `after` is option C as configured
-# in config/config.times-pypsa.yaml. Both use the *same* config file, so the only
-# difference is the `sector.times_heat` overlay applied to the `before` phase.
+# Phases, each written to results/_heat_softlink_comparison/<phase>/ :
+#
+#   before     the legacy transfer — annual heat demand only, PyPSA re-optimises
+#              the appliance fleet from scratch
+#   after      option C — annual energy-mix constraints (docs/heat_soft_linking.md)
+#   option_b   option B' — reconstructed hourly profiles, pinned dispatch
+#              (docs/heat_softlink_option_b.md)
+#
+# All three use the SAME config file; each phase differs only by the
+# `sector.times_heat` overlay written below, so nothing but the mechanism moves.
+# `before` and `after` keep their historical names because
+# scripts/walloon_scripts/compare_heat_softlink.py reads them.
 #
 # The script is idempotent per phase: delete the archive folder to force a redo.
-# See docs/heat_soft_linking.md §8.6 for how the comparison is read.
+# With no phase argument it runs all three, in order.
 
 set -euo pipefail
 
 SCENARIO="${1:-scen_demande_haute}"
+shift || true
+PHASES=("$@")
+[[ ${#PHASES[@]} -eq 0 ]] && PHASES=(before after option_b)
 CONFIG="config/config.times-pypsa.yaml"
 CORES="${CORES:-12}"
 MEM_MB="${MEM_MB:-100000}"
@@ -34,6 +45,8 @@ export GRB_LICENSE_FILE="${GRB_LICENSE_FILE:-$HOME/.gurobi/gurobi.lic}"
 # Plot rules abort with a Qt platform-plugin error on a headless session.
 export MPLBACKEND=Agg
 
+# One overlay per phase, so every phase's configuration is written down rather
+# than implied by whatever the checked-in config happens to say today.
 LEGACY_OVERLAY="$ARCHIVE/legacy_overlay.yaml"
 cat > "$LEGACY_OVERLAY" <<'YAML'
 # `before` phase: every heating soft-link switch back to its pre-2026-08 value.
@@ -42,6 +55,8 @@ sector:
     node: BEWAL
     urban_rural_split: times
     base_year_capacities: false
+    profile:
+      enable: false
     energy_mix:
       enable: false
       mode: share
@@ -49,6 +64,53 @@ sector:
       slack_groups: []
       zero_target: forbid
 YAML
+
+OPTION_C_OVERLAY="$ARCHIVE/option_c_overlay.yaml"
+cat > "$OPTION_C_OVERLAY" <<'YAML'
+# `after` phase: option C — annual energy-mix constraints. The stock and split
+# harmonisations are shared with option B', so only the mechanism differs.
+sector:
+  times_heat:
+    node: BEWAL
+    urban_rural_split: times_base_year
+    base_year_capacities: true
+    profile:
+      enable: false
+    energy_mix:
+      enable: true
+      mode: share
+      tolerance: 0.05
+      slack_groups: []
+      zero_target: forbid
+      penalty: 1000.0
+YAML
+
+OPTION_B_OVERLAY="$ARCHIVE/option_b_overlay.yaml"
+cat > "$OPTION_B_OVERLAY" <<'YAML'
+# `option_b` phase: option B' — reconstructed hourly profiles, pinned dispatch.
+sector:
+  times_heat:
+    node: BEWAL
+    urban_rural_split: times_base_year
+    base_year_capacities: true
+    energy_mix:
+      enable: false
+    profile:
+      enable: true
+      absorber: heat pump
+      penalty: 1000.0
+      free_groups: []
+      export: true
+YAML
+
+overlay_for() {
+  case "$1" in
+    before)   echo "$LEGACY_OVERLAY" ;;
+    after)    echo "$OPTION_C_OVERLAY" ;;
+    option_b) echo "$OPTION_B_OVERLAY" ;;
+    *) echo "unknown phase: $1" >&2; exit 2 ;;
+  esac
+}
 
 targets() {
   for y in "${HORIZONS[@]}"; do
@@ -132,10 +194,14 @@ run_phase() {
   done
   cp -f "resources/times-pypsa/$SCENARIO/existing_heating_distribution_base_s_adm_2025.csv" \
         "$dest/" 2>/dev/null || true
+  if [[ -d "results/times-pypsa/$SCENARIO/heating_profiles" ]]; then
+    rsync -a "results/times-pypsa/$SCENARIO/heating_profiles/" "$dest/heating_profiles/"
+  fi
   echo "[$phase] done"
 }
 
-run_phase before "$LEGACY_OVERLAY"
-run_phase after
+for phase in "${PHASES[@]}"; do
+  run_phase "$phase" "$(overlay_for "$phase")"
+done
 
 echo "ALL_PHASES_DONE"

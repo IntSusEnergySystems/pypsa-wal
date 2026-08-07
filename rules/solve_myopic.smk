@@ -136,6 +136,22 @@ rule solve_sector_network_myopic:
             if config["solving"]["options"]["store_model"]
             else []
         ),
+        # Option B': the reconstructed per-group heat profiles the solve was
+        # pinned to. Declared (rather than written next to the log) so that the
+        # `shadow` directory copies it back and Snakemake can clean it up.
+        heating_profiles=(
+            RESULTS
+            + "heating_profiles/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv"
+            if config.get("sector", {})
+            .get("times_heat", {})
+            .get("profile", {})
+            .get("enable", False)
+            and config.get("sector", {})
+            .get("times_heat", {})
+            .get("profile", {})
+            .get("export", True)
+            else []
+        ),
     shadow:
         shadow_config
     log:

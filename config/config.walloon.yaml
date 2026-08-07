@@ -101,6 +101,15 @@ sector:
     node: BEWAL
     urban_rural_split: times      # times | times_base_year | pypsa
     base_year_capacities: false
+    # Option B' — reconstructed hourly profiles. Mutually exclusive with
+    # `energy_mix` below. docs/heat_softlink_option_b.md
+    profile:
+      enable: false
+      absorber: heat pump         # group left unpinned, takes the bus residual
+      penalty: 1000.0             # EUR/MWh_th undelivered; 0 = hard constraints
+      free_groups: []
+      export: true
+    # Option C — annual energy-mix constraints. docs/heat_soft_linking.md
     energy_mix:
       enable: false
       mode: share                 # share | absolute

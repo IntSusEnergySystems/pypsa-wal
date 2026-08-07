@@ -71,6 +71,24 @@ DEFAULT_OPTIONS: dict = {
         # Set to 0 (or null) for hard constraints.
         "penalty": 1000.0,
     },
+    # Option B' — the alternative mechanism, on the `heat-softlink-option-b`
+    # branch. Instead of bounding the annual energy per group it reconstructs an
+    # hourly profile per group (TIMES share x PyPSA heat-load shape) and pins the
+    # dispatch to it. Mutually exclusive with `energy_mix`; see
+    # `times_heat_profiles.py` and `docs/heat_softlink_option_b.md`.
+    "profile": {
+        "enable": False,
+        # The group left unpinned, so the heat-bus balance determines it and the
+        # relaxation has somewhere physical to go.
+        "absorber": "heat pump",
+        # EUR per MWh_th of TIMES profile not delivered. One scalar per group.
+        "penalty": 1000.0,
+        # Groups not pinned at all — they pool with the absorber and split their
+        # combined residual freely.
+        "free_groups": [],
+        # Write the reconstructed profiles next to the solve log.
+        "export": True,
+    },
 }
 
 _VALID_SPLITS = ("times", "times_base_year", "pypsa")
@@ -81,11 +99,10 @@ _VALID_ZERO_TARGETS = ("forbid", "free")
 def times_heat_options(config: dict) -> dict:
     """``sector.times_heat`` merged onto :data:`DEFAULT_OPTIONS`, validated."""
     raw = (config.get("sector") or {}).get("times_heat") or {}
-    opts = {**DEFAULT_OPTIONS, **{k: v for k, v in raw.items() if k != "energy_mix"}}
-    opts["energy_mix"] = {
-        **DEFAULT_OPTIONS["energy_mix"],
-        **(raw.get("energy_mix") or {}),
-    }
+    nested = ("energy_mix", "profile")
+    opts = {**DEFAULT_OPTIONS, **{k: v for k, v in raw.items() if k not in nested}}
+    for key in nested:
+        opts[key] = {**DEFAULT_OPTIONS[key], **(raw.get(key) or {})}
     if opts["urban_rural_split"] not in _VALID_SPLITS:
         raise ValueError(
             f"sector.times_heat.urban_rural_split must be one of {_VALID_SPLITS}, "
@@ -107,13 +124,37 @@ def times_heat_options(config: dict) -> dict:
             f"sector.times_heat.energy_mix.tolerance must be in [0, 1), got {tol}"
         )
     opts["energy_mix"]["tolerance"] = tol
-    penalty = opts["energy_mix"].get("penalty")
-    penalty = 0.0 if penalty in (None, False) else float(penalty)
-    if penalty < 0:
+    for key in ("energy_mix", "profile"):
+        penalty = opts[key].get("penalty")
+        penalty = 0.0 if penalty in (None, False) else float(penalty)
+        if penalty < 0:
+            raise ValueError(
+                f"sector.times_heat.{key}.penalty must be >= 0, got {penalty}"
+            )
+        opts[key]["penalty"] = penalty
+
+    profile = opts["profile"]
+    if not str(profile.get("absorber") or "").strip():
         raise ValueError(
-            f"sector.times_heat.energy_mix.penalty must be >= 0, got {penalty}"
+            "sector.times_heat.profile.absorber must name a constraint group "
+            "(the one left unpinned, so the heat-bus balance determines it)."
         )
-    opts["energy_mix"]["penalty"] = penalty
+    profile["absorber"] = str(profile["absorber"]).strip()
+    free = profile.get("free_groups") or []
+    if isinstance(free, str):
+        free = [free]
+    profile["free_groups"] = [str(g).strip() for g in free]
+
+    # The two mechanisms transfer the same information through incompatible
+    # constraints; running both would impose the mix twice and make the duals
+    # uninterpretable. Fail loudly rather than let one silently dominate.
+    if opts["energy_mix"]["enable"] and profile["enable"]:
+        raise ValueError(
+            "sector.times_heat.energy_mix.enable and sector.times_heat.profile."
+            "enable are both true. They are alternative mechanisms for the same "
+            "transfer (option C and option B'); enable exactly one. See "
+            "docs/heat_softlink_option_b.md."
+        )
     return opts
 
 
