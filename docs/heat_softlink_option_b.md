@@ -16,6 +16,33 @@
 
 ---
 
+## How to pick this up
+
+Everything needed to continue is in the repository; nothing depends on a session
+being resumed. Read §4 (milestones) for where the work stopped, then:
+
+```bash
+conda activate pypsa-eur
+export GRB_LICENSE_FILE=$HOME/.gurobi/gurobi.lic   # non-interactive shells skip ~/.bashrc
+python -m pytest test/test_times_heat_profiles.py test/test_times_heat_softlink.py -q
+```
+
+```bash
+bash scripts/walloon_scripts/run_heat_softlink_comparison.sh scen_demande_haute
+```
+
+```bash
+python scripts/walloon_scripts/compare_heat_softlink.py scen_demande_haute
+python scripts/walloon_scripts/check_heat_profile_fidelity.py scen_demande_haute option_b
+```
+
+The driver is idempotent per phase — delete
+`results/_heat_softlink_comparison/<phase>/` to force one to redo. §6 lists the
+operational traps that cost the most time; **the one that will bite hardest is a
+phase that finishes far too fast and re-archives the previous answer** (§4, bug 2).
+
+---
+
 ## 0. Why we are doing this again
 
 Option C works — the mix transfers, the chain completes, the numbers are in
