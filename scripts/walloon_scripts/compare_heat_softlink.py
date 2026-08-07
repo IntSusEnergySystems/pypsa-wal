@@ -62,12 +62,16 @@ ALL_PHASES = ["before", "after", "option_b"]
 LABEL = {"before": "legacy", "after": "option C", "option_b": "option B'"}
 PHASES = ARGV[1:] or ALL_PHASES
 
+#: One year's networks at a time. Twelve solved sector networks held together is
+#: several GB of RAM, and this script is normally run while a chain is solving.
 _CACHE: dict[tuple[str, int], pypsa.Network] = {}
 
 
 def load(phase: str, year: int) -> pypsa.Network:
     key = (phase, year)
     if key not in _CACHE:
+        for stale in [k for k in _CACHE if k[1] != year]:
+            del _CACHE[stale]
         _CACHE[key] = pypsa.Network(
             ARCHIVE / phase / "networks" / f"base_s_adm___{year}.nc"
         )
@@ -267,96 +271,103 @@ def available_phases() -> list[str]:
     return present
 
 
+def collect(phases: list[str]) -> dict:
+    """One pass over the archives, so only one year's networks are ever resident."""
+    out: dict = {"mix": {}, "flex": [], "capacity": {}, "totals": [], "inputs": []}
+    for year in HORIZONS:
+        tgt = targets(year).set_index("group")
+        mix_rows, cap_rows = {}, {}
+        flex = {"horizon": year}
+        totals = {"horizon": year}
+        inputs = {"horizon": year}
+        base = None
+        for phase in phases:
+            n = load(phase, year)
+            label = LABEL[phase]
+            s = heat_mix(n, targets(year))
+            mix_rows[f"{label} TWh"] = s
+            mix_rows[f"{label} %"] = 100 * s / s.sum()
+            mix_rows[f"{label} err pp"] = mix_error(s, tgt)
+            cap_rows[label] = decentral_capacity(n)
+
+            decentral = set(decentral_heat_buses(n, NODE))
+            central = {f"{NODE} urban central heat"}
+            flex[f"{label} mix dev %"] = hourly_mix_deviation(n, targets(year))
+            flex[f"{label} dec. store TWh"] = storage_cycling(n, decentral, "water tanks")
+            flex[f"{label} DH store TWh"] = storage_cycling(
+                n, central, "water tanks|water pits"
+            )
+
+            base = n.objective if base is None else base
+            totals[f"{label} obj (bn)"] = n.objective / 1e9
+            totals[f"{label} d (MEUR)"] = (n.objective - base) / 1e6
+            totals[f"{label} CO2 (Mt)"] = walloon_co2(n)
+
+            for carrier, value in heat_inputs(n).items():
+                inputs[f"{carrier} {label}"] = value
+
+        table = pd.DataFrame(mix_rows)
+        table.insert(0, "TIMES %", 100 * tgt.loc[table.index, "share"])
+        table.insert(0, "TIMES TWh", tgt.loc[table.index, "TWh"])
+        table.index.name = f"{year}"
+        out["mix"][year] = table
+        cap = pd.DataFrame(cap_rows).fillna(0.0)
+        cap.loc["TOTAL"] = cap.sum()
+        cap.index.name = f"{year}"
+        out["capacity"][year] = cap
+        out["flex"].append(flex)
+        out["totals"].append(totals)
+        out["inputs"].append(inputs)
+    return out
+
+
 def main() -> None:
     print(f"# Heating soft-link comparison — {SCENARIO}\n")
     phases = available_phases()
+    data = collect(phases)
 
     print("## Decentral heat mix, share of supply\n")
     for year in HORIZONS:
-        tgt = targets(year).set_index("group")
-        rows = {}
-        for phase in phases:
-            s = heat_mix(load(phase, year), targets(year))
-            rows[f"{LABEL[phase]} TWh"] = s
-            rows[f"{LABEL[phase]} %"] = 100 * s / s.sum()
-            rows[f"{LABEL[phase]} err pp"] = mix_error(s, tgt)
-        tbl = pd.DataFrame(rows)
-        tbl.insert(0, "TIMES %", 100 * tgt.loc[tbl.index, "share"])
-        tbl.insert(0, "TIMES TWh", tgt.loc[tbl.index, "TWh"])
-        tbl.index.name = f"{year}"
+        tbl = data["mix"][year]
         print(md(tbl, "{:.2f}"))
         for phase in phases:
             err = tbl[f"{LABEL[phase]} err pp"].abs()
             print(
-                f"\n> {LABEL[phase]}: mean |share error| "
-                f"{err.mean():.2f} pp, worst {err.max():.2f} pp "
-                f"({err.idxmax()})."
+                f"\n> {LABEL[phase]}: mean |share error| {err.mean():.2f} pp, "
+                f"worst {err.max():.2f} pp ({err.idxmax()})."
             )
         print()
 
     print("## Hourly flexibility actually used\n")
-    rows = []
-    for year in HORIZONS:
-        entry = {"horizon": year}
-        for phase in phases:
-            n = load(phase, year)
-            tgt = targets(year)
-            decentral = set(decentral_heat_buses(n, NODE))
-            central = {f"{NODE} urban central heat"}
-            entry[f"{LABEL[phase]} mix dev %"] = hourly_mix_deviation(n, tgt)
-            entry[f"{LABEL[phase]} dec. store TWh"] = storage_cycling(
-                n, decentral, "water tanks"
-            )
-            entry[f"{LABEL[phase]} DH store TWh"] = storage_cycling(
-                n, central, "water tanks|water pits"
-            )
-        rows.append(entry)
-    tbl = pd.DataFrame(rows).set_index("horizon")
+    tbl = pd.DataFrame(data["flex"]).set_index("horizon")
     tbl.index.name = "horizon"
     print(md(tbl, "{:.4f}"))
     print(
         "\n> `mix dev` is the energy-weighted mean |hourly share − annual share|, "
         "aggregated: 0 % means the mix is already constant, so option B' removes "
-        "nothing. `dec. store` is the decentral water-tank cycling option B' "
-        "leaves to the absorber; `DH store` is the district-heating pit store, "
-        "which neither option touches.\n"
+        "nothing. `dec. store` is the decentral water-tank cycling; `DH store` is "
+        "the district-heating pit store, which neither option touches.\n"
     )
 
     print("## Installed decentral heat capacity, MW_th\n")
     for year in HORIZONS:
-        tbl = pd.DataFrame(
-            {LABEL[p]: decentral_capacity(load(p, year)) for p in phases}
-        ).fillna(0.0)
-        tbl.loc["TOTAL"] = tbl.sum()
-        tbl.index.name = f"{year}"
-        print(md(tbl, "{:.1f}"))
+        print(md(data["capacity"][year], "{:.1f}"))
         print()
 
     print("## System totals\n")
-    rows = []
-    for year in HORIZONS:
-        entry = {"horizon": year}
-        base = load(phases[0], year).objective
-        for phase in phases:
-            n = load(phase, year)
-            entry[f"{LABEL[phase]} obj (bn)"] = n.objective / 1e9
-            entry[f"{LABEL[phase]} d (MEUR)"] = (n.objective - base) / 1e6
-            entry[f"{LABEL[phase]} CO2 (Mt)"] = walloon_co2(n)
-        rows.append(entry)
-    tbl = pd.DataFrame(rows).set_index("horizon")
+    tbl = pd.DataFrame(data["totals"]).set_index("horizon")
     tbl.index.name = "horizon"
     print(md(tbl, "{:.3f}"))
-    print(f"\n> `d (MEUR)` is against **{LABEL[phases[0]]}**.\n")
+    print(
+        f"\n> `d (MEUR)` is against **{LABEL[phases[0]]}**. Gurobi runs with "
+        "`Crossover 0` and `BarConvTol 1e-5`, and the measured noise floor on "
+        "these objectives is ~190 MEUR — see "
+        "`docs/heat_softlink_option_comparison.md` §3.0 before reading any "
+        "difference smaller than that.\n"
+    )
 
     print("## Fuel and electricity drawn by decentral heating, TWh\n")
-    rows = []
-    for year in HORIZONS:
-        entry = {"horizon": year}
-        for phase in phases:
-            for label, value in heat_inputs(load(phase, year)).items():
-                entry[f"{label} {LABEL[phase]}"] = value
-        rows.append(entry)
-    tbl = pd.DataFrame(rows).set_index("horizon")
+    tbl = pd.DataFrame(data["inputs"]).set_index("horizon")
     tbl.index.name = "horizon"
     print(md(tbl, "{:.3f}"))
 
