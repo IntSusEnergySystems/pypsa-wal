@@ -4,11 +4,15 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  name: "walloon-model"
+  prefix: "walloon"
+  name:
+  - scen_demande_haute
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
-    file: config/scenarios.yaml
+    enable: true
+    file: config/scenarios.walloon.yaml
+  shared_cutouts: true
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
@@ -113,7 +117,7 @@ sector:
   v2g: false # turn off v2g
 
   times_demand: true
-  times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
+  times_file: data/walloon/scen_base_coherence_3110.vd
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
   oil_boilers: true
@@ -215,7 +219,7 @@ solving:
     agg_nuclear: true
     agg_ccgt: true
     include_existing: true
-    file: data/walloon/agg_p_nom_minmax_base.csv
+    file: data/agg_p_nom_minmax.csv
 
   constraints:
     CCL: true
