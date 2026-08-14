@@ -34,15 +34,30 @@ memory-intensive Gurobi solve is optionally delegated to the cluster.
 Walloon-specific settings (nuclear expansion, custom potentials/costs, NTC
 constraints, cross-border flows) are documented in [`doc/walloon.rst`](doc/walloon.rst).
 
-### Weather year 2010
+### Selecting the weather year
 
-`config.walloon.yaml` sets `snapshots` **and** `atlite.default_cutout` to 2010 —
-both, because the snapshots select the hours and the cutout supplies the weather
-for them; changing one alone silently mismatches load and renewables. The first
-run downloads `cutouts/europe-2010-sarah3-era5.nc` (multi-GB) from
-`https://data.pypsa.org/workflows/cutout/v1.0/`. `config.times-pypsa.yaml` sets
-neither key and so still inherits PyPSA-Eur's **2013** default — the two studies
-are on different weather years, deliberately, until someone aligns them.
+Both study configs carry one `WEATHER YEAR` block — a `snapshots` range
+immediately followed by `atlite.default_cutout` — and that block is the only
+place to change:
+
+| Config | Weather year |
+|--------|--------------|
+| [`config/config.walloon.yaml`](config/config.walloon.yaml) | **2010** |
+| [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) | **2013** |
+
+Change the three years together (`snapshots.start`, `snapshots.end`,
+`default_cutout`): the snapshots pick the hours and the cutout supplies the
+weather for them, so editing one alone silently pairs one year's demand with
+another year's wind and sun — a run that succeeds and is wrong. Both configs are
+explicit rather than inheriting `config.default.yaml`, so the year is visible
+where you set it.
+
+The cutout itself is a ~6.6 GB file under `data/cutout/archive/<version>/`
+(`cutouts/` is a legacy symlink and is not what the rules read). Only the year
+already present there is free; any other year is retrieved from
+`https://data.pypsa.org/workflows/cutout/v1.0/`. The two studies being on
+different years is deliberate for now — aligning them means one download and a
+full rebuild of the affected study.
 
 ### EV charging: flexible and inflexible demand
 
@@ -1261,7 +1276,7 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | S3 upload fails after postprocess | Check `cluster/logs/upload_s3.log`; verify `aws sts get-caller-identity --profile intervectoriel`; use `SKIP_S3_UPLOAD=1` to postprocess without upload |
 | Explorer scenario not in dropdown | See **Troubleshooting Explorer** under Publishing to Wallonie Explorer (S3) |
 | `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
-| First run hangs on the cutout download | `config.walloon.yaml` needs `cutouts/europe-2010-sarah3-era5.nc` (`config.times-pypsa.yaml` still the 2013 one) — symlink it from `~/.cache/snakemake-pypsa-eur/...` or another checkout if you already have it, or wait for the download to finish |
+| First run hangs on the cutout download | The rules read `data/cutout/archive/<version>/europe-<year>-sarah3-era5.nc` (~6.6 GB), **not** the legacy `cutouts/` symlink. `config.walloon.yaml` needs the 2010 file, `config.times-pypsa.yaml` the 2013 one — hardlink or symlink it in from another checkout if you have it, or wait for the download |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
 | `--resources mem_mb=... <target>` fails with `dictionary update sequence element #1 has length 1` | Same `nargs="+"` trap as `--configfile`: the target after `--resources` is parsed as another resource. Put `--cores` (or any flag) between them |
 | Solve is infeasible right after enabling `sector.times_heat.energy_mix` | Check which group binds in the solve log line `TIMES heat-mix constraints (…)`, then either raise `tolerance` or move that group to `slack_groups`. `solar thermal` is the usual suspect — it is the only group with a dispatch upper bound. See [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) §3.3 |

@@ -15,6 +15,12 @@ run:
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
+# WEATHER YEAR — the only place to change it. Keep the three years in step:
+# snapshots.start / snapshots.end pick the hours, default_cutout supplies the
+# weather for them, and a mismatch silently pairs one year's demand with
+# another year's wind and sun. Switching to a year whose cutout is not in
+# data/cutout/archive/<version>/ triggers a multi-GB download (~6.6 GB) of
+# europe-<year>-sarah3-era5.nc.
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
 snapshots:
   start: "2010-01-01"
