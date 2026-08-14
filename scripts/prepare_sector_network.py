@@ -3924,6 +3924,90 @@ def times_demand_twh(demands: pd.DataFrame, categories: list[str]) -> pd.Series:
     return demands["TWh"].reindex(categories).fillna(0.0)
 
 
+#: The two residential decentral heat loads. TIMES determines their *sum*; the
+#: split between them is a labelling convention on the TIMES side (2-façade
+#: houses and apartments → urban decentral, 3- and 4-façade → rural) and a
+#: population fraction on the PyPSA side. See `docs/heat_soft_linking.md`.
+RESIDENTIAL_DECENTRAL_HEAT_LOADS = [
+    "BEWAL residential urban decentral heat",
+    "BEWAL residential rural heat",
+]
+
+
+def harmonise_residential_urban_rural_split(
+    n: pypsa.Network, heat_targets: pd.Series
+) -> pd.Series:
+    """Re-split the TIMES residential decentral heat target between the two buses.
+
+    ``sector.times_heat.urban_rural_split`` selects the convention:
+
+    ``times`` (default)
+        Per-horizon TIMES labels, i.e. what the soft-link has always done. The
+        implied rural share drifts from 59 % (2025) to 37 % (2050), so dwellings
+        migrate between PyPSA heat buses over the horizons and the base-year rural
+        stock strands.
+    ``times_base_year``
+        The TIMES archetype split of the **first planning horizon**, applied to
+        every horizon. Keeps the dwelling-typology information TIMES carries and
+        removes the drift.
+    ``pypsa``
+        PyPSA's own split, ``1 - urban_fraction`` against
+        ``urban_fraction - district_fraction`` — a population-density statement
+        rather than a dwelling-typology one (7.9 % rural for BEWAL).
+
+    The total is untouched in every mode, so nothing here changes the Walloon heat
+    balance; only which bus serves how much of it, and therefore which heat-pump
+    sources and profiles apply.
+    """
+    from scripts.walloon_scripts.times_heat_softlink import (
+        split_residential_heat_target,
+        times_heat_options,
+    )
+
+    options = times_heat_options(snakemake.config)
+    mode = options["urban_rural_split"]
+    if mode == "times":
+        return heat_targets
+
+    categories = [c for c in RESIDENTIAL_DECENTRAL_HEAT_LOADS if c in heat_targets.index]
+    if len(categories) < 2:
+        logger.warning(
+            "Cannot harmonise the residential urban/rural split: only %s present.",
+            categories,
+        )
+        return heat_targets
+
+    total = heat_targets[categories].sum()
+    pypsa_weights = pd.Series(
+        {c: float(n.loads_t.p_set[c].sum()) for c in categories}
+    )
+    if mode == "times_base_year":
+        base_path = snakemake.input.get("wallon_demands_baseyear")
+        if not base_path:
+            raise ValueError(
+                "sector.times_heat.urban_rural_split is 'times_base_year' but the "
+                "rule has no `wallon_demands_baseyear` input (rules/build_sector.smk)."
+            )
+        if isinstance(base_path, (list, tuple)):
+            base_path = base_path[0]
+        base = pd.read_csv(base_path, index_col=0)[["TWh"]]
+        times_weights = times_demand_twh(base, categories)
+    else:
+        times_weights = heat_targets[categories]
+
+    split = split_residential_heat_target(total, mode, pypsa_weights, times_weights)
+    logger.info(
+        "Residential decentral heat split (%s): %s → %s TWh (total %.4f TWh unchanged).",
+        mode,
+        {c: round(heat_targets[c], 4) for c in categories},
+        {c: round(split[c], 4) for c in categories},
+        total,
+    )
+    heat_targets = heat_targets.copy()
+    heat_targets.loc[categories] = split
+    return heat_targets
+
+
 def write_wallon_heat_demands(
     n: pypsa.Network,
 ):
@@ -3951,6 +4035,7 @@ def write_wallon_heat_demands(
     "BEWAL residential rural heat",
     "BEWAL services urban decentral heat"]
     heat_targets = times_demand_twh(wallon_heat, heat_categories)
+    heat_targets = harmonise_residential_urban_rural_split(n, heat_targets)
 
     # Cooking and tertiary "other energy" fuel have no bus of their own in
     # PyPSA-Eur (heat is built from space + water only, and `total services

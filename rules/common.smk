@@ -184,12 +184,79 @@ def memory(w):
         return int(factor * (10000 + 195 * int(w.clusters)))
 
 
+#: Modules `data/custom_extra_functionality.py` imports at solve time. Snakemake
+#: tracks the hook file itself, but not what it imports, so editing a constraint
+#: implementation left every solved network on disk looking up to date — the run
+#: then silently re-archived the *previous* answer. Same class of bug as the
+#: mapping CSVs not invalidating `wallon_demands_*.csv`
+#: (docs/times-heating-softlink-options.md §10.8).
+CUSTOM_EXTRA_FUNCTIONALITY_MODULES = [
+    "scripts/walloon_scripts/times_heat_softlink.py",
+    "scripts/walloon_scripts/times_heat_profiles.py",
+]
+
+
 def input_custom_extra_functionality(w):
     path = config_provider(
         "solving", "options", "custom_extra_functionality", default=False
     )(w)
     if path:
         return os.path.join(os.path.dirname(workflow.snakefile), path)
+    return []
+
+
+def input_custom_extra_functionality_modules(w):
+    """The modules above, declared as rule *inputs* so their content is tracked.
+
+    ``custom_extra_functionality`` is a **param** (``solve_network.py`` imports
+    the module from that path), and a param only retriggers a rule when its
+    *value* changes — the path does not change when the file does. Declaring the
+    modules as inputs is what makes an edit invalidate the solved networks.
+    """
+    if not input_custom_extra_functionality(w):
+        return []
+    # Plain workdir-relative paths, like every other repo file a rule reads.
+    # Do NOT resolve against `workflow.snakefile`: that is what the upstream
+    # `custom_extra_functionality` line does, and on this checkout it produces a
+    # path that does not exist (`<repo>/../data/...`).
+    return [module for module in CUSTOM_EXTRA_FUNCTIONALITY_MODULES if os.path.exists(module)]
+
+
+def input_times_heating_targets(w):
+    """TIMES per-technology heat targets, only for a TIMES-coupled run.
+
+    Option C (``sector.times_heat.energy_mix``) reads them in
+    ``custom_extra_functionality``; without ``sector.times_demand`` there is no
+    ``.vd`` to extract them from, so the input must not be declared at all.
+    """
+    if config_provider("sector", "times_demand", default=False)(w):
+        return resources("heating_targets_{planning_horizons}.csv")
+    return []
+
+
+def input_times_heating_capacities(w):
+    """TIMES base-year heat stock, only when it replaces the EU-dataset row."""
+    if config_provider(
+        "sector", "times_heat", "base_year_capacities", default=False
+    )(w):
+        return resources("heating_capacities_{planning_horizons}.csv")
+    return []
+
+
+def input_times_wallon_demands_baseyear(w):
+    """Base-year ``wallon_demands``, only for the ``times_base_year`` split.
+
+    The TIMES archetype urban/rural split drifts across horizons (59 % rural in
+    2025 → 37 % in 2050), which moves dwellings between PyPSA heat buses. Freezing
+    the split at the first planning horizon needs that horizon's export as well as
+    the current one.
+    """
+    if (
+        config_provider("sector", "times_heat", "urban_rural_split", default="times")(w)
+        == "times_base_year"
+    ):
+        baseyear = config_provider("scenario", "planning_horizons", 0)(w)
+        return resources(f"wallon_demands_{baseyear}.csv")
     return []
 
 

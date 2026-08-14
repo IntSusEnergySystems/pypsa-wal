@@ -27,11 +27,12 @@ configure_logging(snakemake)
 coupling_dir = snakemake.params.get("coupling_dir")
 times_use_preexported = snakemake.params.get("times_use_preexported", False)
 
-demands_src = heating_src = None
+demands_src = heating_src = targets_src = None
 if coupling_dir:
     preexported_dir = Path(coupling_dir) / "pypsa_inputs"
     demands_src = preexported_dir / f"wallon_demands_{planning_horizon}.csv"
     heating_src = preexported_dir / f"heating_capacities_{planning_horizon}.csv"
+    targets_src = preexported_dir / f"heating_targets_{planning_horizon}.csv"
 
 if coupling_dir and (times_use_preexported or demands_src.exists()):
     if not demands_src.exists():
@@ -40,8 +41,15 @@ if coupling_dir and (times_use_preexported or demands_src.exists()):
         raise FileNotFoundError(
             f"Pre-exported heating capacities not found: {heating_src}"
         )
+    if not targets_src.exists():
+        raise FileNotFoundError(
+            f"Pre-exported heating targets not found: {targets_src}. The bundle "
+            "predates the option-C heating soft-link; re-export it with "
+            "`times-pypsa export-coupling`."
+        )
     shutil.copy2(demands_src, snakemake.output.wallon_demands)
     shutil.copy2(heating_src, snakemake.output.heating_capacities)
+    shutil.copy2(targets_src, snakemake.output.heating_targets)
 else:
     mappings_dir = snakemake.params.get("mappings_dir")
     if mappings_dir:
@@ -55,4 +63,5 @@ else:
         horizon=planning_horizon,
         wallon_demands_path=snakemake.output.wallon_demands,
         heating_capacities_path=snakemake.output.heating_capacities,
+        heating_targets_path=snakemake.output.heating_targets,
     )

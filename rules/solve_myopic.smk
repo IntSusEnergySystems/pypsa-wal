@@ -124,6 +124,12 @@ rule solve_sector_network_myopic:
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}_brownfield.nc"
         ),
         co2_totals_name=resources("co2_totals_{clusters}_{planning_horizons}.csv"),
+        heating_targets=input_times_heating_targets,
+        # Not read by the script — declared so that editing a constraint
+        # implementation invalidates the solved networks. Without it Snakemake
+        # sees an up-to-date network, skips the solve, and a comparison run
+        # silently re-archives the *previous* answer.
+        custom_extra_functionality_modules=input_custom_extra_functionality_modules,
     output:
         network=RESULTS
         + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
@@ -133,6 +139,22 @@ rule solve_sector_network_myopic:
             RESULTS
             + "models/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
             if config["solving"]["options"]["store_model"]
+            else []
+        ),
+        # Option B': the reconstructed per-group heat profiles the solve was
+        # pinned to. Declared (rather than written next to the log) so that the
+        # `shadow` directory copies it back and Snakemake can clean it up.
+        heating_profiles=(
+            RESULTS
+            + "heating_profiles/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.csv"
+            if config.get("sector", {})
+            .get("times_heat", {})
+            .get("profile", {})
+            .get("enable", False)
+            and config.get("sector", {})
+            .get("times_heat", {})
+            .get("profile", {})
+            .get("export", True)
             else []
         ),
     shadow:
