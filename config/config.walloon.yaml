@@ -4,13 +4,28 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  name: "walloon-model"
+  prefix: "walloon"
+  name:
+  - scen_demande_haute
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
-    file: config/scenarios.yaml
+    enable: true
+    file: config/scenarios.walloon.yaml
+  shared_cutouts: true
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
+snapshots:
+  start: "2010-01-01"
+  end: "2011-01-01"
+  inclusive: left
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
+atlite:
+  default_cutout: "europe-2010-sarah3-era5"
+  nprocesses: 4
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight
 foresight: myopic
@@ -109,6 +124,8 @@ sector:
     2040: 90  # 180 * 0.5
     2045: 125  # 250 * 0.5
     2050: 125  # 250 * 0.5
+  agriculture_machinery_electric_share: 0.5
+  agriculture_machinery_oil_share: 0.5
   shipping_methanol_share:
     2020: 0
     2025: 0
@@ -127,7 +144,14 @@ sector:
     2050: 0.20
   district_heating:
     potential: 0.3
+  electrobiofuels: false
 
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#co2-budget
+co2_budget:
+  2025: 0.648
+  2030: 0.450
+  2040: 0.250
+  2050: 0.050
 co2_budget_national: true
 co2_price_national: false
 budget_national:
