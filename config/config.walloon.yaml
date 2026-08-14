@@ -4,15 +4,14 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "walloon"
-  name:
-  - scen_demande_haute
+  # Single-run layout: RDIR is "walloon-model/", no {run} wildcard — the cluster
+  # scripts and instructions.md assume it. Multi-scenario runs: config.times-pypsa.yaml
+  name: "walloon-model"
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
-    enable: true
+    enable: false
     file: config/scenarios.walloon.yaml
-  shared_cutouts: true
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
