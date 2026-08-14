@@ -745,6 +745,7 @@ sector:
   bev_charge_rate: 0.011
   bev_avail_max: 0.95
   bev_avail_mean: 0.8
+  bev_avail_min: 0.0
   v2g: true
   land_transport_fuel_cell_share:
     2020: 0

@@ -28,10 +28,62 @@ memory-intensive Gurobi solve is optionally delegated to the cluster.
 | Countries | BE, FR, GB, NL, DE, LU |
 | Spatial clustering | Custom 3-node Belgium (`adm` + `custom_busmap_BE`) |
 | Temporal resolution | Sector snapshots (`resolution_sector: 6h` in default Walloon config) |
+| Weather year | **2010** (`atlite.default_cutout: europe-2010-sarah3-era5`) |
 | Solver | Gurobi (`gurobi-default`) |
 
 Walloon-specific settings (nuclear expansion, custom potentials/costs, NTC
 constraints, cross-border flows) are documented in [`doc/walloon.rst`](doc/walloon.rst).
+
+### Weather year 2010
+
+`config.walloon.yaml` sets `snapshots` **and** `atlite.default_cutout` to 2010 —
+both, because the snapshots select the hours and the cutout supplies the weather
+for them; changing one alone silently mismatches load and renewables. The first
+run downloads `cutouts/europe-2010-sarah3-era5.nc` (multi-GB) from
+`https://data.pypsa.org/workflows/cutout/v1.0/`. `config.times-pypsa.yaml` sets
+neither key and so still inherits PyPSA-Eur's **2013** default — the two studies
+are on different weather years, deliberately, until someone aligns them.
+
+### EV charging: flexible and inflexible demand
+
+Land-transport EV electricity is split in two, so that only the share of the
+fleet that actually offers demand-side flexibility can be shifted in time:
+
+| Load carrier | Bus | Shape |
+|--------------|-----|-------|
+| `land transport EV` | `<node> EV battery` | the original transport profile × `sector.bev_dsm_availability` |
+| `land transport EV inflexible` | `<node>` (moved to `<node> low voltage` when the distribution grid is on) | the remaining energy, reshaped onto Elia's observed natural-charging profile |
+
+The split conserves each node's annual energy (asserted in
+`split_transport_demand`, [`scripts/build_transport_demand.py`](scripts/build_transport_demand.py)).
+`BEV charger` `p_nom` is scaled by `bev_dsm_availability` to match, since the
+`EV battery` bus now carries only the flexible share.
+
+The charging shape comes from the git-tracked
+[`data/walloon/elia_natural_charging_daily_profile.csv`](data/walloon/elia_natural_charging_daily_profile.csv)
+(nothing to stage) and is written to
+`resources/<run>/elia_charging_shape_s_{clusters}_{planning_horizons}.csv`.
+
+> **Known limitation — every horizon charges like 2026.** The CSV holds two
+> daily shapes: Elia's 2026 fleet peaks mid-morning (0.074 at 09:00), their 2036
+> projection peaks in the evening (0.080 at 19:00, midday correspondingly lower).
+> `build_elia_transport_shape()` is called with a literal `year=2026`
+> ([`scripts/build_transport_demand.py`](scripts/build_transport_demand.py)), so
+> although the rule runs per planning horizon, 2030–2050 all get the 2026 shape
+> and the 2036 rows are unused. Accepted for now. It matters because
+> `bev_dsm_availability: 0.01` puts 99 % of EV demand on this fixed shape: the
+> late horizons therefore place EV charging around midday rather than the
+> evening, which **understates the evening peak** EVs contribute to and
+> **overstates their coincidence with solar PV** — the optimistic direction, and
+> largest in 2050 where the fleet is largest. The daily shape is also tiled
+> across all seven days (no weekend) and all seasons. To revisit, pass
+> `snakemake.wildcards.planning_horizons` and interpolate between the two years.
+
+`sector.bev_avail_min` (new, default `0.0`) floors the plugged-in availability
+profile instead of only warning when it goes negative. The Walloon values
+(`bev_dsm_availability: 0.01`, `bev_avail_*` 0.2/0.32/0.4, `v2g: false`) follow
+Elia; they live in `config.walloon.yaml` only, so `config.times-pypsa.yaml` still
+runs the PyPSA-Eur defaults (`bev_dsm_availability: 0.5`, `v2g: true`).
 
 ### The TIMES-coupled multi-scenario config
 
@@ -44,6 +96,15 @@ that change every output path:
 | `run.prefix` | `times-pypsa` |
 | `run.name` | a **list** of scenarios (`scen_base`, `scen_corrige`, …) |
 | `run.scenarios.enable` | `true`, overrides from [`config/scenarios.walloon.yaml`](config/scenarios.walloon.yaml) |
+
+**Scenario runs belong here, not in `config.walloon.yaml`.** Keep the latter
+single-run (`run.name: "walloon-model"`, `run.scenarios.enable: false`): the
+cluster scripts default to `RUN_NAME=walloon-model` with an empty `RUN_PREFIX`
+([`cluster/config.sh`](cluster/config.sh)) and the pypsa2html config reads
+`results/walloon-model/`, so a prefix or a `{run}` wildcard there sends every
+path somewhere the tested tooling does not look. To run a scenario, use this
+config — `run.name` already lists `scen_demande_haute` — or set `RUN_PREFIX` and
+`EXPLORER_SCENARIOS` to match whatever you changed.
 
 With `run.scenarios.enable: true`, `get_rdir()` returns `times-pypsa/{run}/`
 instead of a fixed directory, so **`RDIR` contains a `{run}` wildcard** and
@@ -1200,7 +1261,7 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | S3 upload fails after postprocess | Check `cluster/logs/upload_s3.log`; verify `aws sts get-caller-identity --profile intervectoriel`; use `SKIP_S3_UPLOAD=1` to postprocess without upload |
 | Explorer scenario not in dropdown | See **Troubleshooting Explorer** under Publishing to Wallonie Explorer (S3) |
 | `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
-| First run hangs on Zenodo cutout download | Symlink `cutouts/europe-2013-sarah3-era5.nc` from `~/.cache/snakemake-pypsa-eur/...` if you already retrieved it for pypsa-eur; or wait for the download to finish |
+| First run hangs on the cutout download | `config.walloon.yaml` needs `cutouts/europe-2010-sarah3-era5.nc` (`config.times-pypsa.yaml` still the 2013 one) — symlink it from `~/.cache/snakemake-pypsa-eur/...` or another checkout if you already have it, or wait for the download to finish |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
 | `--resources mem_mb=... <target>` fails with `dictionary update sequence element #1 has length 1` | Same `nargs="+"` trap as `--configfile`: the target after `--resources` is parsed as another resource. Put `--cores` (or any flag) between them |
 | Solve is infeasible right after enabling `sector.times_heat.energy_mix` | Check which group binds in the solve log line `TIMES heat-mix constraints (…)`, then either raise `tolerance` or move that group to `slack_groups`. `solar thermal` is the usual suspect — it is the only group with a dispatch upper bound. See [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) §3.3 |
