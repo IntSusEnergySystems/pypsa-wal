@@ -85,6 +85,15 @@ that change every output path:
 | `run.name` | a **list** of scenarios (`scen_base`, `scen_corrige`, …) |
 | `run.scenarios.enable` | `true`, overrides from [`config/scenarios.walloon.yaml`](config/scenarios.walloon.yaml) |
 
+**Scenario runs belong here, not in `config.walloon.yaml`.** Keep the latter
+single-run (`run.name: "walloon-model"`, `run.scenarios.enable: false`): the
+cluster scripts default to `RUN_NAME=walloon-model` with an empty `RUN_PREFIX`
+([`cluster/config.sh`](cluster/config.sh)) and the pypsa2html config reads
+`results/walloon-model/`, so a prefix or a `{run}` wildcard there sends every
+path somewhere the tested tooling does not look. To run a scenario, use this
+config — `run.name` already lists `scen_demande_haute` — or set `RUN_PREFIX` and
+`EXPLORER_SCENARIOS` to match whatever you changed.
+
 With `run.scenarios.enable: true`, `get_rdir()` returns `times-pypsa/{run}/`
 instead of a fixed directory, so **`RDIR` contains a `{run}` wildcard** and
 results land in one tree per scenario:
@@ -93,15 +102,6 @@ results land in one tree per scenario:
 resources/times-pypsa/scen_base/    results/times-pypsa/scen_base/
 resources/times-pypsa/scen_corrige/ results/times-pypsa/scen_corrige/
 ```
-
-> **Scenario runs belong here, not in `config.walloon.yaml`.** Keep the latter
-> single-run (`run.name: "walloon-model"`, `run.scenarios.enable: false`): the
-> cluster scripts default to `RUN_NAME=walloon-model` with an empty `RUN_PREFIX`
-> ([`cluster/config.sh`](cluster/config.sh)), and the pypsa2html config points at
-> `results/walloon-model/`, so a prefix or a `{run}` wildcard there sends every
-> path somewhere the tested tooling does not look. To run a scenario, use this
-> config — `run.name` already lists `scen_demande_haute` — or set `RUN_PREFIX`
-> and `EXPLORER_SCENARIOS` to match whatever you changed.
 
 Each scenario names its own TIMES `.vd` file (`sector.times_file`). Those files
 are gitignored — symlink them next to the others before running:
