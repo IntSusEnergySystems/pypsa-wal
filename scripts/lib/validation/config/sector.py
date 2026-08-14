@@ -461,6 +461,10 @@ class SectorConfig(BaseModel):
         0.8,
         description="The average share plugged-in availability for passenger electric vehicles.",
     )
+    bev_avail_min: float = Field(
+        0.0,
+        description="The minimum share plugged-in availability for passenger electric vehicles; the availability profile is floored at this value.",
+    )
     v2g: bool = Field(
         True,
         description="Allows feed-in to grid from EV battery. This is only enabled if BEV demand-side management is enabled, and the share of vehicles participating is V2G is given by `bev_dsm_availability`.",
