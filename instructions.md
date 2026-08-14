@@ -109,7 +109,7 @@ that change every output path:
 | Item | Value |
 |------|-------|
 | `run.prefix` | `times-pypsa` |
-| `run.name` | a **list** of scenarios (`scen_base`, `scen_corrige`, …) |
+| `run.name` | a **list** of scenarios (`scen_demande_haute` active; `scen_base`, `scen_corrige`, `scen_nuc*`, … commented out — uncomment to add one) |
 | `run.scenarios.enable` | `true`, overrides from [`config/scenarios.walloon.yaml`](config/scenarios.walloon.yaml) |
 
 **Scenario runs belong here, not in `config.walloon.yaml`.** Keep the latter
@@ -161,6 +161,37 @@ results/walloon-model/networks/base_s_adm___2030.nc
 ```
 
 (Three underscores between `adm` and the year — both `opts` and `sector_opts` wildcards are empty strings.)
+
+A scenario run puts the same tree under `results/times-pypsa/<scenario>/`. What
+is in it, and which of it is worth opening first:
+
+| Subfolder | Contents |
+|-----------|----------|
+| `networks/` | the solved networks — the ground truth for any number you doubt |
+| `csvs/` | summary tables (`costs.csv`, `nodal_costs.csv`, `energy.csv`, …) — what the charts are built from |
+| `graphs/`, `maps/`, `graphics/` | the Snakemake plots (`costs.svg`, static + interactive balance maps) |
+| `html/` | the pypsa2html report — start at `results/times-pypsa/index.html` |
+| `logs/` | `*_solver.log` (grep `Optimal objective`), `*_python.log` (the TIMES heat budget lines), `*_memory.log` |
+| `configs/` | **the config actually used**, one snapshot per horizon |
+| `heating_profiles/` | option B′ only: the profiles the solve was pinned to |
+| `explorer/` | staged ClimAct CSVs + `.vd` for S3 (see the Explorer section) |
+
+> **Only compare runs of the same vintage.** Each horizon's real configuration is
+> in `results/<run>/configs/config.base_s_adm___<year>.yaml`; diff those two
+> files before comparing two scenarios. Scenarios solved weeks apart can differ
+> in weather year, `social_discountrate`, the existing-capacity source, or
+> whether the heating soft-link was on at all — the cross-scenario charts in the
+> report will happily plot them side by side anyway.
+
+**Reading operational costs across horizons.** Two lumpy terms dominate the
+Walloon marginal cost and neither is a smooth trend. Forced *unsustainable*
+biomass exists only in 2025/2030 (an equality constraint, ~656 and ~451
+MEUR/year) and its carriers are absent from the later networks; and the 8.3 TWh
+Walloon biogas block at 78.8 EUR/MWh is effectively all-or-nothing, worth 654
+MEUR/year when it runs. In 2040 the CO₂ shadow price can sit within ~1 EUR/MWh
+of its break-even, so the block flips on or off between otherwise similar
+scenarios and 2040 can look implausibly cheap. Check `biogas` dispatch before
+reading a dip as an economic trend.
 
 ---
 
@@ -255,15 +286,16 @@ heat from new heat pumps where TIMES has 8 %. The heating soft-link also transfe
 the **appliance energy mix**, and replaces PyPSA's EU-2012 base-year heating stock
 with the TIMES one.
 
-> **This branch (`heat-softlink-option-b`) carries two alternative mix
-> mechanisms.** They are mutually exclusive and enabling both raises.
+> **Two alternative mix mechanisms ship in the tree.** They are mutually
+> exclusive and enabling both raises. **Option B′ is the merged default**; option
+> C is kept for the A/B comparison and is off.
 >
 > | | switch | what it does | record |
 > |---|---|---|---|
-> | **option B′** *(on by default here)* | `profile.enable` | reconstructs an hourly heat profile per technology group (TIMES share × PyPSA's heat-load shape) and **pins the dispatch to it** | [`docs/heat_softlink_option_b.md`](docs/heat_softlink_option_b.md) |
-> | **option C** *(off here; the default on `heat-softlink-option-c`)* | `energy_mix.enable` | constrains each group's **annual** heat, `≥` on what TIMES keeps and `≤` on heat pumps, ±5 % | [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) |
+> | **option B′** *(default, on in `config.times-pypsa.yaml`)* | `profile.enable` | reconstructs an hourly heat profile per technology group (TIMES share × PyPSA's heat-load shape) and **pins the dispatch to it** | [`docs/heat_softlink_option_b.md`](docs/heat_softlink_option_b.md) |
+> | **option C** *(off)* | `energy_mix.enable` | constrains each group's **annual** heat, `≥` on what TIMES keeps and `≤` on heat pumps, ±5 % | [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) |
 >
-> Which to merge to `master` is the subject of
+> The three-way evidence behind choosing B′ (legacy vs C vs B′) is in
 > [`docs/heat_softlink_option_comparison.md`](docs/heat_softlink_option_comparison.md).
 
 All switches live in
@@ -314,8 +346,8 @@ The first two come from the `times_pypsa` library
 (`TIMES_PyPSA/times_pypsa/heat_softlink.py`, groups defined in
 `TIMES_PyPSA/data/heat_softlink_groups.csv`), so editing the group definition
 invalidates the exports — it is declared as a rule input alongside the other
-mapping CSVs. **`times_pypsa` is identical on both option branches**: the same
-`share` column feeds both mechanisms.
+mapping CSVs. **`times_pypsa` needs no variant of its own**: the same `share`
+column feeds both mechanisms.
 
 ### Checking a heating soft-link run
 
@@ -344,7 +376,7 @@ prints the three-way tables.
 ## Prerequisites
 
 - Linux (local or cluster login node)
-- [Conda](https://docs.conda.io/) or [Mamba/Micromamba](https://mamba.readthedocs.io/)
+- [Conda](https://docs.conda.io/) / [Mamba](https://mamba.readthedocs.io/) **or** [pixi](https://pixi.sh) — both are supported, see [Environment setup](#environment-setup)
 - A valid [Gurobi licence](https://www.gurobi.com) (academic licence is sufficient for local runs)
 - ~30 GB disk space (data bundle, weather cutout, intermediate files, results)
 - For cluster runs: CÉCI SSH access to NIC5 (typically via the `sqvpn` VPN) and scratch space on `$GLOBALSCRATCH`
@@ -365,6 +397,15 @@ Observed for `config.times-pypsa.yaml` (2 scenarios × 4 horizons, 6h, 12 thread
 | Wall-clock, myopic solve + summaries + plots | ~35 min |
 | Peak RAM per solve | ~7.5 GB (well under the 100 GB cap) |
 | `results/times-pypsa/<scenario>/` on disk | ~680 MB each |
+
+Re-run of a single scenario with builds already cached (`scen_demande_haute`, 6h,
+weather year 2013, `--cores 20 --resources mem_mb=110000`, 14 Aug 2026):
+
+| Metric | Value |
+|--------|-------|
+| Wall-clock, 135 jobs incl. all 4 myopic solves | **17 min** (~4 min per solve) |
+| pypsa2html report, 75 pages | ~50 s |
+| Peak RAM | ~20 GB of 124 GB |
 
 ---
 
@@ -391,6 +432,24 @@ Sanity check:
 ```bash
 python -c "import pypsa, snakemake, gurobipy; print('OK')"
 ```
+
+### Alternative: pixi
+
+[`pixi.toml`](pixi.toml) + `pixi.lock` describe the same environment with pinned
+versions, and the cluster scripts are not needed to use it. `pixi run <task>`
+installs on first call, so there is no separate create step:
+
+```bash
+pixi run walloon-model            # snakemake -call --configfile config/config.walloon.yaml
+pixi run times-pypsa              # same for config.times-pypsa.yaml
+pixi run walloon-model --cores 12 --resources mem_mb=100000   # extra args pass through
+pixi shell                        # or drop into the environment and run snakemake by hand
+```
+
+`pixi run unit-tests` / `pixi run integration-tests` are what CI runs. Conda and
+pixi are interchangeable for the workflow itself; the rest of this guide writes
+`conda activate pypsa-eur` because the cluster scripts
+([`cluster/config.sh`](cluster/config.sh) `LOCAL_RUN`) invoke conda.
 
 ### Gurobi licence (local)
 
@@ -449,7 +508,7 @@ command line so Snakemake never schedules two solves at once:
 snakemake --configfile config/config.times-pypsa.yaml --cores 12 --resources mem_mb=100000 -call
 ```
 
-A finer resolution (3h) doubles the LP and and might require running on NIC5 `hmem`, not locally (see the cluster section).
+A finer resolution (3h) doubles the LP and might require running on NIC5 `hmem`, not locally (see the cluster section).
 
 ### Solve chain only
 
@@ -1274,6 +1333,7 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | Snakemake rebuilds everything after `pull` | Re-run `./cluster/nic5.sh postprocess` (touch + summaries); do not delete `.snakemake/metadata` locally |
 | Missing `config/scenarios.yaml` | Not required unless you set `run.scenarios.enable: true` in config |
 | S3 upload fails after postprocess | Check `cluster/logs/upload_s3.log`; verify `aws sts get-caller-identity --profile intervectoriel`; use `SKIP_S3_UPLOAD=1` to postprocess without upload |
+| S3 upload dies on the `.nc` networks (`Could not connect to the endpoint URL`, `SSL validation failed`), and the Explorer folder stays empty | The four networks are ~250 MB of multipart upload; on a slow link they fail and **abort the sync before the Explorer steps run**, so `scenarios/<id>/` is never populated even though `pypsa_raw_results/` looks full. Publish in two passes: `UPLOAD_SKIP_NETWORKS=1 ./cluster/nic5.sh upload` first (small files, and the Explorer reads only those), then sync `networks/` on its own with `AWS_MAX_ATTEMPTS=10 AWS_RETRY_MODE=standard`. Always verify with `aws s3 ls s3://intervectoriel/test/scenarios/<id>/pypsa/ \| wc -l` (expect 49) rather than trusting the exit code |
 | Explorer scenario not in dropdown | See **Troubleshooting Explorer** under Publishing to Wallonie Explorer (S3) |
 | `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
 | First run hangs on the cutout download | The rules read `data/cutout/archive/<version>/europe-<year>-sarah3-era5.nc` (~6.6 GB), **not** the legacy `cutouts/` symlink. `config.walloon.yaml` needs the 2010 file, `config.times-pypsa.yaml` the 2013 one — hardlink or symlink it in from another checkout if you have it, or wait for the download |
