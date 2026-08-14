@@ -62,10 +62,22 @@ The split conserves each node's annual energy (asserted in
 The charging shape comes from the git-tracked
 [`data/walloon/elia_natural_charging_daily_profile.csv`](data/walloon/elia_natural_charging_daily_profile.csv)
 (nothing to stage) and is written to
-`resources/<run>/elia_charging_shape_s_{clusters}_{planning_horizons}.csv`. The
-file holds Elia's 2026 **and** 2036 columns, but `build_elia_transport_shape()`
-is called with `year=2026` for every planning horizon — the 2036 rows are
-currently unused.
+`resources/<run>/elia_charging_shape_s_{clusters}_{planning_horizons}.csv`.
+
+> **Known limitation — every horizon charges like 2026.** The CSV holds two
+> daily shapes: Elia's 2026 fleet peaks mid-morning (0.074 at 09:00), their 2036
+> projection peaks in the evening (0.080 at 19:00, midday correspondingly lower).
+> `build_elia_transport_shape()` is called with a literal `year=2026`
+> ([`scripts/build_transport_demand.py`](scripts/build_transport_demand.py)), so
+> although the rule runs per planning horizon, 2030–2050 all get the 2026 shape
+> and the 2036 rows are unused. Accepted for now. It matters because
+> `bev_dsm_availability: 0.01` puts 99 % of EV demand on this fixed shape: the
+> late horizons therefore place EV charging around midday rather than the
+> evening, which **understates the evening peak** EVs contribute to and
+> **overstates their coincidence with solar PV** — the optimistic direction, and
+> largest in 2050 where the fleet is largest. The daily shape is also tiled
+> across all seven days (no weekend) and all seasons. To revisit, pass
+> `snakemake.wildcards.planning_horizons` and interpolate between the two years.
 
 `sector.bev_avail_min` (new, default `0.0`) floors the plugged-in availability
 profile instead of only warning when it goes negative. The Walloon values
