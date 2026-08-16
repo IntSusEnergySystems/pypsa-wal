@@ -38,7 +38,9 @@ GUROBI_MODULE_LIC="${GUROBI_MODULE_LIC:-/opt/cecisw/arch/easybuild/2023b/softwar
 # Light rules (add_brownfield) share the same partition but use DEFAULT_MEM_MB.
 # CECI job-efficiency guidance: https://support.ceci-hpc.be/doc/SubmittingJobs/JobEfficiency/
 SOLVE_PARTITION="${SOLVE_PARTITION:-hmem}"
-SOLVE_RUNTIME="${SOLVE_RUNTIME:-360}"     # minutes (fine resolution needs longer solves)
+# EDIT (2026-08-14): 1440 min for the 1h-resolution solve (360 was sized for
+# 6h; the LP is ~6x larger at 1h).
+SOLVE_RUNTIME="${SOLVE_RUNTIME:-1440}"     # minutes
 DEFAULT_PARTITION="${DEFAULT_PARTITION:-hmem}"
 DEFAULT_MEM_MB="${DEFAULT_MEM_MB:-16000}"      # light rules (add_brownfield)
 DEFAULT_RUNTIME="${DEFAULT_RUNTIME:-120}"
@@ -46,12 +48,16 @@ DEFAULT_CPUS="${DEFAULT_CPUS:-1}"              # light rules only; never set glo
 MAX_SLURM_JOBS="${MAX_SLURM_JOBS:-2}"
 
 # --- run / scenario ------------------------------------------------------------
-# pypsa-wal has a single scenario (config/config.walloon.yaml, run name
-# "walloon-model") and does not encode temporal resolution as a `sector_opts`
-# wildcard, so -- unlike pypsa-eur_negawatt -- there is no <scenario>/<resolution>
-# argument anywhere in this tooling.
-CONFIGFILE="${CONFIGFILE:-config/config.walloon.yaml}"
-RUN_NAME="${RUN_NAME:-walloon-model}"
+# EDIT (2026-08-14): default run = the TIMES-coupled multi-scenario config with
+# ONLY scen_demande_haute enabled (2010 weather year, 1h sector resolution;
+# scenario overrides from config/scenarios.walloon.yaml). There is still no
+# <scenario>/<resolution> CLI argument anywhere in this tooling (unlike
+# pypsa-eur_negawatt) — switch runs by exporting the variables below. For the
+# single-run Walloon config instead export:
+#   CONFIGFILE=config/config.walloon.yaml RUN_NAME=walloon-model \
+#   RUN_PREFIX= EXPLORER_SCENARIOS= EXPLORER_TYPE= ./cluster/nic5.sh <command>
+CONFIGFILE="${CONFIGFILE:-config/config.times-pypsa.yaml}"
+RUN_NAME="${RUN_NAME:-scen_demande_haute}"
 HORIZONS="${HORIZONS:-2025 2030 2040 2050}"
 CLUSTERS="${CLUSTERS:-adm}"
 OPTS="${OPTS:-}"
@@ -62,21 +68,27 @@ SECTOR_OPTS="${SECTOR_OPTS:-}"
 # config/config.times-pypsa.yaml -- so results live in results/<prefix>/<scenario>/
 # instead of results/<RUN_NAME>/. Leave RUN_PREFIX and EXPLORER_SCENARIOS empty
 # for a single-run config; the tooling then falls back to RUN_NAME everywhere.
-RUN_PREFIX="${RUN_PREFIX:-}"                   # run.prefix, e.g. times-pypsa
+#
+# EDIT (2026-08-14): active run = scen_demande_haute @ 2010, 1h. The three
+# defaults use `${VAR-default}` (NOT `${VAR:-default}`) so an exported EMPTY
+# value clears them -- that is how the single-run example above works.
+RUN_PREFIX="${RUN_PREFIX-times-pypsa}"       # run.prefix; empty = single-run layout
 # Scenario -> Explorer display label, space-separated "<scenario>:<label>" pairs.
 # The label is what the Explorer dropdown shows and is an editorial choice (the
 # existing scenarios use French names), so set it deliberately -- it is NOT
 # derived from the scenario name. Omit ":<label>" to reuse the scenario name.
-EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS:-}"
+EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS-scen_demande_haute:demande-haute-2010-1h}"
+# `<type>` in the scenario folder name <type>__<scenario>__YYYYMMDD (used by
+# upload_s3.sh and extract_explorer.sh). An explicitly cleared value means
+# `pypsa` (the single-run Walloon type).
+EXPLORER_TYPE="${EXPLORER_TYPE-times-pypsa}"
+: "${EXPLORER_TYPE:=pypsa}"
 #
-# For config/config.times-pypsa.yaml, uncomment the four lines below (or export
-# the same variables ahead of the command for a one-off run):
-# CONFIGFILE="${CONFIGFILE:-config/config.times-pypsa.yaml}"
-# RUN_PREFIX="${RUN_PREFIX:-times-pypsa}"
-# EXPLORER_TYPE="${EXPLORER_TYPE:-times-pypsa}"
-# EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS:-scen_base scen_corrige}"
-# ...with French display labels instead of the scenario names:
-# EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS:-scen_base:demande-haute scen_corrige:demande-réduite}"
+# One-off examples (export ahead of the command):
+#   Both TIMES scenarios with French display labels:
+#     EXPLORER_SCENARIOS="scen_base:demande-haute scen_corrige:demande-réduite" ./cluster/nic5.sh publish
+#   Higher solve runtime for a heavier LP:
+#     SOLVE_RUNTIME=2880 ./cluster/nic5.sh solve
 
 # --- local conda invocation ----------------------------------------------------
 # How to run the local environment (used by `nic5.sh prepare` / `postprocess`).
@@ -116,8 +128,8 @@ EXTRACTOR_BASE_CONFIG="${EXTRACTOR_BASE_CONFIG:-config_extraction_walloon.yaml}"
 EXTRACTOR_GEN_CONFIG="${EXTRACTOR_GEN_CONFIG:-config_extraction_pypsa-wal.generated.yaml}"
 # Per-horizon config snapshot the extractor reads out of results/<run>/configs/.
 EXTRACTOR_CONFIG_FILE="${EXTRACTOR_CONFIG_FILE:-config.base_s_adm___2050.yaml}"
-# `<type>` in the scenario folder name <type>__<scenario>__YYYYMMDD.
-EXPLORER_TYPE="${EXPLORER_TYPE:-pypsa}"
+# `<type>` in the scenario folder name <type>__<scenario>__YYYYMMDD:
+# defined once with the active-run defaults in the multi-scenario section above.
 
 # --- derived helpers (sourced by nic5.sh, upload_s3.sh, extract_explorer.sh) ---
 # Emits one tab-separated record per Explorer scenario:

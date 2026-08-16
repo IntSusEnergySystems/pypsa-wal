@@ -8,10 +8,12 @@
 # cluster, the myopic solve chain runs there, and solved networks are pulled
 # back for post-processing.
 #
-# pypsa-wal uses a single scenario (config/config.walloon.yaml, run name
-# "walloon-model"). Temporal resolution is set in that config
-# (clustering.temporal.resolution_sector, e.g. 6h) — there is no sector_opts
-# resolution switch like in pypsa-eur_negawatt. Solves run on NIC5 `hmem`.
+# The default run (config, scenario, run prefix) is set in cluster/config.sh --
+# currently the TIMES-coupled multi-scenario config with ONLY scen_demande_haute
+# (results under results/times-pypsa/scen_demande_haute/). Temporal resolution
+# is a config key (clustering.temporal.resolution_sector) -- there is no
+# sector_opts resolution switch like in pypsa-eur_negawatt. Solves run on NIC5
+# `hmem`.
 #
 #   ./cluster/nic5.sh setup       # one-time: install env on the cluster
 #   ./cluster/nic5.sh run         # full test: prepare+push+solve+wait+pull+postprocess
@@ -38,6 +40,12 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 # shellcheck source=config.sh
 source "$HERE/config.sh"
+# EDIT (2026-08-14): RDIR-aware path helper for multi-scenario configs
+# (run.prefix + run.scenarios). With RUN_PREFIX=times-pypsa and
+# RUN_NAME=scen_demande_haute this yields "times-pypsa/scen_demande_haute",
+# so prepare/solve/pull/postprocess all point inside the scenario tree.
+# Empty RUN_PREFIX (single-run config) reduces to plain RUN_NAME.
+RUN_DIR_REL="${RUN_PREFIX:+${RUN_PREFIX}/}${RUN_NAME}"
 JOBFILE="$HERE/.last_jobs"
 mkdir -p "$HERE/logs"
 
@@ -67,7 +75,7 @@ solved_targets() {
     local y base
     base=$(network_basename)
     for y in $HORIZONS; do
-        echo "results/${RUN_NAME}/networks/${base}_${y}.nc"
+        echo "results/${RUN_DIR_REL}/networks/${base}_${y}.nc"
     done
 }
 
@@ -75,7 +83,7 @@ brownfield_targets() {
     local y base
     base=$(network_basename)
     for y in $HORIZONS; do
-        echo "resources/${RUN_NAME}/networks/${base}_${y}_brownfield.nc"
+        echo "resources/${RUN_DIR_REL}/networks/${base}_${y}_brownfield.nc"
     done
 }
 
@@ -83,17 +91,17 @@ prepare_targets() {
     local y first base
     first=$(echo "$HORIZONS" | awk '{print $1}')
     base=$(network_basename)
-    echo "resources/${RUN_NAME}/networks/${base}_${first}_brownfield.nc"
+    echo "resources/${RUN_DIR_REL}/networks/${base}_${first}_brownfield.nc"
     for y in $HORIZONS; do
         [ "$y" = "$first" ] && continue
-        echo "resources/${RUN_NAME}/networks/${base}_${y}.nc"
+        echo "resources/${RUN_DIR_REL}/networks/${base}_${y}.nc"
     done
 }
 
 postprocess_targets() {
-    echo "results/${RUN_NAME}/csvs/costs.csv"
-    echo "results/${RUN_NAME}/graphs/costs.svg"
-    echo "results/${RUN_NAME}/csvs/cumulative_costs.csv"
+    echo "results/${RUN_DIR_REL}/csvs/costs.csv"
+    echo "results/${RUN_DIR_REL}/graphs/costs.svg"
+    echo "results/${RUN_DIR_REL}/csvs/cumulative_costs.csv"
 }
 
 verify_run_success() {
@@ -108,14 +116,14 @@ verify_run_success() {
         ok=1
     fi
     for y in $HORIZONS; do
-        t="results/${RUN_NAME}/networks/${base}_${y}.nc"
+        t="results/${RUN_DIR_REL}/networks/${base}_${y}.nc"
         if [ -f "$REPO/$t" ]; then
             msg "  solved network $y: OK ($(du -h "$REPO/$t" | awk '{print $1}'))"
         else
             warn "  solved network $y: MISSING ($t)"
             ok=1
         fi
-        t="results/${RUN_NAME}/logs/${base}_${y}_solver.log"
+        t="results/${RUN_DIR_REL}/logs/${base}_${y}_solver.log"
         if [ -f "$REPO/$t" ] && grep -q 'Optimal objective' "$REPO/$t"; then
             msg "  solver log $y: OK (optimal)"
         elif [ -f "$REPO/$t" ]; then
@@ -140,8 +148,8 @@ sync_brownfield_mtimestamps() {
     local y base bf sol
     base=$(network_basename)
     for y in $HORIZONS; do
-        bf="resources/${RUN_NAME}/networks/${base}_${y}_brownfield.nc"
-        sol="results/${RUN_NAME}/networks/${base}_${y}.nc"
+        bf="resources/${RUN_DIR_REL}/networks/${base}_${y}_brownfield.nc"
+        sol="results/${RUN_DIR_REL}/networks/${base}_${y}.nc"
         if [ -f "$REPO/$bf" ] && [ -f "$REPO/$sol" ]; then
             touch -r "$REPO/$sol" "$REPO/$bf"
         fi
@@ -155,10 +163,13 @@ cmd_prepare() {
     msg "Preparing un-solved solve inputs locally ($LOCAL_CORES cores)"
     msg "  config: $CONFIGFILE"
     msg "  targets: $targets"
-    msg "  log: $log  (also: $REPO/.snakemake/log/ and $REPO/logs/${RUN_NAME}/)"
+    msg "  log: $log  (also: $REPO/.snakemake/log/ and $REPO/logs/${RUN_DIR_REL}/)"
+    # --rerun-incomplete: resume jobs left incomplete by an aborted run
+    # (e.g. disk-full crash) instead of failing on .snakemake/incomplete.
     snakemake_local \
         --cores "$LOCAL_CORES" \
         --rerun-triggers mtime \
+        --rerun-incomplete \
         --printshellcmds \
         -- $targets 2>&1 | tee "$log"
     msg "Local preparation complete."
@@ -167,7 +178,11 @@ cmd_prepare() {
 cmd_push() {
     msg "Syncing repo + inputs to ${REMOTE}:${REMOTE_DIR}"
     rssh "mkdir -p '$REMOTE_DIR'"
-    rssync -arh --no-g \
+    # EDIT (2026-08-14): -L/--copy-links so the local storage redirections
+    # (resources/<prefix>, data/bundle, data/osm -> /sylvain/mount) and any
+    # symlinked inputs (e.g. data/walloon/*.vd) arrive as REAL files on the
+    # cluster instead of dangling absolute symlinks.
+    rssync -arLh --no-g \
         --exclude '.git' --exclude '.pixi' \
         --exclude 'results' --exclude '__pycache__' --exclude '*.pyc' \
         --exclude 'cluster/logs' --exclude 'cutouts' --exclude 'data/cutout' \
@@ -184,22 +199,25 @@ cmd_push() {
 REMOTE_ENV='source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate '"$ENV_NAME"' && unset PYTHONPATH && export GRB_LICENSE_FILE=$HOME/gurobi.lic && export XDG_CACHE_HOME='"$REMOTE_DIR"'/.cache && export TMPDIR='"$REMOTE_DIR"'/tmp && mkdir -p "$XDG_CACHE_HOME" "$TMPDIR"'
 
 cmd_solve() {
-    local solve_cpus targets log pidf pid cache_dir
+    local solve_cpus targets log pidf pid
     solve_cpus=$(cluster_cpus)
     [ -n "$solve_cpus" ] || die "solving.cpus not set in cluster/config_cluster.yaml"
-    cache_dir="$REMOTE_DIR/.cache/snakemake-runtime-cache"
     : > "$JOBFILE"
     msg "Launching Slurm orchestrator on the login node (partition=$SOLVE_PARTITION, cpus=$solve_cpus)"
     msg "  scratch caches: XDG_CACHE_HOME=$REMOTE_DIR/.cache  TMPDIR=$REMOTE_DIR/tmp"
     targets=$(solved_targets | tr '\n' ' ')
     log="cluster/logs/orchestrate.log"
     pidf="cluster/logs/orchestrate.pid"
+    # EDIT (2026-08-14): dropped --runtime-source-cache-path. With it,
+    # Snakemake provisions source files for ALL rules (including unused SEPIA
+    # rules whose log paths contain an unbindable {run} wildcard) and aborts
+    # with WildcardError in rules/postprocess.smk. The default source cache
+    # already lands on scratch via XDG_CACHE_HOME=$REMOTE_DIR/.cache.
     rssh "cd '$REMOTE_DIR' && $REMOTE_ENV && mkdir -p cluster/logs && \
         setsid bash -c \"snakemake --configfile cluster/config_cluster.yaml \
             --configfile $CONFIGFILE \
             --executor slurm --jobs $MAX_SLURM_JOBS \
             --rerun-triggers mtime --keep-going --printshellcmds \
-            --runtime-source-cache-path '$cache_dir' \
             --envvars XDG_CACHE_HOME TMPDIR GRB_LICENSE_FILE \
             --default-resources slurm_partition=$SOLVE_PARTITION runtime=$SOLVE_RUNTIME mem_mb=$DEFAULT_MEM_MB slurm_account=ceci \
             --set-resources solve_sector_network_myopic:cpus_per_task=$solve_cpus \
@@ -326,7 +344,7 @@ cmd_pull() {
         || msg "(no results dir yet)"
     rssync -arh --no-g \
         "${REMOTE}:${REMOTE_DIR}/cluster/logs/" "$HERE/logs/" || true
-    msg "Pull complete. Solved networks are in results/${RUN_NAME}/networks/."
+    msg "Pull complete. Solved networks are in results/${RUN_DIR_REL}/networks/."
 }
 
 cmd_postprocess() {

@@ -27,7 +27,7 @@ memory-intensive Gurobi solve is optionally delegated to the cluster.
 | Foresight | Myopic (2025 → 2030 → 2040 → 2050) |
 | Countries | BE, FR, GB, NL, DE, LU |
 | Spatial clustering | Custom 3-node Belgium (`adm` + `custom_busmap_BE`) |
-| Temporal resolution | Sector snapshots (`resolution_sector: 6h` in default Walloon config) |
+| Temporal resolution | Sector snapshots: `resolution_sector: 6h` in the Walloon config, `1h` in `config.times-pypsa.yaml` |
 | Weather year | **2010** (`atlite.default_cutout: europe-2010-sarah3-era5`) |
 | Solver | Gurobi (`gurobi-default`) |
 
@@ -43,7 +43,7 @@ place to change:
 | Config | Weather year |
 |--------|--------------|
 | [`config/config.walloon.yaml`](config/config.walloon.yaml) | **2010** |
-| [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) | **2013** |
+| [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) | **2010** (was **2013** until the 2026-08-14 1h run aligned the two) |
 
 Change the three years together (`snapshots.start`, `snapshots.end`,
 `default_cutout`): the snapshots pick the hours and the cutout supplies the
@@ -55,9 +55,10 @@ where you set it.
 The cutout itself is a ~6.6 GB file under `data/cutout/archive/<version>/`
 (`cutouts/` is a legacy symlink and is not what the rules read). Only the year
 already present there is free; any other year is retrieved from
-`https://data.pypsa.org/workflows/cutout/v1.0/`. The two studies being on
-different years is deliberate for now — aligning them means one download and a
-full rebuild of the affected study.
+`https://data.pypsa.org/workflows/cutout/v1.0/`. The studies were on different
+years (2010 / 2013) until the 2026-08-14 1h run aligned both on 2010; putting
+them back on different years means one download and a full rebuild of the
+affected study.
 
 ### EV charging: flexible and inflexible demand
 
@@ -114,12 +115,26 @@ that change every output path:
 
 **Scenario runs belong here, not in `config.walloon.yaml`.** Keep the latter
 single-run (`run.name: "walloon-model"`, `run.scenarios.enable: false`): the
-cluster scripts default to `RUN_NAME=walloon-model` with an empty `RUN_PREFIX`
-([`cluster/config.sh`](cluster/config.sh)) and the pypsa2html config reads
-`results/walloon-model/`, so a prefix or a `{run}` wildcard there sends every
-path somewhere the tested tooling does not look. To run a scenario, use this
-config — `run.name` already lists `scen_demande_haute` — or set `RUN_PREFIX` and
-`EXPLORER_SCENARIOS` to match whatever you changed.
+pypsa2html config and the documented Explorer examples read
+`results/walloon-model/`, so a prefix or a `{run}` wildcard there sends the
+report and Explorer paths somewhere the tested tooling does not look.
+
+Since 2026-08-14 the cluster scripts **default** to this TIMES-coupled config
+(`CONFIGFILE=config.times-pypsa.yaml`, `RUN_NAME=scen_demande_haute`,
+`RUN_PREFIX=times-pypsa` — see [`cluster/config.sh`](cluster/config.sh)) and
+are prefix-aware (`RUN_DIR_REL` in [`cluster/nic5.sh`](cluster/nic5.sh), so
+prepare/solve/pull/postprocess follow `results/times-pypsa/<scenario>/`). For
+the single-run Walloon config instead clear the scenario defaults (an exported
+*empty* value clears them):
+
+```bash
+CONFIGFILE=config/config.walloon.yaml RUN_NAME=walloon-model \
+RUN_PREFIX= EXPLORER_SCENARIOS= EXPLORER_TYPE= ./cluster/nic5.sh <command>
+```
+
+To run a different scenario, uncomment it in this config's `run.name`
+(`scen_demande_haute` is already listed) and set `EXPLORER_SCENARIOS`
+to match whatever you changed.
 
 With `run.scenarios.enable: true`, `get_rdir()` returns `times-pypsa/{run}/`
 instead of a fixed directory, so **`RDIR` contains a `{run}` wildcard** and
@@ -407,6 +422,10 @@ weather year 2013, `--cores 20 --resources mem_mb=110000`, 14 Aug 2026):
 | pypsa2html report, 75 pages | ~50 s |
 | Peak RAM | ~20 GB of 124 GB |
 
+Observed for the 1h / 2010 run (`scen_demande_haute`, NIC5 `hmem`, 14 Aug 2026):
+≈37 GB RAM per solve, ≈4.5 h solve chain — see
+[`docs/logs/2026-08-14_scen_demande_haute_2010_1h.md`](docs/logs/2026-08-14_scen_demande_haute_2010_1h.md).
+
 ---
 
 ## Environment setup
@@ -426,6 +445,14 @@ If the environment already exists (e.g. from pypsa-eur_negawatt), update it:
 conda env update -n pypsa-eur -f envs/environment.yaml --prune
 conda activate pypsa-eur
 ```
+
+> The env file ends with a pip section (`-e ../TIMES_PyPSA`) that soft-links the
+> TIMES↔PyPSA coupling code: it needs the `TIMES_PyPSA` checkout as a sibling of
+> `pypsa-wal`, otherwise `conda env create/update` fails on the missing path.
+> [`cluster/cluster_setup.sh`](cluster/cluster_setup.sh) strips that section
+> automatically on NIC5, where no sibling checkout exists. The pip block's
+> indentation is load-bearing — the previously over-indented version was invalid
+> YAML.
 
 Sanity check:
 
@@ -486,7 +513,7 @@ The `-call` flag runs all rules needed for the default `all` target, including
 data retrieval from Zenodo/HTTP, network building, four myopic solves, summary
 CSVs, and plots.
 
-### Local resource settings — 12 threads, 100 GB, 6h
+### Local resource settings — 12 threads, 100 GB
 
 The pypsa-eur defaults (`solving.mem_mb: 128000`, `gurobi-default.threads: 32`)
 are sized for a cluster node and **must not be used on a workstation**: 32 Gurobi
@@ -498,17 +525,22 @@ invites the OOM killer. Local runs use:
 | Gurobi threads (= Snakemake `threads` of the solve rule) | **12** | `solving.solver_options.gurobi-default.threads` |
 | `solving.cpus` | **12** | keep in sync with the above |
 | Memory per solve | **100 GB** (`mem_mb: 100000`) | `solving.mem_mb` |
-| Sector time aggregation | **6h (suggested for testing)** | `clustering.temporal.resolution_sector` |
+| Sector time aggregation | **6h** for local testing | `clustering.temporal.resolution_sector` |
 
-These are set in [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml)
-(and match the 6h default of `config.walloon.yaml`). Pass matching limits on the
-command line so Snakemake never schedules two solves at once:
+Threads and memory are set in [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml).
+That config now carries `resolution_sector: 1h` for the 2026-08 1h study (solved
+on NIC5 `hmem`); `config.walloon.yaml` keeps the 6h default, which is the value
+to set for local testing. Pass matching limits on the command line so Snakemake
+never schedules two solves at once:
 
 ```bash
 snakemake --configfile config/config.times-pypsa.yaml --cores 12 --resources mem_mb=100000 -call
 ```
 
-A finer resolution (3h) doubles the LP and might require running on NIC5 `hmem`, not locally (see the cluster section).
+A finer resolution grows the LP roughly linearly in the number of snapshots —
+**1h is beyond a workstation** (≈37 GB RAM per solve; see
+[`docs/logs/2026-08-14_scen_demande_haute_2010_1h.md`](docs/logs/2026-08-14_scen_demande_haute_2010_1h.md))
+and must run on NIC5 `hmem` (see the cluster section).
 
 ### Solve chain only
 
@@ -613,6 +645,12 @@ nothing to poll.
 | `.snakemake/log/` | Master Snakemake run log |
 | `results/_heat_softlink_comparison/logs/` | `before.log` / `after.log` of the heating soft-link comparison run |
 
+**Solve log:** after each solve run, fill in a copy of
+[`docs/logs/_TEMPLATE_solve_log.md`](docs/logs/_TEMPLATE_solve_log.md) and save
+it as `docs/logs/YYYY-MM-DD_<scenario>_<tags>.md` — goal, parameters, timings,
+cluster queue, memory, issues/fixes, S3/Explorer publication. See
+[`docs/logs/`](docs/logs/) for examples.
+
 After a successful local solve, publish results to the Wallonie Explorer with
 `./cluster/nic5.sh upload` (raw results) followed by the ClimAct CSV extraction
 described in [Publishing to Wallonie Explorer (S3)](#publishing-to-wallonie-explorer-s3).
@@ -637,9 +675,12 @@ post-processing stay on your machine.
   submits each rule to Slurm. Compute nodes run only `add_brownfield` and
   `solve_sector_network_myopic`.
 
-Unlike pypsa-eur_negawatt, pypsa-wal has a **single scenario** and a fixed
-temporal resolution in config — cluster commands do not take `<scenario>` or
-`<resolution>` arguments.
+Unlike pypsa-eur_negawatt, cluster commands do not take `<scenario>` or
+`<resolution>` arguments — the run, scenario and prefix are config defaults in
+[`cluster/config.sh`](cluster/config.sh) (currently the `times-pypsa` /
+`scen_demande_haute` run) and can be overridden per command via environment
+variables, as described
+[above](#the-times-coupled-multi-scenario-config).
 
 ### One-time setup
 
@@ -745,10 +786,12 @@ CECI expects allocations to match actual usage — see the
 | Partition | **`hmem`** | `SOLVE_PARTITION` in [`cluster/config.sh`](cluster/config.sh) |
 | Light rules (`add_brownfield`) | 1 CPU, 16 GB | `--default-resources` in `nic5.sh solve` |
 
-Fine temporal resolution (e.g. `resolution_sector: 6h`) makes sector-coupled
+Fine temporal resolution (`resolution_sector: 6h`, and more so the current `1h`
+default of `config.times-pypsa.yaml`) makes sector-coupled
 PyPSA models memory-hungry during Gurobi model generation — **`hmem` is required**
 for production solves on NIC5. Do not use the `batch` partition for these jobs unless
-you also coarsen the time resolution substantially.
+you also coarsen the time resolution substantially. Solve runtime defaults to
+1440 min (`SOLVE_RUNTIME` in `cluster/config.sh`), sized for the 1h LP.
 
 To change solve CPUs or memory, edit `cluster/config_cluster.yaml` (`solving.cpus`,
 `solving.mem_mb`) and keep Gurobi `threads` in sync with `cpus`. Do not exceed the
@@ -995,9 +1038,9 @@ Disable with `SKIP_S3_UPLOAD=1` or `AUTO_UPLOAD_S3=0` in [`cluster/config.sh`](c
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `S3_ENV` | `test` | `test` or `prod` prefix |
-| `RESULTS_DIR` | `results/<RUN_NAME>` | Results tree to upload — override for a `prefix/{run}` layout |
-| `UPLOAD_ID` | `YYYYMMDD_<RUN_NAME>` | Folder under `pypsa_raw_results/` |
-| `SCENARIO_ID` | `pypsa__<RUN_NAME>__YYYYMMDD` | Folder under `scenarios/` |
+| `RESULTS_DIR` | `results/<RUN_PREFIX/>RUN_NAME` | Results tree to upload (prefix included when `RUN_PREFIX` is set) |
+| `UPLOAD_ID` | `YYYYMMDD_<RUN_PREFIX_>RUN_NAME` | Folder under `pypsa_raw_results/` |
+| `SCENARIO_ID` | `<EXPLORER_TYPE>__<RUN_NAME>__YYYYMMDD` | Folder under `scenarios/` |
 | `UPLOAD_SKIP_NETWORKS` | `0` | Set `1` to omit large `.nc` files |
 | `SKIP_S3_UPLOAD` | `0` | Set `1` to skip upload in `postprocess` |
 | `AUTO_UPLOAD_S3` | `1` | Set `0` to never auto-upload from `postprocess` |
@@ -1155,10 +1198,16 @@ baked into the scripts:
 | `EXTRACTOR_BASE_CONFIG` | `config_extraction_walloon.yaml` | Template, **never modified** |
 | `EXTRACTOR_GEN_CONFIG` | `config_extraction_pypsa-wal.generated.yaml` | Generated copy, selected via `EXTRACTION_CONFIG` |
 | `EXTRACTOR_CONFIG_FILE` | `config.base_s_adm___2050.yaml` | Per-horizon snapshot read from `results/<run>/configs/` |
-| `EXPLORER_TYPE` | `pypsa` | `<type>` in `<type>__<scenario>__YYYYMMDD` |
-| `RUN_PREFIX` | *(empty)* | `run.prefix`; empty = single-run layout |
-| `EXPLORER_SCENARIOS` | *(empty)* | `"<scenario>[:<label>] …"`; empty = one run named `RUN_NAME` |
+| `EXPLORER_TYPE` | `times-pypsa` (cleared → `pypsa`) | `<type>` in `<type>__<scenario>__YYYYMMDD` |
+| `RUN_PREFIX` | `times-pypsa` (cleared → single-run) | `run.prefix`; empty = single-run layout |
+| `EXPLORER_SCENARIOS` | `scen_demande_haute:demande-haute-2010-1h` (cleared → single run) | `"<scenario>[:<label>] …"`; empty = one run named `RUN_NAME` |
 | `UPLOAD_DATE` | today | Shared by extract and upload so one `publish` stamps one date |
+
+The three scenario variables use `${VAR-default}` semantics in `config.sh`, so
+an exported **empty** value clears them (that is how the single-run Walloon
+command in
+[The TIMES-coupled multi-scenario config](#the-times-coupled-multi-scenario-config)
+works).
 
 The template config is treated as read-only: the script copies it and rewrites
 only the `run:` block, so a hand-maintained file in a directory this repo does
@@ -1166,8 +1215,9 @@ not own is never clobbered. Selecting the copy relies on
 `graph_extraction_main.py` honouring `EXTRACTION_CONFIG`; `extract` checks for
 that and tells you the one-line patch if it is missing.
 
-For `config.times-pypsa.yaml`, uncomment the prepared block in `config.sh`, or
-export for a one-off:
+These defaults already target `config.times-pypsa.yaml` (see
+[`cluster/config.sh`](cluster/config.sh)). For other scenarios, export for a
+one-off:
 
 ```bash
 CONFIGFILE=config/config.times-pypsa.yaml RUN_PREFIX=times-pypsa \
@@ -1282,6 +1332,7 @@ S3_ENV=prod ./cluster/nic5.sh upload
 │   ├── input_parameters_for_models.csv  # Shared TIMES/PyPSA assumptions (EUR2025)
 │   └── common_parameters_meta.yaml # EUR_REF + technology-data pin
 ├── common_parameters.md            # How the shared CSV is audited and wired into pypsa-wal
+├── docs/logs/                      # Solve logs (one per run; see _TEMPLATE_solve_log.md)
 ├── cluster/
 │   ├── nic5.sh                    # Local ↔ cluster orchestration (+ extract/publish)
 │   ├── upload_s3.sh               # Publish results/ to Intervectoriel S3

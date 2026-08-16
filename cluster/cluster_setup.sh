@@ -34,11 +34,34 @@ fi
 source "$MINIFORGE/etc/profile.d/conda.sh"
 
 echo "=== [2/4] conda environment '$ENV_NAME' ==="
+# EDIT (2026-08-14): strip the local `-e ../TIMES_PyPSA` pip section before
+# creating/updating the remote env — the sibling checkout does not exist on
+# the cluster, and the solve chain does not import times_pypsa.
+# The awk state machine deletes the marker comment and the pip block iff it
+# contains exactly the expected `-e ../TIMES_PyPSA` line; any other pip
+# content (a sed range would silently eat the rest of the file) aborts setup.
+ENV_YAML_LOCAL="$REPO/envs/environment.yaml"
+ENV_YAML_REMOTE="$(mktemp /tmp/environment.cluster.XXXXXX.yaml)"
+if ! awk '
+    /^[[:space:]]*#.*TIMES.*PyPSA.*soft-linking/ { next }
+    inpip && /^[[:space:]]*-[[:space:]]*-e[[:space:]]+\.\.\/TIMES_PyPSA[[:space:]]*$/ { inpip = 0; sawit = 1; justclosed = 1; next }
+    inpip && /^[[:space:]]*[^[:space:]]/ { bad = 1; inpip = 0 }
+    justclosed && /^[[:space:]]+-[[:space:]]/ { bad = 1 }   # orphaned pip entry after the -e line
+    justclosed && /^[[:space:]]*[^[:space:]#]/ { justclosed = 0 }
+    /^[[:space:]]*-[[:space:]]*pip:[[:space:]]*$/ { if (inpip || sawit) bad = 1; inpip = 1; next }
+    { print }
+    END { exit bad ? 3 : 0 }
+' "$ENV_YAML_LOCAL" > "$ENV_YAML_REMOTE"; then
+    echo "ERROR: unexpected pip section in envs/environment.yaml (not the plain" >&2
+    echo "       TIMES soft-link block) — update the stripping logic in this script." >&2
+    rm -f "$ENV_YAML_REMOTE"
+    exit 1
+fi
 if conda env list | grep -qE "^\s*${ENV_NAME}\s"; then
     echo "Env exists; updating from environment.yaml..."
-    conda env update -n "$ENV_NAME" -f "$REPO/envs/environment.yaml" --prune
+    conda env update -n "$ENV_NAME" -f "$ENV_YAML_REMOTE" --prune
 else
-    conda env create -n "$ENV_NAME" -f "$REPO/envs/environment.yaml"
+    conda env create -n "$ENV_NAME" -f "$ENV_YAML_REMOTE"
 fi
 
 echo "=== [3/4] Gurobi licence (token server) ==="

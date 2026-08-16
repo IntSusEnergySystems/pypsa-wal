@@ -71,6 +71,10 @@ dependencies:
 - snakemake-logger-plugin-pypsa >=0.1.0
 - pydeflate >=2.3.4
 - snakemake-executor-plugin-slurm >=1.9.2
-  # TIMES → PyPSA soft-linking (sibling checkout: svn/TIMES_PyPSA next to pypsa-wal)
-  - pip:
-    - -e ../TIMES_PyPSA
+# TIMES → PyPSA soft-linking: sibling checkout TIMES_PyPSA next to pypsa-wal.
+# EDIT (2026-08-14): re-indented — the previously over-indented pip block was
+# invalid YAML and broke `conda env create/update`. Keep this indentation.
+# cluster/cluster_setup.sh strips this section on NIC5 (no sibling checkout,
+# and the solve chain does not import times_pypsa).
+- pip:
+  - -e ../TIMES_PyPSA

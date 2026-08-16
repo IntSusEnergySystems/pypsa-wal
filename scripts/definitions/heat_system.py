@@ -53,8 +53,14 @@ class HeatSystem(Enum):
     SERVICES_URBAN_DECENTRAL = "services urban decentral"
     URBAN_CENTRAL = "urban central"
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    # EDIT (2026-08-14): removed the no-op
+    #     def __init__(self, *args): super().__init__(*args)
+    # It forwarded member args to object.__init__, which Python 3.14 rejects
+    # with "TypeError: object.__init__() takes exactly one argument"
+    # (verified on 3.14.6; it killed every
+    # build_industrial_production_per_country_tomorrow job). The override did
+    # nothing else, so deleting it restores the default Enum init on all
+    # supported Python versions.
 
     def __str__(self) -> str:
         """

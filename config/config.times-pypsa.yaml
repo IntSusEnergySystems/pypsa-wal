@@ -27,14 +27,16 @@ run:
 # data/cutout/archive/<version>/ triggers a multi-GB download (~6.6 GB) of
 # europe-<year>-sarah3-era5.nc.
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
+# EDIT (2026-08-14): 2010, aligned with config.walloon.yaml for the 1h run
+# (this config had carried 2013 since the explicit-weather-year rework).
 snapshots:
-  start: "2013-01-01"
-  end: "2014-01-01"
+  start: "2010-01-01"
+  end: "2011-01-01"
   inclusive: left
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
 atlite:
-  default_cutout: "europe-2013-sarah3-era5"
+  default_cutout: "europe-2010-sarah3-era5"
   nprocesses: 4
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight
@@ -110,7 +112,10 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    resolution_sector: 6h
+    # EDIT (2026-08-14): 1h sector resolution for this run (was 6h). Too large
+    # for the local workstation — the solve must run on NIC5 hmem (see
+    # instructions.md and docs/logs/2026-08-14_scen_demande_haute_2010_1h.md).
+    resolution_sector: 1h
   exclude_carriers:
     - nuclear
 
