@@ -221,6 +221,9 @@ def split_transport_demand(transport_demand_original, elia_shape, bev_dsm_availa
 
     FLexible demand has the same temporal shape as ``transport``, scaled by ``bev_dsm_availability`` and the inflexible
     demand is reshaped to follow Elia's natural charging profile), conserving each node's total energy.
+
+    The flexible share follows actual fuel/power consumption in the cars (i.e. driving demand),
+    while the inflexible share follows actual observed charging behaviour (Elia's natural charging profile).
     """
     # to get flexible demand, multiple total transport demand by the share of flexible demand (bev_dsm_availability)
     transport_flexible = transport_demand_original * bev_dsm_availability
