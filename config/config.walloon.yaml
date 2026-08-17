@@ -112,8 +112,12 @@ clustering:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
   bev_dsm_availability: 0.01 # Elia assumes 1% flexible demand in 2026
-  bev_dsm_restriction_value: 0.7 # based on NREL paper
-  bev_dsm_restriction_time: 17 # based on NREL paper
+  # bev_dsm_restriction_value and bev_dsm_restriction_time based on:
+  # Blonsky, M., Munankarmi, P., Balamurugan, S. (2021). Incorporating Residential Smart
+  # Electric Vehicle Charging in Home Energy Management Systems: Preprint. NREL/CP-5D00-78540.
+  # https://www.nrel.gov/docs/fy21osti/78540.pdf
+  bev_dsm_restriction_value: 0.7
+  bev_dsm_restriction_time: 17
   bev_avail_max: 0.4 # based on Elia values
   bev_avail_mean: 0.32 # based on Elia values
   bev_avail_min: 0.2 # based on Elia values
