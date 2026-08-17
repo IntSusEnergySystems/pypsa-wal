@@ -1514,7 +1514,7 @@ rule build_transport_demand:
         traffic_data_KFZ=f"{MOBILITY_PROFILES_DATASET['folder']}/kfz.csv",
         traffic_data_Pkw=f"{MOBILITY_PROFILES_DATASET['folder']}/pkw.csv",
         temp_air_total=resources("temp_air_total_base_s_{clusters}.nc"),
-        elia_natural_charging_profile="data/walloon/elia_natural_charging_daily_profile.csv",
+        elia_natural_charging_profile="data/walloon/elia_natural_charging_daily_profile_utc0.csv",
     output:
         transport_demand=resources("transport_demand_s_{clusters}_{planning_horizons}.csv"),
         transport_data=resources("transport_data_s_{clusters}_{planning_horizons}.csv"),
