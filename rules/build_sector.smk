@@ -1520,7 +1520,7 @@ rule build_transport_demand:
         transport_data=resources("transport_data_s_{clusters}_{planning_horizons}.csv"),
         avail_profile=resources("avail_profile_s_{clusters}_{planning_horizons}.csv"),
         dsm_profile=resources("dsm_profile_s_{clusters}_{planning_horizons}.csv"),
-        elia_charging_shape=resources("elia_charging_shape_s_{clusters}_{planning_horizons}.csv"),
+        natural_charging_shape=resources("natural_charging_shape_s_{clusters}_{planning_horizons}.csv"),
     threads: 1
     resources:
         mem_mb=2000,
@@ -1762,7 +1762,7 @@ rule prepare_sector_network:
         transport_data=resources("transport_data_s_{clusters}_{planning_horizons}.csv"),
         avail_profile=resources("avail_profile_s_{clusters}_{planning_horizons}.csv"),
         dsm_profile=resources("dsm_profile_s_{clusters}_{planning_horizons}.csv"),
-        elia_charging_shape=resources("elia_charging_shape_s_{clusters}_{planning_horizons}.csv"),
+        natural_charging_shape=resources("natural_charging_shape_s_{clusters}_{planning_horizons}.csv"),
         co2_totals_name=resources("co2_totals_{clusters}_{planning_horizons}.csv"),
         co2=rules.retrieve_ghg_emissions.output["csv"],
         biomass_potentials=resources(

@@ -196,7 +196,7 @@ def bev_dsm_profile(snapshots, nodes, options):
     )
 
 
-def build_elia_transport_shape(fn, snapshots, nodes, year=2026):
+def build_natural_charging_shape(fn, snapshots, nodes, year=2026):
     """
     Build a normalized weekly charging shape from Elia's observed hourly
     natural (non-flexible) charging profile for a given year.
@@ -215,7 +215,7 @@ def build_elia_transport_shape(fn, snapshots, nodes, year=2026):
     return shape / shape.sum()
 
 
-def split_transport_demand(transport_demand_original, elia_shape, bev_dsm_availability):
+def split_transport_demand(total_transport_demand, natural_charging_shape, bev_dsm_availability):
     """
     Split transport demand into a flexible and inflexible demand.
 
@@ -226,15 +226,15 @@ def split_transport_demand(transport_demand_original, elia_shape, bev_dsm_availa
     while the inflexible share follows actual observed charging behaviour (Elia's natural charging profile).
     """
     # to get flexible demand, multiple total transport demand by the share of flexible demand (bev_dsm_availability)
-    transport_flexible = transport_demand_original * bev_dsm_availability
+    transport_flexible = total_transport_demand * bev_dsm_availability
 
     # to get inflexible demand, multiply total transport demand by the share of inflexible demand (1 - bev_dsm_availability)
     # and then multiply by Elia's natural charging profile to reshape in time
-    inflexible_total = transport_demand_original.sum() * (1 - bev_dsm_availability)
-    transport_inflexible = elia_shape.mul(inflexible_total, axis=1)
+    inflexible_total = total_transport_demand.sum() * (1 - bev_dsm_availability)
+    transport_inflexible = natural_charging_shape.mul(inflexible_total, axis=1)
 
     # add check to ensure that total energy equals the sum of the split (flexible + inflexible)
-    total_orig = transport_demand_original.sum().sum()
+    total_orig = total_transport_demand.sum().sum()
     total_split = transport_flexible.sum().sum() + transport_inflexible.sum().sum()
     assert np.isclose(total_orig, total_split, rtol=1e-6), (
         f"transport split does not match: {total_orig} vs {total_split}"
@@ -289,10 +289,10 @@ if __name__ == "__main__":
 
     dsm_profile = bev_dsm_profile(snapshots, nodes, options)
 
-    elia_transport_shape = build_elia_transport_shape(snakemake.input.elia_natural_charging_profile, snapshots, nodes, year=2026)
+    natural_charging_shape = build_natural_charging_shape(snakemake.input.elia_natural_charging_profile, snapshots, nodes, year=2026)
 
     nodal_transport_data.to_csv(snakemake.output.transport_data)
     transport_demand.to_csv(snakemake.output.transport_demand)
     avail_profile.to_csv(snakemake.output.avail_profile)
     dsm_profile.to_csv(snakemake.output.dsm_profile)
-    elia_transport_shape.to_csv(snakemake.output.elia_charging_shape)
+    natural_charging_shape.to_csv(snakemake.output.natural_charging_shape)

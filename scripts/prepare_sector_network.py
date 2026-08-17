@@ -2240,7 +2240,7 @@ def add_EVs(
     temperature: pd.DataFrame,
     spatial: SimpleNamespace,
     options: dict,
-    elia_shape: pd.DataFrame,
+    natural_charging_shape: pd.DataFrame,
 ) -> None:
     """
     Add electric vehicle (EV) infrastructure to the network.
@@ -2281,7 +2281,7 @@ def add_EVs(
         - bev_energy: float
         - bev_dsm_availability: float
         - v2g: bool
-    elia_shape : pd.DataFrame
+    natural_charging_shape : pd.DataFrame
         Day-invariant normalized Elia natural-charging shape (columns sum to
         1 per node), with snapshots as index and nodes as columns
 
@@ -2351,7 +2351,7 @@ def add_EVs(
     # Split final EV electricity demand into a flexible share and an inflexible (fixed elia natural-charging shape) share
     profile_flexible, profile_inflexible = split_transport_demand(
         profile.loc[n.snapshots],
-        elia_shape.loc[n.snapshots, spatial.nodes],
+        natural_charging_shape.loc[n.snapshots, spatial.nodes],
         options["bev_dsm_availability"],
     )
 
@@ -2660,7 +2660,7 @@ def add_land_transport(
     transport_data_file,
     avail_profile_file,
     dsm_profile_file,
-    elia_charging_shape_file,
+    natural_charging_shape_file,
     temp_air_total_file,
     cf_industry,
     options,
@@ -2684,7 +2684,7 @@ def add_land_transport(
         Path to CSV file containing availability profiles
     dsm_profile_file : str
         Path to CSV file containing demand-side management profiles
-    elia_charging_shape_file : str
+    natural_charging_shape_file : str
         Path to CSV file containing the day-invariant normalized Elia
         natural-charging shape
     temp_air_total_file : str
@@ -2719,7 +2719,7 @@ def add_land_transport(
     number_cars = pd.read_csv(transport_data_file, index_col=0)["number cars"]
     avail_profile = pd.read_csv(avail_profile_file, index_col=0, parse_dates=True)
     dsm_profile = pd.read_csv(dsm_profile_file, index_col=0, parse_dates=True)
-    elia_shape = pd.read_csv(elia_charging_shape_file, index_col=0, parse_dates=True)
+    natural_charging_shape = pd.read_csv(natural_charging_shape_file, index_col=0, parse_dates=True)
 
     # exogenous share of passenger car type
     engine_types = ["fuel_cell", "electric", "ice"]
@@ -2796,7 +2796,7 @@ def add_land_transport(
             temperature,
             spatial,
             options,
-            elia_shape[nodes],
+            natural_charging_shape[nodes],
         )
     elif shares["electric"] > 0:
         add_EVs(
@@ -2809,7 +2809,7 @@ def add_land_transport(
             temperature,
             spatial,
             options,
-            elia_shape[nodes],
+            natural_charging_shape[nodes],
         )
     if (times_demand or suff_demand) and fuel_cell_share.sum() > 0:
         add_fuel_cell_cars(
@@ -6895,7 +6895,7 @@ if __name__ == "__main__":
             transport_data_file=snakemake.input.transport_data,
             avail_profile_file=snakemake.input.avail_profile,
             dsm_profile_file=snakemake.input.dsm_profile,
-            elia_charging_shape_file=snakemake.input.elia_charging_shape,
+            natural_charging_shape_file=snakemake.input.natural_charging_shape,
             temp_air_total_file=snakemake.input.temp_air_total,
             cf_industry=cf_industry,
             options=options,
