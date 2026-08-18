@@ -17,6 +17,8 @@ committed, but row count may change when the technology universe moves.
                 ├─► data/walloon/custom_costs.csv          cost:<tech>:<param>
                 ├─► data/walloon/custom_potentials.csv     potential:<bus>:<tech>:<attr>
                 ├─► data/walloon/ntc_<year>.csv            ntc:<A>-<B>
+                ├─► data/walloon/agg_p_nom_minmax_demande_haute.csv
+                │                                          agg:<country>:<carrier>:<min|max>
                 ├─► data/walloon/discount_rates.csv        hurdle:<sector>  [generated]
                 ├─► config/config.walloon.yaml             config:budget_national
                 │                                          + costs.social_discountrate (from CSV)
@@ -53,6 +55,9 @@ TIMES_PYPSA_CONFIG = ROOT / "config" / "config.times-pypsa.yaml"
 DEFAULT_CONFIG = ROOT / "config" / "config.default.yaml"
 COSTS_FILE = ROOT / "data" / "walloon" / "custom_costs.csv"
 POTENTIALS_FILE = ROOT / "data" / "walloon" / "custom_potentials.csv"
+# TIMES-aligned nuclear (and other) country/carrier caps for scen_demande_haute.
+# Other scenarios keep their own agg files; this patch does not touch them.
+AGG_FILE = ROOT / "data" / "walloon" / "agg_p_nom_minmax_demande_haute.csv"
 NTC_GLOB = "ntc_*.csv"
 COST_ARCHIVE_GLOB = "costs_*.csv"
 COST_TABLE_RENAMES = {"solar-utility single-axis tracking": "solar-hsat"}
@@ -463,6 +468,116 @@ def patch_ntc(df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool) -> lis
             _write(path, frame, before, patch)
         patches.append(patch)
     return patches
+
+
+def _parse_agg_header(lines: list[str]) -> list[tuple[str, str]]:
+    """Year/bound pairs from the three-line header of an agg_p_nom_minmax CSV."""
+    if len(lines) < 3:
+        raise ValueError("agg file shorter than 3 header lines")
+    years = lines[0].split(",")[2:]
+    bounds = lines[1].split(",")[2:]
+    if len(years) != len(bounds):
+        raise ValueError(
+            f"agg header year/bound length mismatch {len(years)} vs {len(bounds)}"
+        )
+    return list(zip(years, bounds))
+
+
+def patch_agg_p_nom(
+    df: pd.DataFrame,
+    horizons: tuple[int, ...],
+    dry_run: bool,
+    path: Path | None = None,
+) -> Patch:
+    """Patch BE/BEWAL nuclear (etc.) caps in the demande-haute agg file.
+
+    Target shape: ``agg:<country>:<carrier>:<min|max>``. Only *explicit* CSV
+    anchor years are written (``Target.anchors``), so 2025/2030 stay empty
+    when the table has no row for them — ``expand_years`` would otherwise
+    hold-forward the first cap onto the legacy-fleet horizons. Extra dest
+    columns such as 2035/2045 are patched when the table anchors them.
+    """
+    path = path or AGG_FILE
+    patch = Patch(path=path)
+    targets = collect_targets(df, "agg", horizons, nparts=3)
+    if not targets:
+        return patch
+    if not path.exists():
+        patch.errors.append(f"{path.name}: missing, cannot apply agg: targets")
+        return patch
+
+    raw = path.read_text()
+    newline = "\r\n" if "\r\n" in raw[:4096] else "\n"
+    lines = raw.splitlines()
+    try:
+        columns = _parse_agg_header(lines)
+    except ValueError as exc:
+        patch.errors.append(f"{path.name}: {exc}")
+        return patch
+    patch.rows = max(len(lines) - 3, 0)
+
+    col_index: dict[tuple[str, str], int] = {}
+    for i, (year, bound) in enumerate(columns):
+        col_index[(str(year), bound)] = i
+
+    # country,carrier -> line index in `lines`
+    row_at: dict[tuple[str, str], int] = {}
+    for i, line in enumerate(lines[3:], start=3):
+        parts = line.split(",")
+        if len(parts) < 2:
+            continue
+        row_at[(parts[0], parts[1])] = i
+
+    seen: set[tuple[str, ...]] = set()
+    for key, tgt in sorted(targets.items()):
+        country, carrier, bound = key
+        if bound not in ("min", "max"):
+            patch.errors.append(
+                f"{path.name}: agg:{tgt.label} bound must be min or max, not {bound!r}"
+            )
+            continue
+        if not units_compatible(tgt.unit, "MW"):
+            patch.errors.append(
+                f"{path.name}: unit mismatch for agg:{tgt.label}: master CSV "
+                f"{tgt.unit!r} vs file MW_e — scales differ, refusing to patch"
+            )
+            continue
+        loc = (country, carrier)
+        if loc not in row_at:
+            patch.errors.append(
+                f"{path.name}: no {country},{carrier} row for active target "
+                f"agg:{tgt.label} — add it to the file or set status=none"
+            )
+            continue
+        seen.add(key)
+        patch.managed += 1
+        li = row_at[loc]
+        cells = lines[li].split(",")
+        # pad so index+value cells cover every header column
+        need = 2 + len(columns)
+        if len(cells) < need:
+            cells.extend([""] * (need - len(cells)))
+        for year, val in sorted(tgt.anchors.items()):
+            idx = col_index.get((str(year), bound))
+            if idx is None:
+                patch.errors.append(
+                    f"{path.name}: no {year}/{bound} column for agg:{tgt.label}"
+                )
+                continue
+            new = fmt_value(val)
+            old = cells[2 + idx]
+            if old and same_value(old, val):
+                continue
+            patch.changes.append(
+                f"{country} {carrier} {year} {bound}: "
+                f"{old or '(empty)'} -> {new} MW"
+            )
+            cells[2 + idx] = new
+        lines[li] = ",".join(cells)
+
+    if not dry_run and patch.ok and patch.changes:
+        path.write_text(newline.join(lines) + newline)
+    return patch
 
 
 # --------------------------------------------------------------------------- #
@@ -1214,6 +1329,7 @@ def cmd_check(df: pd.DataFrame, meta: dict, verbose: bool = False) -> int:
         patch_costs(df, horizons, dry_run=True),
         patch_potentials(df, horizons, dry_run=True),
         *patch_ntc(df, horizons, dry_run=True),
+        patch_agg_p_nom(df, horizons, dry_run=True),
         patch_walloon_config(build_budget_national(df, horizons), dry_run=True),
         *patch_costs_scalars(df, horizons, dry_run=True),
         *patch_discount_rates(df, meta, horizons, dry_run=True),
@@ -1252,6 +1368,7 @@ def cmd_write(df: pd.DataFrame, meta: dict, dry_run: bool, verbose: bool) -> int
         patch_costs(df, horizons, dry_run),
         patch_potentials(df, horizons, dry_run),
         *patch_ntc(df, horizons, dry_run),
+        patch_agg_p_nom(df, horizons, dry_run),
         patch_walloon_config(build_budget_national(df, horizons), dry_run),
         *patch_costs_scalars(df, horizons, dry_run),
         *patch_discount_rates(df, meta, horizons, dry_run),
@@ -1305,7 +1422,13 @@ def cmd_report(df: pd.DataFrame, meta: dict, verbose: bool) -> int:
         .value_counts()
         .to_string()
     )
-    for prefix, nparts in (("cost", 2), ("potential", 3), ("ntc", 1), ("hurdle", 1)):
+    for prefix, nparts in (
+        ("cost", 2),
+        ("potential", 3),
+        ("ntc", 1),
+        ("agg", 3),
+        ("hurdle", 1),
+    ):
         targets = collect_targets(df, prefix, horizons, nparts=nparts)
         by_origin: dict[str, int] = {}
         for t in targets.values():

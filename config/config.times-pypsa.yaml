@@ -112,10 +112,11 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    # EDIT (2026-08-14): 1h sector resolution for this run (was 6h). Too large
-    # for the local workstation — the solve must run on NIC5 hmem (see
-    # instructions.md and docs/logs/2026-08-14_scen_demande_haute_2010_1h.md).
-    resolution_sector: 1h
+    # EDIT (2026-08-18): 6h diagnostic for the nuclear-alignment re-solve.
+    # 1h + option B' made the barrier hostile (3–5 h/horizon even with
+    # BarHomogeneous and a 1% gap). 6h is the last resolution that solved
+    # option B' in minutes; keep it until the nuclear caps are shown feasible.
+    resolution_sector: 6h
   exclude_carriers:
     - nuclear
 

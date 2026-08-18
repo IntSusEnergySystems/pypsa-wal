@@ -21,6 +21,7 @@ shared CSV (monetary values in EUR2025; year in the unit)
                          data/walloon/custom_costs.csv
                          data/walloon/custom_potentials.csv
                          data/walloon/ntc_<year>.csv
+                         data/walloon/agg_p_nom_minmax_demande_haute.csv
                          config/config.walloon.yaml  (budget_national + cost scalars)
                          config/config.times-pypsa.yaml  (cost scalars)
                        and GENERATES
@@ -71,8 +72,8 @@ channels match on free-text labels.
 | financial-rate fill (unmapped fallback) | — | **PyPSA default** `config.default.yaml` (`0.07`) — not overridden in walloon configs | `scripts/process_cost_data.py` `fillna` |
 | Walloon RES potentials, biomass, biogas | 12 | `electricity: walloon_potentials` | `scripts/walloon_scripts/BEWAL_potentials.py` |
 | cross-border NTCs | 18 | `data/walloon/ntc_<year>.csv` | `scripts/walloon_scripts/set_NTCs.py` |
+| aggregate capacity limits per country | 6 | `solving: agg_p_nom_limits: file` (`agg:` targets patch the demande-haute file) | `scripts/solve_network.py` |
 | CO₂ trajectory, CO₂ storage, imports, BEV flexibility | ~24 | `config.walloon.yaml` over `config.default.yaml` | scripts that read the keys |
-| aggregate capacity limits per country | 6 | `solving: agg_p_nom_limits: file` | `scripts/solve_network.py` |
 | TIMES activity drivers | 11 | — | stay in TIMES; demands cross via soft-link |
 
 Two properties of these channels drive the whole design and are easy to forget:
@@ -297,6 +298,9 @@ data/walloon/custom_costs.csv        value cells of `cost:<tech>:<param>` rows
 data/walloon/custom_potentials.csv   value cells of `potential:<bus>:<tech>:<attr>` rows
 data/walloon/ntc_<year>.csv          NTC_MW of `ntc:<A>-<B>` rows (every ntc_*.csv, not
                                      just the planning horizons)
+data/walloon/agg_p_nom_minmax_demande_haute.csv
+                                     min/max cells of `agg:<country>:<carrier>:<min|max>`
+                                     (explicit CSV years only; 2025/2030 stay empty)
 data/walloon/discount_rates.csv     GENERATED per-technology hurdle rates
 config/config.walloon.yaml           budget_national + costs.social_discountrate
                                      (SDR synced from CSV; fill_values stay PyPSA)

@@ -10,6 +10,107 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# Typical duration of Belgian TSO-connected BESS (Vilvoorde, Navagne, Storm, …).
+UTILITY_BATTERY_HOURS = 4.0
+
+
+def _utility_battery_chargers(n, bus):
+    """Charger links of the utility battery at `bus` (not home batteries)."""
+    if n.links.empty:
+        return n.links.iloc[0:0]
+    mask = (
+        n.links.carrier.str.contains("battery charger", na=False)
+        & ~n.links.carrier.str.contains("home", na=False)
+        & (n.links.bus0 == bus)
+    )
+    return n.links.loc[mask]
+
+
+def _utility_battery_dischargers(n, bus):
+    if n.links.empty:
+        return n.links.iloc[0:0]
+    mask = (
+        n.links.carrier.str.contains("battery discharger", na=False)
+        & ~n.links.carrier.str.contains("home", na=False)
+        & (n.links.bus1 == bus)
+    )
+    return n.links.loc[mask]
+
+
+def _utility_battery_stores(n, bus):
+    if n.stores.empty:
+        return n.stores.iloc[0:0]
+    prefix = f"{bus} battery"
+    mask = (
+        (n.stores.carrier == "battery")
+        & n.stores.index.str.startswith(prefix)
+        & ~n.stores.index.str.contains("home", na=False)
+    )
+    return n.stores.loc[mask]
+
+
+def _current_horizon_index(index, bus, kind, planning_horizons):
+    """Names of the current-horizon asset: `{bus} {kind}` or `{bus} {kind}-{year}`."""
+    year = str(int(planning_horizons))
+    exact = f"{bus} {kind}"
+    vintage = f"{bus} {kind}-{year}"
+    return index[(index == exact) | (index == vintage)]
+
+
+def apply_battery_p_nom_min(n, bus, p_min_mw, planning_horizons):
+    """Force a fleet floor on the utility battery at `bus`.
+
+    Existing vintages (other years) already contribute to the floor, so the
+    current-horizon extendable charger/discharger/store only has to cover the
+    residual. Energy floor is 4 h × residual power (Belgian utility BESS).
+    """
+    p_min_mw = float(p_min_mw)
+    chargers = _utility_battery_chargers(n, bus)
+    dischargers = _utility_battery_dischargers(n, bus)
+    stores = _utility_battery_stores(n, bus)
+
+    cur_ch = _current_horizon_index(
+        chargers.index, bus, "battery charger", planning_horizons
+    )
+    cur_dis = _current_horizon_index(
+        dischargers.index, bus, "battery discharger", planning_horizons
+    )
+    cur_st = _current_horizon_index(
+        stores.index, bus, "battery", planning_horizons
+    )
+
+    if cur_ch.empty and cur_dis.empty and cur_st.empty:
+        logger.warning(
+            "No utility battery at bus %s for horizon %s; "
+            "cannot apply p_nom_min=%.0f MW.",
+            bus,
+            planning_horizons,
+            p_min_mw,
+        )
+        return
+
+    existing_p = float(chargers.drop(index=cur_ch, errors="ignore").p_nom.sum())
+    residual_p = max(p_min_mw - existing_p, 0.0)
+    if not cur_ch.empty:
+        n.links.loc[cur_ch, "p_nom_min"] = residual_p
+    if not cur_dis.empty:
+        n.links.loc[cur_dis, "p_nom_min"] = residual_p
+
+    existing_e = float(stores.drop(index=cur_st, errors="ignore").e_nom.sum())
+    residual_e = max(p_min_mw * UTILITY_BATTERY_HOURS - existing_e, 0.0)
+    if not cur_st.empty:
+        n.stores.loc[cur_st, "e_nom_min"] = residual_e
+
+    logger.info(
+        "Battery floor at %s: %.0f MW total (existing %.0f MW, "
+        "current-horizon p_nom_min %.0f MW, e_nom_min %.0f MWh).",
+        bus,
+        p_min_mw,
+        existing_p,
+        residual_p,
+        residual_e,
+    )
+
 
 def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
     if walloon_potentials == None:
@@ -163,6 +264,14 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             n.generators.loc[sustainable_idx, attr] = potential
             if unsustainable_idx in n.generators.index:
                 n.generators.loc[unsustainable_idx, ["p_nom", attr]] = 0
+        if carrier == "battery":
+            allowed = {"p_nom_min"}
+            assert attr in allowed, (
+                f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
+            )
+            logger.info(logger_msg_success)
+            apply_battery_p_nom_min(n, bus, potential, planning_horizons)
+            continue
         if carrier in ['CCGT']:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}
             assert attr in allowed, f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"

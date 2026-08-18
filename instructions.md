@@ -16,6 +16,15 @@ The workflow follows the same strategy as
 retrieval and network preparation run where you have internet; only the
 memory-intensive Gurobi solve is optionally delegated to the cluster.
 
+**Solve log is mandatory.** A run is not finished when Gurobi prints
+`Optimal objective`. Before considering the work done — including diagnostics,
+killed 1h attempts, 6h tests, and runs that skip postprocess/S3 — copy
+[`docs/logs/_TEMPLATE_solve_log.md`](docs/logs/_TEMPLATE_solve_log.md) to
+`docs/logs/YYYY-MM-DD_<scenario>_<tags>.md` and fill it. If resolution or a
+large constraint set changed (e.g. 1h vs 6h, option B′ heat-profile pinning),
+the log **must** record the runtime/feasibility comparison. See
+[Solve logs (required)](#solve-logs-required).
+
 ---
 
 ## Model overview
@@ -27,7 +36,7 @@ memory-intensive Gurobi solve is optionally delegated to the cluster.
 | Foresight | Myopic (2025 → 2030 → 2040 → 2050) |
 | Countries | BE, FR, GB, NL, DE, LU |
 | Spatial clustering | Custom 3-node Belgium (`adm` + `custom_busmap_BE`) |
-| Temporal resolution | Sector snapshots: `resolution_sector: 6h` in the Walloon config, `1h` in `config.times-pypsa.yaml` |
+| Temporal resolution | Sector snapshots: `resolution_sector: 6h` in both study configs as of 2026-08-18. The 14 Aug 2026 publication run used `1h` in `config.times-pypsa.yaml` ([log](docs/logs/2026-08-14_scen_demande_haute_2010_1h.md)); that setting is hostile once option B′ is on — see [the 18 Aug 6h diagnostic](docs/logs/2026-08-18_scen_demande_haute_2010_6h.md). |
 | Weather year | **2010** (`atlite.default_cutout: europe-2010-sarah3-era5`) |
 | Solver | Gurobi (`gurobi-default`) |
 
@@ -240,6 +249,7 @@ The exception is `discount_rates.csv`, which is **generated wholesale** from
 | Financial-rate fill (unmapped fallback) | — | **PyPSA default** in `config.default.yaml` (`0.07`); not overridden in walloon configs |
 | Walloon RES / biomass potentials | `potential:<bus>:<tech>:<attr>` | `data/walloon/custom_potentials.csv` |
 | Cross-border NTCs | `ntc:<A>-<B>` | `data/walloon/ntc_<year>.csv` |
+| Aggregate nuclear caps (demande haute) | `agg:<country>:<carrier>:<min\|max>` | `data/walloon/agg_p_nom_minmax_demande_haute.csv` |
 | CO₂ trajectory | `config:budget_national` | `config/config.walloon.yaml` |
 
 There is no overlay config file and no load-order requirement — the ordinary run
@@ -528,10 +538,13 @@ invites the OOM killer. Local runs use:
 | Sector time aggregation | **6h** for local testing | `clustering.temporal.resolution_sector` |
 
 Threads and memory are set in [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml).
-That config now carries `resolution_sector: 1h` for the 2026-08 1h study (solved
-on NIC5 `hmem`); `config.walloon.yaml` keeps the 6h default, which is the value
-to set for local testing. Pass matching limits on the command line so Snakemake
-never schedules two solves at once:
+Both study configs currently use `resolution_sector: 6h` (the 18 Aug 2026
+nuclear diagnostic switched `config.times-pypsa.yaml` back from the 14 Aug 1h
+study). Flip it to `1h` only deliberately: with option B′ on, hourly solves are
+hostile — see
+[`docs/logs/2026-08-18_scen_demande_haute_2010_6h.md`](docs/logs/2026-08-18_scen_demande_haute_2010_6h.md).
+Pass matching limits on the command line so Snakemake never schedules two
+solves at once:
 
 ```bash
 snakemake --configfile config/config.times-pypsa.yaml --cores 12 --resources mem_mb=100000 -call
@@ -1332,7 +1345,7 @@ S3_ENV=prod ./cluster/nic5.sh upload
 │   ├── input_parameters_for_models.csv  # Shared TIMES/PyPSA assumptions (EUR2025)
 │   └── common_parameters_meta.yaml # EUR_REF + technology-data pin
 ├── common_parameters.md            # How the shared CSV is audited and wired into pypsa-wal
-├── docs/logs/                      # Solve logs (one per run; see _TEMPLATE_solve_log.md)
+├── docs/logs/                      # REQUIRED human solve log per run (see _TEMPLATE_solve_log.md)
 ├── cluster/
 │   ├── nic5.sh                    # Local ↔ cluster orchestration (+ extract/publish)
 │   ├── upload_s3.sh               # Publish results/ to Intervectoriel S3

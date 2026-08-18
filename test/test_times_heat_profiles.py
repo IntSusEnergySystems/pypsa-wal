@@ -34,6 +34,7 @@ import pytest
 
 from scripts.walloon_scripts.times_heat_profiles import (
     SOLAR_GROUP,
+    UNMET_SCALE,
     add_times_heat_profile_constraints,
     decentral_heat_load,
     reconstruct_profiles,
@@ -644,8 +645,10 @@ def test_penalty_turns_an_impossible_mix_into_a_priced_relaxation(tmp_path):
     assert (status, condition) == ("ok", "optimal")
 
     unmet = soft.model.variables["TimesHeatProfile-unmet"].solution.to_series()
-    assert unmet["gas boiler"] > 1.0, "the starved group must be the one that relaxes"
-    assert unmet.drop("gas boiler").max() == pytest.approx(0.0, abs=1e-6)
+    # declared in TWh_th (UNMET_SCALE) — back to MWh_th for the assertion
+    unmet_mwh = unmet * UNMET_SCALE
+    assert unmet_mwh["gas boiler"] > 1.0, "the starved group must be the one that relaxes"
+    assert unmet_mwh.drop("gas boiler").max() == pytest.approx(0.0, abs=1e-6)
 
 
 def test_no_relaxation_is_used_when_the_mix_is_deliverable(tmp_path):
