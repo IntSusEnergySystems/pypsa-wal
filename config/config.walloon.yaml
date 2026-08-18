@@ -126,7 +126,7 @@ sector:
   # Electric Vehicle Charging in Home Energy Management Systems: Preprint. NREL/CP-5D00-78540.
   # https://www.nrel.gov/docs/fy21osti/78540.pdf
   bev_dsm_restriction_value: 0.7
-  bev_dsm_restriction_time: 17 # UTC
+  bev_dsm_restriction_time: 7
   # Elia's 2026 vintage applies to horizons 2025 & 2030; 2036 vintage to 2035, 2040 and beyond.
   bev_avail_max:
     2025: 0.4
