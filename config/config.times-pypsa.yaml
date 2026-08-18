@@ -124,13 +124,10 @@ sector:
   # Elia assumes flexible demand share rising from 1% (2026) towards 17% (2036).
   # 2050 plateaus at the 2040 value; 2020/2045 back/forward-filled to the nearest given horizon.
   bev_dsm_availability:
-    2020: 0.01
     2025: 0.01
     2030: 0.07
-    2035: 0.17
-    2040: 0.17
-    2045: 0.17
-    2050: 0.17
+    2040: 0.21
+    2050: 0.28
   # bev_dsm_restriction_value and bev_dsm_restriction_time based on:
   # Blonsky, M., Munankarmi, P., Balamurugan, S. (2021). Incorporating Residential Smart
   # Electric Vehicle Charging in Home Energy Management Systems: Preprint. NREL/CP-5D00-78540.
