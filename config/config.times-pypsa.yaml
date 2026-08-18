@@ -152,6 +152,18 @@ sector:
   bev_energy: 0.06 # Elia assumes 60 kWh
   bev_charge_rate: 0.011 # aligned with Elia
   v2g: false # turn off v2g
+  land_transport_electric_share:
+    2020: 0
+    2025: 0.15
+    2030: 0.35
+    2040: 0.81
+    2050: 1
+  land_transport_ice_share:
+    2020: 1
+    2025: 0.85
+    2030: 0.65
+    2040: 0.19
+    2050: 0
 
   times_demand: true
   times_file: data/walloon/scen_base_coherence_3110.vd
