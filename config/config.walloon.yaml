@@ -129,28 +129,19 @@ sector:
   bev_dsm_restriction_time: 17 # UTC
   # Elia's 2026 vintage applies to horizons 2025 & 2030; 2036 vintage to 2035, 2040 and beyond.
   bev_avail_max:
-    2020: 0.4
     2025: 0.4
     2030: 0.4
-    2035: 0.48
     2040: 0.48
-    2045: 0.48
     2050: 0.48
   bev_avail_mean:
-    2020: 0.32
     2025: 0.32
     2030: 0.32
-    2035: 0.35
     2040: 0.35
-    2045: 0.35
     2050: 0.35
   bev_avail_min:
-    2020: 0.2
     2025: 0.2
     2030: 0.2
-    2035: 0.18
     2040: 0.18
-    2045: 0.18
     2050: 0.18
   bev_energy: 0.06 # Elia assumes 60 kWh
   bev_charge_rate: 0.011 # aligned with Elia
