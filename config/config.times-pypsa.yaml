@@ -121,16 +121,47 @@ clustering:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  bev_dsm_availability: 0.01 # Elia assumes 1% flexible demand in 2026
+  # Elia assumes flexible demand share rising from 1% (2026) towards 17% (2036).
+  # 2050 plateaus at the 2040 value; 2020/2045 back/forward-filled to the nearest given horizon.
+  bev_dsm_availability:
+    2020: 0.01
+    2025: 0.01
+    2030: 0.07
+    2035: 0.17
+    2040: 0.17
+    2045: 0.17
+    2050: 0.17
   # bev_dsm_restriction_value and bev_dsm_restriction_time based on:
   # Blonsky, M., Munankarmi, P., Balamurugan, S. (2021). Incorporating Residential Smart
   # Electric Vehicle Charging in Home Energy Management Systems: Preprint. NREL/CP-5D00-78540.
   # https://www.nrel.gov/docs/fy21osti/78540.pdf
   bev_dsm_restriction_value: 0.7
   bev_dsm_restriction_time: 17 # UTC
-  bev_avail_max: 0.4 # based on Elia values
-  bev_avail_mean: 0.32 # based on Elia values
-  bev_avail_min: 0.2 # based on Elia values
+  # Elia's 2026 vintage applies to horizons 2025 & 2030; 2036 vintage to 2035, 2040 and beyond.
+  bev_avail_max:
+    2020: 0.4
+    2025: 0.4
+    2030: 0.4
+    2035: 0.48
+    2040: 0.48
+    2045: 0.48
+    2050: 0.48
+  bev_avail_mean:
+    2020: 0.32
+    2025: 0.32
+    2030: 0.32
+    2035: 0.35
+    2040: 0.35
+    2045: 0.35
+    2050: 0.35
+  bev_avail_min:
+    2020: 0.2
+    2025: 0.2
+    2030: 0.2
+    2035: 0.18
+    2040: 0.18
+    2045: 0.18
+    2050: 0.18
   bev_energy: 0.06 # Elia assumes 60 kWh
   bev_charge_rate: 0.011 # aligned with Elia
   v2g: false # turn off v2g

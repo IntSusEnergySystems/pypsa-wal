@@ -4278,9 +4278,11 @@
           "type": "boolean"
         },
         "bev_dsm_availability": {
-          "default": 0.5,
-          "description": "The share for battery electric vehicles (BEV) that are able to do demand side management (DSM).",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The share for battery electric vehicles (BEV) that are able to do demand side management (DSM), in a given year.",
+          "type": "object"
         },
         "bev_energy": {
           "default": 0.05,
@@ -4298,19 +4300,25 @@
           "type": "number"
         },
         "bev_avail_max": {
-          "default": 0.95,
-          "description": "The maximum share plugged-in availability for passenger electric vehicles.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The maximum share plugged-in availability for passenger electric vehicles, in a given year.",
+          "type": "object"
         },
         "bev_avail_mean": {
-          "default": 0.8,
-          "description": "The average share plugged-in availability for passenger electric vehicles.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The average share plugged-in availability for passenger electric vehicles, in a given year.",
+          "type": "object"
         },
         "bev_avail_min": {
-          "default": 0.0,
-          "description": "The minimum share plugged-in availability for passenger electric vehicles; the availability profile is floored at this value.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The minimum share plugged-in availability for passenger electric vehicles, in a given year; the availability profile is floored at this value.",
+          "type": "object"
         },
         "v2g": {
           "default": true,
@@ -10548,9 +10556,11 @@
           "type": "boolean"
         },
         "bev_dsm_availability": {
-          "default": 0.5,
-          "description": "The share for battery electric vehicles (BEV) that are able to do demand side management (DSM).",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The share for battery electric vehicles (BEV) that are able to do demand side management (DSM), in a given year.",
+          "type": "object"
         },
         "bev_energy": {
           "default": 0.05,
@@ -10568,19 +10578,25 @@
           "type": "number"
         },
         "bev_avail_max": {
-          "default": 0.95,
-          "description": "The maximum share plugged-in availability for passenger electric vehicles.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The maximum share plugged-in availability for passenger electric vehicles, in a given year.",
+          "type": "object"
         },
         "bev_avail_mean": {
-          "default": 0.8,
-          "description": "The average share plugged-in availability for passenger electric vehicles.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The average share plugged-in availability for passenger electric vehicles, in a given year.",
+          "type": "object"
         },
         "bev_avail_min": {
-          "default": 0.0,
-          "description": "The minimum share plugged-in availability for passenger electric vehicles; the availability profile is floored at this value.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The minimum share plugged-in availability for passenger electric vehicles, in a given year; the availability profile is floored at this value.",
+          "type": "object"
         },
         "v2g": {
           "default": true,

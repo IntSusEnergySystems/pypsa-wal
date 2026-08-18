@@ -438,9 +438,17 @@ class SectorConfig(BaseModel):
         True,
         description="Add the option for battery electric vehicles (BEV) to participate in demand-side management (DSM).",
     )
-    bev_dsm_availability: float = Field(
-        0.5,
-        description="The share for battery electric vehicles (BEV) that are able to do demand side management (DSM).",
+    bev_dsm_availability: dict[int, float] = Field(
+        default_factory=lambda: {
+            2020: 0.5,
+            2025: 0.5,
+            2030: 0.5,
+            2035: 0.5,
+            2040: 0.5,
+            2045: 0.5,
+            2050: 0.5,
+        },
+        description="The share for battery electric vehicles (BEV) that are able to do demand side management (DSM), in a given year.",
     )
     bev_energy: float = Field(
         0.05, description="The average size of battery electric vehicles (BEV) in MWh."
@@ -453,17 +461,41 @@ class SectorConfig(BaseModel):
         0.011,
         description="The power consumption for one electric vehicle (EV) in MWh. Value derived from 3-phase charger with 11 kW.",
     )
-    bev_avail_max: float = Field(
-        0.95,
-        description="The maximum share plugged-in availability for passenger electric vehicles.",
+    bev_avail_max: dict[int, float] = Field(
+        default_factory=lambda: {
+            2020: 0.95,
+            2025: 0.95,
+            2030: 0.95,
+            2035: 0.95,
+            2040: 0.95,
+            2045: 0.95,
+            2050: 0.95,
+        },
+        description="The maximum share plugged-in availability for passenger electric vehicles, in a given year.",
     )
-    bev_avail_mean: float = Field(
-        0.8,
-        description="The average share plugged-in availability for passenger electric vehicles.",
+    bev_avail_mean: dict[int, float] = Field(
+        default_factory=lambda: {
+            2020: 0.8,
+            2025: 0.8,
+            2030: 0.8,
+            2035: 0.8,
+            2040: 0.8,
+            2045: 0.8,
+            2050: 0.8,
+        },
+        description="The average share plugged-in availability for passenger electric vehicles, in a given year.",
     )
-    bev_avail_min: float = Field(
-        0.0,
-        description="The minimum share plugged-in availability for passenger electric vehicles; the availability profile is floored at this value.",
+    bev_avail_min: dict[int, float] = Field(
+        default_factory=lambda: {
+            2020: 0.0,
+            2025: 0.0,
+            2030: 0.0,
+            2035: 0.0,
+            2040: 0.0,
+            2045: 0.0,
+            2050: 0.0,
+        },
+        description="The minimum share plugged-in availability for passenger electric vehicles, in a given year; the availability profile is floored at this value.",
     )
     v2g: bool = Field(
         True,
