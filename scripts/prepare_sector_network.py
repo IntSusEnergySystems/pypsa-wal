@@ -2241,6 +2241,7 @@ def add_EVs(
     spatial: SimpleNamespace,
     options: dict,
     natural_charging_shape: pd.DataFrame,
+    investment_year: int,
 ) -> None:
     """
     Add electric vehicle (EV) infrastructure to the network.
@@ -2279,11 +2280,13 @@ def add_EVs(
         - bev_charge_efficiency: float
         - bev_dsm: bool
         - bev_energy: float
-        - bev_dsm_availability: float
+        - bev_dsm_availability: float or dict[int, float]
         - v2g: bool
     natural_charging_shape : pd.DataFrame
         Day-invariant normalized Elia natural-charging shape (columns sum to
         1 per node), with snapshots as index and nodes as columns
+    investment_year : int
+        Planning horizon used to resolve year-dependent options (e.g. ``bev_dsm_availability``)
 
     Returns
     -------
@@ -2348,11 +2351,13 @@ def add_EVs(
     else:
         profile = electric_share * p_set.div(efficiency)
 
+    bev_dsm_availability = get(options["bev_dsm_availability"], investment_year)
+
     # Split final EV electricity demand into a flexible share and an inflexible (fixed elia natural-charging shape) share
     profile_flexible, profile_inflexible = split_transport_demand(
         profile.loc[n.snapshots],
         natural_charging_shape.loc[n.snapshots, spatial.nodes],
-        options["bev_dsm_availability"],
+        bev_dsm_availability,
     )
 
     # Add flexible EV load (DSM-capable, attached to EV battery bus)
@@ -2378,7 +2383,7 @@ def add_EVs(
 
     # Add BEV chargers
     # NOTE: p_nom is multiplied by electric_share and bev_dsm_availability, since the EV battery bus (and its DSM store) now only carries flexible demand
-    p_nom = (number_cars * options["bev_charge_rate"] * electric_share * options["bev_dsm_availability"])
+    p_nom = (number_cars * options["bev_charge_rate"] * electric_share * bev_dsm_availability)
     n.add(
         "Link",
         spatial.nodes,
@@ -2397,7 +2402,7 @@ def add_EVs(
         e_nom = (
             number_cars
             * options["bev_energy"]
-            * options["bev_dsm_availability"]
+            * bev_dsm_availability
             * electric_share
         )
 
@@ -2797,6 +2802,7 @@ def add_land_transport(
             spatial,
             options,
             natural_charging_shape[nodes],
+            investment_year,
         )
     elif shares["electric"] > 0:
         add_EVs(
@@ -2810,6 +2816,7 @@ def add_land_transport(
             spatial,
             options,
             natural_charging_shape[nodes],
+            investment_year,
         )
     if (times_demand or suff_demand) and fuel_cell_share.sum() > 0:
         add_fuel_cell_cars(
