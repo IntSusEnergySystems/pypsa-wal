@@ -114,3 +114,5 @@ data/walloon/*.vdt
 cluster/logs/*.log
 cluster/.last_jobs
 cluster/logs/orchestrate.pid
+cluster/logs/bisectA.pid
+cluster/logs/bisectB.pid
