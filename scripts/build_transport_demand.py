@@ -197,7 +197,7 @@ def bev_dsm_profile(snapshots, nodes, options):
     )
 
 
-def build_natural_charging_shape(fn, snapshots, nodes, investment_year):
+def build_natural_charging_shape(fn, snapshots, nodes, investment_year, charging_weights):
     """
     Build a normalized weekly charging shape from Elia's observed hourly
     natural (non-flexible) charging profile for the vintage closest to
@@ -212,6 +212,13 @@ def build_natural_charging_shape(fn, snapshots, nodes, investment_year):
     available_years = sorted(daily["year"].unique())
     year = min(available_years, key=lambda y: (abs(y - investment_year), y))
     daily = daily[daily["year"] == year].sort_values("hour")
+
+    assert sum(charging_weights[investment_year].values()) == 1, (
+        "The sum of charging weights must equal 1.0 for the investment year."
+    )
+
+    daily = sum(weight * daily[key] for key, weight in charging_weights[investment_year].items())
+
     weekly_profile = np.tile(daily["natural_charging_profile"].values, 7)
 
     shape = generate_periodic_profiles(
@@ -298,7 +305,7 @@ if __name__ == "__main__":
     dsm_profile = bev_dsm_profile(snapshots, nodes, options)
 
     natural_charging_shape = build_natural_charging_shape(
-        snakemake.input.elia_natural_charging_profile, snapshots, nodes, investment_year
+        snakemake.input.elia_natural_charging_profile, snapshots, nodes, investment_year, charging_weights=snakemake.params.charging_weights
     )
 
     nodal_transport_data.to_csv(snakemake.output.transport_data)

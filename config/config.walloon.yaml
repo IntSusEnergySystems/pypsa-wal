@@ -141,6 +141,27 @@ sector:
     2050: 0.18
   bev_energy: 0.06 # Elia assumes 60 kWh
   bev_charge_rate: 0.011 # aligned with Elia
+  local_bev_dsm:
+    2025:
+      natural: 0.7
+      TOU_PV: 0.1
+      TOU_noPV: 0.1
+      work: 0.1
+    2030:
+      natural: 0.5
+      TOU_PV: 0.2
+      TOU_noPV: 0.1
+      work: 0.2
+    2040:
+      natural: 0.4
+      TOU_PV: 0.25
+      TOU_noPV: 0.1
+      work: 0.25
+    2050:
+      natural: 0.4
+      TOU_PV: 0.25
+      TOU_noPV: 0.1
+      work: 0.25
   v2g: false # turn off v2g
   land_transport_electric_share:
     2020: 0

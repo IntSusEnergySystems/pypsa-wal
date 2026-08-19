@@ -1504,6 +1504,7 @@ rule build_transport_demand:
         drop_leap_day=config_provider("enable", "drop_leap_day"),
         sector=config_provider("sector"),
         energy_totals_year=config_provider("energy", "energy_totals_year"),
+        charging_weights=config_provider("sector", "local_bev_dsm"),
     input:
         network=resources("networks/base_s.nc"),
         clustered_pop_layout=resources("pop_layout_base_s_{clusters}.csv"),
