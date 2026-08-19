@@ -218,8 +218,7 @@ def build_natural_charging_shape(fn, snapshots, nodes, investment_year, charging
     )
 
     daily = sum(weight * daily[key] for key, weight in charging_weights[investment_year].items())
-
-    weekly_profile = np.tile(daily["natural_charging_profile"].values, 7)
+    weekly_profile = np.tile(daily.values, 7)
 
     shape = generate_periodic_profiles(
         dt_index=snapshots,

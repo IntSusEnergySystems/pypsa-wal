@@ -144,24 +144,32 @@ sector:
   local_bev_dsm:
     2025:
       natural: 0.7
-      TOU_PV: 0.1
-      TOU_noPV: 0.1
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
       work: 0.1
     2030:
       natural: 0.5
-      TOU_PV: 0.2
-      TOU_noPV: 0.1
-      work: 0.2
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.3
     2040:
       natural: 0.4
-      TOU_PV: 0.25
-      TOU_noPV: 0.1
-      work: 0.25
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
     2050:
       natural: 0.4
-      TOU_PV: 0.25
-      TOU_noPV: 0.1
-      work: 0.25
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
   v2g: false # turn off v2g
   land_transport_electric_share:
     2020: 0
