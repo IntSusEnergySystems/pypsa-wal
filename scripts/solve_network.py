@@ -750,7 +750,35 @@ def add_CCL_constraints(
         idx_max = rhs_max.index.join(rhs_cst.index, how="left")
         idx_max_links = rhs_max.index.join(rhs_cst_links.index, how="left")
         rhs_max = rhs_max.reindex(idx_max).fillna(0)
-        rhs_links[rhs_links < 0] = 0
+        # the max for links mirrors the min branch: subtract non-extendable
+        # existing capacity so the cap applies to the total. (Previously this
+        # reused `rhs_links` from the min computation, so nuclear/CCGT link
+        # maxima were silently enforced as a second minimum instead of a cap.)
+        rhs_max_links = rhs_max.reindex(idx_max_links).fillna(0)
+        rhs_links = (
+            rhs_max_links - rhs_cst_links.reindex(idx_max_links).fillna(0).p_nom_e
+        ).dropna()
+        # a cap can never bind below the extendable lower bounds (brownfield
+        # links carry p_nom_min > 0), so raise it there instead of flooring at
+        # zero and making the LP infeasible
+        lower_bounds_links = (
+            pd.concat(
+                [
+                    grouper_links,
+                    (links.p_nom_min * links.efficiency).rename("p_nom_e"),
+                ],
+                axis=1,
+            )
+            .groupby(["bus1", "carrier"])
+            .sum()
+            .p_nom_e
+        )
+        lower_bounds_links.index = lower_bounds_links.index.rename(
+            {"bus1": "country"}
+        )
+        rhs_links = rhs_links.clip(
+            lower=lower_bounds_links.reindex(rhs_links.index).fillna(0)
+        )
         maximum = xr.DataArray(rhs_max).rename(dim_0="group")
         maximum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:
@@ -2032,6 +2060,16 @@ if __name__ == "__main__":
         logger.info(f"Labels:\n{labels}")
         n.model.print_infeasibilities()
         raise RuntimeError("Solving status 'infeasible'. Infeasibilities computed.")
+
+    if condition not in ["optimal", "suboptimal"]:
+        # e.g. Gurobi's "numerical trouble" barrier abort arrives as
+        # status='warning', condition='other'. Without this guard the solve
+        # exports an unoptimized network, snakemake sees the rule as done, and
+        # the myopic chain brownfields an all-zero fleet into later horizons.
+        raise RuntimeError(
+            f"Solving termination condition '{condition}' (status '{status}'); "
+            "refusing to export a network without a certified solution."
+        )
 
     n.meta = dict(snakemake.config, **dict(wildcards=dict(snakemake.wildcards)))
     n.export_to_netcdf(snakemake.output.network)

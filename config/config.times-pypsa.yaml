@@ -112,9 +112,6 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    # EDIT (2026-08-14): 1h sector resolution for this run (was 6h). Too large
-    # for the local workstation — the solve must run on NIC5 hmem (see
-    # instructions.md and docs/logs/2026-08-14_scen_demande_haute_2010_1h.md).
     resolution_sector: 1h
   exclude_carriers:
     - nuclear

@@ -65,6 +65,13 @@ submission and job start), anything noteworthy about the queue state.
 | pypsa2html report | |
 | ClimAct extraction | |
 
+If this run’s **resolution or constraint set** differs from the previous run of
+the same scenario (1h vs 6h, option B′ on/off, tighter caps, …), add a short
+runtime/feasibility comparison here or in §9. Do not leave it as tribal
+knowledge — see
+[`2026-08-18_scen_demande_haute_2010_6h.md`](2026-08-18_scen_demande_haute_2010_6h.md)
+§5.1 for the expected level of detail.
+
 ## 6. Resource usage
 
 | Metric | Value |

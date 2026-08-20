@@ -30,7 +30,12 @@ scen_corrige:
 # path). Source: s3://intervectoriel/test/scenarios/times_20260727/
 # Nuclear in TIMES: Tihange retrofit repeatable to keep 1 GW through 2050;
 # 2045 imposes 0.25 GW SMR + 0.5 GW large-scale; 2050 imposes 1 GW SMR + 1 GW
-# large-scale. PyPSA agg caps match that BE total; retrofit may repeat.
+# large-scale. PyPSA agg caps reproduce that trajectory exactly (MW_e, caps on
+# total incl. existing): 2035/2040 = Tihange 3 LTO 1.03 GW in BEWAL + Doel 4
+# LTO 1.0 GW in Flanders, no new build; 2045 = 1.75 GW all in BEWAL (Doel 4
+# retired); 2050 = 3.0 GW all in BEWAL. Details and vd extraction:
+# docs/nuclear-alignment-20260816.md. `retrofit_nuclear_once: false` allows the
+# 2040->2050 Tihange retrofit repeat, mirroring the vd.
 scen_demande_haute:
   sector:
     times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd

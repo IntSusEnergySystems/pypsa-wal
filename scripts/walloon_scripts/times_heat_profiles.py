@@ -88,6 +88,14 @@ logger = logging.getLogger(__name__)
 #: load-shaped target for it would peak in January and be trivially infeasible.
 SOLAR_GROUP = "solar thermal"
 
+#: The unmet relaxation variables are declared in TWh_th, not MWh_th. At 1h
+#: resolution (8760 equalities per group x bus) MWh-valued variables made the
+#: spreading coefficients ``rhs_t / E_g`` ~1e-6 and Gurobi's barrier aborted
+#: with "Numerical trouble encountered" (2026-08-17, 2025 solve twice). With
+#: TWh the coefficients are O(0.1-1); the objective penalty and every consumer
+#: must multiply/divide by this factor.
+UNMET_SCALE = 1e6
+
 #: Relative tolerance for the two closure identities. They are exact in exact
 #: arithmetic; this only absorbs float64 rounding over ~10^4 snapshots.
 _CLOSURE_RTOL = 1e-9
@@ -434,17 +442,18 @@ def add_times_heat_profile_constraints(n, snapshots, snakemake) -> None:
     unmet = None
     if penalty > 0 and relaxable:
         # `upper` as an explicit DataArray: a bare pandas Series arrives with a
-        # `dim_0` dimension name, which linopy refuses.
+        # `dim_0` dimension name, which linopy refuses. Units: TWh_th (see
+        # UNMET_SCALE) for barrier conditioning.
         unmet = n.model.add_variables(
             lower=0.0,
             upper=xr.DataArray(
-                [energies[g] for g in relaxable],
+                [energies[g] / UNMET_SCALE for g in relaxable],
                 coords={"times_heat_group": list(relaxable)},
                 dims=["times_heat_group"],
             ),
             name="TimesHeatProfile-unmet",
         )
-        n.model.objective = n.model.objective + (penalty * unmet).sum()
+        n.model.objective = n.model.objective + (penalty * UNMET_SCALE * unmet).sum()
 
     for group in pinned:
         for bus in buses:
@@ -462,11 +471,11 @@ def add_times_heat_profile_constraints(n, snapshots, snakemake) -> None:
                 # supply == the heat load exactly, relaxation or not.
                 for other in relaxable:
                     lhs = lhs - unmet.sel(times_heat_group=other) * _snapshot_da(
-                        profiles[other][bus] / energies[other], snapshots
+                        profiles[other][bus] / energies[other] * UNMET_SCALE, snapshots
                     )
             elif group in relaxable:
                 lhs = lhs + unmet.sel(times_heat_group=group) * _snapshot_da(
-                    rhs / energies[group], snapshots
+                    rhs / energies[group] * UNMET_SCALE, snapshots
                 )
             n.model.add_constraints(
                 lhs == _snapshot_da(rhs, snapshots),
