@@ -410,6 +410,53 @@ class SectorConfig(BaseModel):
     bev_dsm_restriction_time: float = Field(
         7, description="Time at which SOC of BEV has to be dsm_restriction_value."
     )
+    local_bev_dsm: dict[int, dict[str, float]] = Field({
+        default_factory=lambda: {
+            2025:
+                "natural": 0.7,
+                "sunny_PV": 0.05,
+                "sunny_noPV": 0.05,
+                "cloudy_PV": 0.05,
+                "cloudy_noPV": 0.05,
+                "work": 0.1
+            2030:
+                "natural": 0.5,
+                "sunny_PV": 0.05,
+                "sunny_noPV": 0.05,
+                "cloudy_PV": 0.05,
+                "cloudy_noPV": 0.05,
+                "work": 0.3
+            2035:
+                "natural": 0.5,
+                "sunny_PV": 0.05,
+                "sunny_noPV": 0.05,
+                "cloudy_PV": 0.05,
+                "cloudy_noPV": 0.05,
+                "work": 0.3
+            2040:
+                "natural": 0.4,
+                "sunny_PV": 0.075,
+                "sunny_noPV": 0.075,
+                "cloudy_PV": 0.075,
+                "cloudy_noPV": 0.075,
+                "work": 0.3
+            2045:
+                "natural": 0.4,
+                "sunny_PV": 0.075,
+                "sunny_noPV": 0.075,
+                "cloudy_PV": 0.075,
+                "cloudy_noPV": 0.075,
+                "work": 0.3
+            2050:
+                "natural": 0.4,
+                "sunny_PV": 0.075,
+                "sunny_noPV": 0.075,
+                "cloudy_PV": 0.075,
+                "cloudy_noPV": 0.075,
+                "work": 0.3
+            },
+            description="Share of local BEV dsm (at distribution level) per available curve (sunny with PV, sunny without PV, cloudy with PV, cloudy without PV, work)",
+        },
     transport_heating_deadband_upper: float = Field(
         20.0,
         description="The maximum temperature in the vehicle. At higher temperatures, the energy required for cooling in the vehicle increases.",
