@@ -310,15 +310,24 @@ co2_budget_national: true
 co2_price_national: false
 budget_national:
   2025:
-    BEBRU: 0.64
-    BEVLG: 0.64
-    BEWAL: 0.64
-    DE: 0.64
-    FR: 0.64
-    GB: 0.64
-    NL: 0.64
-    LU: 0.64
+    BEBRU: 0.648
+    BEVLG: 0.648
+    BEWAL: 0.648
+    DE: 0.648
+    FR: 0.648
+    GB: 0.648
+    NL: 0.648
+    LU: 0.648
   2030:
+    BEBRU: 0.648
+    BEVLG: 0.648
+    BEWAL: 0.648
+    DE: 0.648
+    FR: 0.648
+    GB: 0.648
+    NL: 0.648
+    LU: 0.648
+  2040:
     BEBRU: 0.45
     BEVLG: 0.45
     BEWAL: 0.45
@@ -327,15 +336,6 @@ budget_national:
     GB: 0.45
     NL: 0.45
     LU: 0.45
-  2040:
-    BEBRU: 0.25
-    BEVLG: 0.25
-    BEWAL: 0.25
-    DE: 0.25
-    FR: 0.25
-    GB: 0.25
-    NL: 0.25
-    LU: 0.25
   2050:
     BEBRU: 0.05
     BEVLG: 0.05
