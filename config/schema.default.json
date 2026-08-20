@@ -4243,6 +4243,12 @@
           "type": "number"
         },
         "local_bev_dsm": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object"
+          },
           "description": "Share of local BEV dsm (at distribution level) per available curve (sunny with PV, sunny without PV, cloudy with PV, cloudy without PV, work)",
           "type": "object"
         },
@@ -10525,6 +10531,12 @@
           "type": "number"
         },
         "local_bev_dsm": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object"
+          },
           "description": "Share of local BEV dsm (at distribution level) per available curve (sunny with PV, sunny without PV, cloudy with PV, cloudy without PV, work)",
           "type": "object"
         },
