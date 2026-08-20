@@ -4242,6 +4242,10 @@
           "description": "Time at which SOC of BEV has to be dsm_restriction_value.",
           "type": "number"
         },
+        "local_bev_dsm": {
+          "description": "Share of local BEV dsm (at distribution level) per available curve (sunny with PV, sunny without PV, cloudy with PV, cloudy without PV, work)",
+          "type": "object"
+        },
         "transport_heating_deadband_upper": {
           "default": 20.0,
           "description": "The maximum temperature in the vehicle. At higher temperatures, the energy required for cooling in the vehicle increases.",
@@ -10519,6 +10523,10 @@
           "default": 7,
           "description": "Time at which SOC of BEV has to be dsm_restriction_value.",
           "type": "number"
+        },
+        "local_bev_dsm": {
+          "description": "Share of local BEV dsm (at distribution level) per available curve (sunny with PV, sunny without PV, cloudy with PV, cloudy without PV, work)",
+          "type": "object"
         },
         "transport_heating_deadband_upper": {
           "default": 20.0,

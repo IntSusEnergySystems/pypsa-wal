@@ -133,6 +133,49 @@ sector:
   # https://www.nrel.gov/docs/fy21osti/78540.pdf
   bev_dsm_restriction_value: 0.7
   bev_dsm_restriction_time: 7
+  local_bev_dsm:
+    2025:
+      natural: 0.7
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.1
+    2030:
+      natural: 0.5
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.3
+    2035:
+      natural: 0.5
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.3
+    2040:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
+    2045:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
+    2050:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
   # Elia's 2026 vintage applies to horizons 2025 & 2030; 2036 vintage to 2035, 2040 and beyond.
   bev_avail_max:
     2025: 0.4
