@@ -2281,10 +2281,12 @@ def add_EVs(
         - bev_dsm: bool
         - bev_energy: float
         - bev_dsm_availability: float or dict[int, float]
+        - bev_natural_charging_split: bool
         - v2g: bool
     natural_charging_shape : pd.DataFrame
-        Day-invariant normalized Elia natural-charging shape (columns sum to
-        1 per node), with snapshots as index and nodes as columns
+        Day-invariant normalized natural-charging shape (columns sum to
+        1 per node), with snapshots as index and nodes as columns. Only used
+        when ``bev_natural_charging_split`` is enabled.
     investment_year : int
         Planning horizon used to resolve year-dependent options (e.g. ``bev_dsm_availability``)
 
@@ -2352,38 +2354,62 @@ def add_EVs(
         profile = electric_share * p_set.div(efficiency)
 
     bev_dsm_availability = get(options["bev_dsm_availability"], investment_year)
+    natural_charging_split = options["bev_natural_charging_split"]
 
-    # Split final EV electricity demand into a flexible share and an inflexible (fixed elia natural-charging shape) share
-    profile_flexible, profile_inflexible = split_transport_demand(
-        profile.loc[n.snapshots],
-        natural_charging_shape.loc[n.snapshots, spatial.nodes],
-        bev_dsm_availability,
-    )
+    if natural_charging_split:
+        # Split final EV electricity demand into a flexible share and an inflexible (fixed natural-charging shape) share
+        profile_flexible, profile_inflexible = split_transport_demand(
+            profile.loc[n.snapshots],
+            natural_charging_shape.loc[n.snapshots, spatial.nodes],
+            bev_dsm_availability,
+        )
 
-    # Add flexible EV load (DSM-capable, attached to EV battery bus)
-    n.add(
-        "Load",
-        spatial.nodes,
-        suffix=" land transport EV",
-        bus=spatial.nodes + " EV battery",
-        carrier="land transport EV",
-        p_set=profile_flexible,
-    )
+        # `profile` is battery-side energy (the EV battery bus carries physical battery capacity - see `bev_energy`).
+        # The flexible share reaches it through the BEV charger link, which applies the AC->battery loss;
+        # the inflexible load sits directly on the AC (low voltage) bus, so apply the same loss here instead.
+        # Grid-side total therefore exceeds `profile`, and bev_dsm_availability stays energy-neutral.
+        profile_inflexible /= options["bev_charge_efficiency"]
 
-    # Add inflexible EV load (fixed natural charging shape, attached directly to the AC bus)
-    # remapped to the low-voltage bus in insert_electricity_distribution_grid() if the distribution grid is enabled
-    n.add(
-        "Load",
-        spatial.nodes,
-        suffix=" land transport EV inflexible",
-        bus=spatial.nodes,
-        carrier="land transport EV inflexible",
-        p_set=profile_inflexible,
-    )
+        # Add flexible EV load (DSM-capable, attached to EV battery bus)
+        n.add(
+            "Load",
+            spatial.nodes,
+            suffix=" land transport EV",
+            bus=spatial.nodes + " EV battery",
+            carrier="land transport EV",
+            p_set=profile_flexible,
+        )
+
+        # Add inflexible EV load (fixed natural charging shape, attached directly to the AC bus)
+        # remapped to the low-voltage bus in insert_electricity_distribution_grid() if the distribution grid is enabled
+        n.add(
+            "Load",
+            spatial.nodes,
+            suffix=" land transport EV inflexible",
+            bus=spatial.nodes,
+            carrier="land transport EV inflexible",
+            p_set=profile_inflexible,
+        )
+    else:
+        # All EV demand stays dispatchable on the EV battery bus (PyPSA-Eur default)
+        n.add(
+            "Load",
+            spatial.nodes,
+            suffix=" land transport EV",
+            bus=spatial.nodes + " EV battery",
+            carrier="land transport EV",
+            p_set=profile.loc[n.snapshots],
+        )
 
     # Add BEV chargers
-    # NOTE: p_nom is multiplied by electric_share and bev_dsm_availability, since the EV battery bus (and its DSM store) now only carries flexible demand
-    p_nom = (number_cars * options["bev_charge_rate"] * electric_share * bev_dsm_availability)
+    p_nom = number_cars * options["bev_charge_rate"] * electric_share
+
+    # NOTE: p_nom is multiplied by electric_share and bev_dsm_availability
+    # since the EV battery bus (and its DSM store) now only carries flexible demand
+    # V2G only ever moves the DSM-capable share, whether or not the load is split
+    v2g_p_nom = p_nom * bev_dsm_availability
+    if natural_charging_split:
+        p_nom = v2g_p_nom
     n.add(
         "Link",
         spatial.nodes,
@@ -2426,7 +2452,7 @@ def add_EVs(
                 suffix=" V2G",
                 bus1=spatial.nodes,
                 bus0=spatial.nodes + " EV battery",
-                p_nom=p_nom,
+                p_nom=v2g_p_nom,
                 carrier="V2G",
                 p_max_pu=avail_profile.loc[n.snapshots, spatial.nodes],
                 lifetime=1,

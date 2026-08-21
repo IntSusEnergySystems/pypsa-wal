@@ -304,7 +304,7 @@ if __name__ == "__main__":
     dsm_profile = bev_dsm_profile(snapshots, nodes, options)
 
     natural_charging_shape = build_natural_charging_shape(
-        snakemake.input.elia_natural_charging_profile, snapshots, nodes, investment_year, charging_weights=snakemake.params.charging_weights
+        snakemake.input.natural_charging_profile, snapshots, nodes, investment_year, charging_weights=snakemake.params.charging_weights
     )
 
     nodal_transport_data.to_csv(snakemake.output.transport_data)
