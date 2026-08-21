@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Active times-pypsa scenarios must point at existing TIMES .vd inputs.
+"""Active TIMES-coupled scenarios must point at existing TIMES .vd inputs.
 
 Prevents a mid-run MissingInputException when a new TIMES export is wired in
 config but the .vd was never downloaded / symlinked into data/walloon/.
@@ -14,7 +14,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-TIMES_CONFIG = ROOT / "config" / "config.times-pypsa.yaml"
+TIMES_CONFIG = ROOT / "config" / "config.walloon.yaml"
 SCENARIOS_FILE = ROOT / "config" / "scenarios.walloon.yaml"
 
 
@@ -42,7 +42,7 @@ def test_active_scenario_times_file_exists(scenario: str):
     if not times_file:
         pytest.fail(
             f"{scenario}: no sector.times_file in scenarios.walloon.yaml "
-            "or config.times-pypsa.yaml."
+            "or config.walloon.yaml."
         )
 
     path = ROOT / times_file
@@ -69,6 +69,6 @@ def test_active_scenarios_are_defined_in_scenarios_file():
     missing = [s for s in _active_run_names() if s not in scenarios]
     if missing:
         pytest.fail(
-            "config.times-pypsa.yaml run.name lists scenario(s) with no block in "
+            "config.walloon.yaml run.name lists scenario(s) with no block in "
             f"scenarios.walloon.yaml: {missing}"
         )
