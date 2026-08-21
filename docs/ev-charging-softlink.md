@@ -238,8 +238,12 @@ Applying PyPSA's 0.9 on top therefore double-counts:
 | before this branch | 3.419 | +0.8 % |
 | **with `/= bev_charge_efficiency`** | **3.770** | **+11.1 %** |
 
-Before the change only the flexible slice (7 % of the load in 2030) was affected,
-so the error was rounding; now it is the whole load. **The coupled Walloon
+The error scales with `bev_dsm_availability`, because before the change only the
+flexible slice passed through the charger. At the 2030 value of 0.07 it was
+rounding (+0.8 %); at the `config.default.yaml` 0.5 the archived run actually
+carried **+5.6 %** at every horizon (measured on
+`results/times-pypsa/scen_demande_haute/`); with the branch's line it becomes
++11.1 % regardless of `dsm`, because the whole load is affected. **The coupled Walloon
 transport electricity demand is 11 % above the TIMES answer the soft-link exists
 to transfer.**
 
