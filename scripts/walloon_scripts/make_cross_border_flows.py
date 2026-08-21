@@ -158,7 +158,7 @@ if __name__ == "__main__":
             opts="",
             sector_opts="",
             planning_horizons="2025",
-            run="walloon-model",
+            run="scen_demande_haute",
         )
 
     configure_logging(snakemake)
