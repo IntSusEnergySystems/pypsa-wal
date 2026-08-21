@@ -20,9 +20,8 @@ committed, but row count may change when the technology universe moves.
                 ├─► data/walloon/agg_p_nom_minmax_demande_haute.csv
                 │                                          agg:<country>:<carrier>:<min|max>
                 ├─► data/walloon/discount_rates.csv        hurdle:<sector>  [generated]
-                ├─► config/config.walloon.yaml             config:budget_national
-                │                                          + costs.social_discountrate (from CSV)
-                └─► config/config.times-pypsa.yaml         costs.social_discountrate (from CSV)
+                └─► config/config.walloon.yaml             config:budget_national
+                                                           + costs.social_discountrate (from CSV)
                                                            fill_values stay at PyPSA defaults
 
 Failsafe (patched files only): a patch may only rewrite the ``value`` cell of
@@ -51,7 +50,6 @@ ROOT = Path(__file__).resolve().parents[1]
 CSV_PATH = ROOT / "config" / "input_parameters_for_models.csv"
 META_PATH = ROOT / "config" / "common_parameters_meta.yaml"
 WALLOON_CONFIG = ROOT / "config" / "config.walloon.yaml"
-TIMES_PYPSA_CONFIG = ROOT / "config" / "config.times-pypsa.yaml"
 DEFAULT_CONFIG = ROOT / "config" / "config.default.yaml"
 COSTS_FILE = ROOT / "data" / "walloon" / "custom_costs.csv"
 POTENTIALS_FILE = ROOT / "data" / "walloon" / "custom_potentials.csv"
@@ -66,7 +64,7 @@ HURDLE_MAPPING_FILE = ROOT / "config" / "hurdle_rate_mapping.csv"
 DISCOUNT_RATES_FILE = ROOT / "data" / "walloon" / "discount_rates.csv"
 HURDLE_SECTORS = ("production", "industry", "tertiary", "residential")
 VARIANT_NAME_RE = re.compile(r"^[a-z0-9_]+$")
-COST_CONFIG_FILES = (WALLOON_CONFIG, TIMES_PYPSA_CONFIG)
+COST_CONFIG_FILES = (WALLOON_CONFIG,)
 
 BUDGET_REGIONS = ("BEBRU", "BEVLG", "BEWAL", "DE", "FR", "GB", "NL", "LU")
 
@@ -1120,10 +1118,10 @@ def _insert_social_discountrate(text: str, span: tuple[int, int], sdr: str) -> s
 def patch_costs_scalars(
     df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool
 ) -> list[Patch]:
-    """Sync ``costs.social_discountrate`` from the master CSV into walloon configs.
+    """Sync ``costs.social_discountrate`` from the master CSV into the walloon config.
 
     ``fill_values`` (including the financial discount-rate fallback) stay at the
-    PyPSA defaults in ``config.default.yaml`` — walloon overlays must not override
+    PyPSA defaults in ``config.default.yaml`` — the walloon overlay must not override
     them. TIMES-negotiated financial rates live only in ``discount_rates.csv``.
     """
     sdr_tgt = collect_targets(df, "config", horizons, nparts=1).get(
@@ -1403,10 +1401,7 @@ def cmd_write(df: pd.DataFrame, meta: dict, dry_run: bool, verbose: bool) -> int
         )
         return 1
     if not dry_run:
-        print(
-            "Review with: git diff data/walloon config/config.walloon.yaml "
-            "config/config.times-pypsa.yaml"
-        )
+        print("Review with: git diff data/walloon config/config.walloon.yaml")
     return 0
 
 
