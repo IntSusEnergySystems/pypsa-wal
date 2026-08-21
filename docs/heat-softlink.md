@@ -21,7 +21,8 @@ Generated result tables:
 | [§2](#2-the-four-mechanisms-and-why-b-won) | options A / B / B′ / C, and the decision |
 | [§3](#3-what-is-implemented) | config, code, artefacts |
 | [§4](#4-results) | fidelity, cost, capacity, fuels |
-| [§5](#5-the-2030-heat-pump-dip-diagnosed) | why BEWAL heat-pump **capacity** falls 2025 → 2030 |
+| [§5](#5-the-2030-heat-pump-dip-diagnosed) | why BEWAL heat-pump **capacity** falls 2025 → 2030, and the fix |
+| [§5b](#5b-cost-reconciliation--times-prices-decentral-heating-135-cheaper) | TIMES vs PyPSA appliance costs, measured |
 | [§6](#6-scope-district-heating-stays-out) | district heating is excluded, and why |
 | [§7](#7-facts-that-are-easy-to-get-wrong) | units, availability factors, timeslices |
 | [§8](#8-open-points) | what is unresolved |
@@ -408,6 +409,79 @@ is measured above.*
 restatement of the pinned peak, so heat **delivered** remains the informative
 indicator; capacity alone still cannot be read as an electrification signal.
 
+## 5b. Cost reconciliation — TIMES prices decentral heating 1.3–5× cheaper
+
+Pinning PyPSA to the TIMES mix is only meaningful if the two models price the
+appliances alike. They do not, and the gap is not uniform — which changes how the
+whole exercise should be read.
+
+**The comparison is annuity to annuity, and needs no assumption on either side.**
+PyPSA's `capital_cost` *is* an annuity (`investment × annuity(lifetime, hurdle) +
+investment × FOM`, EUR/MW/a). TIMES `Cost_Inv` turns out to be a **constant
+annual payment stream over the asset's life**, not an overnight cost — verified on
+the reference `.vd`, where `CHBALTH101` builds 0.0045 GW once in 2022 and then
+pays 0.0469 MEUR/a in every period to 2040. So `Cost_Inv / VAR_Ncap` in a
+process's **first** build period is its annuity in EUR/kW_th/a, directly
+comparable, with no lifetime or discount rate assumed anywhere. Later periods are
+unusable: their `Cost_Inv` carries earlier vintages' streams.
+
+Reproduce with
+[`scripts/walloon_scripts/compare_heat_costs.py`](../scripts/walloon_scripts/compare_heat_costs.py):
+
+| EUR/kW_th/a | TIMES (weighted) | TIMES range | PyPSA | TIMES / PyPSA | processes |
+|---|---:|---|---:|---:|---:|
+| decentral gas boiler | 15.20 | 5.1–35.3 | 79.62 | **0.19** | 33 |
+| decentral ground-sourced heat pump | 151.65 | 151.7 | 284.45 | 0.53 | 7 |
+| biomass boiler | 95.80 | 22.0–143.2 | 166.80 | 0.57 | 26 |
+| decentral air-sourced heat pump | 116.38 | 74.9–202.3 | 190.70 | **0.61** | 40 |
+| decentral resistive heater | 15.37 | 7.2–16.6 | 20.56 | 0.75 | 19 |
+
+*Solar thermal is excluded: PyPSA prices it per 1000 m² and TIMES per GW_th.*
+
+**The level gap matters less than the relative one.** Against its own heat pumps,
+**PyPSA's gas boiler is ~3× more expensive than TIMES's** (0.61 / 0.19). That is
+exactly the direction needed to explain the legacy over-electrification of §1:
+PyPSA saw gas as dear relative to heat pumps and built heat pumps. **So part of
+the 47–55 pp heat-pump overshoot the soft-link removes was a parameter
+inconsistency, not a structural one** — the constraint was papering over it.
+
+Backing the annuities out at PyPSA's own annuity factor suggests roughly
+113 EUR/kW_th overnight for a TIMES gas boiler against PyPSA's 396, and
+~850 against 1135 for an air heat pump: consistent with **equipment-only versus
+fully-installed** cost scopes rather than a disagreement about the same quantity.
+That is a hypothesis, not a result — the overnight cost is **not in the `.vd`**
+(`NCAP_COST` is an input), so confirming it needs the VEDA `~FI_T` heating cost
+tables from ICEDD/Climact. **That request is now the action**, recorded as five
+`status=pending` rows in
+[`config/input_parameters_for_models.csv`](../config/input_parameters_for_models.csv)
+under `none:heating_cost_reconciliation`.
+
+Three caveats, all in the same direction:
+
+* If TIMES capacity is `activity / 1314 h` rather than peak-sized (§7), its kW are
+  fewer than PyPSA's for the same physical fleet, so its true EUR per *peak* kW is
+  **lower still**. The finding is conservative.
+* The `.vd` does not state its currency year; a 10–15 % inflation difference does
+  not move a 5× ratio.
+* `Cost_Inv` excludes `Cost_Fom`, which is reported separately, while PyPSA's
+  `capital_cost` includes FOM. Removing PyPSA's FOM narrows gas from 0.19 to 0.29
+  and the air heat pump from 0.61 to 0.75 — the *relative* distortion between them
+  is unchanged.
+
+**What this means for the live model.** Under option B′ the mix is pinned, so the
+cost inconsistency **no longer changes what gets built** — it changes the reported
+cost of building it. Two consequences:
+
+1. The objective differences of §4.3 and the "what it costs PyPSA to accept the
+   TIMES mix" number are inflated by whatever share of the gap is a genuine
+   disagreement rather than a scope difference. Do not publish that number as a
+   reconciliation cost until the `~FI_T` tables arrive.
+2. Switching back to option C, or to the legacy transfer, would immediately
+   re-expose the model to the distortion. That is now a documented reason to keep
+   B′ rather than a preference.
+
+---
+
 ## 6. Scope: district heating stays out
 
 The DH *demand* is transferred exactly. The *supply* is not transferred at all,
@@ -489,7 +563,7 @@ Ordered by how much they block.
 | # | Open point | Blocks |
 |---|---|---|
 | 1 | **Add a 2024 `grouping_years_heat` bin.** §5.2 fixed the *level* of the inherited heat-pump vintages but not their *date*: the newest bin is still 2019, so a fleet TIMES says was built in 2022–25 retires in 2037 rather than 2041. One config line, but it shifts every technology's vintage structure. | second-order capacity drift after 2035 |
-| 2 | **Heating cost assumptions are unreconciled.** `data/walloon/custom_costs.csv` has no decentral heating rows and neither does `config/input_parameters_for_models.csv`. If PyPSA's heat pumps are cheaper or its gas dearer than TIMES's, part of the divergence is a *parameter* inconsistency the constraint is papering over. **This is the natural next piece of analysis** and it could change how tight the constraints ought to be. | the credibility of the whole transfer |
+| 2 | **Get the VEDA `~FI_T` heating cost tables from ICEDD/Climact.** §5b measured the gap — TIMES prices decentral heating 1.3–5× cheaper in annuity terms, and ~3× cheaper for gas *relative to* heat pumps — but only the annuity is in the `.vd`, so whether the gap is a scope difference (equipment vs installed) or a real disagreement cannot be settled without the input costs. Five `status=pending` rows now carry the ask. | publishing any reconciliation cost |
 | 3 | **The 2040 solid-biomass conflict** (§4.2) belongs in the shared-assumptions table. It is a statement about the two models' resource envelopes. | 2040 fidelity |
 | 4 | **`TimesHeatProfile-unmet` is not exported.** They are bare linopy variables, so PyPSA does not write them to the netCDF; they currently have to be reconstructed from realised dispatch by `check_heat_profile_fidelity.py`. Same gap for option C's slack and for option C's **per-group shadow prices**, which need `solving.options.store_model: true` plus a manual read and are that mechanism's single best output. | diagnostics |
 | 5 | **Set `energy_mix.enable: false` explicitly in every config** rather than relying on the default, so the mutual-exclusion check never fires in someone else's run. | robustness |
