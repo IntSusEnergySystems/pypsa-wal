@@ -276,6 +276,150 @@ from the dict. It works today — every config's `local_bev_dsm` covers its own
 
 ---
 
+## 3b. Strategy: how to weight all the Elia profiles consistently
+
+**The problem.** There are six profile columns, two config keys and one TIMES
+model, and the weights are easy to make *plausible* and hard to make
+*consistent*. The branch's 2025 and 2030 weights reproduce Elia almost exactly;
+its 2040 and 2050 weights do not, because the two config keys were extrapolated
+independently.
+
+### 3b.1 Three levels, and the rule for each
+
+| level | what it weights | source | rule |
+|---|---|---|---|
+| **1 — flexibility mode** | natural / local / market | `ev_operation_mode_shares.csv` | all three from **one (scenario, year) cell**, or they cannot be consistent |
+| **2 — inside natural** | home / work / public | `ev_v0_location_shares.csv` | rebuild per horizon; Elia's `natural` column *is* this weighted sum |
+| **3 — inside local** | work vs home; sky × PV | **not published by Elia** | needs a model-side input — §3b.4 |
+
+The reason level 1 is delicate is that pypsa-wal splits one Elia row across two
+config keys with different denominators:
+
+* `sector.bev_dsm_availability` = the **market** share of the whole fleet;
+* `sector.local_bev_dsm` = natural vs local **renormalised over those two only**,
+  because `split_transport_demand` applies it to what is left after the market
+  slice.
+
+So `natural_abs = local_bev_dsm.natural × (1 − bev_dsm_availability)`, and it is
+that product — not the config number — that must equal Elia's `V0`.
+
+### 3b.2 What the branch's weights imply, against Elia
+
+| horizon | branch natural | branch local | branch market | Elia natural | Elia local | Elia market |
+|---|---:|---:|---:|---:|---:|---:|
+| 2025 | 0.693 | 0.297 | 0.010 | 0.69 | 0.30 | 0.01 |
+| 2030 | 0.465 | 0.465 | 0.070 | 0.47 | 0.46 | 0.07 |
+| 2040 | 0.316 | 0.474 | **0.210** | 0.27 | 0.55 | 0.18 |
+| 2050 | **0.288** | **0.432** | **0.280** | **0.17** | **0.55** | **0.28** |
+
+All shares of the whole fleet. 2025 and 2030 are right. **2040 and 2050 pair the
+market share of a *more* flexible Elia case with the natural/local split of a
+*less* flexible one**: 0.28 in 2050 is exactly Elia's **High Flex 2036** market
+share, but High Flex 2036 has natural at 0.17, not 0.288. Natural ends up **+69 %**
+and local **−21 %** against the case the market share was taken from.
+
+### 3b.3 The rule: pick a scenario, hold the year, never extrapolate
+
+1. **Name the Elia scenario** and read all three modes from it. Extra flexibility
+   comes from the **scenario axis**, which Elia publishes, not from extending a
+   year.
+2. **Map horizons onto Elia years, holding the last one.** Elia stops at 2036;
+   2040 and 2050 both take 2036. A behavioural adoption curve extended 14 years
+   past its source is worse than its last observed point, and holding it is
+   auditable.
+3. **Renormalise natural/local over themselves** before writing `local_bev_dsm`.
+
+[`scripts/walloon_scripts/build_ev_charging_weights.py`](../scripts/walloon_scripts/build_ev_charging_weights.py)
+does this and prints a consistency audit that reproduces Elia's absolute shares
+exactly. Base case, **Current commitments**:
+
+| horizon | Elia year | `bev_dsm_availability` | `local_bev_dsm.natural` | each of 4 home | `work` |
+|---|---|---:|---:|---:|---:|
+| 2025 | 2025 | 0.01 | 0.697 | 0.0498 | 0.104 |
+| 2030 | 2030 | 0.07 | 0.505 | 0.0909 | 0.131 |
+| 2040 | 2036 *(held)* | **0.18** | **0.329** | 0.1381 | 0.118 |
+| 2050 | 2036 *(held)* | **0.18** | **0.329** | 0.1381 | 0.118 |
+
+Sensitivity, **Current commitments – High Flex** — this is where a
+flexibility-rich 2050 should come from:
+
+| horizon | Elia year | `bev_dsm_availability` | `local_bev_dsm.natural` |
+|---|---|---:|---:|
+| 2025 | 2025 | 0.030 | 0.691 |
+| 2030 | 2030 | 0.131 | 0.465 |
+| 2040 | 2036 *(held)* | **0.280** | **0.236** |
+| 2050 | 2036 *(held)* | **0.280** | **0.236** |
+
+**Minimum change to the branch:** if the 0.21/0.28 market trajectory is kept
+because the study wants that much 2050 flexibility, then `local_bev_dsm.natural`
+must come down to **0.236** for 2040 and 2050, not stay at 0.40. Keeping both is
+the one combination that matches no Elia case at all.
+
+### 3b.4 Level 3, where Elia gives nothing
+
+**Work vs home.** Elia publishes no location split for `V1H`. The only
+Elia-grounded proxy is the **`V0` location split restricted to home + work**,
+since Elia explicitly assumes no flexibility from public charging:
+
+| | 2025 | 2030 | 2036 |
+|---|---:|---:|---:|
+| work / (home + work) | 0.343 | 0.265 | **0.176** |
+| branch `work` weight, as a share of local | 0.333 | 0.600 | 0.500 |
+
+The proxy **declines** — Elia has home charging rising 0.53 → 0.70 as private EV
+ownership displaces company cars — while the branch's rises. 2025 agrees; 2030
+and later do not. The counter-argument is real (workplace *smart* charging is a
+different thing from workplace *natural* charging, and it is tariff-driven rather
+than plug-in-driven), but it is an assumption, and right now it is the only
+unsourced weight in the block. **Use the proxy, or document the reasoning for
+departing from it.**
+
+**With PV vs without PV.** This is the one place where TIMES should drive the
+weight, and it does not yet. The right quantity is the share of *EV-owning
+dwellings* that have rooftop PV. Neither model has it directly, but both have
+dwelling-level PV penetration, and TIMES has it exogenously per horizon:
+
+* **Recommended:** export residential PV capacity per horizon from TIMES
+  (`times_pypsa` already reads `VAR_Cap`; the `PV residential`/`ALL-PV` processes
+  are in the same table as the vehicle fleet), divide by dwellings, and use that
+  as the with-PV weight. It keeps the split on the TIMES trajectory, which is the
+  point of the coupling, and it is the same export mechanism as
+  `road_transport_*.csv`.
+* **Do not** use PyPSA's own endogenous `solar-rooftop` capacity: it is a model
+  output, so the weight would depend on the solution it feeds.
+* **Interim:** 50/50, as the branch has, noting that EV owners are richer than
+  average and more likely to own PV, so 50 % is a lower bound on the with-PV
+  share.
+
+**Sunny vs cloudy.** A fixed weight is the wrong instrument: PyPSA already knows
+which days are sunny. The physically correct treatment is to **select the curve
+per day** from the model's own rooftop-PV availability — above/below the median
+daily capacity factor at that node — instead of blending two shapes that never
+occur simultaneously. Concretely: pass `profile_adm_solar.nc` (or the rooftop
+`p_max_pu`) into `build_transport_demand`, compute a daily sunny/cloudy mask, and
+build the local shape on the snapshot index rather than by tiling a weekly
+profile. That turns `build_natural_charging_shape` from day-invariant to
+day-varying, which is why it is a separate change and not part of the weight fix.
+**Interim:** 50/50, which is what the equal home weights above give.
+
+### 3b.5 Where TIMES constrains this, and where it does not
+
+| quantity | TIMES has it? | consequence |
+|---|---|---|
+| natural / local / market split | **no** — one `EV charger` process, no operation modes | must come from Elia; TIMES cannot arbitrate |
+| BEV fleet and its growth | **yes** — `road_transport_*.csv` | drives what the shares are applied *to* (§2) |
+| road electricity demand | **yes** — `electricity road` | the total the profiles redistribute; must stay matched (§3.1) |
+| residential PV penetration | **yes** — `VAR_Cap` on the PV processes | should drive the with-PV weight, §3b.4 |
+| daily weather | **no** — only electricity is sub-annual | PyPSA must supply the sky split |
+
+So the division of labour is: **TIMES sets the magnitudes, Elia sets the shapes
+and the behavioural split, PyPSA supplies the weather.** Every weight above is
+placed according to which of the three owns it. The one place the current
+implementation departs from that is the sky and PV split, which is why §3b.4 is
+the next piece of work rather than a nicety.
+
+---
+
 ## 4. Merging with the 2026-08-21 doc + discount-rate work
 
 `git merge-tree` between the two: **one conflict, in `config/config.walloon.yaml`
