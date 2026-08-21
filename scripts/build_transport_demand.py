@@ -203,10 +203,9 @@ def build_natural_charging_shape(fn, snapshots, nodes, investment_year, charging
     natural (non-flexible) charging profile for the vintage closest to
     ``investment_year``.
 
-    ``investment_year`` is the planning horizon, not the.
+    ``investment_year`` is the planning horizon, not the year of the data.
     Because the data CSV may contain vintages that do not match the planning horizon (e.g. 2026, 2036),
-    the vintage numerically closest to ``investment_year`` is used
-    (if tied, the lower vintage is used).
+    the vintage numerically closest to ``investment_year`` is used (if tied, the lower vintage is used).
     """
     daily = pd.read_csv(fn)
     available_years = sorted(daily["year"].unique())
