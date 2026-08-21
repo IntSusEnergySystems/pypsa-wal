@@ -2364,10 +2364,6 @@ def add_EVs(
             bev_dsm_availability,
         )
 
-        # `profile` is battery-side energy (the EV battery bus carries physical battery capacity - see `bev_energy`).
-        # The flexible share reaches it through the BEV charger link, which applies the AC->battery loss;
-        # the inflexible load sits directly on the AC (low voltage) bus, so apply the same loss here instead.
-        # Grid-side total therefore exceeds `profile`, and bev_dsm_availability stays energy-neutral.
         profile_inflexible /= options["bev_charge_efficiency"]
 
         # Add flexible EV load (DSM-capable, attached to EV battery bus)
