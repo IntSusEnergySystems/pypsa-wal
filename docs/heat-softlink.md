@@ -334,30 +334,79 @@ idle at peak — while **2030 is the first horizon in which the capacity is actu
 determined by the model**, and it lands exactly on the pinned peak, topping up by
 6.15 MW.
 
-### 5.2 What this means, and what to do
+### 5.2 The fix, and what it changes
 
-* **The 2030 number is the meaningful one.** Reading 2025 → 2030 as
-  "de-electrification" is wrong: it is 2025 that is inflated, by the base-year
-  substitution of §3.4 (which raised inherited air heat pumps 54 → 936 MW_th).
-* **Do not report heat-pump *capacity* on its own for this chain.** Under B′,
-  decentral capacity is a restatement of the pinned peak, so the informative
-  indicator is heat **delivered** (or electricity drawn). The legacy path does not
-  show the dip (972.7 → 1 573.9 MW_th) only because it is free to over-build.
-* **Two candidate fixes, neither applied yet — decision needed:**
-  1. Make `add_existing_baseyear` select grouping years with the **per-technology**
-     lifetime instead of `default_heating_lifetime`, so a vintage is never created
-     with less remaining life than the gap to the next horizon. This is an upstream
-     PyPSA-Eur behaviour change and touches every country.
-  2. Leave the code and accept the retirement, but stop assuming a linear
-     1980→2019 age distribution for heat pumps in Wallonia: the real HP fleet is
-     overwhelmingly post-2015, so putting 35.7 % of it in a 2010 bin over-ages it.
-     A Walloon-specific age profile for the substituted row would be a
-     `times_heat_softlink.py` change and stays local.
+**Implemented (option 2 of the two candidates): a per-technology age profile for
+the inherited heat-pump stock, derived from the TIMES trajectory itself.**
 
-  Option 2 is the smaller change and the more defensible input fix; option 1 is
-  the one that removes the class of artefact. **Not decided.**
+`existing_capacities.heat_stock_age_profile` is a new, optional config mapping
+`{cost technology substring: {grouping_year: share}}`. Without it nothing changes;
+with it, the named technologies get an explicit age distribution instead of the
+linear one. Both Walloon configs set:
 
----
+```yaml
+existing_capacities:
+  heat_stock_age_profile:
+    air-sourced heat pump:
+      2010: 0.089
+      2015: 0.089
+      2019: 0.822
+```
+
+**Where those numbers come from — TIMES, not an assumption.** The same `.vd` that
+supplies the stock level also reports it in earlier years:
+
+| Walloon air heat pump, MW_th | 2021 | 2025 | installed 2022–25 |
+|---|---:|---:|---:|
+| `VAR_Cap` via `heating_capacities()` | 231.6 | 929.4 | **697.8 = 75.1 %** |
+
+Three quarters of the base-year fleet is younger than **every** available
+grouping year, so it belongs in the newest live bin; the 231.6 MW_th that was
+already standing in 2021 keeps the linear spread. That gives
+`0.249 × {5/14, 5/14, 4/14}` plus `0.751` on 2019 — the three numbers above.
+
+The contrast with the other technologies is the point: over the same 2021 → 2025
+window the TIMES gas-boiler stock grew 30 %, biomass 4 %, while oil boilers and
+resistive heaters **shrank** 20–25 %. A linear age spread is defensible for those
+and demonstrably wrong for heat pumps, which is why the override is
+per-technology rather than global.
+
+**Verified** on the rebuilt `base_s_adm___2025_brownfield.nc`:
+
+| BEWAL urban decentral air heat pump, MW_th | linear (before) | profile (after) |
+|---|---:|---:|
+| `-2010` vintage — dies 2028 | 334.4 | **83.3** |
+| `-2015` vintage — dies 2033 | 334.4 | 83.3 |
+| `-2019` vintage — dies 2037 | 267.5 | **769.7** |
+| total inherited (unchanged) | 936.4 | 936.4 |
+| **surviving into 2030** | **602.0** | **853.0** |
+
+853 MW_th is above the 608 MW_th the pinned 2030 profile needs, so the 2030
+capacity is inherited rather than rebuilt and **the total BEWAL heat-pump fleet
+now rises across the 2025 → 2030 step** instead of falling. A small genuine
+retirement remains — 83 MW_th of stock that really was installed around 2010 —
+which is the physically correct behaviour rather than an artefact. *The 2030
+figure itself needs the full myopic chain to confirm; only the 2025 vintage split
+is measured above.*
+
+**Two further notes:**
+
+* **The profile applies to every node, not only BEWAL.** `add_existing_baseyear`
+  adds the vintages vectorised over nodes, so a per-node profile would mean
+  splitting that call. It is not worth it: European heat-pump sales grew by an
+  order of magnitude over the same period, so a recent-weighted profile is closer
+  to the truth everywhere than the linear default.
+* **`grouping_years_heat` still stops at 2019**, so nothing can be dated later
+  than that even though TIMES says most of the fleet is 2022+. The shares
+  compensate for the level but not for the retirement *date*: the 2019 tranche
+  dies in 2037 when the real 2023 vintage would live to 2041. Adding a 2024
+  grouping year would fix that properly and is a one-line config change — but it
+  shifts every technology's vintage structure, so it belongs in its own change
+  with its own check.
+
+**Reporting guidance is unchanged.** Under option B′ decentral capacity is a
+restatement of the pinned peak, so heat **delivered** remains the informative
+indicator; capacity alone still cannot be read as an electrification signal.
 
 ## 6. Scope: district heating stays out
 
@@ -439,7 +488,7 @@ Ordered by how much they block.
 
 | # | Open point | Blocks |
 |---|---|---|
-| 1 | **The 2030 heat-pump dip fix is not chosen** (§5.2): per-technology lifetime in the grouping-year selection, or a Walloon HP age profile. | reporting heat-pump capacity |
+| 1 | **Add a 2024 `grouping_years_heat` bin.** §5.2 fixed the *level* of the inherited heat-pump vintages but not their *date*: the newest bin is still 2019, so a fleet TIMES says was built in 2022–25 retires in 2037 rather than 2041. One config line, but it shifts every technology's vintage structure. | second-order capacity drift after 2035 |
 | 2 | **Heating cost assumptions are unreconciled.** `data/walloon/custom_costs.csv` has no decentral heating rows and neither does `config/input_parameters_for_models.csv`. If PyPSA's heat pumps are cheaper or its gas dearer than TIMES's, part of the divergence is a *parameter* inconsistency the constraint is papering over. **This is the natural next piece of analysis** and it could change how tight the constraints ought to be. | the credibility of the whole transfer |
 | 3 | **The 2040 solid-biomass conflict** (§4.2) belongs in the shared-assumptions table. It is a statement about the two models' resource envelopes. | 2040 fidelity |
 | 4 | **`TimesHeatProfile-unmet` is not exported.** They are bare linopy variables, so PyPSA does not write them to the netCDF; they currently have to be reconstructed from realised dispatch by `check_heat_profile_fidelity.py`. Same gap for option C's slack and for option C's **per-group shadow prices**, which need `solving.options.store_model: true` plus a manual read and are that mechanism's single best output. | diagnostics |

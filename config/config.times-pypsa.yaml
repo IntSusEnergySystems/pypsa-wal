@@ -106,6 +106,24 @@ pypsa_eur:
 existing_capacities:
   grouping_years_power: [1920, 1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030, 2035, 2040, 2050]
   threshold_capacity: 0
+  # Age distribution of the inherited heat-pump stock, overriding the linear
+  # 1980-2019 spread that PyPSA-Eur assumes for every heating technology.
+  # `decentral air-sourced heat pump` has an 18-year technology-data lifetime
+  # against a 20-year default_heating_lifetime, so the linear spread puts 5/14 =
+  # 36 % of the fleet in a 2010 bin that dies in 2028 -- between the 2025 and
+  # 2030 horizons. Derived from the TIMES stock trajectory itself: Walloon air-HP
+  # capacity goes 231.6 MW_th (2021) -> 929.4 MW_th (2025), so 75 % of the base-
+  # year fleet was installed in 2022-2025, i.e. after every available grouping
+  # year. That tranche goes to the newest live bin; the 2021 stock keeps the
+  # linear spread. docs/heat-softlink.md S5.
+  # Applies to every node, not only BEWAL -- European heat-pump sales grew by an
+  # order of magnitude over the same period, so it is closer to the truth
+  # everywhere than the linear default.
+  heat_stock_age_profile:
+    air-sourced heat pump:
+      2010: 0.089
+      2015: 0.089
+      2019: 0.822
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#clustering
 clustering:

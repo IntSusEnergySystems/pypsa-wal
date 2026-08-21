@@ -620,6 +620,7 @@ existing_capacities:
   - 2019
   threshold_capacity: 10
   default_heating_lifetime: 20
+  heat_stock_age_profile:
   conventional_carriers:
   - lignite
   - coal

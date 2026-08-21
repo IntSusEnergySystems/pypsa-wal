@@ -61,6 +61,10 @@ class ExistingCapacitiesConfig(ConfigModel):
         20,
         description="Default lifetime for heating technologies (years).",
     )
+    heat_stock_age_profile: dict[str, dict[int, float]] | None = Field(
+        None,
+        description="Optional per-technology age distribution of the inherited heating stock, `{cost technology substring: {grouping year: share}}`. Without it every technology is spread over the live `grouping_years_heat` assuming installation was linear in the past. That over-ages a fleet that grew recently: a heat pump whose technology-data lifetime is shorter than `default_heating_lifetime` then loses its oldest tranche between two planning horizons, so the reported capacity falls while the delivered heat rises. Shares are reindexed on the live grouping years and renormalised.",
+    )
     conventional_carriers: list[str] = Field(
         default_factory=lambda: ["lignite", "coal", "oil", "uranium"],
         description="List of conventional power plants to include in the sectoral network.",

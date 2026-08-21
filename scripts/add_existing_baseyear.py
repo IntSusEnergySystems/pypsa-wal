@@ -497,6 +497,53 @@ def get_efficiency(
     return efficiency
 
 
+def resolve_stock_age_ratios(
+    costs_name: str,
+    linear_ratios: pd.Series | list,
+    valid_grouping_years: pd.Series | list,
+    stock_age_profile: dict[str, dict[int, float]] | None,
+) -> pd.Series | list:
+    """Age distribution of the inherited stock for one technology.
+
+    ``linear_ratios`` is the PyPSA-Eur default — installation assumed linear over
+    the live grouping years — and is returned unless ``stock_age_profile`` names a
+    substring of ``costs_name``. An explicit profile is reindexed on
+    ``valid_grouping_years``, so a year already dead at the base year contributes
+    nothing rather than shifting the others, and renormalised.
+
+    The linear assumption over-ages a fleet that grew recently. Where the
+    technology's own lifetime is shorter than ``default_heating_lifetime`` that
+    costs a whole tranche between two planning horizons: reported capacity falls
+    while delivered heat rises. ``docs/heat-softlink.md`` §5.
+    """
+    if not stock_age_profile:
+        return linear_ratios
+    for key, profile in stock_age_profile.items():
+        if key not in costs_name:
+            continue
+        out = pd.Series(
+            [float(profile.get(int(y), 0.0)) for y in valid_grouping_years]
+        )
+        total = out.sum()
+        if total <= 0:
+            logger.warning(
+                "existing_capacities.heat_stock_age_profile[%r] puts no share on "
+                "any live grouping year %s; using the linear default.",
+                key,
+                list(valid_grouping_years),
+            )
+            return linear_ratios
+        if abs(total - 1.0) > 1e-6:
+            logger.info(
+                "heat_stock_age_profile[%r] sums to %.4f over the live grouping "
+                "years; renormalising.",
+                key,
+                total,
+            )
+        return out / total
+    return linear_ratios
+
+
 def add_heating_capacities_installed_before_baseyear(
     n: pypsa.Network,
     costs: pd.DataFrame,
@@ -511,6 +558,7 @@ def add_heating_capacities_installed_before_baseyear(
     energy_totals_year: int,
     capacity_threshold: float,
     use_electricity_distribution_grid: bool,
+    stock_age_profile: dict[str, dict[int, float]] | None = None,
 ) -> None:
     """
     Add heating capacities installed before base year.
@@ -543,6 +591,15 @@ def add_heating_capacities_installed_before_baseyear(
         Minimum capacity threshold
     use_electricity_distribution_grid : bool
         Whether to use electricity distribution grid
+    stock_age_profile : dict, optional
+        Per-technology override of the age distribution of the inherited stock,
+        ``{cost technology substring: {grouping_year: share}}``. Without it every
+        technology is spread over the valid grouping years assuming installation
+        was linear in the past, which over-ages a fleet that grew recently: a
+        heat pump whose lifetime is shorter than ``default_lifetime`` then loses
+        its oldest tranche between two planning horizons, and the reported
+        capacity falls while the delivered heat rises. Walloon values and their
+        derivation from the TIMES stock trajectory: ``docs/heat-softlink.md`` §5.
     """
     logger.debug(f"Adding heating capacities installed before {baseyear}")
 
@@ -600,10 +657,16 @@ def add_heating_capacities_installed_before_baseyear(
                 # Installation is assumed to be linear for the past
                 ratios = _years / _years.sum()
 
-        for ratio, grouping_year in zip(ratios, valid_grouping_years):
+        for index, grouping_year in enumerate(valid_grouping_years):
+            ratio = ratios[index]
             # Add heat pumps
             for heat_source in heat_pump_source_types[heat_system.system_type.value]:
                 costs_name = heat_system.heat_pump_costs_name(heat_source)
+                # Heat pumps may carry their own age distribution: the Walloon
+                # fleet is far younger than a linear spread implies.
+                hp_ratio = resolve_stock_age_ratios(
+                    costs_name, ratios, valid_grouping_years, stock_age_profile
+                )[index]
 
                 efficiency = (
                     heat_pump_cop.sel(
@@ -629,7 +692,7 @@ def add_heating_capacities_installed_before_baseyear(
                     p_nom=existing_capacities.loc[
                         nodes, (heat_system.value, f"{heat_source} heat pump")
                     ]
-                    * ratio,
+                    * hp_ratio,
                     p_max_pu=0,
                     p_min_pu=-1 * efficiency / efficiency.clip(lower=0.001),
                     build_year=int(grouping_year),
@@ -845,6 +908,9 @@ if __name__ == "__main__":
                 "threshold_capacity"
             ],
             use_electricity_distribution_grid=options["electricity_distribution_grid"],
+            stock_age_profile=snakemake.params.existing_capacities.get(
+                "heat_stock_age_profile"
+            ),
         )
 
     # Set defaults for missing missing values
