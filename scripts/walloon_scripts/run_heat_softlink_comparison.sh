@@ -26,7 +26,7 @@ SCENARIO="${1:-scen_demande_haute}"
 shift || true
 PHASES=("$@")
 [[ ${#PHASES[@]} -eq 0 ]] && PHASES=(before after option_b)
-CONFIG="config/config.times-pypsa.yaml"
+CONFIG="config/config.walloon.yaml"
 CORES="${CORES:-12}"
 MEM_MB="${MEM_MB:-100000}"
 HORIZONS=(2025 2030 2040 2050)
@@ -114,7 +114,7 @@ overlay_for() {
 
 targets() {
   for y in "${HORIZONS[@]}"; do
-    printf 'results/times-pypsa/%s/networks/base_s_adm___%s.nc ' "$SCENARIO" "$y"
+    printf 'results/walloon/%s/networks/base_s_adm___%s.nc ' "$SCENARIO" "$y"
   done
 }
 
@@ -132,12 +132,12 @@ start_watchdog() {
   stop_watchdog
   (
     while true; do
-      for log in results/times-pypsa/"$SCENARIO"/logs/*_solver.log; do
+      for log in results/walloon/"$SCENARIO"/logs/*_solver.log; do
         [[ -f "$log" ]] || continue
         if grep -q "Infeasible model" "$log" 2>/dev/null; then
           echo "WATCHDOG: infeasible model in $log — aborting $phase before the" \
                "IIS computation starts" >&2
-          pkill -f "bin/snakemake results/times-pypsa" 2>/dev/null
+          pkill -f "bin/snakemake results/walloon" 2>/dev/null
           sleep 2
           pkill -9 -f "\.snakemake/scripts/tmp" 2>/dev/null
           exit 1
@@ -174,7 +174,7 @@ run_phase() {
   #  * An overlay is an extra file on the SAME `--configfile` flag. Repeating the
   #    flag (`--configfile a --configfile b`) keeps only the last file, which
   #    drops `run.scenarios` and makes every scenario path unproducible
-  #    ("No rule to produce results/times-pypsa/<scen>/networks/…").
+  #    ("No rule to produce results/walloon/<scen>/networks/…").
   # shellcheck disable=SC2046
   snakemake $(targets) \
     --configfile "$CONFIG" "$@" \
@@ -186,16 +186,16 @@ run_phase() {
   echo "[$phase] archiving to $dest"
   mkdir -p "$dest"
   rsync -a --delete \
-    "results/times-pypsa/$SCENARIO/networks/" "$dest/networks/"
+    "results/walloon/$SCENARIO/networks/" "$dest/networks/"
   for sub in logs configs csvs; do
-    if [[ -d "results/times-pypsa/$SCENARIO/$sub" ]]; then
-      rsync -a "results/times-pypsa/$SCENARIO/$sub/" "$dest/$sub/"
+    if [[ -d "results/walloon/$SCENARIO/$sub" ]]; then
+      rsync -a "results/walloon/$SCENARIO/$sub/" "$dest/$sub/"
     fi
   done
-  cp -f "resources/times-pypsa/$SCENARIO/existing_heating_distribution_base_s_adm_2025.csv" \
+  cp -f "resources/walloon/$SCENARIO/existing_heating_distribution_base_s_adm_2025.csv" \
         "$dest/" 2>/dev/null || true
-  if [[ -d "results/times-pypsa/$SCENARIO/heating_profiles" ]]; then
-    rsync -a "results/times-pypsa/$SCENARIO/heating_profiles/" "$dest/heating_profiles/"
+  if [[ -d "results/walloon/$SCENARIO/heating_profiles" ]]; then
+    rsync -a "results/walloon/$SCENARIO/heating_profiles/" "$dest/heating_profiles/"
   fi
   echo "[$phase] done"
 }
