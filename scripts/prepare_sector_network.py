@@ -2400,12 +2400,14 @@ def add_EVs(
     # Add BEV chargers
     p_nom = number_cars * options["bev_charge_rate"] * electric_share
 
-    # NOTE: p_nom is multiplied by electric_share and bev_dsm_availability
-    # since the EV battery bus (and its DSM store) now only carries flexible demand
     # V2G only ever moves the DSM-capable share, whether or not the load is split
     v2g_p_nom = p_nom * bev_dsm_availability
+
+    # NOTE: if the load is split, the p_nom should be multiplied by electric_share and bev_dsm_availability
+    # since the EV battery bus (and its DSM store) now only carries flexible demand
     if natural_charging_split:
         p_nom = v2g_p_nom
+
     n.add(
         "Link",
         spatial.nodes,
