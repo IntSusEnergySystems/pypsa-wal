@@ -54,7 +54,7 @@ from scripts.walloon_scripts.times_heat_softlink import (  # noqa: E402
 ARGV = sys.argv[1:]
 SCENARIO = ARGV[0] if ARGV else "scen_demande_haute"
 ARCHIVE = Path("results/_heat_softlink_comparison")
-RESOURCES = Path("resources/times-pypsa") / SCENARIO
+RESOURCES = Path("resources/walloon") / SCENARIO
 HORIZONS = [2025, 2030, 2040, 2050]
 NODE = "BEWAL"
 
