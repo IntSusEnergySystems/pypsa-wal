@@ -4,14 +4,19 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  # Single-run layout: RDIR is "walloon-model/", no {run} wildcard — the cluster
-  # scripts and instructions.md assume it. Multi-scenario runs: config.times-pypsa.yaml
-  name: "walloon-model"
+  prefix: "walloon"
+  # RDIR is "walloon/{run}/", so one entry in `name` is
+  # a single run and several are a multi-scenario run — the only difference is how
+  # many names are listed. Every name must be a key of run.scenarios.file;
+  # `name: all` expands to all of them.
+  name:
+  - scen_demande_haute
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
-    enable: false
+    enable: true
     file: config/scenarios.walloon.yaml
+  shared_cutouts: true
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
@@ -105,7 +110,7 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    resolution_sector: 1h
+    resolution_sector: 168h
   exclude_carriers:
     - nuclear
 
@@ -123,6 +128,51 @@ sector:
   # https://www.nrel.gov/docs/fy21osti/78540.pdf
   bev_dsm_restriction_value: 0.7
   bev_dsm_restriction_time: 7
+  bev_natural_charging_split: true
+  bev_natural_charging_profile_fn: data/walloon/elia_natural_charging_daily_profile_utc0.csv
+  local_bev_dsm:
+    2025:
+      natural: 0.7
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.1
+    2030:
+      natural: 0.5
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.3
+    2035:
+      natural: 0.5
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.3
+    2040:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
+    2045:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
+    2050:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
   # Elia's 2026 vintage applies to horizons 2025 & 2030; 2036 vintage to 2035, 2040 and beyond.
   bev_avail_max:
     2025: 0.4
@@ -141,37 +191,6 @@ sector:
     2050: 0.18
   bev_energy: 0.06 # Elia assumes 60 kWh
   bev_charge_rate: 0.011 # aligned with Elia
-  bev_natural_charging_split: true
-  bev_natural_charging_profile_fn: data/walloon/elia_natural_charging_daily_profile_utc0.csv
-  local_bev_dsm:
-    2025:
-      natural: 0.7
-      sunny_PV: 0.05
-      sunny_noPV: 0.05
-      cloudy_PV: 0.05
-      cloudy_noPV: 0.05
-      work: 0.1
-    2030:
-      natural: 0.5
-      sunny_PV: 0.05
-      sunny_noPV: 0.05
-      cloudy_PV: 0.05
-      cloudy_noPV: 0.05
-      work: 0.3
-    2040:
-      natural: 0.4
-      sunny_PV: 0.075
-      sunny_noPV: 0.075
-      cloudy_PV: 0.075
-      cloudy_noPV: 0.075
-      work: 0.3
-    2050:
-      natural: 0.4
-      sunny_PV: 0.075
-      sunny_noPV: 0.075
-      cloudy_PV: 0.075
-      cloudy_noPV: 0.075
-      work: 0.3
   v2g: false # turn off v2g
   land_transport_electric_share:
     2020: 0
@@ -340,6 +359,16 @@ costs:
   social_discountrate: 0.035
 
 solving:
+  # Local workstation allocation: 12 Gurobi threads and 100 GB per solve
+  # (the pypsa-eur defaults, 32 threads / 128 GB, exceed a 24-core / 124 GB box).
+  # Keep cpus and gurobi-default.threads in sync. NIC5 overrides both via
+  # cluster/config_cluster.yaml.
+  mem_mb: 100000
+  cpus: &local_cpus 12
+  solver_options:
+    gurobi-default:
+      threads: *local_cpus
+
   agg_p_nom_limits:
     agg_offwind: true
     agg_solar: true

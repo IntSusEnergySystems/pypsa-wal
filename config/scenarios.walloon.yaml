@@ -1,4 +1,4 @@
-# Scenario overrides for config/config.times-pypsa.yaml (run.scenarios.enable: true).
+# Scenario overrides for config/config.walloon.yaml (run.scenarios.enable: true).
 #
 # Costs and potentials come from the single pair of files patched by
 # scripts/build_common_parameters.py:
