@@ -213,11 +213,13 @@ def build_natural_charging_shape(fn, snapshots, nodes, investment_year, charging
     year = min(available_years, key=lambda y: (abs(y - investment_year), y))
     daily = daily[daily["year"] == year].sort_values("hour")
 
-    assert sum(charging_weights[investment_year].values()) == 1, (
-        "The sum of charging weights must equal 1.0 for the investment year."
+    weights = charging_weights[investment_year]
+    assert np.isclose(sum(weights.values()), 1), (
+        f"The sum of charging weights must equal 1.0 for {investment_year}, "
+        f"got {sum(weights.values())}."
     )
 
-    daily = sum(weight * daily[key] for key, weight in charging_weights[investment_year].items())
+    daily = sum(weight * daily[key] for key, weight in weights.items())
     weekly_profile = np.tile(daily.values, 7)
 
     shape = generate_periodic_profiles(
