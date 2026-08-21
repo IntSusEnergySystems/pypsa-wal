@@ -317,11 +317,11 @@ with the TIMES one.
 >
 > | | switch | what it does | record |
 > |---|---|---|---|
-> | **option B′** *(default, on in `config.times-pypsa.yaml`)* | `profile.enable` | reconstructs an hourly heat profile per technology group (TIMES share × PyPSA's heat-load shape) and **pins the dispatch to it** | [`docs/heat_softlink_option_b.md`](docs/heat_softlink_option_b.md) |
-> | **option C** *(off)* | `energy_mix.enable` | constrains each group's **annual** heat, `≥` on what TIMES keeps and `≤` on heat pumps, ±5 % | [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) |
+> | **option B′** *(default, on in `config.times-pypsa.yaml`)* | `profile.enable` | reconstructs an hourly heat profile per technology group (TIMES share × PyPSA's heat-load shape) and **pins the dispatch to it** | [`docs/heat-softlink.md`](docs/heat-softlink.md) §3 |
+> | **option C** *(off)* | `energy_mix.enable` | constrains each group's **annual** heat, `≥` on what TIMES keeps and `≤` on heat pumps, ±5 % | [`docs/heat-softlink.md`](docs/heat-softlink.md) §2 |
 >
 > The three-way evidence behind choosing B′ (legacy vs C vs B′) is in
-> [`docs/heat_softlink_option_comparison.md`](docs/heat_softlink_option_comparison.md).
+> [`docs/heat-softlink.md`](docs/heat-softlink.md) §2.
 
 All switches live in
 [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) (present but off
@@ -1403,8 +1403,8 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | First run hangs on the cutout download | The rules read `data/cutout/archive/<version>/europe-<year>-sarah3-era5.nc` (~6.6 GB), **not** the legacy `cutouts/` symlink. `config.walloon.yaml` needs the 2010 file, `config.times-pypsa.yaml` the 2013 one — hardlink or symlink it in from another checkout if you have it, or wait for the download |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
 | `--resources mem_mb=... <target>` fails with `dictionary update sequence element #1 has length 1` | Same `nargs="+"` trap as `--configfile`: the target after `--resources` is parsed as another resource. Put `--cores` (or any flag) between them |
-| Solve is infeasible right after enabling `sector.times_heat.energy_mix` | Check which group binds in the solve log line `TIMES heat-mix constraints (…)`, then either raise `tolerance` or move that group to `slack_groups`. `solar thermal` is the usual suspect — it is the only group with a dispatch upper bound. See [`docs/heat_soft_linking.md`](docs/heat_soft_linking.md) §3.3 |
-| `energy_mix.enable and profile.enable are both true` | The two mix mechanisms are alternatives, not layers. Enable exactly one — see [`docs/heat_softlink_option_comparison.md`](docs/heat_softlink_option_comparison.md) |
+| Solve is infeasible right after enabling `sector.times_heat.energy_mix` | Check which group binds in the solve log line `TIMES heat-mix constraints (…)`, then either raise `tolerance` or move that group to `slack_groups`. `solar thermal` is the usual suspect — it is the only group with a dispatch upper bound. See [`docs/heat-softlink.md`](docs/heat-softlink.md) §8 |
+| `energy_mix.enable and profile.enable are both true` | The two mix mechanisms are alternatives, not layers. Enable exactly one — see [`docs/heat-softlink.md`](docs/heat-softlink.md) §2 |
 | You changed a constraint script and Snakemake says **`Nothing to be done`** | `solving.options.custom_extra_functionality` is a Snakemake **param**, and a param only retriggers a rule when its *value* changes — a path never changes when the file behind it does. Snakemake also does not follow what that module imports. Anything the hook imports must be listed in `CUSTOM_EXTRA_FUNCTIONALITY_MODULES` (`rules/common.smk`), which declares them as *inputs* of the solve. **Symptom to watch for:** a comparison run that finishes far too quickly and produces numbers identical to the previous variant — it re-archived the old answer |
 | Solve is infeasible right after enabling `sector.times_heat.profile` | With the default `penalty: 1000` it cannot be the heat-mix constraints — the reconstructed profiles close on the heat load exactly and every pinned technology is extendable. Read the `TIMES heat profile budget` lines in the solve log: they print the fuel and CO₂ the profiles imply against the node's cap *before* the solver runs. If a group genuinely cannot be supplied, it relaxes instead, and the gap shows up in `check_heat_profile_fidelity.py`. Last resorts: `profile.free_groups: [gas boiler, biomass boiler]`, then `profile.enable: false` |
 | Option B′ solve much slower than option C | Expected: B′ adds ≈ 14 600 equality rows at 6 h (≈ 87 600 at 1 h) against option C's 6. It also *removes* degrees of freedom, so the net effect is not one-signed — measure rather than assume |

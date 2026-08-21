@@ -124,7 +124,7 @@ sector:
   # so removing this block reproduces the old results. Two ALTERNATIVE mix
   # mechanisms — `energy_mix` (option C, annual constraint) and `profile`
   # (option B', pinned hourly profile). Enabling both raises.
-  # docs/heat_soft_linking.md and docs/heat_softlink_option_b.md.
+  # docs/heat-softlink.md.
   times_heat:
     node: BEWAL
     # times | times_base_year | pypsa — how the TIMES residential decentral heat
@@ -141,7 +141,7 @@ sector:
     # is then exactly TIMES's at every hour, with no tolerance, no senses and no
     # zero-target special case. Solar thermal follows its own collector
     # availability instead of the load, because it is the only group with a
-    # dispatch ceiling. docs/heat_softlink_option_b.md
+    # dispatch ceiling. docs/heat-softlink.md
     profile:
       enable: true
       # The group left unpinned, so the heat-bus balance determines it. The heat
@@ -177,6 +177,13 @@ sector:
       # against a binding CO2 cap) relaxes at a price instead of making the LP
       # infeasible and hanging the myopic chain. 0 = hard constraints.
       penalty: 1000.0
+  # RSD-RENO / COM-RENO in the TIMES ~TFM_INS table (0.12 / 0.11). PyPSA holds
+  # a single scalar, so the residential rate wins — Wallonia's renovation is
+  # overwhelmingly residential. Inert while `retro_endogen` is false (the
+  # config.default.yaml value), but it must be right the day it is switched on.
+  # docs/discount-rates.md D6.
+  retrofitting:
+    interest_rate: 0.12
   oil_boilers: true
   solid_biomass_import:
     enable: true

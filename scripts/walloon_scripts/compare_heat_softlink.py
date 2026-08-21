@@ -11,9 +11,9 @@ Markdown tables ready to paste into the decision documents:
 ``before``   legacy transfer — annual heat demand only, PyPSA re-optimises the
              appliance fleet from scratch
 ``after``    **option C** — annual energy-mix constraints
-             (``docs/heat_soft_linking.md``)
+             (``docs/heat-softlink.md``)
 ``option_b`` **option B'** — reconstructed hourly profiles, pinned dispatch
-             (``docs/heat_softlink_option_b.md``)
+             (``docs/heat-softlink.md``)
 ===========  ================================================================
 
 Tables:
@@ -119,7 +119,7 @@ def hourly_mix_deviation(n: pypsa.Network, tgt: pd.DataFrame) -> float:
     hourly substitution freedom option B' removes is worth nothing. The larger
     it is, the more option B' gives up — and the more of what PyPSA is doing is
     the single-bus perfect-substitutability artefact discussed in
-    ``docs/heat_softlink_option_b.md`` §2.2.
+    ``docs/heat-softlink.md`` §2.
     """
     supply = group_dispatch(n, tgt)
     w = n.snapshot_weightings.generators
@@ -362,7 +362,7 @@ def main() -> None:
         f"\n> `d (MEUR)` is against **{LABEL[phases[0]]}**. Gurobi runs with "
         "`Crossover 0` and `BarConvTol 1e-5`, and the measured noise floor on "
         "these objectives is ~190 MEUR — see "
-        "`docs/heat_softlink_option_comparison.md` §3.0 before reading any "
+        "`docs/heat-softlink.md` §4.3 before reading any "
         "difference smaller than that.\n"
     )
 

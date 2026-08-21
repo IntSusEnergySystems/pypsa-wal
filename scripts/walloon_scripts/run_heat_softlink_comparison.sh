@@ -8,9 +8,9 @@
 #
 #   before     the legacy transfer — annual heat demand only, PyPSA re-optimises
 #              the appliance fleet from scratch
-#   after      option C — annual energy-mix constraints (docs/heat_soft_linking.md)
+#   after      option C — annual energy-mix constraints (docs/heat-softlink.md)
 #   option_b   option B' — reconstructed hourly profiles, pinned dispatch
-#              (docs/heat_softlink_option_b.md)
+#              (docs/heat-softlink.md)
 #
 # All three use the SAME config file; each phase differs only by the
 # `sector.times_heat` overlay written below, so nothing but the mechanism moves.

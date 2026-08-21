@@ -33,7 +33,7 @@ def times_mapping_files(w):
     process that no extraction rule could match) leaves stale demands on disk and
     Snakemake reuses them silently — how the 2026 Walloon heat leak stayed in the
     solved networks after it had been fixed upstream. See
-    `docs/times-heating-softlink-options.md` §10.6.
+    `docs/heat-softlink.md` §10.6.
     """
     from times_pypsa import default_mappings_dir
 

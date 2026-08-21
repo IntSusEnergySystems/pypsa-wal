@@ -155,7 +155,7 @@ def build_existing_heating():
     # but whose vintage structure lets PyPSA greenfield 2.5 GW_th of heat pumps in
     # the base year against 74 MW_th inherited; TIMES has 929 MW_th. Both sides
     # are in MW thermal output, so this is a substitution, not a conversion.
-    # See docs/heat_soft_linking.md.
+    # See docs/heat-softlink.md.
     nodal_heat_name_tech = maybe_apply_times_base_year_stock(
         nodal_heat_name_tech, urban_fraction
     )

@@ -125,21 +125,21 @@ sector:
   times_file: data/walloon/scen_base_coherence_3110.vd
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
-  # TIMES heating soft-link, option C — see docs/heat_soft_linking.md. Left on the
+  # TIMES heating soft-link, option C — see docs/heat-softlink.md. Left on the
   # legacy path here; config.times-pypsa.yaml enables it.
   times_heat:
     node: BEWAL
     urban_rural_split: times      # times | times_base_year | pypsa
     base_year_capacities: false
     # Option B' — reconstructed hourly profiles. Mutually exclusive with
-    # `energy_mix` below. docs/heat_softlink_option_b.md
+    # `energy_mix` below. docs/heat-softlink.md
     profile:
       enable: false
       absorber: heat pump         # group left unpinned, takes the bus residual
       penalty: 1000.0             # EUR/MWh_th undelivered; 0 = hard constraints
       free_groups: []
       export: true
-    # Option C — annual energy-mix constraints. docs/heat_soft_linking.md
+    # Option C — annual energy-mix constraints. docs/heat-softlink.md
     energy_mix:
       enable: false
       mode: share                 # share | absolute
@@ -151,6 +151,13 @@ sector:
       # against a binding CO2 cap) relaxes at a price instead of making the LP
       # infeasible and hanging the myopic chain. 0 = hard constraints.
       penalty: 1000.0
+  # RSD-RENO / COM-RENO in the TIMES ~TFM_INS table (0.12 / 0.11). PyPSA holds
+  # a single scalar, so the residential rate wins — Wallonia's renovation is
+  # overwhelmingly residential. Inert while `retro_endogen` is false (the
+  # config.default.yaml value), but it must be right the day it is switched on.
+  # docs/discount-rates.md D6.
+  retrofitting:
+    interest_rate: 0.12
   oil_boilers: true
   solid_biomass_import:
     enable: true

@@ -12,7 +12,7 @@ components are constrained to deliver it.
 
 Why the shape has to come from PyPSA: TIMES-WAL resolves *only electricity*
 sub-annually — every heat commodity is ``ANNUAL`` and the timeslice→calendar
-mapping is not even in the ``.vd`` (``docs/times-heating-softlink-options.md``
+mapping is not even in the ``.vd`` (``docs/heat-softlink.md``
 §1.3). So there is no TIMES profile to import; there is a TIMES *composition*,
 and PyPSA has the shape.
 
@@ -51,7 +51,7 @@ in the constraint set.
    heat`` and served its 3.8 TWh_th with heat pumps, taking the reported heat-pump
    share from the intended 37.9 % to 57 %. Pinning every group makes the total
    decentral supply equal the heat load exactly, so DAC has to source its heat
-   where it did before. ``docs/heat_softlink_option_b.md`` arbitrage A5.
+   where it did before. ``docs/heat-softlink.md`` arbitrage A5.
 
 Feasibility on the heat bus is structural — ``rhs`` is itself a feasible point,
 because every pinned technology is extendable with no dispatch ceiling except
@@ -61,7 +61,7 @@ already bind in 2040 before any heat constraint exists. That is what the single
 scalar relaxation per group (``profile.penalty``) and the pre-solve budget report
 are for.
 
-Full design record, including every arbitrage: ``docs/heat_softlink_option_b.md``.
+Full design record, including every arbitrage: ``docs/heat-softlink.md``.
 """
 
 from __future__ import annotations
@@ -218,7 +218,7 @@ def reconstruct_profiles(
                     f"The solar-thermal availability on {bus!r} is zero at every "
                     "snapshot, so its TIMES share cannot be delivered. If this is "
                     "a snapshot subsample, check the stride is coprime with the "
-                    "snapshots per day (docs/heat_soft_linking.md §8.5)."
+                    "snapshots per day (docs/heat-softlink.md §9)."
                 )
             solar[bus] = s_solar * annual[bus] * avail / denominator
     if SOLAR_GROUP in shares.index:
@@ -234,7 +234,7 @@ def reconstruct_profiles(
             f"The reconstructed solar-thermal profile exceeds the heat load on "
             f"{worst!r} at some snapshot (min residual "
             f"{residual.min().min():.2f} MW). The TIMES solar share is too large "
-            "for this collector profile; see docs/heat_softlink_option_b.md A3."
+            "for this collector profile; see docs/heat-softlink.md §3."
         )
 
     rest = shares.drop(index=SOLAR_GROUP, errors="ignore")
@@ -528,7 +528,7 @@ def budget_report(n, profiles, terms, energies, weightings, node: str) -> None:
     LP does not merely fail: ``solve_network.py`` reacts to
     ``infeasible_or_unbounded`` by calling ``compute_infeasibilities()``, a Gurobi
     IIS over ~1.3 M rows that ran for 13 h without finishing on the 2040 network
-    and blocked the whole myopic chain (``docs/heat_soft_linking.md`` §8.7).
+    and blocked the whole myopic chain (``docs/heat-softlink.md`` §8.7).
 
     Never raises: a diagnostic that can break a solve is worse than no
     diagnostic.

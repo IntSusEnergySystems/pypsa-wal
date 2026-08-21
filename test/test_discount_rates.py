@@ -4,7 +4,7 @@
 
 """Tests for TIMES↔PyPSA hurdle-rate / discount-rate harmonisation.
 
-Covers the guarantees in docs/discount-rates-analysis.md §13 (T1–T20): mapping
+Covers the guarantees in docs/discount-rates.md (T1–T21): mapping
 completeness, master-CSV rates, generated discount_rates.csv sync, resolution
 fallback/override rules, and prepare_costs() downstream behaviour.
 """
@@ -168,7 +168,7 @@ def test_every_technology_is_mapped():
             f"{len(missing)} technolog(ies) missing from "
             f"{HURDLE_MAPPING_FILE.relative_to(ROOT)}: {missing}. "
             "Add each with hurdle_sector in "
-            "production|industry|tertiary|residential|none, then run "
+            f"{'|'.join(HURDLE_SECTORS)}|none, then run "
             "`python scripts/build_common_parameters.py --write`."
         )
 
@@ -434,9 +434,9 @@ def test_variant_inherits_unlisted_sectors():
     """T10c: a variant overriding one sector inherits the rest from the base."""
     df = load_master().copy()
     horizons = planning_horizons()
-    # Synthetic variant: bump production only.
-    template = df[df["pypsa_wal_target"] == "hurdle:production"].iloc[0].copy()
-    template["pypsa_wal_target"] = "hurdle:highprod:production"
+    # Synthetic variant: bump the ELC-PUB (power) sector only.
+    template = df[df["pypsa_wal_target"] == "hurdle:power"].iloc[0].copy()
+    template["pypsa_wal_target"] = "hurdle:highprod:power"
     template["value"] = 0.099
     template["status"] = "active"
     df = pd.concat([df, pd.DataFrame([template])], ignore_index=True)
@@ -447,13 +447,11 @@ def test_variant_inherits_unlisted_sectors():
     base = resolve_hurdle_rates(df, load_meta(), horizons, variants[None])
     high = resolve_hurdle_rates(df, load_meta(), horizons, variants["highprod"])
 
-    # Production-mapped techs differ; others match.
+    # Power-mapped techs differ; others match.
     mapping = pd.read_csv(HURDLE_MAPPING_FILE, dtype=str, keep_default_na=False)
-    production = set(
-        mapping.loc[mapping["hurdle_sector"] == "production", "technology"]
-    )
+    power = set(mapping.loc[mapping["hurdle_sector"] == "power", "technology"])
     for tech, rates in base.rates.items():
-        if tech in production:
+        if tech in power:
             assert high.rates[tech] != rates
             assert all(abs(v - 0.099) < 1e-12 for v in high.rates[tech].values())
         else:
@@ -498,12 +496,17 @@ def test_expected_rates_spot_check():
     """T11: prepare_costs() applies the agreed sector rates on the archive."""
     costs = _prepare_archive_costs()
     expected = {
-        "onwind": 0.075,
-        "nuclear": 0.075,
-        "solar-rooftop": 0.075,
-        "decentral air-sourced heat pump": 0.12,
-        "industrial heat pump high temperature": 0.10,
-        "electricity distribution grid": 0.075,
+        "onwind": 0.075,  # ELC-PUB
+        "nuclear": 0.075,  # ELC-PUB
+        "solar-rooftop": 0.075,  # ALL-PV, not RSD-processes
+        "decentral CHP": 0.075,  # ALL-CHP, not RSD-processes
+        "micro CHP": 0.075,  # ALL-CHP, not RSD-processes
+        "central gas CHP": 0.075,  # ALL-CHP
+        "Battery electric (passenger cars)": 0.075,  # TRA-processes
+        "electrolysis": 0.075,  # SUP-processes
+        "decentral air-sourced heat pump": 0.12,  # RSD-processes
+        "industrial heat pump high temperature": 0.10,  # IND-process
+        "electricity distribution grid": 0.075,  # ELC-PUB
     }
     bad = {
         tech: float(costs.at[tech, "discount rate"])
@@ -518,6 +521,44 @@ def test_expected_rates_spot_check():
             )
             + "\nCheck config/hurdle_rate_mapping.csv and "
             "`python scripts/build_common_parameters.py --write`."
+        )
+
+
+def test_pset_set_column_is_consistent():
+    """T21: times_pset_set labels the sector one-to-one, and every group is used.
+
+    The column is the audit trail back to the TIMES-WAL ``~TFM_INS`` table; a
+    sector labelled with two different Pset_Sets (or an unlabelled non-``none``
+    row) means the mapping and the TIMES table have drifted apart.
+    """
+    mapping = pd.read_csv(HURDLE_MAPPING_FILE, dtype=str, keep_default_na=False)
+    if "times_pset_set" not in mapping.columns:
+        pytest.fail(
+            f"{HURDLE_MAPPING_FILE.relative_to(ROOT)} lost the times_pset_set "
+            "column — it is the audit trail back to TIMES ~TFM_INS."
+        )
+    rated = mapping[mapping["hurdle_sector"] != "none"]
+    blank = sorted(rated.loc[rated["times_pset_set"].str.strip() == "", "technology"])
+    if blank:
+        pytest.fail(f"rows with a sector but no times_pset_set: {blank}")
+    ambiguous = {
+        sector: sorted(g["times_pset_set"].unique())
+        for sector, g in rated.groupby("hurdle_sector")
+        if g["times_pset_set"].nunique() > 1
+    }
+    if ambiguous:
+        pytest.fail(f"hurdle_sector mapped to several Pset_Sets: {ambiguous}")
+    # The two config-only groups (RSD-RENO/COM-RENO) have no cost-table row;
+    # every other sector must actually be used by at least one technology.
+    config_only = {"residential_reno", "tertiary_reno"}
+    # COM-processes and AGR-processes are deliberately empty — see D2/D4.
+    empty_by_design = {"tertiary", "agriculture"}
+    unused = set(HURDLE_SECTORS) - set(rated["hurdle_sector"])
+    unexpected = unused - config_only - empty_by_design
+    if unexpected:
+        pytest.fail(
+            f"hurdle sector(s) with no technology and no documented reason: "
+            f"{sorted(unexpected)}."
         )
 
 
@@ -623,7 +664,7 @@ def test_per_technology_override_wins():
     df = load_master().copy()
     horizons = planning_horizons()
     override = 0.042
-    template = df[df["pypsa_wal_target"] == "hurdle:production"].iloc[0].copy()
+    template = df[df["pypsa_wal_target"] == "hurdle:power"].iloc[0].copy()
     template["pypsa_wal_target"] = "cost:onwind:discount rate"
     template["parameter"] = "discount_rate"
     template["value"] = override
@@ -734,7 +775,7 @@ def test_egs_uses_geothermal_rate():
         pytest.fail(
             "add_enhanced_geothermal() no longer reads "
             "costs.at['geothermal', 'discount rate'] — EGS would ignore the "
-            "hurdle-rate table (see docs/discount-rates-analysis.md S10)."
+            "hurdle-rate table (see docs/discount-rates.md §2.3)."
         )
     if 'costs.at["organic rankine cycle", "discount rate"]' not in source:
         pytest.fail(

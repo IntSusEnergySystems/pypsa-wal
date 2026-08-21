@@ -167,7 +167,7 @@ sector lives in `config/hurdle_rate_mapping.csv`; `--write` generates
 walloon configs. The financial-rate **fallback** for unmapped technologies is the
 **PyPSA default** (`config.default.yaml` → `0.07`); walloon overlays must not
 override `costs.fill_values."discount rate"`. Full design:
-[`docs/discount-rates-analysis.md`](docs/discount-rates-analysis.md).
+[`docs/discount-rates.md`](docs/discount-rates.md).
 Building-retrofit `sector.retrofitting.interest_rate` remains a separate lever
 (out of scope of the cost-table path).
 
@@ -386,7 +386,7 @@ file at all. Fixed by declaring it as a rule `input` (`rules/solve_myopic.smk`,
 8. [x] Wire `--check` into tests/CI (`test/test_discount_rates.py` T20)
 9. [x] Decide residual currency questions §8.8–8.9 (EUR2023 / Valbiom) — both inflated
 10. [x] Document application path in `instructions.md`; rename to `common_parameters.md`
-11. [x] Discount/hurdle-rate harmonisation (§3.6 / `docs/discount-rates-analysis.md`)
+11. [x] Discount/hurdle-rate harmonisation (§3.6 / `docs/discount-rates.md`)
 
 ---
 
@@ -419,7 +419,7 @@ file at all. Fixed by declaring it as a rule `input` (`rules/solve_myopic.smk`,
 4. **Discount / hurdle rates** — sectoral TIMES hurdles (7.5 / 10 / 11 / 12 %) and
    SDR 3.5 % in the master CSV (**status=active**); financial-rate fallback is the
    PyPSA default 7 %. See §3.6 and
-   [`docs/discount-rates-analysis.md`](docs/discount-rates-analysis.md).
+   [`docs/discount-rates.md`](docs/discount-rates.md).
 5. **Lifetimes** — CSV authoritative. Where Walloon `custom_costs` had a *different* value,
    the CSV value wins and a note records the superseded Walloon figure. Where Walloon had a
    lifetime **absent** from the CSV, it was **added** (nuclear retrofit, solar, rooftop

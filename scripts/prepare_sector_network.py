@@ -3927,7 +3927,7 @@ def times_demand_twh(demands: pd.DataFrame, categories: list[str]) -> pd.Series:
 #: The two residential decentral heat loads. TIMES determines their *sum*; the
 #: split between them is a labelling convention on the TIMES side (2-façade
 #: houses and apartments → urban decentral, 3- and 4-façade → rural) and a
-#: population fraction on the PyPSA side. See `docs/heat_soft_linking.md`.
+#: population fraction on the PyPSA side. See `docs/heat-softlink.md`.
 RESIDENTIAL_DECENTRAL_HEAT_LOADS = [
     "BEWAL residential urban decentral heat",
     "BEWAL residential rural heat",

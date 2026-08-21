@@ -64,7 +64,22 @@ COST_TABLE_RENAMES = {"solar-utility single-axis tracking": "solar-hsat"}
 COST_TABLE_CLONES = {"waste": "waste CHP"}
 HURDLE_MAPPING_FILE = ROOT / "config" / "hurdle_rate_mapping.csv"
 DISCOUNT_RATES_FILE = ROOT / "data" / "walloon" / "discount_rates.csv"
-HURDLE_SECTORS = ("production", "industry", "tertiary", "residential")
+# TIMES-WAL ~TFM_INS NCAP_DRATE process groups, one hurdle:<sector> row each.
+# Mapping to the Pset_Set names lives in config/hurdle_rate_mapping.csv
+# (times_pset_set column) and in docs/discount-rates.md.
+HURDLE_SECTORS = (
+    "supply",  # SUP-processes
+    "power",  # ELC-PUB
+    "chp",  # ALL-CHP
+    "pv",  # ALL-PV
+    "transport",  # TRA-processes
+    "industry",  # IND-process / IND-processNE
+    "tertiary",  # COM-processes
+    "agriculture",  # AGR-processes
+    "residential",  # RSD-processes
+    "residential_reno",  # RSD-RENO — config target, no cost-table technology
+    "tertiary_reno",  # COM-RENO — config target, no cost-table technology
+)
 VARIANT_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 COST_CONFIG_FILES = (WALLOON_CONFIG, TIMES_PYPSA_CONFIG)
 
@@ -992,7 +1007,7 @@ def patch_discount_rates(
                 f"rate {fmt_value(fb)} was written for them:\n"
                 + "\n".join(f"  - {t}" for t in resolution.unmapped)
                 + "\nAdd each to config/hurdle_rate_mapping.csv with one of "
-                "production|industry|tertiary|residential, or hurdle_sector=none "
+                f"{'|'.join(HURDLE_SECTORS)}, or hurdle_sector=none "
                 "if a rate is inert."
             )
             soft_shared.append(msg)

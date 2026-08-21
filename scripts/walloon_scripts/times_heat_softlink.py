@@ -23,7 +23,7 @@ reproduces the previous results exactly:
     ``urban decentral``; 3- and 4-façade houses → ``rural``) — and its implied
     rural share **drifts from 59 % to 37 %** across the horizons, i.e. dwellings
     migrate between PyPSA buses over time and the base-year rural stock strands.
-    See ``docs/heat_soft_linking.md``.
+    See ``docs/heat-softlink.md``.
 
 ``base_year_capacities``
     Replace the BEWAL rows of ``existing_heating_distribution`` with the TIMES
@@ -34,7 +34,7 @@ Scope is the two decentral heat buses only. The urban-central bus is excluded by
 design: DAC withdraws more heat than the district-heating load, CHP heat is
 welded to CHP electricity, the pit store re-injects, and 73 % of the TIMES 2050
 district-heat supply (geothermal + industrial waste heat) has no PyPSA component
-to constrain. ``docs/times-heating-softlink-options.md`` §6 *Scope*.
+to constrain. ``docs/heat-softlink.md`` §6 *Scope*.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ DEFAULT_OPTIONS: dict = {
     # branch. Instead of bounding the annual energy per group it reconstructs an
     # hourly profile per group (TIMES share x PyPSA heat-load shape) and pins the
     # dispatch to it. Mutually exclusive with `energy_mix`; see
-    # `times_heat_profiles.py` and `docs/heat_softlink_option_b.md`.
+    # `times_heat_profiles.py` and `docs/heat-softlink.md`.
     "profile": {
         "enable": False,
         # The group left unpinned, so the heat-bus balance determines it and the
@@ -153,7 +153,7 @@ def times_heat_options(config: dict) -> dict:
             "sector.times_heat.energy_mix.enable and sector.times_heat.profile."
             "enable are both true. They are alternative mechanisms for the same "
             "transfer (option C and option B'); enable exactly one. See "
-            "docs/heat_softlink_option_b.md."
+            "docs/heat-softlink.md."
         )
     return opts
 
@@ -268,7 +268,7 @@ def times_heat_stock_capacities(
     here, which removes the single largest objection to reusing TIMES capacities.
 
     Placement rules, all of them arbitrary at some level and all documented in
-    ``docs/heat_soft_linking.md``:
+    ``docs/heat-softlink.md``:
 
     * ``services`` capacity goes to ``services urban decentral`` only —
       ``write_wallon_heat_demands`` deletes the whole ``BEWAL services rural``
@@ -603,7 +603,7 @@ def add_times_heat_mix_constraints(n, snapshots, snakemake) -> None:
     # penalty is ~10-25x the marginal cost of heat, so relaxing is never cheaper
     # than complying), and where it cannot, the slack *is* the answer — "TIMES
     # asks for X TWh_th more gas heat than Wallonia can emit for". See
-    # `docs/heat_soft_linking.md`.
+    # `docs/heat-softlink.md`.
     penalty = mix["penalty"]
     groups_to_constrain = [
         row["group"]

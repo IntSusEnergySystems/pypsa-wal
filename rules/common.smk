@@ -189,7 +189,7 @@ def memory(w):
 #: implementation left every solved network on disk looking up to date — the run
 #: then silently re-archived the *previous* answer. Same class of bug as the
 #: mapping CSVs not invalidating `wallon_demands_*.csv`
-#: (docs/times-heating-softlink-options.md §10.8).
+#: (docs/heat-softlink.md §9).
 CUSTOM_EXTRA_FUNCTIONALITY_MODULES = [
     "scripts/walloon_scripts/times_heat_softlink.py",
     "scripts/walloon_scripts/times_heat_profiles.py",
