@@ -1,0 +1,298 @@
+planning_horizon,technology,parameter,value,unit,source,further_description
+all,Alkaline electrolyzer large size,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,Alkaline electrolyzer medium size,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,Alkaline electrolyzer small size,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,Ammonia cracker,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,BEV Bus city,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,BEV Coach,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,BEV Truck Semi-Trailer max 50 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,BEV Truck Solo max 26 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,BEV Truck Trailer max 56 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Battery electric (passenger cars),discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Battery electric (trucks),discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,BioSNG,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,BtL,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CCGT,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,CH4 (g) fill compressor station,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CH4 (g) pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CH4 (g) submarine pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CH4 (l) transport ship,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,CH4 evaporation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CH4 liquefaction,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CO2 liquefaction,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CO2 pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CO2 storage tank,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CO2 submarine pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,Charging infrastructure fast (purely) battery electric vehicles passenger cars,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Charging infrastructure fuel cell vehicles passenger cars,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Charging infrastructure fuel cell vehicles trucks,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Charging infrastructure slow (purely) battery electric vehicles passenger cars,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Compressed-Air-Adiabatic-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Compressed-Air-Adiabatic-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Concrete-charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Concrete-discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Concrete-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,"Container feeder, ammonia",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,"Container feeder, diesel",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,"Container feeder, methanol",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,"Container, ammonia",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,"Container, diesel",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,"Container, methanol",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Diesel Bus city,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Diesel Coach,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Diesel Truck Semi-Trailer max 50 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Diesel Truck Solo max 26 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Diesel Truck Trailer max 56 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,FCV Bus city,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,FCV Coach,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,FCV Truck Semi-Trailer max 50 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,FCV Truck Solo max 26 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,FCV Truck Trailer max 56 tons,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,FT fuel transport ship,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Fischer-Tropsch,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,Gasnetz,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,General liquid hydrocarbon storage (crude),discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,General liquid hydrocarbon storage (product),discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,Gravity-Brick-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Gravity-Brick-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Gravity-Water-Aboveground-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Gravity-Water-Aboveground-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Gravity-Water-Underground-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Gravity-Water-Underground-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,H2 (g) fill compressor station,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 (g) pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 (g) pipeline repurposed,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 (g) submarine pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 (g) submarine pipeline repurposed,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 (l) storage tank,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 (l) transport ship,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,H2 evaporation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 liquefaction,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 production biomass gasification,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 production biomass gasification CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 production coal gasification,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 production coal gasification CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 production heavy oil partial oxidation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 production natural gas steam reforming,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 production natural gas steam reforming CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 production solid biomass steam reforming,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,HVAC overhead,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HVAC submarine,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HVAC underground,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HVDC inverter pair,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HVDC overhead,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HVDC submarine,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HVDC underground,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Haber-Bosch,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,HighT-Molten-Salt-charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HighT-Molten-Salt-discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HighT-Molten-Salt-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Hydrogen fuel cell (passenger cars),discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Hydrogen fuel cell (trucks),discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Hydrogen-charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Hydrogen-discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Hydrogen-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,LNG storage tank,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,LOHC chemical,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,LOHC dehydrogenation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,LOHC dehydrogenation (small scale),discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,LOHC hydrogenation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,LOHC loaded DBT storage,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,LOHC transport ship,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,LOHC unloaded DBT storage,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,Lead-Acid-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Lead-Acid-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Liquid fuels ICE (passenger cars),discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Liquid fuels ICE (trucks),discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Liquid-Air-charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Liquid-Air-discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Liquid-Air-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Lithium-Ion-LFP-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Lithium-Ion-LFP-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Lithium-Ion-NMC-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Lithium-Ion-NMC-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,LowT-Molten-Salt-charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,LowT-Molten-Salt-discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,LowT-Molten-Salt-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,MeOH transport ship,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Methanol steam reforming,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,NH3 (l) storage tank incl. liquefaction,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,NH3 (l) transport ship,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Ni-Zn-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Ni-Zn-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,OCGT,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,PEM electrolyzer small size,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,PHS,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Pumped-Heat-charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Pumped-Heat-discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Pumped-Heat-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Pumped-Storage-Hydro-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Pumped-Storage-Hydro-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,SMR,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,SMR CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,SOEC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,Sand-charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Sand-discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Sand-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Steam methane reforming,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,"Tank&bulk, diesel",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,"Tank&bulk, methanol",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,"Tankbulk, ammonia",discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,Vanadium-Redox-Flow-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Vanadium-Redox-Flow-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Zn-Air-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Zn-Air-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Zn-Br-Flow-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Zn-Br-Flow-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Zn-Br-Nonflow-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,Zn-Br-Nonflow-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,air separation unit,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,allam,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,ammonia carbon capture retrofit,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,battery inverter,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,battery storage,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,biochar pyrolysis,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,biodiesel crops,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,bioethanol crops,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,biogas,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,biogas CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,biogas manure,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,biogas plus hydrogen,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,biogas upgrading,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,biomass,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,biomass CHP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,biomass CHP capture,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,biomass EOP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,biomass HOP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,biomass boiler,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,biomass-to-methanol,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,blast furnace-basic oxygen furnace,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,cement capture,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,cement carbon capture retrofit,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,cement dry clinker,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,cement finishing,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,central air-sourced heat pump,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central coal CHP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,central excess-heat-sourced heat pump,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central gas CHP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,central gas CHP CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,central gas boiler,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central geothermal heat source,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central ground-sourced heat pump,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central hydrogen CHP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,central resistive heater,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central solar thermal,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central solid biomass CHP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,central solid biomass CHP CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,central solid biomass CHP powerboost CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,central water pit charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central water pit discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central water pit storage,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central water tank charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central water tank discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,central water tank storage,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,clean water tank storage,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,coal,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,csp-tower,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,csp-tower TES,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,csp-tower power block,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,decentral CHP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,decentral air-sourced heat pump,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral gas boiler,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral gas boiler connection,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral ground-sourced heat pump,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral oil boiler,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral resistive heater,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral solar thermal,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral water tank charger,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral water tank discharger,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,decentral water tank storage,discount rate,0.12,per unit,input_parameters_for_models.csv,TIMES hurdle: residential
+all,digestible biomass,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,digestible biomass to hydrogen,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,direct air capture,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,direct firing gas,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,direct firing gas CC,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,direct firing solid fuels,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,direct firing solid fuels CC,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,dry bulk carrier Capesize,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,electric arc furnace,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,electric arc furnace with hbi and scrap,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,electric boiler steam,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,electric steam cracker,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,electricity distribution grid,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,electricity grid connection,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,electrobiofuels,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,electrolysis,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,electrolysis small,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,ethanol carbon capture retrofit,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,ethanol from starch crop,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,ethanol from sugar crops,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,fuel cell,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,fuelwood,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,gas,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,gas boiler steam,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,gas storage,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,gas storage charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,gas storage discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,geothermal,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,grey methanol synthesis,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,helmeth,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,home battery inverter,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,home battery storage,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,hydro,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,hydrogen direct iron reduction furnace,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,hydrogen storage compressor,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,hydrogen storage tank type 1,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,hydrogen storage tank type 1 including compressor,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,hydrogen storage underground,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,industrial heat pump high temperature,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,industrial heat pump medium temperature,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,iron ore DRI-ready,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,iron-air battery,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,iron-air battery charge,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,iron-air battery discharge,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,lignite,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,methanation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,methane storage tank incl. compressor,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,methanol,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,methanol-to-kerosene,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,methanol-to-olefins/aromatics,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,methanolisation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,micro CHP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,natural gas direct iron reduction furnace,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,nuclear,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,nuclear retrofit,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-ac-connection-submarine,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-ac-connection-underground,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-ac-station,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-dc-connection-submarine,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-dc-connection-underground,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-dc-station,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-float,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-float-connection-submarine,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-float-connection-underground,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,offwind-float-station,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,oil,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,onwind,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,organic rankine cycle,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,ror,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,seawater RO desalination,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,seawater desalination,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,shipping fuel methanol,discount rate,0.11,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
+all,solar-hsat,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: pv
+all,solar-rooftop,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: pv
+all,solar-rooftop commercial,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: pv
+all,solar-rooftop residential,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: pv
+all,solar-utility,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: pv
+all,solid biomass,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,solid biomass boiler steam,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,solid biomass boiler steam CC,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,solid biomass to hydrogen,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,steel carbon capture retrofit,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
+all,uranium,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,waste CHP,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,waste CHP CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: chp
+all,water tank charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,water tank discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply

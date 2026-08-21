@@ -230,12 +230,32 @@ the file is still written, with the 0.07 fallback, and the run exits 1.
 | # | Question | Decision |
 |---|---|---|
 | **D1** | The master CSV's old flat 4 % vs the sectoral 7.5–12 % | **Retired.** The unmapped-technology **fallback** is the PyPSA default fill (0.07), not a TIMES rate. Sector rates live only in `hurdle:<sector>` rows. |
-| **D2** | **No tertiary/residential split in the cost table** — one `decentral *` family serves both the residential and the services heat buses | **Map all `decentral *` to `residential` (0.12).** No demand-weighted blend: a blend is unauditable and cannot be reproduced from the CSV. `COM-processes` (0.11) stays defined so the table remains faithful to TIMES and a future split can use it. **Consequence: tertiary decentral heat is annualised 1 pp too high.** Fixing it needs per-sector clones of the `decentral *` cost rows and a `HeatSystem` change — see [§7](#7-open-points). |
+| **D2** | **No tertiary/residential split in the cost table** — one `decentral *` family serves both the residential and the services heat buses | **Map all `decentral *` to `residential` (0.12), and do not build the split.** No demand-weighted blend either: a blend is unauditable and cannot be reproduced from the CSV. `COM-processes` (0.11) stays defined so the table remains faithful to TIMES. **Decided against the fix (2026-08-21), with the effect measured:** it overstates the annualised capital cost of *services* decentral heating appliances by **4.1–6.8 %** ([§4.3](#43-what-d2-actually-costs)). Closing it needs per-sector clones of every `decentral *` cost row plus a change to `HeatSystem.heat_pump_costs_name`, i.e. a refactor of upstream PyPSA-Eur heating for a single-digit-percent error on one sector — and under the option-B′ heat soft-link the *mix* is pinned anyway, so it moves reported cost, not what gets built. Revisit only if a services-specific renovation or heating study is commissioned. |
 | **D3** | Where district-heating supply plant belongs | `SUP-processes`. Numerically identical to `ELC-PUB`; recorded so the label is a decision rather than an accident. |
 | **D4** | `AGR-processes` (0.11) has no PyPSA counterpart | **Defined but unused.** PyPSA-Eur models agriculture as a demand (machinery oil/electricity, `agriculture_machinery_*_share`) with no capital stock, so there is nothing to annualise. Keep the row for traceability. |
 | **D5** | Home batteries and rooftop PV: prosumer or supply asset? | **Supply** (0.075), following the explicit `ALL-PV` group. Flagged, not settled — see [§6](#6-what-the-literature-supports). |
 | **D6** | `sector.retrofitting.interest_rate` | **Set to 0.12** (RSD-RENO) in both Walloon configs. PyPSA holds a **single scalar**, so `COM-RENO` (0.11) cannot be expressed and the residential rate wins — Wallonia's renovation is overwhelmingly residential. **Inert while `retro_endogen: false`** (the default, and it must stay false: TIMES has already retrofitted the demand), but correct the day it is switched on. Raising it from the old 0.04 removes the inversion where renovation was cheaper to finance than the heat pump it substitutes for. |
 | **D7** | PyPSA ≥ 1.1's per-component `overnight_cost` + `discount_rate` + `lifetime` API | **Not now.** Medium–high effort; `envs/environment.yaml` floors `pypsa >=0.35.2`, which predates it. Revisit only if an audit trail on the network object is required. |
+
+### 4.3 What D2 actually costs
+
+`annuity(lifetime, 0.11)` against `annuity(lifetime, 0.12)`, plus FOM, on the
+2030 processed cost table — i.e. what the services heat buses are overcharged:
+
+| technology | lifetime | `capital_cost` at 0.12 | at 0.11 | overstatement |
+|---|---:|---:|---:|---:|
+| decentral air-sourced heat pump | 18 | 190 697 | 181 507 | **4.8 %** |
+| decentral ground-sourced heat pump | 20 | 284 449 | 268 921 | 5.5 % |
+| decentral gas boiler | 20 | 79 617 | 76 325 | **4.1 %** |
+| decentral oil boiler | 20 | 32 069 | 30 339 | 5.4 % |
+| decentral resistive heater | 20 | 20 555 | 19 446 | 5.4 % |
+| decentral solar thermal | 20 | 52 974 | 49 980 | 5.7 % |
+| decentral water tank storage | 30 | 70 815 | 66 001 | **6.8 %** |
+
+EUR/MW/a. The spread is narrow and the sign is uniform, so the error is close to a
+constant mark-up on services heating CAPEX rather than a distortion *between*
+technologies — which is why it does not change the services appliance choice, only
+its cost. That is the substance of the D2 "no".
 
 ### 4.1 Scenario design — when hurdle rates apply at all
 
@@ -373,7 +393,7 @@ Via `hurdle:<variant>:<sector>` ([§2.4](#24-scenario-variants)):
 | `lowrate` | all groups near the SDR (~3.5 %) — the social-planner counterfactual, and the "barriers removed by policy" scenario of [§4.1](#41-scenario-design--when-hurdle-rates-apply-at-all) |
 | `market_res` | `power`/`pv` at 4–5 % (the IRENA/Fraunhofer cluster) — impact of bankable mature-RES finance |
 | `resid09` / `resid15` | residential 9 % vs 15 % — bounds the heat-pump vs gas-boiler arbitrage |
-| `car11` | `transport` at 11 % (PRIMES household cars) — tests tension 1 above |
+| **`car11`** *(built)* | `transport` at 11 % (PRIMES household cars) — tests tension 1 above. `data/walloon/discount_rates_car11.csv`, 42 of 297 technologies repriced. |
 
 Dimitri Krings (Climact) noted that a December 2025 test with higher uniform rates
 had a **strong impact** (sharp drop in renewables). Expect re-alignment to move
@@ -406,10 +426,10 @@ disabled · PyPSA-Eur `technology-data` v0.14.0.
 
 | # | Open point | Blocks |
 |---|---|---|
-| 1 | **`COM-processes` (0.11) reaches nothing** (D2). Services decentral heat is annualised at the residential 0.12. Fixing it needs per-sector clones of the `decentral *` cost rows (`services decentral air-sourced heat pump`, …) plus a `HeatSystem.heat_pump_costs_name` change — a real refactor for a 1 pp effect on one sector. **Decide whether it is worth it.** | fidelity of tertiary heat costs |
-| 2 | **Household cars and rooftop PV/home batteries** ([§6.2](#62-the-two-assignment-tensions-that-survive)). TIMES decisions, so raise them in the shared table. A `car11` variant quantifies the first before anyone argues about it. | comparability with PRIMES |
+| ~~1~~ | ~~`COM-processes` reaches nothing — decide whether to fix it.~~ **Decided 2026-08-21: no.** Effect measured at 4.1–6.8 % on services heating CAPEX and uniform in sign ([§4.3](#43-what-d2-actually-costs)); the fix is an upstream `HeatSystem` refactor; and option B′ pins the mix so it moves reported cost only. Revisit only for a services-specific heating study. | — |
+| 2 | **Household cars and rooftop PV/home batteries** ([§6.2](#62-the-two-assignment-tensions-that-survive)). Both are now recorded in the shared table as `none:hurdle_assignment_tension` `status=pending` rows, so ICEDD sees the ask, and the **`car11` variant is built and runnable** — `data/walloon/discount_rates_car11.csv` reprices the 42 `TRA-processes` technologies at the PRIMES household-car 0.11 and nothing else. Remaining action: run it and take the number to the next ICEDD meeting. | comparability with PRIMES |
 | 3 | **`retro_endogen` must stay `false`** and the 0.12 is therefore inert. If a renovation study is ever wanted, the double count against TIMES's already-retrofitted demand has to be resolved first ([`heat-softlink.md`](heat-softlink.md) §7). | a renovation study |
-| 4 | **The result impact of the 2026-08-21 change has not been quantified.** Only `decentral CHP` and `micro CHP` moved (0.12 → 0.075), and neither is built in the current chain under option B′ — but that has not been *verified* on a solved network. Check `micro_chp: false` still holds and confirm no CHP capacity appears on a decentral bus. | publishing the change |
+| ~~4~~ | ~~The result impact of the 2026-08-21 change has not been quantified.~~ **Closed 2026-08-21.** `sector.chp.micro_chp` is `false` (the `config.default.yaml` value, not overridden in either Walloon config) and the four solved `scen_demande_haute` networks carry **zero** `micro CHP` / `decentral CHP` links. The only two rates that changed are provably inert in the current chain, so the rework is a pure traceability improvement with no result impact. It would bite the moment `micro_chp` is enabled. | — |
 | 5 | **`prepare_costs()` is awkward to call outside Snakemake** — it reads the `snakemake` global for `custom_costs` and `planning_horizon` instead of its own parameters. The tests work around it. Cosmetic, but it will bite the next test author. | test ergonomics |
 | 6 | **Heating cost assumptions are unreconciled with TIMES** (`custom_costs.csv` has no decentral heating rows). If PyPSA's heat pumps are cheaper or its gas dearer than TIMES's, part of the mix divergence is a parameter inconsistency and the hurdle rate is not the lever. Shared with [`heat-softlink.md`](heat-softlink.md) §8. | the credibility of both couplings |
 
