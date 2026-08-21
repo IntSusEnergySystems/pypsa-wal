@@ -46,9 +46,14 @@ import yaml
 
 DATA = Path("data/walloon/elia_adeqflex2025")
 DEFAULT_SCENARIO = "Current commitments"
-DEFAULT_HORIZONS = (2025, 2030, 2040, 2050)
+#: Every horizon config.default.yaml lists, so a generated block cannot let a
+#: PyPSA-Eur default leak into an unlisted year.
+DEFAULT_HORIZONS = (2020, 2025, 2030, 2035, 2040, 2045, 2050)
 
-#: Elia stops at 2036. Anything later holds that year rather than extrapolating.
+#: Elia covers 2023-2036. Anything outside is clamped to the nearest end rather
+#: than extrapolated: a behavioural adoption curve extended past its source is
+#: worse than its nearest observed point, and clamping is auditable.
+FIRST_ELIA_YEAR = 2023
 LAST_ELIA_YEAR = 2036
 
 NATURAL_MODES = ["V0"]
@@ -60,8 +65,15 @@ HOME_CURVES = ["sunny_PV", "sunny_noPV", "cloudy_PV", "cloudy_noPV"]
 WORK_CURVE = "work"
 
 
-def elia_year(horizon: int) -> int:
-    return min(int(horizon), LAST_ELIA_YEAR)
+def clamp(horizon: int, index) -> int:
+    """Nearest year the table actually has.
+
+    The two tables do not span the same years -- mode shares start at 2023,
+    location shares at 2025 -- so each lookup is clamped to its own range rather
+    than to one global window.
+    """
+    years = sorted(int(y) for y in index)
+    return min(max(int(horizon), years[0]), years[-1])
 
 
 def mode_shares(scenario: str) -> pd.DataFrame:
@@ -97,7 +109,7 @@ def weights(scenario: str, horizons: tuple[int, ...]) -> dict:
 
     availability, local_bev_dsm, audit = {}, {}, []
     for h in horizons:
-        y = elia_year(h)
+        y = clamp(h, modes.index)
         m = modes.loc[y]
         # Level 1: the market slice is taken off the top; natural vs local is
         # renormalised over the remainder, because that is where it is applied.
@@ -106,7 +118,7 @@ def weights(scenario: str, horizons: tuple[int, ...]) -> dict:
         local = 1.0 - natural
         # Level 3: work vs home from the V0 split, public excluded (Elia assumes
         # no flexibility from public charging).
-        l = loc.loc[y]
+        l = loc.loc[clamp(h, loc.index)]
         work_of_local = float(l["work"] / (l["home"] + l["work"]))
         home_of_local = 1.0 - work_of_local
         # Level 3b: no Elia weights for sky x PV -- equal until a model-side
@@ -128,7 +140,7 @@ def weights(scenario: str, horizons: tuple[int, ...]) -> dict:
             {
                 "horizon": h,
                 "elia_year": y,
-                "held": y != h,
+                "clamped": y != h,
                 "market": availability[h],
                 "natural_abs": round(natural * (1 - m["market"]), 3),
                 "local_abs": round(local * (1 - m["market"]), 3),

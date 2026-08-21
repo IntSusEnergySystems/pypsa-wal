@@ -136,6 +136,124 @@ clustering:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
+  # Elia AdeqFlex 2025 "Current commitments", derived by
+  # scripts/walloon_scripts/build_ev_charging_weights.py -- do not hand-edit.
+  # bev_dsm_availability is the MARKET share (V1M+V2M) of the fleet;
+  # local_bev_dsm splits what is left between natural (V0) and the local curves
+  # (V1H+V2H), renormalised over those two. Both must come from the SAME Elia
+  # (scenario, year) cell or they describe no real case: mixing them is what put
+  # the 2050 natural share 69 % above the scenario its market share came from.
+  # Horizons past 2036 hold that year rather than extrapolating a behavioural
+  # adoption curve. For a flexibility-rich case, regenerate with
+  # --scenario "Current commitments - High Flex" (market 0.28 / natural 0.236 at
+  # 2040+), do not hand-tune a middle. docs/ev-charging-softlink.md S3b.
+  bev_dsm_availability:
+    2020: 0.005
+    2025: 0.01
+    2030: 0.07
+    2035: 0.172
+    2040: 0.18
+    2045: 0.18
+    2050: 0.18
+  # bev_dsm_restriction_value based on:
+  # Blonsky, M., Munankarmi, P., Balamurugan, S. (2021). Incorporating Residential Smart
+  # Electric Vehicle Charging in Home Energy Management Systems: Preprint. NREL/CP-5D00-78540.
+  # https://www.nrel.gov/docs/fy21osti/78540.pdf
+  bev_dsm_restriction_value: 0.7
+  bev_dsm_restriction_time: 7
+  bev_natural_charging_split: true
+  bev_natural_charging_profile_fn: data/walloon/elia_natural_charging_daily_profile_utc0.csv
+  local_bev_dsm:
+    2020:
+      natural: 0.7388
+      sunny_PV: 0.0429
+      sunny_noPV: 0.0429
+      cloudy_PV: 0.0429
+      cloudy_noPV: 0.0429
+      work: 0.0896
+    2025:
+      natural: 0.6969
+      sunny_PV: 0.0498
+      sunny_noPV: 0.0498
+      cloudy_PV: 0.0498
+      cloudy_noPV: 0.0498
+      work: 0.1039
+    2030:
+      natural: 0.5054
+      sunny_PV: 0.0909
+      sunny_noPV: 0.0909
+      cloudy_PV: 0.0909
+      cloudy_noPV: 0.0909
+      work: 0.131
+    2035:
+      natural: 0.3416
+      sunny_PV: 0.1331
+      sunny_noPV: 0.1331
+      cloudy_PV: 0.1331
+      cloudy_noPV: 0.1331
+      work: 0.126
+    2040:
+      natural: 0.3292
+      sunny_PV: 0.1381
+      sunny_noPV: 0.1381
+      cloudy_PV: 0.1381
+      cloudy_noPV: 0.1381
+      work: 0.1184
+    2045:
+      natural: 0.3292
+      sunny_PV: 0.1381
+      sunny_noPV: 0.1381
+      cloudy_PV: 0.1381
+      cloudy_noPV: 0.1381
+      work: 0.1184
+    2050:
+      natural: 0.3292
+      sunny_PV: 0.1381
+      sunny_noPV: 0.1381
+      cloudy_PV: 0.1381
+      cloudy_noPV: 0.1381
+      work: 0.1184
+  # Elia's 2026 vintage applies to horizons 2025 & 2030; 2036 vintage to 2035, 2040 and beyond.
+  bev_avail_max:
+    2020: 0.4
+    2025: 0.4
+    2030: 0.4
+    2035: 0.48
+    2040: 0.48
+    2045: 0.48
+    2050: 0.48
+  bev_avail_mean:
+    2020: 0.32
+    2025: 0.32
+    2030: 0.32
+    2035: 0.35
+    2040: 0.35
+    2045: 0.35
+    2050: 0.35
+  bev_avail_min:
+    2020: 0.2
+    2025: 0.2
+    2030: 0.2
+    2035: 0.18
+    2040: 0.18
+    2045: 0.18
+    2050: 0.18
+  bev_energy: 0.06 # Elia assumes 60 kWh
+  bev_charge_rate: 0.011 # aligned with Elia
+  v2g: false # turn off v2g
+  land_transport_electric_share:
+    2020: 0
+    2025: 0.15
+    2030: 0.35
+    2040: 0.81
+    2050: 1
+  land_transport_ice_share:
+    2020: 1
+    2025: 0.85
+    2030: 0.65
+    2040: 0.19
+    2050: 0
+
   times_demand: true
   times_file: data/walloon/scen_base_coherence_3110.vd
   # TIMES heating soft-link. Every switch defaults to the pre-2026-08 behaviour,
@@ -248,15 +366,24 @@ co2_budget_national: true
 co2_price_national: false
 budget_national:
   2025:
-    BEBRU: 0.64
-    BEVLG: 0.64
-    BEWAL: 0.64
-    DE: 0.64
-    FR: 0.64
-    GB: 0.64
-    NL: 0.64
-    LU: 0.64
+    BEBRU: 0.648
+    BEVLG: 0.648
+    BEWAL: 0.648
+    DE: 0.648
+    FR: 0.648
+    GB: 0.648
+    NL: 0.648
+    LU: 0.648
   2030:
+    BEBRU: 0.648
+    BEVLG: 0.648
+    BEWAL: 0.648
+    DE: 0.648
+    FR: 0.648
+    GB: 0.648
+    NL: 0.648
+    LU: 0.648
+  2040:
     BEBRU: 0.45
     BEVLG: 0.45
     BEWAL: 0.45
@@ -265,15 +392,6 @@ budget_national:
     GB: 0.45
     NL: 0.45
     LU: 0.45
-  2040:
-    BEBRU: 0.25
-    BEVLG: 0.25
-    BEWAL: 0.25
-    DE: 0.25
-    FR: 0.25
-    GB: 0.25
-    NL: 0.25
-    LU: 0.25
   2050:
     BEBRU: 0.05
     BEVLG: 0.05

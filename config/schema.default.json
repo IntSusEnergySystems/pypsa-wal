@@ -4260,6 +4260,26 @@
           "description": "Time at which SOC of BEV has to be dsm_restriction_value.",
           "type": "number"
         },
+        "bev_natural_charging_split": {
+          "default": false,
+          "description": "Split land transport EV electricity demand into a flexible share (`bev_dsm_availability`, attached to the EV battery bus and dispatchable) and an inflexible share pinned to the observed natural-charging profile in `bev_natural_charging_profile_fn`. If false, all EV demand is placed on the EV battery bus (PyPSA-Eur default behaviour).",
+          "type": "boolean"
+        },
+        "bev_natural_charging_profile_fn": {
+          "default": "data/walloon/elia_natural_charging_daily_profile_utc0.csv",
+          "description": "CSV of observed hourly (0-23, UTC) daily charging profiles per data vintage, one column per charging curve weighted by `local_bev_dsm`. Only used when `bev_natural_charging_split` is true.",
+          "type": "string"
+        },
+        "local_bev_dsm": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "description": "Share of local BEV dsm (at distribution level) per available curve (sunny with PV, sunny without PV, cloudy with PV, cloudy without PV, work)",
+          "type": "object"
+        },
         "transport_heating_deadband_upper": {
           "default": 20.0,
           "description": "The maximum temperature in the vehicle. At higher temperatures, the energy required for cooling in the vehicle increases.",
@@ -4296,9 +4316,11 @@
           "type": "boolean"
         },
         "bev_dsm_availability": {
-          "default": 0.5,
-          "description": "The share for battery electric vehicles (BEV) that are able to do demand side management (DSM).",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The share for battery electric vehicles (BEV) that are able to do demand side management (DSM), in a given year.",
+          "type": "object"
         },
         "bev_energy": {
           "default": 0.05,
@@ -4316,19 +4338,25 @@
           "type": "number"
         },
         "bev_avail_max": {
-          "default": 0.95,
-          "description": "The maximum share plugged-in availability for passenger electric vehicles.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The maximum share plugged-in availability for passenger electric vehicles, in a given year.",
+          "type": "object"
         },
         "bev_avail_mean": {
-          "default": 0.8,
-          "description": "The average share plugged-in availability for passenger electric vehicles.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The average share plugged-in availability for passenger electric vehicles, in a given year.",
+          "type": "object"
         },
         "bev_avail_min": {
-          "default": 0.0,
-          "description": "The minimum share plugged-in availability for passenger electric vehicles; the availability profile is floored at this value.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The minimum share plugged-in availability for passenger electric vehicles, in a given year; the availability profile is floored at this value.",
+          "type": "object"
         },
         "v2g": {
           "default": true,
@@ -10548,6 +10576,26 @@
           "description": "Time at which SOC of BEV has to be dsm_restriction_value.",
           "type": "number"
         },
+        "bev_natural_charging_split": {
+          "default": false,
+          "description": "Split land transport EV electricity demand into a flexible share (`bev_dsm_availability`, attached to the EV battery bus and dispatchable) and an inflexible share pinned to the observed natural-charging profile in `bev_natural_charging_profile_fn`. If false, all EV demand is placed on the EV battery bus (PyPSA-Eur default behaviour).",
+          "type": "boolean"
+        },
+        "bev_natural_charging_profile_fn": {
+          "default": "data/walloon/elia_natural_charging_daily_profile_utc0.csv",
+          "description": "CSV of observed hourly (0-23, UTC) daily charging profiles per data vintage, one column per charging curve weighted by `local_bev_dsm`. Only used when `bev_natural_charging_split` is true.",
+          "type": "string"
+        },
+        "local_bev_dsm": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "description": "Share of local BEV dsm (at distribution level) per available curve (sunny with PV, sunny without PV, cloudy with PV, cloudy without PV, work)",
+          "type": "object"
+        },
         "transport_heating_deadband_upper": {
           "default": 20.0,
           "description": "The maximum temperature in the vehicle. At higher temperatures, the energy required for cooling in the vehicle increases.",
@@ -10584,9 +10632,11 @@
           "type": "boolean"
         },
         "bev_dsm_availability": {
-          "default": 0.5,
-          "description": "The share for battery electric vehicles (BEV) that are able to do demand side management (DSM).",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The share for battery electric vehicles (BEV) that are able to do demand side management (DSM), in a given year.",
+          "type": "object"
         },
         "bev_energy": {
           "default": 0.05,
@@ -10604,19 +10654,25 @@
           "type": "number"
         },
         "bev_avail_max": {
-          "default": 0.95,
-          "description": "The maximum share plugged-in availability for passenger electric vehicles.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The maximum share plugged-in availability for passenger electric vehicles, in a given year.",
+          "type": "object"
         },
         "bev_avail_mean": {
-          "default": 0.8,
-          "description": "The average share plugged-in availability for passenger electric vehicles.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The average share plugged-in availability for passenger electric vehicles, in a given year.",
+          "type": "object"
         },
         "bev_avail_min": {
-          "default": 0.0,
-          "description": "The minimum share plugged-in availability for passenger electric vehicles; the availability profile is floored at this value.",
-          "type": "number"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "The minimum share plugged-in availability for passenger electric vehicles, in a given year; the availability profile is floored at this value.",
+          "type": "object"
         },
         "v2g": {
           "default": true,

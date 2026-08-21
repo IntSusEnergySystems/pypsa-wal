@@ -17,6 +17,7 @@ import xarray as xr
 from scripts._helpers import (
     configure_logging,
     generate_periodic_profiles,
+    get,
     get_snapshots,
     set_scenario_config,
 )
@@ -142,18 +143,18 @@ def transport_degree_factor(
     return dd
 
 
-def bev_availability_profile(fn, snapshots, nodes, options):
+def bev_availability_profile(fn, snapshots, nodes, options, investment_year):
     """
     Derive plugged-in availability for passenger electric vehicles.
     """
     # car count in typical week
     traffic = pd.read_csv(fn, skiprows=2, usecols=["count"]).squeeze("columns")
     # maximum share plugged-in availability for passenger electric vehicles
-    avail_max = options["bev_avail_max"]
+    avail_max = get(options["bev_avail_max"], investment_year)
     # average share plugged-in availability for passenger electric vehicles
-    avail_mean = options["bev_avail_mean"]
+    avail_mean = get(options["bev_avail_mean"], investment_year)
     # minimum share plugged-in availability for passenger electric vehicles
-    avail_min = options["bev_avail_min"]
+    avail_min = get(options["bev_avail_min"], investment_year)
 
     if avail_min < 0:
         logger.warning(
@@ -196,16 +197,56 @@ def bev_dsm_profile(snapshots, nodes, options):
     )
 
 
-def build_elia_transport_shape(fn, snapshots, nodes, year=2026):
+def build_natural_charging_shape(fn, snapshots, nodes, investment_year, charging_weights):
     """
     Build a normalized weekly charging shape from Elia's observed hourly
-    natural (non-flexible) charging profile for a given year.
+    natural (non-flexible) charging profile for the vintage closest to
+    ``investment_year``.
 
-    The year refers to the year of data to use from the CSV file, not the year of the snapshots.
+    ``investment_year`` is the planning horizon, not the year of the data.
+    Because the data CSV may contain vintages that do not match the planning horizon (e.g. 2026, 2036),
+    the vintage numerically closest to ``investment_year`` is used (if tied, the lower vintage is used).
     """
     daily = pd.read_csv(fn)
+    available_years = sorted(daily["year"].unique())
+    year = min(available_years, key=lambda y: (abs(y - investment_year), y))
     daily = daily[daily["year"] == year].sort_values("hour")
-    weekly_profile = np.tile(daily["natural_charging_profile"].values, 7)
+
+    # Resolve the horizon explicitly rather than indexing. `_helpers.get` cannot
+    # be used here: its fallback interpolates linearly between the neighbouring
+    # keys, and these values are dicts, so it would raise a bare TypeError. Fall
+    # back to the nearest lower horizon instead -- a behavioural adoption split
+    # holds better than it interpolates -- and say so.
+    weights = charging_weights.get(investment_year)
+    if weights is None:
+        earlier = [y for y in sorted(charging_weights) if y < investment_year]
+        if not earlier:
+            raise ValueError(
+                f"sector.local_bev_dsm has no entry at or before {investment_year} "
+                f"(has {sorted(charging_weights)}). Add the horizon."
+            )
+        logger.warning(
+            "sector.local_bev_dsm has no entry for %s; holding the %s weights. "
+            "Add the horizon explicitly to keep the Elia mode shares consistent "
+            "(docs/ev-charging-softlink.md S3b).",
+            investment_year,
+            earlier[-1],
+        )
+        weights = charging_weights[earlier[-1]]
+    missing = sorted(set(weights) - set(daily.columns))
+    if missing:
+        raise ValueError(
+            f"sector.local_bev_dsm[{investment_year}] names charging curve(s) "
+            f"{missing} that are not columns of the profile CSV "
+            f"({sorted(c for c in daily.columns if c not in ('hour', 'year'))})."
+        )
+    assert np.isclose(sum(weights.values()), 1), (
+        f"The sum of charging weights must equal 1.0 for {investment_year}, "
+        f"got {sum(weights.values())}."
+    )
+
+    daily = sum(weight * daily[key] for key, weight in weights.items())
+    weekly_profile = np.tile(daily.values, 7)
 
     shape = generate_periodic_profiles(
         dt_index=snapshots,
@@ -215,23 +256,26 @@ def build_elia_transport_shape(fn, snapshots, nodes, year=2026):
     return shape / shape.sum()
 
 
-def split_transport_demand(transport_demand_original, elia_shape, bev_dsm_availability):
+def split_transport_demand(total_transport_demand, natural_charging_shape, bev_dsm_availability):
     """
     Split transport demand into a flexible and inflexible demand.
 
     FLexible demand has the same temporal shape as ``transport``, scaled by ``bev_dsm_availability`` and the inflexible
     demand is reshaped to follow Elia's natural charging profile), conserving each node's total energy.
+
+    The flexible share follows actual fuel/power consumption in the cars (i.e. driving demand),
+    while the inflexible share follows actual observed charging behaviour (Elia's natural charging profile).
     """
     # to get flexible demand, multiple total transport demand by the share of flexible demand (bev_dsm_availability)
-    transport_flexible = transport_demand_original * bev_dsm_availability
+    transport_flexible = total_transport_demand * bev_dsm_availability
 
     # to get inflexible demand, multiply total transport demand by the share of inflexible demand (1 - bev_dsm_availability)
     # and then multiply by Elia's natural charging profile to reshape in time
-    inflexible_total = transport_demand_original.sum() * (1 - bev_dsm_availability)
-    transport_inflexible = elia_shape.mul(inflexible_total, axis=1)
+    inflexible_total = total_transport_demand.sum() * (1 - bev_dsm_availability)
+    transport_inflexible = natural_charging_shape.mul(inflexible_total, axis=1)
 
     # add check to ensure that total energy equals the sum of the split (flexible + inflexible)
-    total_orig = transport_demand_original.sum().sum()
+    total_orig = total_transport_demand.sum().sum()
     total_split = transport_flexible.sum().sum() + transport_inflexible.sum().sum()
     assert np.isclose(total_orig, total_split, rtol=1e-6), (
         f"transport split does not match: {total_orig} vs {total_split}"
@@ -260,6 +304,7 @@ if __name__ == "__main__":
     )
 
     options = snakemake.params.sector
+    investment_year = int(snakemake.wildcards.planning_horizons)
 
     snapshots = get_snapshots(
         snakemake.params.snapshots, snakemake.params.drop_leap_day, tz="UTC"
@@ -281,15 +326,17 @@ if __name__ == "__main__":
     )
 
     avail_profile = bev_availability_profile(
-        snakemake.input.traffic_data_Pkw, snapshots, nodes, options
+        snakemake.input.traffic_data_Pkw, snapshots, nodes, options, investment_year
     )
 
     dsm_profile = bev_dsm_profile(snapshots, nodes, options)
 
-    elia_transport_shape = build_elia_transport_shape(snakemake.input.elia_natural_charging_profile, snapshots, nodes, year=2026)
+    natural_charging_shape = build_natural_charging_shape(
+        snakemake.input.natural_charging_profile, snapshots, nodes, investment_year, charging_weights=snakemake.params.charging_weights
+    )
 
     nodal_transport_data.to_csv(snakemake.output.transport_data)
     transport_demand.to_csv(snakemake.output.transport_demand)
     avail_profile.to_csv(snakemake.output.avail_profile)
     dsm_profile.to_csv(snakemake.output.dsm_profile)
-    elia_transport_shape.to_csv(snakemake.output.elia_charging_shape)
+    natural_charging_shape.to_csv(snakemake.output.natural_charging_shape)

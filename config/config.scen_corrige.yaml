@@ -761,6 +761,51 @@ sector:
   heat_demand_cutout: default
   bev_dsm_restriction_value: 0.8
   bev_dsm_restriction_time: 7
+  bev_natural_charging_split: true
+  bev_natural_charging_profile_fn: data/walloon/elia_natural_charging_daily_profile_utc0.csv
+  local_bev_dsm:
+    2025:
+      natural: 0.7
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.1
+    2030:
+      natural: 0.5
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.3
+    2035:
+      natural: 0.5
+      sunny_PV: 0.05
+      sunny_noPV: 0.05
+      cloudy_PV: 0.05
+      cloudy_noPV: 0.05
+      work: 0.3
+    2040:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
+    2045:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
+    2050:
+      natural: 0.4
+      sunny_PV: 0.075
+      sunny_noPV: 0.075
+      cloudy_PV: 0.075
+      cloudy_noPV: 0.075
+      work: 0.3
   transport_heating_deadband_upper: 20.0
   transport_heating_deadband_lower: 15.0
   ICE_lower_degree_factor: 0.375
@@ -768,12 +813,33 @@ sector:
   EV_lower_degree_factor: 0.98
   EV_upper_degree_factor: 0.63
   bev_dsm: true
-  bev_dsm_availability: 0.5
+  bev_dsm_availability:
+    2020: 0.5
+    2025: 0.5
+    2030: 0.5
+    2035: 0.5
+    2040: 0.5
+    2045: 0.5
+    2050: 0.5
   bev_energy: 0.05
   bev_charge_efficiency: 0.9
   bev_charge_rate: 0.011
-  bev_avail_max: 0.95
-  bev_avail_mean: 0.8
+  bev_avail_max:
+    2020: 0.95
+    2025: 0.95
+    2030: 0.95
+    2035: 0.95
+    2040: 0.95
+    2045: 0.95
+    2050: 0.95
+  bev_avail_mean:
+    2020: 0.8
+    2025: 0.8
+    2030: 0.8
+    2035: 0.8
+    2040: 0.8
+    2045: 0.8
+    2050: 0.8
   v2g: true
   land_transport_fuel_cell_share:
     2020: 0

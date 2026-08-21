@@ -2240,7 +2240,8 @@ def add_EVs(
     temperature: pd.DataFrame,
     spatial: SimpleNamespace,
     options: dict,
-    elia_shape: pd.DataFrame,
+    natural_charging_shape: pd.DataFrame,
+    investment_year: int,
 ) -> None:
     """
     Add electric vehicle (EV) infrastructure to the network.
@@ -2279,11 +2280,15 @@ def add_EVs(
         - bev_charge_efficiency: float
         - bev_dsm: bool
         - bev_energy: float
-        - bev_dsm_availability: float
+        - bev_dsm_availability: float or dict[int, float]
+        - bev_natural_charging_split: bool
         - v2g: bool
-    elia_shape : pd.DataFrame
-        Day-invariant normalized Elia natural-charging shape (columns sum to
-        1 per node), with snapshots as index and nodes as columns
+    natural_charging_shape : pd.DataFrame
+        Day-invariant normalized natural-charging shape (columns sum to
+        1 per node), with snapshots as index and nodes as columns. Only used
+        when ``bev_natural_charging_split`` is enabled.
+    investment_year : int
+        Planning horizon used to resolve year-dependent options (e.g. ``bev_dsm_availability``)
 
     Returns
     -------
@@ -2348,37 +2353,76 @@ def add_EVs(
     else:
         profile = electric_share * p_set.div(efficiency)
 
-    # Split final EV electricity demand into a flexible share and an inflexible (fixed elia natural-charging shape) share
-    profile_flexible, profile_inflexible = split_transport_demand(
-        profile.loc[n.snapshots],
-        elia_shape.loc[n.snapshots, spatial.nodes],
-        options["bev_dsm_availability"],
-    )
+    bev_dsm_availability = get(options["bev_dsm_availability"], investment_year)
+    natural_charging_split = options["bev_natural_charging_split"]
 
-    # Add flexible EV load (DSM-capable, attached to EV battery bus)
-    n.add(
-        "Load",
-        spatial.nodes,
-        suffix=" land transport EV",
-        bus=spatial.nodes + " EV battery",
-        carrier="land transport EV",
-        p_set=profile_flexible,
-    )
+    if natural_charging_split:
+        # Split final EV electricity demand into a flexible share and an inflexible (fixed natural-charging shape) share
+        profile_flexible, profile_inflexible = split_transport_demand(
+            profile.loc[n.snapshots],
+            natural_charging_shape.loc[n.snapshots, spatial.nodes],
+            bev_dsm_availability,
+        )
 
-    # Add inflexible EV load (fixed natural charging shape, attached directly to the AC bus)
-    # remapped to the low-voltage bus in insert_electricity_distribution_grid() if the distribution grid is enabled
-    n.add(
-        "Load",
-        spatial.nodes,
-        suffix=" land transport EV inflexible",
-        bus=spatial.nodes,
-        carrier="land transport EV inflexible",
-        p_set=profile_inflexible,
-    )
+        # Put the two branches on the same side of the charger, WITHOUT adding a
+        # second charger loss. The flexible load sits on the EV-battery bus
+        # behind the BEV-charger link, so its grid draw is already
+        # `p_set / bev_charge_efficiency`; the inflexible load sits directly on
+        # the AC bus, so its grid draw is `p_set`. Scaling the flexible load DOWN
+        # makes both draw exactly their share of `profile` from the grid.
+        #
+        # Grossing the inflexible load UP instead (`/= bev_charge_efficiency`)
+        # also aligns the two, but it raises the total: with times_demand,
+        # `profile` is the TIMES `electricity road` flow, which is metered at
+        # `fuel_input` -- i.e. upstream of TIMES's OWN 0.95 charger efficiency
+        # (VAR_FOut/VAR_FIn on TCHARGHOMN01 and TCHARGWRKN01). Applying PyPSA's
+        # 0.9 on top counted the loss twice and put BEWAL road-transport
+        # electricity 11 % above the TIMES answer the soft-link exists to
+        # transfer. docs/ev-charging-softlink.md S3.1.
+        profile_flexible *= options["bev_charge_efficiency"]
+
+        # Add flexible EV load (DSM-capable, attached to EV battery bus)
+        n.add(
+            "Load",
+            spatial.nodes,
+            suffix=" land transport EV",
+            bus=spatial.nodes + " EV battery",
+            carrier="land transport EV",
+            p_set=profile_flexible,
+        )
+
+        # Add inflexible EV load (fixed natural charging shape, attached directly to the AC bus)
+        # remapped to the low-voltage bus in insert_electricity_distribution_grid() if the distribution grid is enabled
+        n.add(
+            "Load",
+            spatial.nodes,
+            suffix=" land transport EV inflexible",
+            bus=spatial.nodes,
+            carrier="land transport EV inflexible",
+            p_set=profile_inflexible,
+        )
+    else:
+        # All EV demand stays dispatchable on the EV battery bus (PyPSA-Eur default)
+        n.add(
+            "Load",
+            spatial.nodes,
+            suffix=" land transport EV",
+            bus=spatial.nodes + " EV battery",
+            carrier="land transport EV",
+            p_set=profile.loc[n.snapshots],
+        )
 
     # Add BEV chargers
-    # NOTE: p_nom is multiplied by electric_share and bev_dsm_availability, since the EV battery bus (and its DSM store) now only carries flexible demand
-    p_nom = (number_cars * options["bev_charge_rate"] * electric_share * options["bev_dsm_availability"])
+    p_nom = number_cars * options["bev_charge_rate"] * electric_share
+
+    # V2G only ever moves the DSM-capable share, whether or not the load is split
+    v2g_p_nom = p_nom * bev_dsm_availability
+
+    # NOTE: if the load is split, the p_nom should be multiplied by electric_share and bev_dsm_availability
+    # since the EV battery bus (and its DSM store) now only carries flexible demand
+    if natural_charging_split:
+        p_nom = v2g_p_nom
+
     n.add(
         "Link",
         spatial.nodes,
@@ -2397,7 +2441,7 @@ def add_EVs(
         e_nom = (
             number_cars
             * options["bev_energy"]
-            * options["bev_dsm_availability"]
+            * bev_dsm_availability
             * electric_share
         )
 
@@ -2421,7 +2465,7 @@ def add_EVs(
                 suffix=" V2G",
                 bus1=spatial.nodes,
                 bus0=spatial.nodes + " EV battery",
-                p_nom=p_nom,
+                p_nom=v2g_p_nom,
                 carrier="V2G",
                 p_max_pu=avail_profile.loc[n.snapshots, spatial.nodes],
                 lifetime=1,
@@ -2660,7 +2704,7 @@ def add_land_transport(
     transport_data_file,
     avail_profile_file,
     dsm_profile_file,
-    elia_charging_shape_file,
+    natural_charging_shape_file,
     temp_air_total_file,
     cf_industry,
     options,
@@ -2684,7 +2728,7 @@ def add_land_transport(
         Path to CSV file containing availability profiles
     dsm_profile_file : str
         Path to CSV file containing demand-side management profiles
-    elia_charging_shape_file : str
+    natural_charging_shape_file : str
         Path to CSV file containing the day-invariant normalized Elia
         natural-charging shape
     temp_air_total_file : str
@@ -2719,7 +2763,7 @@ def add_land_transport(
     number_cars = pd.read_csv(transport_data_file, index_col=0)["number cars"]
     avail_profile = pd.read_csv(avail_profile_file, index_col=0, parse_dates=True)
     dsm_profile = pd.read_csv(dsm_profile_file, index_col=0, parse_dates=True)
-    elia_shape = pd.read_csv(elia_charging_shape_file, index_col=0, parse_dates=True)
+    natural_charging_shape = pd.read_csv(natural_charging_shape_file, index_col=0, parse_dates=True)
 
     # exogenous share of passenger car type
     engine_types = ["fuel_cell", "electric", "ice"]
@@ -2796,7 +2840,8 @@ def add_land_transport(
             temperature,
             spatial,
             options,
-            elia_shape[nodes],
+            natural_charging_shape[nodes],
+            investment_year,
         )
     elif shares["electric"] > 0:
         add_EVs(
@@ -2809,7 +2854,8 @@ def add_land_transport(
             temperature,
             spatial,
             options,
-            elia_shape[nodes],
+            natural_charging_shape[nodes],
+            investment_year,
         )
     if (times_demand or suff_demand) and fuel_cell_share.sum() > 0:
         add_fuel_cell_cars(
@@ -6895,7 +6941,7 @@ if __name__ == "__main__":
             transport_data_file=snakemake.input.transport_data,
             avail_profile_file=snakemake.input.avail_profile,
             dsm_profile_file=snakemake.input.dsm_profile,
-            elia_charging_shape_file=snakemake.input.elia_charging_shape,
+            natural_charging_shape_file=snakemake.input.natural_charging_shape,
             temp_air_total_file=snakemake.input.temp_air_total,
             cf_industry=cf_industry,
             options=options,

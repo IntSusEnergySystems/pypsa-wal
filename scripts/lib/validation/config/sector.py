@@ -410,6 +410,68 @@ class SectorConfig(BaseModel):
     bev_dsm_restriction_time: float = Field(
         7, description="Time at which SOC of BEV has to be dsm_restriction_value."
     )
+    bev_natural_charging_split: bool = Field(
+        False,
+        description="Split land transport EV electricity demand into a flexible share (`bev_dsm_availability`, attached to the EV battery bus and dispatchable) and an inflexible share pinned to the observed natural-charging profile in `bev_natural_charging_profile_fn`. If false, all EV demand is placed on the EV battery bus (PyPSA-Eur default behaviour).",
+    )
+    bev_natural_charging_profile_fn: str = Field(
+        "data/walloon/elia_natural_charging_daily_profile_utc0.csv",
+        description="CSV of observed hourly (0-23, UTC) daily charging profiles per data vintage, one column per charging curve weighted by `local_bev_dsm`. Only used when `bev_natural_charging_split` is true.",
+    )
+    local_bev_dsm: dict[int, dict[str, float]] = Field(
+        default_factory=lambda: {
+            2025: {
+                "natural": 0.7,
+                "sunny_PV": 0.05,
+                "sunny_noPV": 0.05,
+                "cloudy_PV": 0.05,
+                "cloudy_noPV": 0.05,
+                "work": 0.1,
+            },
+            2030: {
+                "natural": 0.5,
+                "sunny_PV": 0.05,
+                "sunny_noPV": 0.05,
+                "cloudy_PV": 0.05,
+                "cloudy_noPV": 0.05,
+                "work": 0.3,
+            },
+            2035: {
+                "natural": 0.5,
+                "sunny_PV": 0.05,
+                "sunny_noPV": 0.05,
+                "cloudy_PV": 0.05,
+                "cloudy_noPV": 0.05,
+                "work": 0.3,
+            },
+            2040: {
+                "natural": 0.4,
+                "sunny_PV": 0.075,
+                "sunny_noPV": 0.075,
+                "cloudy_PV": 0.075,
+                "cloudy_noPV": 0.075,
+                "work": 0.3,
+            },
+            2045: {
+                "natural": 0.4,
+                "sunny_PV": 0.075,
+                "sunny_noPV": 0.075,
+                "cloudy_PV": 0.075,
+                "cloudy_noPV": 0.075,
+                "work": 0.3,
+            },
+            2050: {
+                "natural": 0.4,
+                "sunny_PV": 0.075,
+                "sunny_noPV": 0.075,
+                "cloudy_PV": 0.075,
+                "cloudy_noPV": 0.075,
+                "work": 0.3,
+            },
+        },
+        description="Share of local BEV dsm (at distribution level) per available curve (sunny with PV, sunny without PV, cloudy with PV, cloudy without PV, work)",
+    )
+
     transport_heating_deadband_upper: float = Field(
         20.0,
         description="The maximum temperature in the vehicle. At higher temperatures, the energy required for cooling in the vehicle increases.",
@@ -438,9 +500,17 @@ class SectorConfig(BaseModel):
         True,
         description="Add the option for battery electric vehicles (BEV) to participate in demand-side management (DSM).",
     )
-    bev_dsm_availability: float = Field(
-        0.5,
-        description="The share for battery electric vehicles (BEV) that are able to do demand side management (DSM).",
+    bev_dsm_availability: dict[int, float] = Field(
+        default_factory=lambda: {
+            2020: 0.5,
+            2025: 0.5,
+            2030: 0.5,
+            2035: 0.5,
+            2040: 0.5,
+            2045: 0.5,
+            2050: 0.5,
+        },
+        description="The share for battery electric vehicles (BEV) that are able to do demand side management (DSM), in a given year.",
     )
     bev_energy: float = Field(
         0.05, description="The average size of battery electric vehicles (BEV) in MWh."
@@ -453,17 +523,41 @@ class SectorConfig(BaseModel):
         0.011,
         description="The power consumption for one electric vehicle (EV) in MWh. Value derived from 3-phase charger with 11 kW.",
     )
-    bev_avail_max: float = Field(
-        0.95,
-        description="The maximum share plugged-in availability for passenger electric vehicles.",
+    bev_avail_max: dict[int, float] = Field(
+        default_factory=lambda: {
+            2020: 0.95,
+            2025: 0.95,
+            2030: 0.95,
+            2035: 0.95,
+            2040: 0.95,
+            2045: 0.95,
+            2050: 0.95,
+        },
+        description="The maximum share plugged-in availability for passenger electric vehicles, in a given year.",
     )
-    bev_avail_mean: float = Field(
-        0.8,
-        description="The average share plugged-in availability for passenger electric vehicles.",
+    bev_avail_mean: dict[int, float] = Field(
+        default_factory=lambda: {
+            2020: 0.8,
+            2025: 0.8,
+            2030: 0.8,
+            2035: 0.8,
+            2040: 0.8,
+            2045: 0.8,
+            2050: 0.8,
+        },
+        description="The average share plugged-in availability for passenger electric vehicles, in a given year.",
     )
-    bev_avail_min: float = Field(
-        0.0,
-        description="The minimum share plugged-in availability for passenger electric vehicles; the availability profile is floored at this value.",
+    bev_avail_min: dict[int, float] = Field(
+        default_factory=lambda: {
+            2020: 0.0,
+            2025: 0.0,
+            2030: 0.0,
+            2035: 0.0,
+            2040: 0.0,
+            2045: 0.0,
+            2050: 0.0,
+        },
+        description="The minimum share plugged-in availability for passenger electric vehicles, in a given year; the availability profile is floored at this value.",
     )
     v2g: bool = Field(
         True,

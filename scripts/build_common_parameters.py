@@ -626,14 +626,16 @@ def render_budget_block(budget: dict[int, dict[str, float]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def patch_walloon_config(budget: dict[int, dict[str, float]], dry_run: bool) -> Patch:
-    """Rewrite the `budget_national:` block of config.walloon.yaml in place."""
-    patch = Patch(path=WALLOON_CONFIG)
-    text = WALLOON_CONFIG.read_text()
+def patch_walloon_config(
+    budget: dict[int, dict[str, float]], dry_run: bool, config: Path = WALLOON_CONFIG
+) -> Patch:
+    """Rewrite the `budget_national:` block of a config file in place."""
+    patch = Patch(path=config)
+    text = config.read_text()
     # The block runs from `budget_national:` to the next top-level key.
     m = re.search(r"^budget_national:\n(?:[ \t].*\n|\n)*", text, flags=re.MULTILINE)
     if not m:
-        patch.errors.append(f"{WALLOON_CONFIG.name}: no `budget_national:` block found")
+        patch.errors.append(f"{config.name}: no `budget_national:` block found")
         return patch
     if not budget:
         patch.errors.append("master CSV has no active config:budget_national anchors")
@@ -651,7 +653,7 @@ def patch_walloon_config(budget: dict[int, dict[str, float]], dry_run: bool) -> 
         + ", ".join(f"{y}={next(iter(r.values()))}" for y, r in budget.items())
     )
     if not dry_run:
-        WALLOON_CONFIG.write_text(text[: m.start()] + new + trailing + text[m.end() :])
+        config.write_text(text[: m.start()] + new + trailing + text[m.end() :])
     return patch
 
 
@@ -1345,7 +1347,10 @@ def cmd_check(df: pd.DataFrame, meta: dict, verbose: bool = False) -> int:
         patch_potentials(df, horizons, dry_run=True),
         *patch_ntc(df, horizons, dry_run=True),
         patch_agg_p_nom(df, horizons, dry_run=True),
-        patch_walloon_config(build_budget_national(df, horizons), dry_run=True),
+        *[
+            patch_walloon_config(build_budget_national(df, horizons), True, cfg)
+            for cfg in COST_CONFIG_FILES
+        ],
         *patch_costs_scalars(df, horizons, dry_run=True),
         *patch_discount_rates(df, meta, horizons, dry_run=True),
     ]
@@ -1384,7 +1389,10 @@ def cmd_write(df: pd.DataFrame, meta: dict, dry_run: bool, verbose: bool) -> int
         patch_potentials(df, horizons, dry_run),
         *patch_ntc(df, horizons, dry_run),
         patch_agg_p_nom(df, horizons, dry_run),
-        patch_walloon_config(build_budget_national(df, horizons), dry_run),
+        *[
+            patch_walloon_config(build_budget_national(df, horizons), dry_run, cfg)
+            for cfg in COST_CONFIG_FILES
+        ],
         *patch_costs_scalars(df, horizons, dry_run),
         *patch_discount_rates(df, meta, horizons, dry_run),
     ]
