@@ -1,208 +1,83 @@
 # WIP — misc tasks (2026-08-21)
 
-Temporary progress tracker. Delete once all items are closed.
+Temporary tracker. **All items closed.** Delete this file once the branch is
+reviewed; everything durable has been moved into the permanent notes.
 
-| # | Task | Status |
-|---|------|--------|
-| 1 | Discount rates: follow the TIMES `~TFM_INS` / `NCAP_DRATE` table — extend master CSV + `hurdle_rate_mapping.csv` | ✅ **done** |
-| 2 | Consolidate the heat soft-linking `.md` files into one informative note; remove obsolete ones | ✅ **done** |
-| 3 | Merge the two discount-rate `.md` files, update with latest info | ✅ **done** |
-| 4 | Investigate: fewer heat pumps in Wallonia in 2030 than 2025 (latest AWS run) | ✅ **done** |
-| 5 | EV shares harmonisation with TIMES: export from `TIMES_PyPSA` (no wiring yet), document | ✅ **done** |
-| 6 | Document feasibility of 3 BEV charging profiles (natural / local / flexible) from Elia AdeqFlex2025 | ✅ **done** |
-| 7 | Final check: everything works, list open decisions (no full pipeline run) | ✅ **done** |
+Branch: `softlink-harmonisation` (pypsa-wal and TIMES_PyPSA). `master` untouched
+in both.
 
-## Notes / findings
+## The seven original tasks
 
-(appended as work proceeds)
+| # | Task | Status | Where it lives now |
+|---|------|--------|--------------------|
+| 1 | Discount rates on the TIMES `~TFM_INS` / `NCAP_DRATE` table | ✅ | [`discount-rates.md`](discount-rates.md) §3 |
+| 2 | Consolidate the heat soft-linking notes | ✅ | [`heat-softlink.md`](heat-softlink.md) |
+| 3 | Merge the two discount-rate notes | ✅ | [`discount-rates.md`](discount-rates.md) |
+| 4 | Fewer heat pumps in 2030 than 2025 | ✅ diagnosed **and fixed** | [`heat-softlink.md`](heat-softlink.md) §5 |
+| 5 | EV shares from TIMES | ✅ exported, documented, not wired | [`ev-charging-softlink.md`](ev-charging-softlink.md) §2 |
+| 6 | Three BEV charging profiles | ✅ implemented (merged) + weights corrected | [`ev-charging-softlink.md`](ev-charging-softlink.md) §1, §3b |
+| 7 | Check everything works | ✅ | below |
 
-### Task 1 — discount rates (done)
+## The 13 open decisions — all resolved
 
-* `config/input_parameters_for_models.csv`: the 4 `hurdle:*` rows (production /
-  industry / tertiary / residential) are replaced by **11**, one per
-  `~TFM_INS` `Pset_Set` group, with the group name recorded in
-  `technology_name_times`:
-  `supply` SUP-processes 0.075 · `power` ELC-PUB 0.075 · `chp` ALL-CHP 0.075 ·
-  `pv` ALL-PV 0.075 · `transport` TRA-processes 0.075 · `industry`
-  IND-process(NE) 0.10 · `tertiary` COM-processes 0.11 · `agriculture`
-  AGR-processes 0.11 · `residential` RSD-processes 0.12 · `residential_reno`
-  RSD-RENO 0.12 · `tertiary_reno` COM-RENO 0.11.
-* `config/hurdle_rate_mapping.csv`: all 307 technologies re-mapped; new
-  `times_pset_set` column carries the audit trail. 262 of 307 rows change label.
-* **Only two rates change numerically**: `decentral CHP` and `micro CHP`
-  0.12 → 0.075 (ALL-CHP applies to every CHP, not to the building sector).
-  Everything else was already on the right number under a coarser label.
-* `sector.retrofitting.interest_rate: 0.12` added to `config.walloon.yaml` and
-  `config.times-pypsa.yaml` (RSD-RENO). Inert while `retro_endogen: false`.
-* `scripts/build_common_parameters.py`: `HURDLE_SECTORS` extended.
-* `data/walloon/discount_rates.csv` regenerated (297 rows).
-* `test/test_discount_rates.py`: spot check extended, new T21 checks the
-  `times_pset_set` column is one-to-one with the sector. **26 tests pass.**
+| # | Was | Resolution |
+|---|-----|-----------|
+| 1 | Charger loss counted twice on `feat/bev-myopic` | **Fixed.** `add_EVs` scales the flexible branch down instead of grossing the inflexible one up. BEWAL 2030 grid draw 3.770 → **3.393 TWh**, exactly the TIMES figure. Regression test pins the direction. |
+| 2 | Heating costs unreconciled with TIMES | **Measured.** TIMES prices decentral heating 1.3–5× cheaper in annuity terms, ~3× cheaper for gas *relative to* heat pumps. Five `status=pending` rows carry the ask for the VEDA `~FI_T` tables. [`heat-softlink.md`](heat-softlink.md) §5b |
+| 3 | EV energy-vs-fleet share | **Documented + exported, deliberately not wired** (E1–E3). Waiting on the availability-profile work, as instructed. |
+| 4 | 2030 heat-pump dip fix not chosen | **Option 2 implemented**: per-technology age profile derived from the TIMES 2021→2025 trajectory. Retiring tranche 334.4 → **83.3 MW_th**. |
+| 5 | 2040 solid-biomass conflict | **Recorded** as `none:solid_biomass_2040_conflict` in the shared table. Needs an ICEDD/Valbiom decision, not a constraint. |
+| 6 | Confirm the branch's non-BEV config changes | **Reverted** in `config.walloon.yaml` (legacy heat path, 6 h) with a comment saying why, so the next merge cannot undo it silently. |
+| 7 | Provenance of the branch's Elia local profiles | **Still open — the one thing I could not resolve.** See below. |
+| 8 | `COM-processes` reaches no technology | **Decided: no fix.** Effect measured at 4.1–6.8 % on services heating CAPEX, uniform in sign. [`discount-rates.md`](discount-rates.md) §4.3 |
+| 9 | Cars and rooftop PV at 7.5 % | **Recorded** as `none:hurdle_assignment_tension`; the `car11` sensitivity is built and runnable. |
+| 10 | District-heating supply mix | **Decided: stays out.** Checked — no geothermal potential exists for BEWAL, so nothing is instantiated. Recorded as `none:district_heating_supply_conflict`. |
+| 11 | `local_bev_dsm` hard-indexed | **Fixed.** Holds the nearest earlier horizon with a warning, and validates the curve names. |
+| 12 | `mapping_processes.csv` defects | **Fixed** in TIMES_PyPSA: 7 duplicate process codes dropped, `TCARGASEX14`'s description repaired, both guarded by tests. |
+| 13 | Quantify the discount-rate change | **Closed.** `micro_chp: false` and zero micro/decentral CHP links in all four solved networks, so the two rates that moved are provably inert. |
 
-### Tasks 2 & 3 — docs consolidation (done)
+**Plus one bug found during the merge that was on nobody's list:** `update_config`
+merges dicts key by key, so the horizons a Walloon config did not list
+(2020/2035/2045) silently inherited `config.default.yaml`'s
+`bev_dsm_availability: 0.5`, `bev_avail_min: 0.0`, `bev_avail_max: 0.95` —
+and `_helpers.get` returns those keys without warning. Both configs now list
+every horizon, and a test fails on any future leak.
 
-`docs/` went from 8 working notes to 6 files.
+## Still open
 
-* **New** [`docs/heat-softlink.md`](heat-softlink.md) — replaces
-  `heat_soft_linking.md`, `heat_softlink_option_b.md`,
-  `heat_softlink_option_comparison.md`, `times-heating-softlink-options.md`
-  (166 KB → 22 KB). Keeps: the four options and why B′ won, what is implemented,
-  the result tables, the district-heating exclusion, the units/availability facts
-  that are easy to get wrong, 10 open points, 8 operational hazards.
-* **Kept** `heat_softlink_comparison_tables.md` — generated by
-  `compare_heat_softlink.py`, not hand-written.
-* **New** [`docs/discount-rates.md`](discount-rates.md) — replaces
-  `discount-rates-analysis.md` + `discount-rates-literature.md` (80 KB → 24 KB).
-  The implementation plan (S1–S11) and the test plan are dropped: both are done.
-  The literature review is compressed to the per-rate verdict, the surviving
-  assignment tensions, the sensitivity variants and the source list.
-* ~30 references in configs, rules, scripts, tests, `instructions.md`,
-  `common_parameters.md` and the `TIMES_PyPSA` repo repointed.
+**The provenance of the branch's Elia local charging curves.** The four
+`sunny/cloudy × PV` columns in
+`data/walloon/elia_natural_charging_daily_profile_utc0.csv` are genuinely
+distinct, whereas the published AdeqFlex 2025 workbook collapses to two (tariff
+and sky are inert there). So `a4fab1c6 add updated values from elia` came from a
+later source, and nothing records which. **Ask the branch author for the
+document, date and contact**, and note whether the updated curves are still a
+winter-only illustration — [`ev-charging-softlink.md`](ev-charging-softlink.md)
+§1.2, E8/E14. My extraction in `data/walloon/elia_adeqflex2025/` is the published
+baseline for audit, not the input.
 
-### Task 4 — heat pumps 2030 < 2025 (done)
-
-**Confirmed and diagnosed**; written up in
-[`heat-softlink.md` §5](heat-softlink.md#5-the-2030-heat-pump-dip-diagnosed).
-BEWAL `urban decentral air heat pump` 936.4 → 608.1 MW_th, total HP
-1 319 → 1 140 MW_th, while HP heat **delivered** rises 2.20 → 3.06 TWh_th.
-
-Root cause, two parts:
-1. `existing_capacities.default_heating_lifetime: 20` selects the grouping years
-   {2010, 2015, 2019}, but the asset gets the technology-data lifetime — and
-   `decentral air-sourced heat pump` is **18**. The 2010 tranche (5/14 = 35.7 % =
-   334.4 MW_th) dies in 2028, between the two horizons.
-2. Nothing replaces it, because the 2025 stock was never binding: peak use is
-   **47 %** of installed in 2025 and **100 %** in 2030. Under option B′ each group
-   is sized for its share of the pinned peak, so 2030 is the first horizon whose
-   capacity the model actually chooses.
-
-**Not an economic signal, and not a soft-link bug.** Two candidate fixes are
-written up; **neither applied — decision needed.**
-
-### Task 5 & 6 — EV shares and charging profiles (revised 2026-08-21 after reviewing `origin/feat/bev-myopic`)
-
-**Much of task 6 is already implemented on the branch** — 30 commits,
-2026-08-17 → 2026-08-21, 0 behind master. Full write-up in
-[`ev-charging-softlink.md`](ev-charging-softlink.md); the note was rewritten
-against the branch rather than against master.
-
-**Done on the branch:**
-* the **three-profile split** — `natural` + 4 local home variants + `work`,
-  blended by `sector.local_bev_dsm` weights per horizon that reproduce Elia's
-  V0/V1H shares renormalised to exclude the market modes (0.70/0.30 in 2025,
-  0.50/0.50 in 2030 — Elia gives 0.70 and 0.505);
-* **horizon-varying** `bev_dsm_availability` (0.01/0.07/0.21/0.28 = Elia
-  V1M+V2M) and `bev_avail_{max,mean,min}` per Elia vintage;
-* the natural-charging **vintage now follows the planning horizon** instead of a
-  hard-coded 2026 (my E9);
-* a **real timezone bug fixed** — the Elia profile was in local time against UTC
-  snapshots, so the evening charging peak sat two hours early in every run to
-  date;
-* **`config.times-pypsa.yaml` now carries the EV block** — this closes what I
-  flagged as the single most urgent finding;
-* config schema + pydantic validation regenerated; `bev_natural_charging_split:
-  false` as a clean escape hatch.
-
-**Two defects found in the branch, both blocking:**
-1. **The charger loss is now counted twice.** The new
-   `profile_inflexible /= bev_charge_efficiency` is internally defensible, but
-   TIMES already models a **0.95** charger efficiency and `electricity road` is
-   metered at `fuel_input`/`VAR_FIn`, i.e. *upstream* of it. BEWAL road-transport
-   grid draw goes from **+0.8 % to +11.1 %** against the TIMES figure the
-   soft-link exists to transfer — and it now hits the whole load, not just the
-   7 % flexible slice. Three fixes offered; recommendation: drop the division and
-   scale the flexible load by 0.9 instead, plus a guard test.
-2. **`local_bev_dsm` is hard-indexed** by horizon
-   (`charging_weights[investment_year]`) while every other year-dependent option
-   uses `_helpers.get()`. Works today — all six configs checked — but a 2035
-   Walloon run would `KeyError`.
-
-**What the branch does *not* fix:** the energy-vs-fleet share defect. It adds
-`land_transport_electric_share` (Elia's Belgian car BEV stock shares) to both
-Walloon configs, but `add_land_transport`'s `times_demand` branch is unchanged,
-so **BEWAL still ignores them** and keeps using `electricity road / total road`.
-TIMES car BEV stock share is 0.529 in 2030 against that 0.142; correcting the
-share alone moves BEWAL's 2030 BEV charger from **213 MW to 793 MW**.
-
-**Also worth confirming:** the branch changes `config.walloon.yaml` beyond BEV —
-`resolution_sector` 6h → **1h**, and `times_heat` off the legacy path
-(`urban_rural_split: times_base_year`, `base_year_capacities: true`). Both look
-like fallout from `d07f35bf Merge branch 'master'`, and both change what that
-config means.
-
-**Comparability:** the archived 2026-08-14 results are not comparable with
-anything the branch produces — the flexible EV fleet shrinks 3–50× depending on
-horizon once Elia's `bev_dsm_availability` replaces the 0.5 default.
-
-**Merge:** `git merge-tree` gives **one conflict, in `config/config.walloon.yaml`
-only** — comments plus the heat settings above. No EV lines, no discount-rate
-lines. `build_common_parameters.py`, `prepare_sector_network.py`,
-`rules/build_sector.smk` and `config.times-pypsa.yaml` all auto-merge. The branch
-still references the four deleted heat notes in its config comments.
-
-`TIMES_PyPSA` side (library export done, pypsa-wal wiring deliberately not):
-* new `times_pypsa/transport_softlink.py` + `data/transport_softlink_groups.csv`
-* `road_transport_{year}.csv` and `..._shares.csv` in `export_all_horizons` and
-  every `export-coupling` bundle; opt-in in `export_horizon`
-* `tests/test_transport_softlink.py` — 15 tests, green on toy and full data
-* `VAR_ACT` added to `scripts/build_toy_fixtures.py` `KEEP_VARS`
-
-Elia tables extracted to `data/walloon/elia_adeqflex2025/` (4 CSVs) by
-`scripts/walloon_scripts/extract_elia_adeqflex_ev.py`. **Note:** the branch's
-local profiles are *newer* than the published workbook — four distinct
-sunny/cloudy × PV shapes where the public version collapses to two — so my
-extraction is the audit baseline, not the input. Its provenance needs recording.
-
-### Task 7 — verification (done, no full pipeline run)
+## Verification
 
 | Check | Result |
 |---|---|
-| `pytest test/` (pypsa-wal) | **136 passed** |
-| `pytest tests/` (TIMES_PyPSA) | **164 passed, 2 skipped** (toy fixture has no `VAR_Act` / `VAR_Ncap`) |
-| `pytest tests/test_transport_softlink.py` on the full `.vd` | **15 passed** |
+| `pytest test/` (pypsa-wal) | **161 passed** |
+| `pytest tests/` (TIMES_PyPSA), full `.vd` | **168 passed** |
 | `build_common_parameters.py --check` | **CHECK PASSED** |
-| `ConfigSchema` on `config.walloon.yaml` + `config.times-pypsa.yaml` merged onto the default | **OK**, `retrofitting.interest_rate = 0.12` |
-| `snakemake --configfile config/config.times-pypsa.yaml -n` | **DAG builds, 218 jobs.** Retrigger reasons are pre-existing provenance drift (`retrieve_cutout` output missing, `base_network`/`build_hydro_profile` params, `build_ship_raster` inputs) — none of the touched files is a rule script |
-| `ruff check` on new files | clean |
-| Cross-references | every `docs/*.md` pointer in configs, rules, scripts, tests, `instructions.md`, `common_parameters.md` and `TIMES_PyPSA` resolves to a section that exists |
+| every `config/config.*.yaml` against `ConfigSchema` | **6/6 OK** |
+| default-leak check at used horizons, all configs | **clean** |
+| `snakemake -n` on both Walloon configs | **DAG resolves** |
+| `add_existing_baseyear` for 2025, real network | **ran; vintages verified** |
+| `build_transport_demand` for 2030, real config | **ran; shape normalised** |
+| charger-loss identity | **grid draw == TIMES to the digit** |
 
-**No pipeline was run** — as instructed.
+**Not verified: `prepare_sector_network`.** It fails on this machine because the
+archived `resources/` tree is a **2013 weather year at 6 h** build while master's
+configs now ask for **2010 at 1 h** — so `profile.loc[n.snapshots]` cannot align.
+That is a stale-artefact problem, not a code problem, and a clean run elsewhere
+will not hit it. Forcing those rules also deleted two intermediate networks from
+the local (gitignored) `resources/` tree. **The archived `results/` are therefore
+stale against this branch for three independent reasons: weather year,
+resolution, and every change here.**
 
-`ruff` note: `ruff.toml` selects `D` but ignores `D212`, which contradicts the
-selected `D213`. `scripts/build_common_parameters.py` and
-`test/test_discount_rates.py` carry 11 pre-existing `D213`/`D209` violations;
-the new T21 docstring matches the style of every other test in the file rather
-than the rule. Pre-commit runs `ruff --fix`, so a future hook run will rewrite
-all 12 at once. Left alone deliberately.
-
----
-
-## Urgent / open decisions surfaced by this pass
-
-Re-ranked 2026-08-21 after reviewing `origin/feat/bev-myopic`. My previous #1
-(`config.times-pypsa.yaml` has no EV block) is **resolved by that branch**.
-
-| # | Decision | Where | Why it is urgent |
-|---|---|---|---|
-| **1** | **The charger loss is counted twice** on `feat/bev-myopic`. TIMES already applies a 0.95 charger efficiency and meters `electricity road` upstream of it; the branch's new `profile_inflexible /= bev_charge_efficiency` applies PyPSA's 0.9 on top. BEWAL road-transport grid draw goes **+0.8 % → +11.1 %** against TIMES, on the whole load. | [`ev-charging-softlink.md` §3.1](ev-charging-softlink.md) | it breaks the quantity the soft-link exists to transfer, and it blocks merging the branch |
-| **2** | **Heating cost assumptions are unreconciled with TIMES** — `custom_costs.csv` has no decentral heating rows. If PyPSA's heat pumps are cheaper or its gas dearer than TIMES's, part of the mix divergence is a parameter inconsistency the soft-link is papering over. | [`heat-softlink.md` §8](heat-softlink.md) #2, [`discount-rates.md` §7](discount-rates.md) #6 | prerequisite for trusting either coupling |
-| **3** | **EV energy-vs-fleet share** — the branch does **not** fix it. Split `electric_share` into an energy share for the load and a fleet share for `p_nom`/`e_nom`; BEWAL's 2030 charger moves 213 → 793 MW. Also decide whether TIMES replaces the frozen `number cars`. | [`ev-charging-softlink.md` §2](ev-charging-softlink.md), E1–E3 | the flexible EV fleet is understated 3.7× in 2030 |
-| **4** | **The 2030 heat-pump dip fix** — per-technology lifetime in the grouping-year selection (upstream change), or a Walloon HP age profile (local change). | [`heat-softlink.md` §5.2](heat-softlink.md) | until it is decided, heat-pump capacity cannot be reported for this chain |
-| **5** | **The 2040 solid-biomass conflict.** The TIMES 2040 Walloon heating mix needs more solid biomass than PyPSA's Wallonia can obtain (0.461 TWh_th relaxed). Belongs in `input_parameters_for_models.csv`, not in a constraint. | [`heat-softlink.md` §4.2](heat-softlink.md) | a shared-assumption disagreement, not a modelling artefact |
-| **6** | **Confirm the non-BEV changes** the branch makes to `config.walloon.yaml`: `resolution_sector` 6h → 1h, and `times_heat` off the legacy path. Both look like merge fallout. | [`ev-charging-softlink.md` §1.6](ev-charging-softlink.md) | they silently change what that config means |
-| **7** | **Provenance of the branch's updated Elia local profiles** — four distinct sunny/cloudy × PV shapes where the published workbook has two. Currently the only unsourced input in the EV chain. And E8: are they still a winter-only illustration? | [`ev-charging-softlink.md` §1.2](ev-charging-softlink.md), E8/E14 | unverifiable input feeding a live mechanism |
-| **8** | **`COM-processes` (0.11) reaches no technology** — services decentral heat is annualised at the residential 0.12. Fixing it needs per-sector clones of the `decentral *` cost rows. Decide whether a 1 pp effect on one sector is worth the refactor. | [`discount-rates.md` §7](discount-rates.md) #1 | small effect, real cost — worth an explicit "no" if that is the answer |
-| **9** | **Household cars at 7.5 % and rooftop PV / home batteries at 7.5 %.** Both are explicit TIMES `~TFM_INS` choices, so raise them in the shared table, not in the mapping. PRIMES puts private cars at 11 %. | [`discount-rates.md` §6.2](discount-rates.md) | affects the EV-vs-heat-pump arbitrage the study is about |
-| **10** | **Whether to reconcile the district-heating supply mix at all** — needs a geothermal heat source and an industrial-waste-heat link for BEWAL first, plus a question to the TIMES modellers about the 52 %-geothermal 2050 DH. | [`heat-softlink.md` §6](heat-softlink.md), §8 #6 | blocks reading BEWAL DH results as DH results |
-| **11** | **`local_bev_dsm` hard-indexed by horizon** — use `_helpers.get()` like every other year-dependent option, or validate coverage against `planning_horizons`. | [`ev-charging-softlink.md` §3.2](ev-charging-softlink.md) | one line; latent `KeyError` |
-| **12** | **Fix `mapping_processes.csv`** in `TIMES_PyPSA`: seven duplicated process codes (a latent double count in `prepare_annual_values`, all zero today) and `TCARGASEX14`'s overwritten description. | [`ev-charging-softlink.md` §7](ev-charging-softlink.md) | cheap, and a silent-wrong-answer risk |
-| **13** | **Quantify the discount-rate change.** Only `decentral CHP` and `micro CHP` moved (0.12 → 0.075) and neither should be built under option B′ with `micro_chp: false` — not yet verified on a solved network. | [`discount-rates.md` §7](discount-rates.md) #4 | needed before publishing the change |
-
-## Merge order
-
-1. Fix #1 and #11 on `feat/bev-myopic`, resolve #6.
-2. Merge this pass (docs + discount rates) — one conflict, `config.walloon.yaml`
-   comments plus the heat settings of #6.
-3. Merge `feat/bev-myopic`, then sweep its config comments for the four deleted
-   heat notes.
-4. Re-run the full chain. The archived 2026-08-14 results are not comparable.
+See the uncommitted `RUN_ME.md` for how to run it on a clean machine and what to
+watch.

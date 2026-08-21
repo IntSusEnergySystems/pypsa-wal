@@ -69,46 +69,55 @@ years (2010 / 2013) until the 2026-08-14 1h run aligned both on 2010; putting
 them back on different years means one download and a full rebuild of the
 affected study.
 
-### EV charging: flexible and inflexible demand
+### EV charging: three profiles, two loads
 
-Land-transport EV electricity is split in two, so that only the share of the
-fleet that actually offers demand-side flexibility can be shifted in time:
+Land-transport EV electricity is split so that only the share of the fleet that
+actually offers demand-side flexibility can be shifted in time:
 
 | Load carrier | Bus | Shape |
-|--------------|-----|-------|
-| `land transport EV` | `<node> EV battery` | the original transport profile × `sector.bev_dsm_availability` |
-| `land transport EV inflexible` | `<node>` (moved to `<node> low voltage` when the distribution grid is on) | the remaining energy, reshaped onto Elia's observed natural-charging profile |
+|---|---|---|
+| `land transport EV` | `<node> EV battery` | the driving profile × `sector.bev_dsm_availability`, × `bev_charge_efficiency` |
+| `land transport EV inflexible` | `<node>` (→ `<node> low voltage` with the distribution grid) | the remainder, reshaped onto a **weighted blend** of Elia's charging curves |
 
-The split conserves each node's annual energy (asserted in
-`split_transport_demand`, [`scripts/build_transport_demand.py`](scripts/build_transport_demand.py)).
-`BEV charger` `p_nom` is scaled by `bev_dsm_availability` to match, since the
-`EV battery` bus now carries only the flexible share.
+Set `sector.bev_natural_charging_split: false` to switch the whole mechanism off
+and put all EV demand on the EV-battery bus (PyPSA-Eur default).
 
-The charging shape comes from the git-tracked
-[`data/walloon/elia_natural_charging_daily_profile.csv`](data/walloon/elia_natural_charging_daily_profile.csv)
-(nothing to stage) and is written to
-`resources/<run>/elia_charging_shape_s_{clusters}_{planning_horizons}.csv`.
+**The blend is the three-profile split.**
+[`data/walloon/elia_natural_charging_daily_profile_utc0.csv`](data/walloon/elia_natural_charging_daily_profile_utc0.csv)
+(git-tracked, nothing to stage) holds six 24 h curves per vintage — `natural`,
+four home local curves (`sunny_PV`, `sunny_noPV`, `cloudy_PV`, `cloudy_noPV`) and
+`work` — and `sector.local_bev_dsm` weights them per horizon. Output:
+`resources/<run>/natural_charging_shape_s_{clusters}_{planning_horizons}.csv`.
 
-> **Known limitation — every horizon charges like 2026.** The CSV holds two
-> daily shapes: Elia's 2026 fleet peaks mid-morning (0.074 at 09:00), their 2036
-> projection peaks in the evening (0.080 at 19:00, midday correspondingly lower).
-> `build_elia_transport_shape()` is called with a literal `year=2026`
-> ([`scripts/build_transport_demand.py`](scripts/build_transport_demand.py)), so
-> although the rule runs per planning horizon, 2030–2050 all get the 2026 shape
-> and the 2036 rows are unused. Accepted for now. It matters because
-> `bev_dsm_availability: 0.01` puts 99 % of EV demand on this fixed shape: the
-> late horizons therefore place EV charging around midday rather than the
-> evening, which **understates the evening peak** EVs contribute to and
-> **overstates their coincidence with solar PV** — the optimistic direction, and
-> largest in 2050 where the fleet is largest. The daily shape is also tiled
-> across all seven days (no weekend) and all seasons. To revisit, pass
-> `snakemake.wildcards.planning_horizons` and interpolate between the two years.
+**Do not hand-edit the weights.** `bev_dsm_availability` (the market share) and
+`local_bev_dsm` (natural vs local, renormalised over the remainder) are two keys
+carved out of one Elia row with different denominators, so they only describe a
+real case when both come from the same Elia (scenario, year) cell. Regenerate:
 
-`sector.bev_avail_min` (new, default `0.0`) floors the plugged-in availability
-profile instead of only warning when it goes negative. The Walloon values
-(`bev_dsm_availability: 0.01`, `bev_avail_*` 0.2/0.32/0.4, `v2g: false`) follow
-Elia; they live in `config.walloon.yaml` only, so `config.times-pypsa.yaml` still
-runs the PyPSA-Eur defaults (`bev_dsm_availability: 0.5`, `v2g: true`).
+```bash
+python scripts/walloon_scripts/build_ev_charging_weights.py
+```
+
+Add `--scenario "Current commitments - High Flex"` for the flexibility-rich case.
+Horizons past 2036 hold that year rather than extrapolating. `test_ev_charging.py`
+fails if the two keys drift apart or if a horizon is missing — a horizon a config
+does not list silently inherits the PyPSA-Eur default, because `update_config`
+merges dicts key by key.
+
+**Energy identity worth knowing.** With `times_demand`, the transferred quantity
+is the TIMES `electricity road` flow, metered *upstream* of TIMES's own 0.95
+charger efficiency. `add_EVs` therefore scales the **flexible** load down by
+`bev_charge_efficiency` rather than grossing the inflexible one up, so total
+Walloon EV grid draw equals the TIMES figure exactly. Reversing that direction
+counts the charger loss twice (+11 %). See
+[`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §3.1.
+
+**Still exogenous:** the EV *fleet* share. `electric_share` at BEWAL is the TIMES
+**energy** ratio `electricity road / total road`, and it also scales the BEV
+charger `p_nom` and the EV-battery `e_nom`, which are fleet quantities — TIMES's
+own car BEV stock share is 0.53 in 2030 against that 0.14.
+`TIMES_PyPSA` exports the fleet (`road_transport_{year}.csv`); **nothing reads it
+yet**. [`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §2.
 
 ### The TIMES-coupled multi-scenario config
 
@@ -245,12 +254,13 @@ The exception is `discount_rates.csv`, which is **generated wholesale** from
 |--------|-------------------|--------------------------|
 | Costs / lifetimes / fuel prices | `cost:<tech>:<param>` | `data/walloon/custom_costs.csv` |
 | Per-technology hurdle rates | `hurdle:<sector>` (+ mapping) | `data/walloon/discount_rates.csv` (**generated**) |
+| Hurdle-rate sensitivity variants | `hurdle:<variant>:<sector>` | `data/walloon/discount_rates_<variant>.csv` (**generated**); select with `costs.hurdle_rate_fn` |
 | Social discount rate (SDR) | `config:costs.social_discountrate` | `config.walloon.yaml` / `config.times-pypsa.yaml` (synced) |
 | Financial-rate fill (unmapped fallback) | — | **PyPSA default** in `config.default.yaml` (`0.07`); not overridden in walloon configs |
 | Walloon RES / biomass potentials | `potential:<bus>:<tech>:<attr>` | `data/walloon/custom_potentials.csv` |
 | Cross-border NTCs | `ntc:<A>-<B>` | `data/walloon/ntc_<year>.csv` |
 | Aggregate nuclear caps (demande haute) | `agg:<country>:<carrier>:<min\|max>` | `data/walloon/agg_p_nom_minmax_demande_haute.csv` |
-| CO₂ trajectory | `config:budget_national` | `config/config.walloon.yaml` |
+| CO₂ trajectory | `config:budget_national` | `config.walloon.yaml` **and** `config.times-pypsa.yaml` |
 
 There is no overlay config file and no load-order requirement — the ordinary run
 command already picks the shared values up:
@@ -297,6 +307,17 @@ custom-costs file and *before* the annuity, so `capital_cost` follows. Values ar
 in **EUR/MW** (the table is already converted from `/kW` at that point) and must
 be written as plain numbers: PyYAML follows YAML 1.1, where `13.5e6` parses as a
 string, not a float.
+
+Two config keys carry a TIMES-derived number that no script patches, so a
+`--write` will not restore them if they are deleted:
+
+* `sector.retrofitting.interest_rate: 0.12` — the `RSD-RENO` rate. Inert while
+  `retro_endogen: false`, which it must stay. [`docs/discount-rates.md`](docs/discount-rates.md) D6.
+* `existing_capacities.heat_stock_age_profile` — the age distribution of the
+  inherited heat-pump stock, derived from the TIMES 2021 → 2025 capacity
+  trajectory. Without it 36 % of the fleet retires between 2025 and 2030 and
+  reported heat-pump capacity falls while delivered heat rises.
+  [`docs/heat-softlink.md`](docs/heat-softlink.md) §5.
 
 Soft-linked **demands** (TIMES → PyPSA) are a separate path — see
 [`times_data_extraction.md`](times_data_extraction.md), not the common-parameters CSV.
