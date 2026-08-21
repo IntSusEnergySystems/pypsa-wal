@@ -4242,6 +4242,16 @@
           "description": "Time at which SOC of BEV has to be dsm_restriction_value.",
           "type": "number"
         },
+        "bev_natural_charging_split": {
+          "default": false,
+          "description": "Split land transport EV electricity demand into a flexible share (`bev_dsm_availability`, attached to the EV battery bus and dispatchable) and an inflexible share pinned to the observed natural-charging profile in `bev_natural_charging_profile_fn`. If false, all EV demand is placed on the EV battery bus (PyPSA-Eur default behaviour).",
+          "type": "boolean"
+        },
+        "bev_natural_charging_profile_fn": {
+          "default": "data/walloon/elia_natural_charging_daily_profile_utc0.csv",
+          "description": "CSV of observed hourly (0-23, UTC) daily charging profiles per data vintage, one column per charging curve weighted by `local_bev_dsm`. Only used when `bev_natural_charging_split` is true.",
+          "type": "string"
+        },
         "local_bev_dsm": {
           "additionalProperties": {
             "additionalProperties": {
@@ -10529,6 +10539,16 @@
           "default": 7,
           "description": "Time at which SOC of BEV has to be dsm_restriction_value.",
           "type": "number"
+        },
+        "bev_natural_charging_split": {
+          "default": false,
+          "description": "Split land transport EV electricity demand into a flexible share (`bev_dsm_availability`, attached to the EV battery bus and dispatchable) and an inflexible share pinned to the observed natural-charging profile in `bev_natural_charging_profile_fn`. If false, all EV demand is placed on the EV battery bus (PyPSA-Eur default behaviour).",
+          "type": "boolean"
+        },
+        "bev_natural_charging_profile_fn": {
+          "default": "data/walloon/elia_natural_charging_daily_profile_utc0.csv",
+          "description": "CSV of observed hourly (0-23, UTC) daily charging profiles per data vintage, one column per charging curve weighted by `local_bev_dsm`. Only used when `bev_natural_charging_split` is true.",
+          "type": "string"
         },
         "local_bev_dsm": {
           "additionalProperties": {

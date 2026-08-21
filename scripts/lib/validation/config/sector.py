@@ -410,6 +410,14 @@ class SectorConfig(BaseModel):
     bev_dsm_restriction_time: float = Field(
         7, description="Time at which SOC of BEV has to be dsm_restriction_value."
     )
+    bev_natural_charging_split: bool = Field(
+        False,
+        description="Split land transport EV electricity demand into a flexible share (`bev_dsm_availability`, attached to the EV battery bus and dispatchable) and an inflexible share pinned to the observed natural-charging profile in `bev_natural_charging_profile_fn`. If false, all EV demand is placed on the EV battery bus (PyPSA-Eur default behaviour).",
+    )
+    bev_natural_charging_profile_fn: str = Field(
+        "data/walloon/elia_natural_charging_daily_profile_utc0.csv",
+        description="CSV of observed hourly (0-23, UTC) daily charging profiles per data vintage, one column per charging curve weighted by `local_bev_dsm`. Only used when `bev_natural_charging_split` is true.",
+    )
     local_bev_dsm: dict[int, dict[str, float]] = Field(
         default_factory=lambda: {
             2025: {

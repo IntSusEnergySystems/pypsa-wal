@@ -130,6 +130,8 @@ sector:
   # https://www.nrel.gov/docs/fy21osti/78540.pdf
   bev_dsm_restriction_value: 0.7
   bev_dsm_restriction_time: 7
+  bev_natural_charging_split: true
+  bev_natural_charging_profile_fn: data/walloon/elia_natural_charging_daily_profile_utc0.csv
   local_bev_dsm:
     2025:
       natural: 0.7

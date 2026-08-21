@@ -761,6 +761,8 @@ sector:
   heat_demand_cutout: default
   bev_dsm_restriction_value: 0.8
   bev_dsm_restriction_time: 7
+  bev_natural_charging_split: true
+  bev_natural_charging_profile_fn: data/walloon/elia_natural_charging_daily_profile_utc0.csv
   local_bev_dsm:
     2025:
       natural: 0.7
