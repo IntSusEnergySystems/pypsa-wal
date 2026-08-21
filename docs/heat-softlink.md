@@ -5,7 +5,7 @@ PyPSA-Wal: the mechanisms that were evaluated, the one that is live, what it
 delivers, and what is still open.
 
 **Status:** implemented and merged. Option **B′** (reconstructed hourly profiles)
-is on in [`config/config.times-pypsa.yaml`](../config/config.times-pypsa.yaml);
+is on in [`config/config.walloon.yaml`](../config/config.walloon.yaml);
 option **C** (annual energy-mix constraints) stays in the tree behind its own
 switch and is off. Both are off in
 [`config/config.walloon.yaml`](../config/config.walloon.yaml).
@@ -140,7 +140,7 @@ enabling both raises. Deleting the whole `times_heat` block reproduces the
 pre-2026-08 results exactly; every switch defaults to the legacy behaviour.
 
 ```bash
-snakemake --configfile config/config.times-pypsa.yaml --resources mem_mb=100000 --cores 12 -call
+snakemake --configfile config/config.walloon.yaml --resources mem_mb=100000 --cores 12 -call
 ```
 
 ### 3.2 Where the code lives
@@ -288,7 +288,7 @@ only B′'s is checkable against the load. **This property is what §5 is about.
 in 2025 in the archived run. Confirmed, and it is an accounting artefact, not an
 economic signal.
 
-`results/times-pypsa/scen_demande_haute/csvs/nodal_capacities.csv`, BEWAL, MW_th:
+`results/walloon/scen_demande_haute/csvs/nodal_capacities.csv`, BEWAL, MW_th:
 
 | carrier | 2025 | 2030 | 2040 | 2050 |
 |---|---:|---:|---:|---:|

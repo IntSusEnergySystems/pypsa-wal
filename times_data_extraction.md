@@ -1,5 +1,11 @@
 # TIMES data in pypsa-wal
 
+> **Paths below predate the 2026-08-21 config consolidation.** `run.prefix` is
+> now `walloon` with scenarios enabled, so `results/walloon-model/` reads
+> `results/walloon/<scenario>/` (default `scen_demande_haute`), and
+> `config.times-pypsa.yaml` no longer exists — it was folded into
+> `config/config.walloon.yaml`. The commands are otherwise unchanged.
+
 Two things: **how the TIMES soft-link demands enter the PyPSA network**
 ([below](#how-times-demands-enter-the-pypsa-network)), and how to publish the
 TIMES scenario file (`.vd`) alongside PyPSA results so the
@@ -197,7 +203,7 @@ grep times_file results/walloon-model/configs/config.walloon-model.yaml
 # or per-horizon configs under results/walloon-model/configs/
 ```
 
-Other scenario overlays (`config/scenarios.walloon.yaml`, `config.times-pypsa.yaml`)
+Other scenario overlays (`config/scenarios.walloon.yaml`, `config.walloon.yaml`)
 point at different `.vd` files — always use the one that was actually solved.
 
 ---

@@ -19,7 +19,7 @@ Usage::
     python scripts/walloon_scripts/check_heat_profile_fidelity.py [scenario] [phase]
 
 ``phase`` is a folder under ``results/_heat_softlink_comparison`` (default
-``option_b``); pass ``live`` to read ``results/times-pypsa/<scenario>`` instead.
+``option_b``); pass ``live`` to read ``results/walloon/<scenario>`` instead.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ NODE = "BEWAL"
 
 def roots() -> tuple[Path, Path]:
     if PHASE == "live":
-        base = Path("results/times-pypsa") / SCENARIO
+        base = Path("results/walloon") / SCENARIO
     else:
         base = Path("results/_heat_softlink_comparison") / PHASE
     return base / "networks", base / "heating_profiles"
@@ -54,7 +54,7 @@ def roots() -> tuple[Path, Path]:
 
 def main() -> None:
     networks, profiles_dir = roots()
-    targets_dir = Path("resources/times-pypsa") / SCENARIO
+    targets_dir = Path("resources/walloon") / SCENARIO
     rows = []
     for year in HORIZONS:
         net_path = networks / f"base_s_adm___{year}.nc"

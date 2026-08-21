@@ -32,11 +32,11 @@ the log **must** record the runtime/feasibility comparison. See
 | Item | Value |
 |------|-------|
 | Config file | [`config/config.walloon.yaml`](config/config.walloon.yaml) |
-| Run name (`RDIR`) | `walloon-model` |
+| Run name (`RDIR`) | `walloon/<scenario>/` — `run.prefix: walloon` plus one entry of `run.name` (default `scen_demande_haute`). Was `walloon-model` before scenarios were enabled. |
 | Foresight | Myopic (2025 → 2030 → 2040 → 2050) |
 | Countries | BE, FR, GB, NL, DE, LU |
 | Spatial clustering | Custom 3-node Belgium (`adm` + `custom_busmap_BE`) |
-| Temporal resolution | Sector snapshots: `resolution_sector: 6h` in both study configs as of 2026-08-18. The 14 Aug 2026 publication run used `1h` in `config.times-pypsa.yaml` ([log](docs/logs/2026-08-14_scen_demande_haute_2010_1h.md)); that setting is hostile once option B′ is on — see [the 18 Aug 6h diagnostic](docs/logs/2026-08-18_scen_demande_haute_2010_6h.md). |
+| Temporal resolution | Sector snapshots: **`resolution_sector: 1h`**. The config consolidation of 2026-08-21 briefly set `168h` (a weekly test value); restored. `1h` is what the 14 Aug 2026 publication run used ([log](docs/logs/2026-08-14_scen_demande_haute_2010_1h.md)) and it is expensive once option B′ is on — see [the 18 Aug 6h diagnostic](docs/logs/2026-08-18_scen_demande_haute_2010_6h.md) if you need it cheaper. |
 | Weather year | **2010** (`atlite.default_cutout: europe-2010-sarah3-era5`) |
 | Solver | Gurobi (`gurobi-default`) |
 
@@ -52,7 +52,7 @@ place to change:
 | Config | Weather year |
 |--------|--------------|
 | [`config/config.walloon.yaml`](config/config.walloon.yaml) | **2010** |
-| [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) | **2010** (was **2013** until the 2026-08-14 1h run aligned the two) |
+| [`config/config.walloon.yaml`](config/config.walloon.yaml) | **2010** (was **2013** until the 2026-08-14 1h run aligned the two) |
 
 Change the three years together (`snapshots.start`, `snapshots.end`,
 `default_cutout`): the snapshots pick the hours and the cutout supplies the
@@ -121,7 +121,7 @@ yet**. [`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §2.
 
 ### The TIMES-coupled multi-scenario config
 
-[`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) is the
+[`config/config.walloon.yaml`](config/config.walloon.yaml) is the
 TIMES↔PyPSA coupled study. It differs from `config.walloon.yaml` in three ways
 that change every output path:
 
@@ -138,10 +138,10 @@ pypsa2html config and the documented Explorer examples read
 report and Explorer paths somewhere the tested tooling does not look.
 
 Since 2026-08-14 the cluster scripts **default** to this TIMES-coupled config
-(`CONFIGFILE=config.times-pypsa.yaml`, `RUN_NAME=scen_demande_haute`,
-`RUN_PREFIX=times-pypsa` — see [`cluster/config.sh`](cluster/config.sh)) and
+(`CONFIGFILE=config.walloon.yaml`, `RUN_NAME=scen_demande_haute`,
+`RUN_PREFIX=walloon` — see [`cluster/config.sh`](cluster/config.sh)) and
 are prefix-aware (`RUN_DIR_REL` in [`cluster/nic5.sh`](cluster/nic5.sh), so
-prepare/solve/pull/postprocess follow `results/times-pypsa/<scenario>/`). For
+prepare/solve/pull/postprocess follow `results/walloon/<scenario>/`). For
 the single-run Walloon config instead clear the scenario defaults (an exported
 *empty* value clears them):
 
@@ -159,8 +159,8 @@ instead of a fixed directory, so **`RDIR` contains a `{run}` wildcard** and
 results land in one tree per scenario:
 
 ```
-resources/times-pypsa/scen_base/    results/times-pypsa/scen_base/
-resources/times-pypsa/scen_corrige/ results/times-pypsa/scen_corrige/
+resources/walloon/scen_base/    results/walloon/scen_base/
+resources/walloon/scen_corrige/ results/walloon/scen_corrige/
 ```
 
 This config is also where the **heating soft-link** is switched on — see
@@ -195,7 +195,7 @@ results/walloon-model/networks/base_s_adm___2030.nc
 
 (Three underscores between `adm` and the year — both `opts` and `sector_opts` wildcards are empty strings.)
 
-A scenario run puts the same tree under `results/times-pypsa/<scenario>/`. What
+A scenario run puts the same tree under `results/walloon/<scenario>/`. What
 is in it, and which of it is worth opening first:
 
 | Subfolder | Contents |
@@ -203,7 +203,7 @@ is in it, and which of it is worth opening first:
 | `networks/` | the solved networks — the ground truth for any number you doubt |
 | `csvs/` | summary tables (`costs.csv`, `nodal_costs.csv`, `energy.csv`, …) — what the charts are built from |
 | `graphs/`, `maps/`, `graphics/` | the Snakemake plots (`costs.svg`, static + interactive balance maps) |
-| `html/` | the pypsa2html report — start at `results/times-pypsa/index.html` |
+| `html/` | the pypsa2html report — start at `results/walloon/index.html` |
 | `logs/` | `*_solver.log` (grep `Optimal objective`), `*_python.log` (the TIMES heat budget lines), `*_memory.log` |
 | `configs/` | **the config actually used**, one snapshot per horizon |
 | `heating_profiles/` | option B′ only: the profiles the solve was pinned to |
@@ -255,12 +255,12 @@ The exception is `discount_rates.csv`, which is **generated wholesale** from
 | Costs / lifetimes / fuel prices | `cost:<tech>:<param>` | `data/walloon/custom_costs.csv` |
 | Per-technology hurdle rates | `hurdle:<sector>` (+ mapping) | `data/walloon/discount_rates.csv` (**generated**) |
 | Hurdle-rate sensitivity variants | `hurdle:<variant>:<sector>` | `data/walloon/discount_rates_<variant>.csv` (**generated**); select with `costs.hurdle_rate_fn` |
-| Social discount rate (SDR) | `config:costs.social_discountrate` | `config.walloon.yaml` / `config.times-pypsa.yaml` (synced) |
+| Social discount rate (SDR) | `config:costs.social_discountrate` | `config.walloon.yaml` (synced) |
 | Financial-rate fill (unmapped fallback) | — | **PyPSA default** in `config.default.yaml` (`0.07`); not overridden in walloon configs |
 | Walloon RES / biomass potentials | `potential:<bus>:<tech>:<attr>` | `data/walloon/custom_potentials.csv` |
 | Cross-border NTCs | `ntc:<A>-<B>` | `data/walloon/ntc_<year>.csv` |
 | Aggregate nuclear caps (demande haute) | `agg:<country>:<carrier>:<min\|max>` | `data/walloon/agg_p_nom_minmax_demande_haute.csv` |
-| CO₂ trajectory | `config:budget_national` | `config.walloon.yaml` **and** `config.times-pypsa.yaml` |
+| CO₂ trajectory | `config:budget_national` | `config.walloon.yaml` |
 
 There is no overlay config file and no load-order requirement — the ordinary run
 command already picks the shared values up:
@@ -338,15 +338,17 @@ with the TIMES one.
 >
 > | | switch | what it does | record |
 > |---|---|---|---|
-> | **option B′** *(default, on in `config.times-pypsa.yaml`)* | `profile.enable` | reconstructs an hourly heat profile per technology group (TIMES share × PyPSA's heat-load shape) and **pins the dispatch to it** | [`docs/heat-softlink.md`](docs/heat-softlink.md) §3 |
+> | **option B′** *(default, on in `config.walloon.yaml`)* | `profile.enable` | reconstructs an hourly heat profile per technology group (TIMES share × PyPSA's heat-load shape) and **pins the dispatch to it** | [`docs/heat-softlink.md`](docs/heat-softlink.md) §3 |
 > | **option C** *(off)* | `energy_mix.enable` | constrains each group's **annual** heat, `≥` on what TIMES keeps and `≤` on heat pumps, ±5 % | [`docs/heat-softlink.md`](docs/heat-softlink.md) §2 |
 >
 > The three-way evidence behind choosing B′ (legacy vs C vs B′) is in
 > [`docs/heat-softlink.md`](docs/heat-softlink.md) §2.
 
 All switches live in
-[`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml) (present but off
-in `config.walloon.yaml`):
+[`config/config.walloon.yaml`](config/config.walloon.yaml), which since
+2026-08-21 is the only study config — `config.times-pypsa.yaml` was folded
+into it. The legacy and option-C variants are reached through the config
+overlays in `scripts/walloon_scripts/run_heat_softlink_comparison.sh`:
 
 ```yaml
 sector:
@@ -434,7 +436,7 @@ Observed local footprint for the default Walloon configuration (PR #3, Sep 2025)
 | Wall-clock time (full workflow) | ~19 min |
 | Peak RAM | ~8.2 GB |
 
-Observed for `config.times-pypsa.yaml` (2 scenarios × 4 horizons, 6h, 12 threads,
+Observed for `config.walloon.yaml` (2 scenarios × 4 horizons, 6h, 12 threads,
 24-core / 124 GB workstation, 26 Jul 2026):
 
 | Metric | Value |
@@ -442,7 +444,7 @@ Observed for `config.times-pypsa.yaml` (2 scenarios × 4 horizons, 6h, 12 thread
 | Wall-clock, build phase (both scenarios, cutout cached) | ~50 min |
 | Wall-clock, myopic solve + summaries + plots | ~35 min |
 | Peak RAM per solve | ~7.5 GB (well under the 100 GB cap) |
-| `results/times-pypsa/<scenario>/` on disk | ~680 MB each |
+| `results/walloon/<scenario>/` on disk | ~680 MB each |
 
 Re-run of a single scenario with builds already cached (`scen_demande_haute`, 6h,
 weather year 2013, `--cores 20 --resources mem_mb=110000`, 14 Aug 2026):
@@ -499,7 +501,6 @@ installs on first call, so there is no separate create step:
 
 ```bash
 pixi run walloon-model            # snakemake -call --configfile config/config.walloon.yaml
-pixi run times-pypsa              # same for config.times-pypsa.yaml
 pixi run walloon-model --cores 12 --resources mem_mb=100000   # extra args pass through
 pixi shell                        # or drop into the environment and run snakemake by hand
 ```
@@ -558,9 +559,9 @@ invites the OOM killer. Local runs use:
 | Memory per solve | **100 GB** (`mem_mb: 100000`) | `solving.mem_mb` |
 | Sector time aggregation | **6h** for local testing | `clustering.temporal.resolution_sector` |
 
-Threads and memory are set in [`config/config.times-pypsa.yaml`](config/config.times-pypsa.yaml).
+Threads and memory are set in [`config/config.walloon.yaml`](config/config.walloon.yaml).
 Both study configs currently use `resolution_sector: 6h` (the 18 Aug 2026
-nuclear diagnostic switched `config.times-pypsa.yaml` back from the 14 Aug 1h
+nuclear diagnostic switched `config.walloon.yaml` back from the 14 Aug 1h
 study). Flip it to `1h` only deliberately: with option B′ on, hourly solves are
 hostile — see
 [`docs/logs/2026-08-18_scen_demande_haute_2010_6h.md`](docs/logs/2026-08-18_scen_demande_haute_2010_6h.md).
@@ -568,7 +569,7 @@ Pass matching limits on the command line so Snakemake never schedules two
 solves at once:
 
 ```bash
-snakemake --configfile config/config.times-pypsa.yaml --cores 12 --resources mem_mb=100000 -call
+snakemake --configfile config/config.walloon.yaml --cores 12 --resources mem_mb=100000 -call
 ```
 
 A finer resolution grows the LP roughly linearly in the number of snapshots —
@@ -821,7 +822,7 @@ CECI expects allocations to match actual usage — see the
 | Light rules (`add_brownfield`) | 1 CPU, 16 GB | `--default-resources` in `nic5.sh solve` |
 
 Fine temporal resolution (`resolution_sector: 6h`, and more so the current `1h`
-default of `config.times-pypsa.yaml`) makes sector-coupled
+default of `config.walloon.yaml`) makes sector-coupled
 PyPSA models memory-hungry during Gurobi model generation — **`hmem` is required**
 for production solves on NIC5. Do not use the `batch` partition for these jobs unless
 you also coarsen the time resolution substantially. Solve runtime defaults to
@@ -879,9 +880,9 @@ nodes:
   labels: {BEWAL: Wallonia, BEVLG: Flanders, BEBRU: Brussels, …}
 
 scenarios:
-  - {name: scen_demande_haute, label: High demand, results_dir: results/times-pypsa/scen_demande_haute}
-  - {name: scen_corrige,       label: Corrected,   results_dir: results/times-pypsa/scen_corrige}
-  - {name: scen_base,          label: Base,        results_dir: results/times-pypsa/scen_base}
+  - {name: scen_demande_haute, label: High demand, results_dir: results/walloon/scen_demande_haute}
+  - {name: scen_corrige,       label: Corrected,   results_dir: results/walloon/scen_corrige}
+  - {name: scen_base,          label: Base,        results_dir: results/walloon/scen_base}
 
 landing:
   scenario: scen_demande_haute
@@ -889,7 +890,7 @@ landing:
   page: overview
 
 output:
-  dir: results/times-pypsa/{scenario}/html
+  dir: results/walloon/{scenario}/html
 ```
 
 Nothing lists the horizons or the eight nodes — both are read from the
@@ -901,7 +902,7 @@ networks. Add a scenario by appending three lines to `scenarios:`.
 scenario's own results tree**, next to `csvs/`, `graphs/` and `networks/`:
 
 ```
-results/times-pypsa/
+results/walloon/
 ├── index.html                          ← site entry point
 ├── scen_demande_haute/
 │   ├── csvs/  graphs/  maps/  networks/  explorer/  logs/
@@ -950,7 +951,7 @@ pypsa2html build --config /home/sylvain/svn/pypsa2html/config/pypsa-wal.yaml
 Open it:
 
 ```bash
-xdg-open results/times-pypsa/index.html
+xdg-open results/walloon/index.html
 ```
 
 Other useful invocations:
@@ -1094,8 +1095,8 @@ export PATH="$HOME/.local/bin:$PATH"
 DATE=$(date +%Y%m%d)
 for s in scen_base scen_corrige; do
   RUN_NAME="times-pypsa_$s" \
-  RESULTS_DIR="$PWD/results/times-pypsa/$s" \
-  CONFIGFILE=config/config.times-pypsa.yaml \
+  RESULTS_DIR="$PWD/results/walloon/$s" \
+  CONFIGFILE=config/config.walloon.yaml \
   UPLOAD_ID="${DATE}_times-pypsa_$s" \
   SCENARIO_ID="times-pypsa__${s}__${DATE}" \
   ./cluster/upload_s3.sh
@@ -1249,12 +1250,12 @@ not own is never clobbered. Selecting the copy relies on
 `graph_extraction_main.py` honouring `EXTRACTION_CONFIG`; `extract` checks for
 that and tells you the one-line patch if it is missing.
 
-These defaults already target `config.times-pypsa.yaml` (see
+These defaults already target `config.walloon.yaml` (see
 [`cluster/config.sh`](cluster/config.sh)). For other scenarios, export for a
 one-off:
 
 ```bash
-CONFIGFILE=config/config.times-pypsa.yaml RUN_PREFIX=times-pypsa \
+CONFIGFILE=config/config.walloon.yaml RUN_PREFIX=walloon \
 EXPLORER_TYPE=times-pypsa EXPLORER_SCENARIOS="scen_base scen_corrige" \
   ./cluster/nic5.sh publish
 ```
@@ -1421,7 +1422,7 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | S3 upload dies on the `.nc` networks (`Could not connect to the endpoint URL`, `SSL validation failed`), and the Explorer folder stays empty | The four networks are ~250 MB of multipart upload; on a slow link they fail and **abort the sync before the Explorer steps run**, so `scenarios/<id>/` is never populated even though `pypsa_raw_results/` looks full. Publish in two passes: `UPLOAD_SKIP_NETWORKS=1 ./cluster/nic5.sh upload` first (small files, and the Explorer reads only those), then sync `networks/` on its own with `AWS_MAX_ATTEMPTS=10 AWS_RETRY_MODE=standard`. Always verify with `aws s3 ls s3://intervectoriel/test/scenarios/<id>/pypsa/ \| wc -l` (expect 49) rather than trusting the exit code |
 | Explorer scenario not in dropdown | See **Troubleshooting Explorer** under Publishing to Wallonie Explorer (S3) |
 | `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
-| First run hangs on the cutout download | The rules read `data/cutout/archive/<version>/europe-<year>-sarah3-era5.nc` (~6.6 GB), **not** the legacy `cutouts/` symlink. `config.walloon.yaml` needs the 2010 file, `config.times-pypsa.yaml` the 2013 one — hardlink or symlink it in from another checkout if you have it, or wait for the download |
+| First run hangs on the cutout download | The rules read `data/cutout/archive/<version>/europe-<year>-sarah3-era5.nc` (~6.6 GB), **not** the legacy `cutouts/` symlink. `config.walloon.yaml` needs the 2010 file, `config.walloon.yaml` the 2013 one — hardlink or symlink it in from another checkout if you have it, or wait for the download |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
 | `--resources mem_mb=... <target>` fails with `dictionary update sequence element #1 has length 1` | Same `nargs="+"` trap as `--configfile`: the target after `--resources` is parsed as another resource. Put `--cores` (or any flag) between them |
 | Solve is infeasible right after enabling `sector.times_heat.energy_mix` | Check which group binds in the solve log line `TIMES heat-mix constraints (…)`, then either raise `tolerance` or move that group to `slack_groups`. `solar thermal` is the usual suspect — it is the only group with a dispatch upper bound. See [`docs/heat-softlink.md`](docs/heat-softlink.md) §8 |

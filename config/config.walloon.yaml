@@ -4,14 +4,19 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  # Single-run layout: RDIR is "walloon-model/", no {run} wildcard — the cluster
-  # scripts and instructions.md assume it. Multi-scenario runs: config.times-pypsa.yaml
-  name: "walloon-model"
+  prefix: "walloon"
+  # RDIR is "walloon/{run}/", so one entry in `name` is
+  # a single run and several are a multi-scenario run — the only difference is how
+  # many names are listed. Every name must be a key of run.scenarios.file;
+  # `name: all` expands to all of them.
+  name:
+  - scen_demande_haute
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
-    enable: false
+    enable: true
     file: config/scenarios.walloon.yaml
+  shared_cutouts: true
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
@@ -123,11 +128,9 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    # 6 h here on purpose: this config is the light legacy reference. The 1 h
-    # coupled study is config.times-pypsa.yaml. `feat/bev-myopic` set 1 h here as
-    # well; reverted, because a 1 h four-horizon myopic chain is a different
-    # machine's worth of solve time.
-    resolution_sector: 6h
+    # 1 h: this is the coupled study config. The consolidation commit
+    # (7225e6fb) set 168 h, which is a weekly test resolution -- restored.
+    resolution_sector: 1h
   exclude_carriers:
     - nuclear
 
@@ -260,22 +263,21 @@ sector:
   # mechanisms — `energy_mix` (option C, annual constraint) and `profile`
   # (option B', pinned hourly profile). Enabling both raises. docs/heat-softlink.md
   #
-  # This config stays on the LEGACY path deliberately: the soft-link is enabled in
-  # config.times-pypsa.yaml, and keeping one config on each side is what makes the
-  # before/after comparison of docs/heat-softlink.md §4 reproducible from one
-  # checkout. `feat/bev-myopic` flipped these three switches on (probably fallout
-  # from its merge of master); reverted here. Flip them if you want this config
-  # coupled too — but then the legacy reference is gone.
+  # Option B' is ON: since config.times-pypsa.yaml was folded in here (7225e6fb)
+  # this is the coupled study, not a legacy reference. The legacy path is still
+  # reachable — run_heat_softlink_comparison.sh drives all three variants from
+  # config overlays on this one file, which is how the before/after comparison of
+  # docs/heat-softlink.md §4 is reproduced.
   times_heat:
     node: BEWAL
     # times | times_base_year | pypsa — how the TIMES residential decentral heat
     # is divided between the rural and urban decentral buses. `times` (the old
     # behaviour) lets the TIMES archetype labelling drift the rural share from
     # 59 % (2025) to 37 % (2050), i.e. dwellings move between PyPSA buses.
-    urban_rural_split: times
+    urban_rural_split: times_base_year
     # Replace the BEWAL row of existing_heating_distribution (EU 2012 dataset,
     # population-scaled) with the TIMES base-year stock. Both are in MW_th.
-    base_year_capacities: false
+    base_year_capacities: true
     # --- option B' — reconstructed hourly profiles ---
     # The TIMES technology shares combined with PyPSA's own heat-load shape give
     # one heat profile per group and bus; the dispatch is pinned to it. The mix
@@ -284,7 +286,7 @@ sector:
     # availability instead of the load, because it is the only group with a
     # dispatch ceiling. Mutually exclusive with `energy_mix`. docs/heat-softlink.md
     profile:
-      enable: false
+      enable: true
       # The group left unpinned, so the heat-bus balance determines it. The heat
       # pump is the only group with no fuel or CO2 limit upstream, so it can
       # always take the residual — and any relaxation shows up as visible extra
@@ -418,6 +420,16 @@ costs:
   social_discountrate: 0.035
 
 solving:
+  # Local workstation allocation: 12 Gurobi threads and 100 GB per solve
+  # (the pypsa-eur defaults, 32 threads / 128 GB, exceed a 24-core / 124 GB box).
+  # Keep cpus and gurobi-default.threads in sync. NIC5 overrides both via
+  # cluster/config_cluster.yaml.
+  mem_mb: 100000
+  cpus: &local_cpus 12
+  solver_options:
+    gurobi-default:
+      threads: *local_cpus
+
   agg_p_nom_limits:
     agg_offwind: true
     agg_solar: true

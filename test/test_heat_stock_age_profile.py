@@ -28,10 +28,9 @@ import yaml
 from scripts.add_existing_baseyear import resolve_stock_age_ratios
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG_FILES = (
-    ROOT / "config" / "config.walloon.yaml",
-    ROOT / "config" / "config.times-pypsa.yaml",
-)
+#: config.times-pypsa.yaml was folded into config.walloon.yaml (7225e6fb), so
+#: there is one study config. Kept as a tuple: scenario overlays may add more.
+CONFIG_FILES = (ROOT / "config" / "config.walloon.yaml",)
 PROFILE_KEY = "air-sourced heat pump"
 
 #: The TIMES air-heat-pump stock the profile is derived from, MW_th. Read off

@@ -10,7 +10,7 @@ merged.
 
 | | |
 |---|---|
-| **Done on the branch** | three-profile split (natural + 4 local + work), horizon-varying `bev_dsm_availability` and `bev_avail_*`, per-horizon natural-charging vintage, UTC timezone fix, `config.times-pypsa.yaml`/`config.walloon.yaml` aligned, config schema + validation |
+| **Done on the branch** | three-profile split (natural + 4 local + work), horizon-varying `bev_dsm_availability` and `bev_avail_*`, per-horizon natural-charging vintage, UTC timezone fix, `config.walloon.yaml`/`config.walloon.yaml` aligned, config schema + validation |
 | **Still open** | the energy-vs-fleet share defect ([§2](#2-the-energy-vs-fleet-share-defect-still-open)); the double-counted charger loss the branch introduces ([§3](#3-two-defects-in-the-branch)); the Elia hourly availability table ([§5](#5-decisions-still-needed) E10) |
 
 | Section | |
@@ -111,7 +111,7 @@ horizon** instead of the hard-coded 2026 — decision E9, resolved.
 
 ### 1.5 The two configs are aligned
 
-`config/config.times-pypsa.yaml` now carries the full EV block. **This closes the
+`config/config.walloon.yaml` now carries the full EV block. **This closes the
 finding I flagged as most urgent**: the coupled study no longer silently inherits
 `bev_dsm_availability: 0.5` and `v2g: true` from `config.default.yaml`. The four
 `scen_*` configs and `config.default.yaml` got the block too.
@@ -136,8 +136,8 @@ Three changes on the branch are **not** about BEV and look like they arrived wit
 * `config.walloon.yaml`: `times_heat.urban_rural_split: times` → `times_base_year`
   and `base_year_capacities: false` → **`true`**, i.e. it leaves the legacy heat
   path that master deliberately keeps it on ("Left on the legacy path here;
-  `config.times-pypsa.yaml` enables it");
-* `config.times-pypsa.yaml`: `budget_national` regenerated, and
+  `config.walloon.yaml` enables it");
+* `config.walloon.yaml`: `budget_national` regenerated, and
   `build_common_parameters.py` extended so `--write` patches **both** cost
   configs' `budget_national` block, not just `config.walloon.yaml`. This one is a
   genuine improvement and orthogonal to everything else.
@@ -149,7 +149,7 @@ intended** rather than merge fallout.
 
 ## 2. The energy-vs-fleet share defect (still open)
 
-The branch adds `land_transport_electric_share` to both Walloon configs —
+The branch adds `land_transport_electric_share` to the Walloon config —
 0.15 / 0.35 / 0.81 / 1.0 — which are **Elia's Belgian passenger-car BEV+PHEV
 stock shares** (sheet 2.2: 0.147 in 2025, 0.337 in 2030), extrapolated. Good
 numbers. But `add_land_transport`'s `times_demand` branch is **unchanged**, so
@@ -242,7 +242,7 @@ The error scales with `bev_dsm_availability`, because before the change only the
 flexible slice passed through the charger. At the 2030 value of 0.07 it was
 rounding (+0.8 %); at the `config.default.yaml` 0.5 the archived run actually
 carried **+5.6 %** at every horizon (measured on
-`results/times-pypsa/scen_demande_haute/`); with the branch's line it becomes
+`results/walloon/scen_demande_haute/`); with the branch's line it becomes
 +11.1 % regardless of `dsm`, because the whole load is affected. **The coupled Walloon
 transport electricity demand is 11 % above the TIMES answer the soft-link exists
 to transfer.**
@@ -274,7 +274,7 @@ Every other year-dependent option on the branch goes through `_helpers.get()`,
 which holds or interpolates. This one raises `KeyError` on any horizon absent
 from the dict. It works today — every config's `local_bev_dsm` covers its own
 `planning_horizons`, and I checked all six — but `config.walloon.yaml` lists only
-2025/2030/2040/2050 while `config.times-pypsa.yaml` and the rest also carry
+2025/2030/2040/2050 while `config.walloon.yaml` and the rest also carry
 2035/2045. Adding 2035 to a Walloon run would crash in `build_transport_demand`.
 **Use `get()`, or validate the coverage against `planning_horizons`.**
 
@@ -428,7 +428,7 @@ the next piece of work rather than a nicety.
 
 `git merge-tree` between the two: **one conflict, in `config/config.walloon.yaml`
 only**, and it is entirely comments plus the heat settings of §1.6 — no EV lines,
-no discount-rate lines. `config.times-pypsa.yaml`,
+no discount-rate lines. `config.walloon.yaml`,
 `scripts/build_common_parameters.py`, `scripts/prepare_sector_network.py` and
 `rules/build_sector.smk` all auto-merge, including the `HURDLE_SECTORS` change
 against their `patch_walloon_config` change.
@@ -454,7 +454,7 @@ variants), **E7** (fixed exogenous shape), **E9** (vintage per horizon).
 | **E3** | Does TIMES also replace `number cars`? | keep the frozen 1.947 M / take TIMES `stock_kveh` | **take TIMES.** Same export, Walloon rather than population-scaled, removes a 21 % drift. Changes every horizon. |
 | **E8** | The local profiles are a **winter** illustration in the published workbook — is that still true of the updated values? | apply year-round / heating season only / rebuild from the model's own PV profile | **ask Elia**, then apply year-round with the caveat recorded. Largest remaining fidelity loss, and §1.2 means it cannot be checked from the public workbook. |
 | **E10** | Replace the synthesised BEV availability *shape* with Elia's hourly table? | keep `pkw.csv` scaled between the Elia min/mean/max / read `ev_availability.csv` | **read the table.** The branch already uses Elia's min/mean/max per vintage, so only the shape is still German traffic counts. Interpolate 2026 → 2036. |
-| **E11** | V2G | `false` in both Walloon configs on the branch | **keep `false`.** Elia gives V2H+V2M at 0.00–0.02 of the fleet to 2036, and the branch now sizes V2G on `bev_dsm_availability`, which is the V1M+V2M total — too generous if switched on. |
+| **E11** | V2G | `false` in the Walloon config on the branch | **keep `false`.** Elia gives V2H+V2M at 0.00–0.02 of the fleet to 2036, and the branch now sizes V2G on `bev_dsm_availability`, which is the V1M+V2M total — too generous if switched on. |
 | **E13** | The `work` weight rises 0.10 → 0.30 while Elia's V0 workplace share *falls* 0.277 → 0.15 | keep / align with the location shares / source it | **document the reasoning.** V1H workplace smart charging and V0 workplace charging are different concepts, so the divergence may be right — but it is currently the only unsourced weight in the block. |
 | **E14** | Provenance of the updated local profiles (§1.2) | — | **record who/what/when next to the CSV**, and keep the published-workbook extraction as the audit baseline. |
 

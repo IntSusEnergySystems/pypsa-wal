@@ -59,7 +59,7 @@ NOTE_PLACEHOLDER = (
 NOTE_DISCOUNT = (
     "Fallback financial discount rate is the PyPSA default "
     "(config.default.yaml costs.fill_values 'discount rate'=0.07). "
-    "Do not override it in config.walloon.yaml / config.times-pypsa.yaml. "
+    "Do not override it in config.walloon.yaml. "
     "TIMES sector hurdles live in hurdle:<sector> rows → "
     "data/walloon/discount_rates.csv; SDR in config:costs.social_discountrate. "
     "status=none — not patched into walloon configs."

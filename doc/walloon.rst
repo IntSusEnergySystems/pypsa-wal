@@ -31,6 +31,25 @@ The Walloon workflow includes several changes to the default PyPSA-Eur:
   contains a Walloon override under ``electricity.extendable_carriers`` that allows nuclear to be
   extendable only for specific planning horizons (e.g. 2040 and 2050). The planning horizon and 
   the carrier list can be configured as needed.
+* **Flexible and inflexible EV demand.** Land transport EV electricity demand is split in two: flexible and inflexible, 
+  so that only the share of the fleet that offers demand-side flexibility can be shifted in time. The flexible
+  share, set by `sector.bev_dsm_availability`, stays on the ``<node> EV battery`` bus as the
+  ``land transport EV`` load and remains dispatchable through the ``BEV charger`` link and the DSM store.
+  The remaining share is added as a separate fixed load, ``land transport EV inflexible``, which follows
+  an observed charging profile instead and is moved to the ``<node> low voltage`` bus when the
+  distribution grid is enabled. The split conserves each node's annual energy. 
+  This is enabled via the `sector.bev_natural_charging_split` parameter.
+* **Charging profiles for the inflexible EV demand.** The profile of the inflexible share is built for each
+  planning horizon from ``data/walloon/elia_natural_charging_daily_profile_utc0.csv``, selected via the
+  `sector.bev_natural_charging_profile_fn` parameter. The file holds one daily profile per charging
+  behaviour and per data year, and the `sector.local_bev_dsm` parameter gives the weight of each behaviour
+  in a given planning horizon (the weights have to sum to 1). Because the data years do not match the
+  modelled horizons, the data year closest to the planning horizon is used.
+* **Year-dependent BEV parameters.** `sector.bev_dsm_availability`, `sector.bev_avail_max`,
+  `sector.bev_avail_mean`, `sector.bev_avail_min` and `sector.local_bev_dsm` can be given per planning
+  horizon, so that each modelled planning horizon has its own assumption. `sector.bev_avail_min` is a new
+  config parameter that sets a floor on the plugged-in availability profile, instead of only warning when 
+  the profile goes negative.
 
 With these adjustments the Walloon run retires the Tihange power plant incrementally 
 at their scheduled dates, removes duplicate representation of nuclear, and only allows

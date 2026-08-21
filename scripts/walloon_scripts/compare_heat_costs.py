@@ -35,7 +35,7 @@ Usage::
 
     python scripts/walloon_scripts/compare_heat_costs.py \
         --vd ../TIMES_PyPSA/data/scen_demande_haute_v01_260727_fix_nuc_2807.vd \
-        --costs resources/times-pypsa/scen_demande_haute/costs_2030_processed.csv
+        --costs resources/walloon/scen_demande_haute/costs_2030_processed.csv
 """
 
 from __future__ import annotations

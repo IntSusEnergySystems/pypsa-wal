@@ -23,7 +23,7 @@ shared CSV (monetary values in EUR2025; year in the unit)
                          data/walloon/ntc_<year>.csv
                          data/walloon/agg_p_nom_minmax_demande_haute.csv
                          config/config.walloon.yaml  (budget_national + cost scalars)
-                         config/config.times-pypsa.yaml  (cost scalars)
+                         config/config.walloon.yaml  (cost scalars)
                        and GENERATES
                          data/walloon/discount_rates.csv  (hurdle rates; see §5.1)
 ```
@@ -304,7 +304,7 @@ data/walloon/agg_p_nom_minmax_demande_haute.csv
 data/walloon/discount_rates.csv     GENERATED per-technology hurdle rates
 config/config.walloon.yaml           budget_national + costs.social_discountrate
                                      (SDR synced from CSV; fill_values stay PyPSA)
-config/config.times-pypsa.yaml       costs.social_discountrate (same)
+config/config.walloon.yaml       costs.social_discountrate (same)
 ```
 
 Planning horizons are read from `config.walloon.yaml` → `scenario.planning_horizons`

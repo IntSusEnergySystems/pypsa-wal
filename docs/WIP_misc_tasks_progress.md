@@ -27,7 +27,7 @@ in both.
 | 3 | EV energy-vs-fleet share | **Documented + exported, deliberately not wired** (E1–E3). Waiting on the availability-profile work, as instructed. |
 | 4 | 2030 heat-pump dip fix not chosen | **Option 2 implemented**: per-technology age profile derived from the TIMES 2021→2025 trajectory. Retiring tranche 334.4 → **83.3 MW_th**. |
 | 5 | 2040 solid-biomass conflict | **Recorded** as `none:solid_biomass_2040_conflict` in the shared table. Needs an ICEDD/Valbiom decision, not a constraint. |
-| 6 | Confirm the branch's non-BEV config changes | **Reverted** in `config.walloon.yaml` (legacy heat path, 6 h) with a comment saying why, so the next merge cannot undo it silently. |
+| 6 | Confirm the branch's non-BEV config changes | **Superseded.** Meas then folded `config.times-pypsa.yaml` into `config.walloon.yaml` (`7225e6fb`), so there is one study config and the legacy/coupled split I had preserved no longer exists. The surviving config is the coupled one; the legacy and option-C variants come from the overlays in `run_heat_softlink_comparison.sh`. I restored `resolution_sector: 1h` — the consolidation commit had set a `168h` test value. |
 | 7 | Provenance of the branch's Elia local profiles | **Still open — the one thing I could not resolve.** See below. |
 | 8 | `COM-processes` reaches no technology | **Decided: no fix.** Effect measured at 4.1–6.8 % on services heating CAPEX, uniform in sign. [`discount-rates.md`](discount-rates.md) §4.3 |
 | 9 | Cars and rooftop PV at 7.5 % | **Recorded** as `none:hurdle_assignment_tension`; the `car11` sensitivity is built and runnable. |
@@ -36,7 +36,15 @@ in both.
 | 12 | `mapping_processes.csv` defects | **Fixed** in TIMES_PyPSA: 7 duplicate process codes dropped, `TCARGASEX14`'s description repaired, both guarded by tests. |
 | 13 | Quantify the discount-rate change | **Closed.** `micro_chp: false` and zero micro/decentral CHP links in all four solved networks, so the two rates that moved are provably inert. |
 
-**Plus one bug found during the merge that was on nobody's list:** `update_config`
+**Plus two bugs found during the merges that were on nobody's list.**
+
+First, the soft-link silently ended up **off** after integrating the config
+consolidation: my earlier resolution had held `config.walloon.yaml` on the legacy
+path, and that setting survived into the merged single config. Restored, along
+with `resolution_sector: 1h`. Anyone merging these two branches in the other
+order should check the same three switches.
+
+Second: `update_config`
 merges dicts key by key, so the horizons a Walloon config did not list
 (2020/2035/2045) silently inherited `config.default.yaml`'s
 `bev_dsm_availability: 0.5`, `bev_avail_min: 0.0`, `bev_avail_max: 0.95` —
@@ -60,12 +68,12 @@ baseline for audit, not the input.
 
 | Check | Result |
 |---|---|
-| `pytest test/` (pypsa-wal) | **161 passed** |
+| `pytest test/` (pypsa-wal) | **152 passed** (9 fewer instances: the config-parametrised tests now have one config, not two) |
 | `pytest tests/` (TIMES_PyPSA), full `.vd` | **168 passed** |
 | `build_common_parameters.py --check` | **CHECK PASSED** |
-| every `config/config.*.yaml` against `ConfigSchema` | **6/6 OK** |
+| every `config/config.*.yaml` against `ConfigSchema` | **5/5 OK** (`config.times-pypsa.yaml` deleted) |
 | default-leak check at used horizons, all configs | **clean** |
-| `snakemake -n` on both Walloon configs | **DAG resolves** |
+| `snakemake -n` on the Walloon config | **DAG resolves** |
 | `add_existing_baseyear` for 2025, real network | **ran; vintages verified** |
 | `build_transport_demand` for 2030, real config | **ran; shape normalised** |
 | charger-loss identity | **grid draw == TIMES to the digit** |

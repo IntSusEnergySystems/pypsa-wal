@@ -62,7 +62,7 @@ flowchart TD
     P["config/hurdle_rate_mapping.csv<br/>technology → sector"] --> S
     U["technology universe<br/>archive + custom_costs + derived"] --> S
     S --> G["data/walloon/discount_rates.csv<br/>GENERATED, committed"]
-    S --> Y["config.walloon.yaml / config.times-pypsa.yaml<br/>costs.social_discountrate only"]
+    S --> Y["config.walloon.yaml<br/>costs.social_discountrate only"]
     G --> PC["scripts/process_cost_data.py::prepare_costs()"]
     PC --> R["resources/&lt;run&gt;/costs_{year}_processed.csv"]
 ```
@@ -234,7 +234,7 @@ the file is still written, with the 0.07 fallback, and the run exits 1.
 | **D3** | Where district-heating supply plant belongs | `SUP-processes`. Numerically identical to `ELC-PUB`; recorded so the label is a decision rather than an accident. |
 | **D4** | `AGR-processes` (0.11) has no PyPSA counterpart | **Defined but unused.** PyPSA-Eur models agriculture as a demand (machinery oil/electricity, `agriculture_machinery_*_share`) with no capital stock, so there is nothing to annualise. Keep the row for traceability. |
 | **D5** | Home batteries and rooftop PV: prosumer or supply asset? | **Supply** (0.075), following the explicit `ALL-PV` group. Flagged, not settled — see [§6](#6-what-the-literature-supports). |
-| **D6** | `sector.retrofitting.interest_rate` | **Set to 0.12** (RSD-RENO) in both Walloon configs. PyPSA holds a **single scalar**, so `COM-RENO` (0.11) cannot be expressed and the residential rate wins — Wallonia's renovation is overwhelmingly residential. **Inert while `retro_endogen: false`** (the default, and it must stay false: TIMES has already retrofitted the demand), but correct the day it is switched on. Raising it from the old 0.04 removes the inversion where renovation was cheaper to finance than the heat pump it substitutes for. |
+| **D6** | `sector.retrofitting.interest_rate` | **Set to 0.12** (RSD-RENO) in the Walloon config. PyPSA holds a **single scalar**, so `COM-RENO` (0.11) cannot be expressed and the residential rate wins — Wallonia's renovation is overwhelmingly residential. **Inert while `retro_endogen: false`** (the default, and it must stay false: TIMES has already retrofitted the demand), but correct the day it is switched on. Raising it from the old 0.04 removes the inversion where renovation was cheaper to finance than the heat pump it substitutes for. |
 | **D7** | PyPSA ≥ 1.1's per-component `overnight_cost` + `discount_rate` + `lifetime` API | **Not now.** Medium–high effort; `envs/environment.yaml` floors `pypsa >=0.35.2`, which predates it. Revisit only if an audit trail on the network object is required. |
 
 ### 4.3 What D2 actually costs

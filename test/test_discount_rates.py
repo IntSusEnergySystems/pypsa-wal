@@ -74,10 +74,7 @@ STORAGE_AGGREGATES = {
 
 ARCHIVE_COSTS = ROOT / "data" / "costs" / "archive" / "v0.14.0" / "costs_2050.csv"
 CUSTOM_COSTS = ROOT / "data" / "walloon" / "custom_costs.csv"
-CONFIG_FILES = (
-    ROOT / "config" / "config.walloon.yaml",
-    ROOT / "config" / "config.times-pypsa.yaml",
-)
+CONFIG_FILES = (ROOT / "config" / "config.walloon.yaml",)
 
 
 @pytest.fixture

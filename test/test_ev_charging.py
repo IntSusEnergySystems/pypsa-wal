@@ -39,10 +39,9 @@ from scripts.build_transport_demand import split_transport_demand
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = ROOT / "config" / "config.default.yaml"
-CONFIG_FILES = (
-    ROOT / "config" / "config.walloon.yaml",
-    ROOT / "config" / "config.times-pypsa.yaml",
-)
+#: config.times-pypsa.yaml was folded into config.walloon.yaml (7225e6fb), so
+#: there is one study config. Kept as a tuple: scenario overlays may add more.
+CONFIG_FILES = (ROOT / "config" / "config.walloon.yaml",)
 ELIA_DIR = ROOT / "data" / "walloon" / "elia_adeqflex2025"
 
 #: Dict-valued sector options whose horizons must be fully listed.
