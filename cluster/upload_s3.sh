@@ -12,8 +12,8 @@
 #
 # Environment overrides (also set in cluster/config.sh):
 #   S3_ENV=test|prod          bucket prefix (default: test)
-#   UPLOAD_ID=20260717_walloon-model   S3 folder name under pypsa_raw_results/
-#   SCENARIO_ID=pypsa__walloon-model__20260717  Explorer scenario folder (optional)
+#   UPLOAD_ID=20260717_scen_demande_haute   S3 folder name under pypsa_raw_results/
+#   SCENARIO_ID=times-pypsa__scen_demande_haute__20260717  Explorer scenario folder (optional)
 #   UPLOAD_SKIP_NETWORKS=1    skip large .nc files (quick connectivity test)
 #   SKIP_S3_UPLOAD=1          no-op (used by nic5.sh postprocess to opt out)
 #

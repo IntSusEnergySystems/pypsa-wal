@@ -48,15 +48,14 @@ DEFAULT_CPUS="${DEFAULT_CPUS:-1}"              # light rules only; never set glo
 MAX_SLURM_JOBS="${MAX_SLURM_JOBS:-2}"
 
 # --- run / scenario ------------------------------------------------------------
-# EDIT (2026-08-14): default run = the TIMES-coupled multi-scenario config with
-# ONLY scen_demande_haute enabled (2010 weather year, 1h sector resolution;
-# scenario overrides from config/scenarios.walloon.yaml). There is still no
-# <scenario>/<resolution> CLI argument anywhere in this tooling (unlike
-# pypsa-eur_negawatt) — switch runs by exporting the variables below. For the
-# single-run Walloon config instead export:
-#   CONFIGFILE=config/config.walloon.yaml RUN_NAME=walloon-model \
-#   RUN_PREFIX= EXPLORER_SCENARIOS= EXPLORER_TYPE= ./cluster/nic5.sh <command>
-CONFIGFILE="${CONFIGFILE:-config/config.times-pypsa.yaml}"
+# config/config.walloon.yaml is the only study config: it always runs in
+# scenario mode (run.prefix + run.scenarios), so RDIR is "walloon/{run}/" whether
+# run.name lists one scenario or several. Scenario overrides come from
+# config/scenarios.walloon.yaml. There is still no <scenario>/<resolution> CLI
+# argument anywhere in this tooling (unlike pypsa-eur_negawatt) — switch runs by
+# exporting the variables below, e.g.
+#   RUN_NAME=scen_base ./cluster/nic5.sh <command>
+CONFIGFILE="${CONFIGFILE:-config/config.walloon.yaml}"
 RUN_NAME="${RUN_NAME:-scen_demande_haute}"
 HORIZONS="${HORIZONS:-2025 2030 2040 2050}"
 CLUSTERS="${CLUSTERS:-adm}"
@@ -64,15 +63,13 @@ OPTS="${OPTS:-}"
 SECTOR_OPTS="${SECTOR_OPTS:-}"
 
 # --- multi-scenario runs (run.prefix + run.scenarios) --------------------------
-# Set these for a config whose RDIR is "<prefix>/{run}" -- e.g.
-# config/config.times-pypsa.yaml -- so results live in results/<prefix>/<scenario>/
-# instead of results/<RUN_NAME>/. Leave RUN_PREFIX and EXPLORER_SCENARIOS empty
-# for a single-run config; the tooling then falls back to RUN_NAME everywhere.
+# RUN_PREFIX must match run.prefix in CONFIGFILE, so results live in
+# results/<prefix>/<scenario>/. The three defaults use `${VAR-default}` (NOT
+# `${VAR:-default}`) so an exported EMPTY value clears them; clearing RUN_PREFIX
+# falls back to results/<RUN_NAME>/, i.e. a config with no run.prefix.
 #
-# EDIT (2026-08-14): active run = scen_demande_haute @ 2010, 1h. The three
-# defaults use `${VAR-default}` (NOT `${VAR:-default}`) so an exported EMPTY
-# value clears them -- that is how the single-run example above works.
-RUN_PREFIX="${RUN_PREFIX-times-pypsa}"       # run.prefix; empty = single-run layout
+# EDIT (2026-08-14): active run = scen_demande_haute @ 2010, 1h.
+RUN_PREFIX="${RUN_PREFIX-walloon}"           # = run.prefix; empty = no prefix
 # Scenario -> Explorer display label, space-separated "<scenario>:<label>" pairs.
 # The label is what the Explorer dropdown shows and is an editorial choice (the
 # existing scenarios use French names), so set it deliberately -- it is NOT
@@ -107,9 +104,9 @@ AUTO_UPLOAD_S3="${AUTO_UPLOAD_S3:-1}"           # 1 = upload after nic5.sh postp
 SKIP_S3_UPLOAD="${SKIP_S3_UPLOAD:-0}"          # 1 = skip upload even when AUTO_UPLOAD_S3=1
 UPLOAD_SKIP_NETWORKS="${UPLOAD_SKIP_NETWORKS:-0}"  # 1 = omit large .nc files
 # Optional overrides (defaults: YYYYMMDD_<RUN_NAME> and <RUN_NAME>__YYYYMMDD):
-# UPLOAD_ID=20260717_walloon-model
-# SCENARIO_ID=pypsa__walloon-model__20260717
-# EXPLORER_SRC=results/walloon-model/explorer/pypsa
+# UPLOAD_ID=20260717_scen_demande_haute
+# SCENARIO_ID=times-pypsa__scen_demande_haute__20260717
+# EXPLORER_SRC=results/walloon/scen_demande_haute/explorer/pypsa
 # Shared by upload_s3.sh and extract_explorer.sh so a single `publish` stamps one
 # date on the raw folder, the scenario folder and the extractor run_nickname.
 UPLOAD_DATE="${UPLOAD_DATE:-$(date +%Y%m%d)}"

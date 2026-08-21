@@ -9,8 +9,8 @@
 # back for post-processing.
 #
 # The default run (config, scenario, run prefix) is set in cluster/config.sh --
-# currently the TIMES-coupled multi-scenario config with ONLY scen_demande_haute
-# (results under results/times-pypsa/scen_demande_haute/). Temporal resolution
+# currently config/config.walloon.yaml with ONLY scen_demande_haute
+# (results under results/walloon/scen_demande_haute/). Temporal resolution
 # is a config key (clustering.temporal.resolution_sector) -- there is no
 # sector_opts resolution switch like in pypsa-eur_negawatt. Solves run on NIC5
 # `hmem`.
@@ -30,9 +30,9 @@
 #   ./cluster/nic5.sh upload      # publish results/ to Intervectoriel S3 (test/)
 #   ./cluster/nic5.sh publish     # extract + upload (Explorer needs both)
 #
-# A multi-scenario config (run.prefix + run.scenarios, e.g.
-# config/config.times-pypsa.yaml) is driven by RUN_PREFIX / EXPLORER_SCENARIOS in
-# cluster/config.sh; `extract`, `upload` and `publish` then loop over scenarios.
+# config/config.walloon.yaml always runs in scenario mode (run.prefix +
+# run.scenarios), driven by RUN_PREFIX / EXPLORER_SCENARIOS in cluster/config.sh;
+# `extract`, `upload` and `publish` then loop over EXPLORER_SCENARIOS.
 ###############################################################################
 set -euo pipefail
 
@@ -40,11 +40,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 # shellcheck source=config.sh
 source "$HERE/config.sh"
-# EDIT (2026-08-14): RDIR-aware path helper for multi-scenario configs
-# (run.prefix + run.scenarios). With RUN_PREFIX=times-pypsa and
-# RUN_NAME=scen_demande_haute this yields "times-pypsa/scen_demande_haute",
+# EDIT (2026-08-14): RDIR-aware path helper. With RUN_PREFIX=walloon and
+# RUN_NAME=scen_demande_haute this yields "walloon/scen_demande_haute",
 # so prepare/solve/pull/postprocess all point inside the scenario tree.
-# Empty RUN_PREFIX (single-run config) reduces to plain RUN_NAME.
+# Empty RUN_PREFIX (a config with no run.prefix) reduces to plain RUN_NAME.
 RUN_DIR_REL="${RUN_PREFIX:+${RUN_PREFIX}/}${RUN_NAME}"
 JOBFILE="$HERE/.last_jobs"
 mkdir -p "$HERE/logs"
