@@ -88,3 +88,96 @@ scen_data:
   solving:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_corrige.csv
+
+# Ambitious EV flexibility. Same TIMES vd and nuclear trajectory as
+# `scen_demande_haute` — the only delta is the pair of EV charging-weight keys,
+# so a diff against it is a clean EV-flexibility sensitivity. `test_ev_charging.py`
+# pins the vd/agg-caps pairing, so this block cannot drift off the study run.
+#
+# Elia AdeqFlex 2025 "Current commitments - High Flex" (Elia's most ambitious
+# flexibility case) through 2035, then **extrapolated** to 2040/2045/2050 instead
+# of holding 2036 as the base case does. Reproduce with:
+#
+#   python scripts/walloon_scripts/build_ev_charging_weights.py \
+#       --scenario "Current commitments - High Flex" --extrapolate
+#
+# The extrapolation continues two adoption fractions as saturating logistics
+# anchored on Elia's 2036 value, with the log-odds slope read from Elia's own
+# 2030-2036 window: the steerable share `1 - V0` against a `1 - public` = 0.85
+# ceiling (Elia assumes no flexibility from public charging, so that share is
+# unmanaged by construction), and the market share *of* steerable charging
+# against a stated 0.70 ceiling. Absolute fleet shares that produces —
+# natural / local / market: 0.153 / 0.492 / 0.355 (2040) -> 0.150 / 0.357 / 0.493
+# (2050). The location split is held at 2036, not extrapolated: its driver (the
+# company-car -> private-ownership shift) has run its course by then.
+# Do not hand-edit either key. docs/ev-charging-softlink.md §4.6.
+scen_evflex:
+  sector:
+    times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
+    bev_dsm_availability:
+      2020: 0.005
+      2025: 0.03
+      2030: 0.131
+      2035: 0.27
+      2040: 0.355
+      2045: 0.433
+      2050: 0.493
+    # `natural` is renormalised over natural+local, so it *rises* after 2040
+    # (0.237 -> 0.296) while the absolute natural share still falls (0.153 ->
+    # 0.150): the market slice taken off the top grows faster than natural
+    # shrinks, so natural gains share of the shrinking remainder. Not a typo.
+    local_bev_dsm:
+      2020:
+        natural: 0.7388
+        sunny_PV: 0.0429
+        sunny_noPV: 0.0429
+        cloudy_PV: 0.0429
+        cloudy_noPV: 0.0429
+        work: 0.0896
+      2025:
+        natural: 0.6908
+        sunny_PV: 0.0508
+        sunny_noPV: 0.0508
+        cloudy_PV: 0.0508
+        cloudy_noPV: 0.0508
+        work: 0.106
+      2030:
+        natural: 0.4652
+        sunny_PV: 0.0983
+        sunny_noPV: 0.0983
+        cloudy_PV: 0.0983
+        cloudy_noPV: 0.0983
+        work: 0.1416
+      2035:
+        natural: 0.2601
+        sunny_PV: 0.1496
+        sunny_noPV: 0.1496
+        cloudy_PV: 0.1496
+        cloudy_noPV: 0.1496
+        work: 0.1415
+      2040:
+        natural: 0.237
+        sunny_PV: 0.1571
+        sunny_noPV: 0.1571
+        cloudy_PV: 0.1571
+        cloudy_noPV: 0.1571
+        work: 0.1346
+      2045:
+        natural: 0.2651
+        sunny_PV: 0.1513
+        sunny_noPV: 0.1513
+        cloudy_PV: 0.1513
+        cloudy_noPV: 0.1513
+        work: 0.1297
+      2050:
+        natural: 0.2957
+        sunny_PV: 0.145
+        sunny_noPV: 0.145
+        cloudy_PV: 0.145
+        cloudy_noPV: 0.145
+        work: 0.1243
+  electricity:
+    retrofit_nuclear_once: false
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_demande_haute.csv

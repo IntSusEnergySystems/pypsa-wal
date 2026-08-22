@@ -2242,6 +2242,7 @@ def add_EVs(
     options: dict,
     natural_charging_shape: pd.DataFrame,
     investment_year: int,
+    electric_share_fleet: pd.Series | float | None = None,
 ) -> None:
     """
     Add electric vehicle (EV) infrastructure to the network.
@@ -2261,7 +2262,10 @@ def add_EVs(
     p_set : pd.Series
         Base power demand profile for EVs
     electric_share : pd.Series
-        Share of electric vehicles per node
+        Share of electric vehicles per node, applied to the **load**. With
+        ``times_demand`` this is the TIMES *energy* ratio
+        ``electricity road / total road``, which is what makes the EV grid draw
+        equal the transferred demand exactly.
     number_cars : pd.Series
         Number of cars per node
     temperature : pd.DataFrame
@@ -2289,6 +2293,14 @@ def add_EVs(
         when ``bev_natural_charging_split`` is enabled.
     investment_year : int
         Planning horizon used to resolve year-dependent options (e.g. ``bev_dsm_availability``)
+    electric_share_fleet : pd.Series or float, optional
+        Share of electric vehicles per node applied to the **fleet** quantities
+        ``p_nom`` (BEV charger, V2G) and ``e_nom`` (EV battery), which multiply a
+        vehicle count rather than an energy flow. Defaults to ``electric_share``,
+        which is PyPSA-Eur's behaviour and correct wherever the configured share
+        already is a fleet share. With ``times_demand`` the Walloon entry is
+        TIMES's BEV stock share by count, 3.7x the energy ratio at 2030.
+        docs/ev-charging-softlink.md S2.
 
     Returns
     -------
@@ -2412,14 +2424,23 @@ def add_EVs(
             p_set=profile.loc[n.snapshots],
         )
 
-    # Add BEV chargers
-    p_nom = number_cars * options["bev_charge_rate"] * electric_share
+    # Add BEV chargers.
+    #
+    # `electric_share_fleet`, NOT `electric_share`: this multiplies a vehicle
+    # count, so it needs the share of vehicles that are electric, not the share of
+    # road energy that is electricity. The two coincide only where the configured
+    # share is already a fleet share. docs/ev-charging-softlink.md S2.
+    if electric_share_fleet is None:
+        electric_share_fleet = electric_share
+    p_nom = number_cars * options["bev_charge_rate"] * electric_share_fleet
 
     # V2G only ever moves the DSM-capable share, whether or not the load is split
     v2g_p_nom = p_nom * bev_dsm_availability
 
-    # NOTE: if the load is split, the p_nom should be multiplied by electric_share and bev_dsm_availability
-    # since the EV battery bus (and its DSM store) now only carries flexible demand
+    # If the load is split, the EV battery bus (and its DSM store) carries only
+    # the flexible demand, so the charger is sized on the DSM-capable slice --
+    # i.e. number_cars x charge_rate x electric_share_fleet x bev_dsm_availability,
+    # which is exactly `v2g_p_nom`.
     if natural_charging_split:
         p_nom = v2g_p_nom
 
@@ -2442,7 +2463,7 @@ def add_EVs(
             number_cars
             * options["bev_energy"]
             * bev_dsm_availability
-            * electric_share
+            * electric_share_fleet
         )
 
         n.add(
@@ -2697,6 +2718,56 @@ def add_ice_cars(
     )
 
 
+#: Vehicle classes of `road_transport_*_shares.csv` that the Walloon EV
+#: components represent. `number cars` counts passenger cars and
+#: `bev_energy` / `bev_charge_rate` are passenger-car parameters (60 kWh, 11 kW),
+#: so `cars` is the boundary that keeps all three consistent. Adding
+#: `light commercial vehicles` -- Elia's boundary -- changes the *share* a lot
+#: (0.529 -> 0.454 at 2030) but the BEV *count* not at all (987.9 -> 988.0 kveh),
+#: because TIMES has ~0.1 kveh of electric LDVs; the count is what `p_nom` and
+#: `e_nom` are built from, so the choice is immaterial as long as the count and
+#: the share come from the SAME classes. docs/ev-charging-softlink.md S2.
+EV_FLEET_CLASSES = ("cars",)
+
+
+def times_ev_fleet(
+    road_transport_shares_file, classes=EV_FLEET_CLASSES
+) -> tuple[float, float]:
+    """`(vehicle count, BEV share by count)` for one horizon, from TIMES.
+
+    Both numbers come from the same vehicle classes, which is the only thing that
+    has to hold: their product is the BEV count that `p_nom` and `e_nom` are
+    really scaled on.
+
+    **By count (`stock_share`), not by km.** `road_transport_*_shares.csv` also
+    carries `activity_share` -- the BEV share of driven km, 0.500 against 0.529 at
+    2030. `activity_share` is the right number for a *per-km* quantity; a charger
+    rating and a battery capacity are per-*vehicle*, so the count is what applies.
+    The two differ by ~6 % because BEVs drive slightly fewer km than the average
+    car in TIMES, which is small next to the 3.7x this whole substitution fixes.
+    docs/ev-charging-softlink.md S2.
+    """
+    fleet = pd.read_csv(road_transport_shares_file)
+    sub = fleet[fleet["vehicle_class"].isin(classes)]
+    if sub.empty:
+        raise ValueError(
+            f"{road_transport_shares_file} has no rows for vehicle class(es) "
+            f"{list(classes)}; it has {sorted(fleet['vehicle_class'].unique())}. "
+            "The TIMES transport group definitions "
+            "(transport_softlink_groups.csv) and EV_FLEET_CLASSES disagree."
+        )
+    count = float(sub["stock_kveh"].sum()) * 1e3
+    electric = float(
+        sub.loc[sub["pypsa_engine_type"] == "electric", "stock_kveh"].sum()
+    ) * 1e3
+    if count <= 0:
+        raise ValueError(
+            f"{road_transport_shares_file} reports a zero {list(classes)} stock; "
+            "the BEV charger and EV battery would be sized at 0 MW."
+        )
+    return count, electric / count
+
+
 def add_land_transport(
     n,
     costs,
@@ -2799,6 +2870,59 @@ def add_land_transport(
         electric_share = shares_per_node.loc["electric"]
         fuel_cell_share = shares_per_node.loc["fuel_cell"]
         ice_share = shares_per_node.loc["ice"]
+        if shares_wal["ice"] < 0:
+            raise ValueError(
+                f"TIMES {investment_year} road electricity ({elec_val:.3f} TWh) "
+                f"plus hydrogen ({hydro_val:.3f}) exceeds total road "
+                f"({total_share:.3f}), so the ICE share is {shares_wal['ice']:.3f}. "
+                "The extraction rules for the three road categories disagree."
+            )
+
+        # E1-E3: `electric_share` above is the TIMES *energy* ratio
+        # `electricity road / total road`. It is the right number for the load --
+        # it reproduces the transferred `electricity road` exactly, which
+        # `test_split_draws_exactly_the_transferred_demand` pins -- and the wrong
+        # one for `p_nom`/`e_nom`, which multiply a vehicle COUNT. A BEV turns
+        # more of its energy into km than an ICE, and `total road` meters freight
+        # the car count excludes, so the energy ratio understates the fleet 3.7x
+        # at 2030 (0.142 against 0.529). Both the count and the share now come
+        # from the same TIMES vehicle classes.
+        # docs/ev-charging-softlink.md S2.
+        electric_share_fleet = electric_share.copy()
+        number_cars = number_cars.copy()
+        times_cars, times_bev_share = times_ev_fleet(
+            snakemake.input.road_transport_shares
+        )
+        if times_bev_share < shares_wal["electric"] - 1e-9:
+            raise ValueError(
+                f"TIMES {investment_year} BEV fleet share {times_bev_share:.4f} is "
+                f"below the road-electricity energy share "
+                f"{shares_wal['electric']:.4f}. That cannot happen: a BEV converts "
+                "more of its final energy into km than an ICE, and the energy "
+                "denominator also carries freight the car count excludes. One of "
+                "the two extractions is wrong."
+            )
+        if wallon_node in number_cars.index:
+            if logger:
+                logger.info(
+                    "%s: TIMES fleet replaces the population-scaled car count "
+                    "(%.0f -> %.0f) and the energy ratio for p_nom/e_nom "
+                    "(%.4f -> %.4f).",
+                    wallon_node,
+                    number_cars[wallon_node],
+                    times_cars,
+                    electric_share[wallon_node],
+                    times_bev_share,
+                )
+            number_cars[wallon_node] = times_cars
+            electric_share_fleet[wallon_node] = times_bev_share
+        elif logger:
+            logger.warning(
+                "Walloon node %r is not in the transport data index %s; the TIMES "
+                "fleet share is not applied.",
+                wallon_node,
+                list(number_cars.index),
+            )
     elif suff_demand:
         demands = pd.read_csv(snakemake.input.clever_transport, index_col=0)
         clever_totals = demands.loc[pop_layout.ct].fillna(0.0)
@@ -2821,6 +2945,9 @@ def add_land_transport(
         electric_share = shares_per_node["electric"]
         fuel_cell_share = shares_per_node["fuel_cell"]
         ice_share = shares_per_node["ice"]
+        # No TIMES fleet in the sufficiency path; the CLEVER shares are used for
+        # both jobs, as PyPSA-Eur does.
+        electric_share_fleet = electric_share
     else:
         logger.info("Skipping Walloon adjustments — study mode not active.")
 
@@ -2842,6 +2969,7 @@ def add_land_transport(
             options,
             natural_charging_shape[nodes],
             investment_year,
+            electric_share_fleet=electric_share_fleet,
         )
     elif shares["electric"] > 0:
         add_EVs(

@@ -103,11 +103,13 @@ real case when both come from the same Elia (scenario, year) cell. Regenerate:
 python scripts/walloon_scripts/build_ev_charging_weights.py
 ```
 
-Add `--scenario "Current commitments - High Flex"` for the flexibility-rich case.
-Horizons past 2036 hold that year rather than extrapolating. `test_ev_charging.py`
-fails if the two keys drift apart or if a horizon is missing — a horizon a config
-does not list silently inherits the PyPSA-Eur default, because `update_config`
-merges dicts key by key.
+Add `--scenario "Current commitments - High Flex"` for the flexibility-rich case,
+and `--extrapolate` on top of it for the ambitious `scen_evflex` scenario, which
+continues Elia's adoption curves past 2036 instead of holding them. Everything
+else holds 2036. `test_ev_charging.py` fails if the two keys drift apart, if a
+horizon is missing — a horizon a config does not list silently inherits the
+PyPSA-Eur default, because `update_config` merges dicts key by key — or if a
+generated scenario block stops matching the generator.
 
 **Energy identity worth knowing.** With `times_demand`, the transferred quantity
 is the TIMES `electricity road` flow, metered *upstream* of TIMES's own 0.95
@@ -117,12 +119,19 @@ Walloon EV grid draw equals the TIMES figure exactly. Reversing that direction
 counts the charger loss twice (+11 %). See
 [`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §3.1.
 
-**Still exogenous:** the EV *fleet* share. `electric_share` at BEWAL is the TIMES
-**energy** ratio `electricity road / total road`, and it also scales the BEV
-charger `p_nom` and the EV-battery `e_nom`, which are fleet quantities — TIMES's
-own car BEV stock share is 0.53 in 2030 against that 0.14.
-`TIMES_PyPSA` exports the fleet (`road_transport_{year}.csv`); **nothing reads it
-yet**. [`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §2.
+**Two shares, two jobs.** At BEWAL the **load** uses the TIMES *energy* ratio
+`electricity road / total road`, which is what makes the EV grid draw equal the
+transferred demand. The BEV-charger `p_nom` and EV-battery `e_nom` multiply a
+*vehicle count*, so they use TIMES's **BEV stock share by count** and TIMES's own
+car count instead — `road_transport_{horizon}_shares.csv`, a new output of
+`build_wallon_demands`. The two shares are far apart early on (0.142 vs 0.529 at
+2030) and converge as the fleet electrifies; the charger correction is 3.6× at
+2030 and 1.3× at 2050. Both numbers come from the same vehicle classes
+(`EV_FLEET_CLASSES = ("cars",)`), which is the only thing that has to hold.
+[`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §2.
+
+An older `coupling_dir` bundle without `road_transport_*.csv` now fails with an
+explicit message — re-export it with `times-pypsa export-coupling`.
 
 ### Scenarios
 
@@ -132,7 +141,7 @@ on it:
 | Key | Value |
 |-----|-------|
 | `run.prefix` | `walloon` |
-| `run.name` | a **list** of scenarios (`scen_demande_haute` active; `scen_base`, `scen_corrige`, `scen_nuc*`, … commented out — uncomment to add one) |
+| `run.name` | a **list** of scenarios (`scen_demande_haute` active; `scen_base`, `scen_corrige`, `scen_nuc*`, `scen_evflex`, … commented out — uncomment to add one) |
 | `run.scenarios.enable` | `true`, overrides from [`config/scenarios.walloon.yaml`](config/scenarios.walloon.yaml) |
 
 One name in `run.name` is a single run, several is a multi-scenario run — that is
@@ -338,12 +347,31 @@ Regenerate both together:
 ```bash
 python scripts/walloon_scripts/build_ev_charging_weights.py                                    # base
 python scripts/walloon_scripts/build_ev_charging_weights.py --scenario "Current commitments - High Flex"
+python scripts/walloon_scripts/build_ev_charging_weights.py --scenario "Current commitments - High Flex" --extrapolate
 ```
 
-and paste both YAML blocks into `config.walloon.yaml`. The base is Elia's central
-case (market share 0.01 / 0.07 / 0.18 / 0.18); High Flex is the flexibility-rich
-one (0.030 / 0.131 / 0.280 / 0.280). `test_ev_charging.py` fails if the two keys
-end up on different Elia scenarios.
+and paste both YAML blocks into `config.walloon.yaml` (base) or into the scenario
+overlay (variants). Market share at 2025 / 2030 / 2040 / 2050:
+
+| case | where | market share |
+|---|---|---|
+| Elia's central case | `config.walloon.yaml` | 0.010 / 0.070 / 0.180 / 0.180 |
+| High Flex, 2036 held | not currently instantiated | 0.030 / 0.131 / 0.280 / 0.280 |
+| **High Flex, extrapolated** | `scen_evflex` | **0.030 / 0.131 / 0.355 / 0.493** |
+
+`scen_evflex` is an overlay on `scen_demande_haute` that changes **nothing but the
+two EV keys**, so `results/walloon/scen_evflex` vs
+`results/walloon/scen_demande_haute` is a clean EV-flexibility sensitivity. Run it
+by adding `scen_evflex` to `run.name`. It is the one place where horizons past
+2036 are extrapolated rather than held, as a saturating logistic anchored on
+Elia's 2036 value — see
+[`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §4.6 for the
+ceilings and their sensitivity. Beware: at `bev_dsm_availability` 0.493 the BEV
+charger and EV battery are ~2.7× the base case, and `v2g` must stay `false`.
+
+`test_ev_charging.py` fails if the two keys end up on different Elia scenarios, if
+a generated block is hand-edited, or if `scen_evflex` drifts off
+`scen_demande_haute` outside the EV keys.
 [`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §4.
 
 Soft-linked **demands** (TIMES → PyPSA) are a separate path — see
