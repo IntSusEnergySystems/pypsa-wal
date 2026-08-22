@@ -22,8 +22,7 @@ killed 1h attempts, 6h tests, and runs that skip postprocess/S3 — copy
 [`docs/logs/_TEMPLATE_solve_log.md`](docs/logs/_TEMPLATE_solve_log.md) to
 `docs/logs/YYYY-MM-DD_<scenario>_<tags>.md` and fill it. If resolution or a
 large constraint set changed (e.g. 1h vs 6h, option B′ heat-profile pinning),
-the log **must** record the runtime/feasibility comparison. See
-[Solve logs (required)](#solve-logs-required).
+the log **must** record the runtime/feasibility comparison. See [Logs](#logs).
 
 ---
 
@@ -32,11 +31,11 @@ the log **must** record the runtime/feasibility comparison. See
 | Item | Value |
 |------|-------|
 | Config file | [`config/config.walloon.yaml`](config/config.walloon.yaml) |
-| Run name (`RDIR`) | `walloon/<scenario>/` — `run.prefix: walloon` plus one entry of `run.name` (default `scen_demande_haute`). Was `walloon-model` before scenarios were enabled. |
+| Run name (`RDIR`) | `walloon/<scenario>/` — `run.prefix: walloon` plus one entry of `run.name` (default `scen_demande_haute`) |
 | Foresight | Myopic (2025 → 2030 → 2040 → 2050) |
 | Countries | BE, FR, GB, NL, DE, LU |
 | Spatial clustering | Custom 3-node Belgium (`adm` + `custom_busmap_BE`) |
-| Temporal resolution | Sector snapshots: **`resolution_sector: 1h`**. The config consolidation of 2026-08-21 briefly set `168h` (a weekly test value); restored. `1h` is what the 14 Aug 2026 publication run used ([log](docs/logs/2026-08-14_scen_demande_haute_2010_1h.md)) and it is expensive once option B′ is on — see [the 18 Aug 6h diagnostic](docs/logs/2026-08-18_scen_demande_haute_2010_6h.md) if you need it cheaper. |
+| Temporal resolution | `clustering.temporal.resolution_sector: 1h`. Expensive with option B′ on; 6h is the usual testing value — see [Reducing runtime for testing](#reducing-runtime-for-testing). |
 | Weather year | **2010** (`atlite.default_cutout: europe-2010-sarah3-era5`) |
 | Solver | Gurobi (`gurobi-default`) |
 
@@ -45,29 +44,35 @@ constraints, cross-border flows) are documented in [`doc/walloon.rst`](doc/wallo
 
 ### Selecting the weather year
 
-Both study configs carry one `WEATHER YEAR` block — a `snapshots` range
-immediately followed by `atlite.default_cutout` — and that block is the only
-place to change:
-
-| Config | Weather year |
-|--------|--------------|
-| [`config/config.walloon.yaml`](config/config.walloon.yaml) | **2010** |
-| [`config/config.walloon.yaml`](config/config.walloon.yaml) | **2010** (was **2013** until the 2026-08-14 1h run aligned the two) |
+`config/config.walloon.yaml` carries one `WEATHER YEAR` block — a `snapshots`
+range immediately followed by `atlite.default_cutout` — and that block is the only
+place to change it. Current value: **2010**.
 
 Change the three years together (`snapshots.start`, `snapshots.end`,
 `default_cutout`): the snapshots pick the hours and the cutout supplies the
 weather for them, so editing one alone silently pairs one year's demand with
-another year's wind and sun — a run that succeeds and is wrong. Both configs are
-explicit rather than inheriting `config.default.yaml`, so the year is visible
+another year's wind and sun — a run that succeeds and is wrong. The block is
+explicit rather than inherited from `config.default.yaml`, so the year is visible
 where you set it.
 
-The cutout itself is a ~6.6 GB file under `data/cutout/archive/<version>/`
-(`cutouts/` is a legacy symlink and is not what the rules read). Only the year
-already present there is free; any other year is retrieved from
-`https://data.pypsa.org/workflows/cutout/v1.0/`. The studies were on different
-years (2010 / 2013) until the 2026-08-14 1h run aligned both on 2010; putting
-them back on different years means one download and a full rebuild of the
-affected study.
+The cutout is a ~6.6 GB file under `data/cutout/archive/<version>/` (`cutouts/` is
+a legacy symlink and is not what the rules read). Only the year already present
+there is free; any other year is retrieved from
+`https://data.pypsa.org/workflows/cutout/v1.0/`.
+
+> **Changing the weather year or the temporal resolution invalidates
+> `resources/`, and Snakemake will not always notice.** A tree built for another
+> year fails deep inside `prepare_sector_network` with
+> `KeyError: "None of [DatetimeIndex(['2013-01-01 00:00:00', ...])] are in the
+> [index]"`, which reads like a code bug and is not one: the profile CSVs carry
+> the new year and the cached networks the old one. Delete the run's resources and
+> rebuild:
+>
+> ```bash
+> rm -rf resources/walloon/<scenario>
+> ```
+>
+> `resources/` is gitignored, so nothing is lost that Snakemake cannot rebuild.
 
 ### EV charging: three profiles, two loads
 
@@ -119,84 +124,72 @@ own car BEV stock share is 0.53 in 2030 against that 0.14.
 `TIMES_PyPSA` exports the fleet (`road_transport_{year}.csv`); **nothing reads it
 yet**. [`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §2.
 
-### The TIMES-coupled multi-scenario config
+### Scenarios
 
-[`config/config.walloon.yaml`](config/config.walloon.yaml) is the
-TIMES↔PyPSA coupled study. It differs from `config.walloon.yaml` in three ways
-that change every output path:
+One config, `config/config.walloon.yaml`, drives every run. Scenarios are overlays
+on it:
 
-| Item | Value |
-|------|-------|
-| `run.prefix` | `times-pypsa` |
+| Key | Value |
+|-----|-------|
+| `run.prefix` | `walloon` |
 | `run.name` | a **list** of scenarios (`scen_demande_haute` active; `scen_base`, `scen_corrige`, `scen_nuc*`, … commented out — uncomment to add one) |
 | `run.scenarios.enable` | `true`, overrides from [`config/scenarios.walloon.yaml`](config/scenarios.walloon.yaml) |
 
-**Scenario runs belong here, not in `config.walloon.yaml`.** Keep the latter
-single-run (`run.name: "walloon-model"`, `run.scenarios.enable: false`): the
-pypsa2html config and the documented Explorer examples read
-`results/walloon-model/`, so a prefix or a `{run}` wildcard there sends the
-report and Explorer paths somewhere the tested tooling does not look.
+One name in `run.name` is a single run, several is a multi-scenario run — that is
+the only difference. `name: all` expands to every key of the scenarios file.
 
-Since 2026-08-14 the cluster scripts **default** to this TIMES-coupled config
-(`CONFIGFILE=config.walloon.yaml`, `RUN_NAME=scen_demande_haute`,
-`RUN_PREFIX=walloon` — see [`cluster/config.sh`](cluster/config.sh)) and
-are prefix-aware (`RUN_DIR_REL` in [`cluster/nic5.sh`](cluster/nic5.sh), so
-prepare/solve/pull/postprocess follow `results/walloon/<scenario>/`). For
-the single-run Walloon config instead clear the scenario defaults (an exported
-*empty* value clears them):
-
-```bash
-CONFIGFILE=config/config.walloon.yaml RUN_NAME=walloon-model \
-RUN_PREFIX= EXPLORER_SCENARIOS= EXPLORER_TYPE= ./cluster/nic5.sh <command>
-```
-
-To run a different scenario, uncomment it in this config's `run.name`
-(`scen_demande_haute` is already listed) and set `EXPLORER_SCENARIOS`
-to match whatever you changed.
-
-With `run.scenarios.enable: true`, `get_rdir()` returns `times-pypsa/{run}/`
-instead of a fixed directory, so **`RDIR` contains a `{run}` wildcard** and
-results land in one tree per scenario:
+Because `run.scenarios.enable` is `true`, `get_rdir()` returns `walloon/{run}/`,
+so **`RDIR` contains a `{run}` wildcard** and each scenario gets its own tree:
 
 ```
-resources/walloon/scen_base/    results/walloon/scen_base/
-resources/walloon/scen_corrige/ results/walloon/scen_corrige/
+resources/walloon/scen_demande_haute/   results/walloon/scen_demande_haute/
+resources/walloon/scen_base/            results/walloon/scen_base/
 ```
-
-This config is also where the **heating soft-link** is switched on — see
-[The heating soft-link](#the-heating-soft-link).
 
 Each scenario names its own TIMES `.vd` file (`sector.times_file`). Those files
-are gitignored — symlink them next to the others before running:
+are gitignored (~75 MB each) — symlink them in before running:
 
 ```bash
-ln -sfn /path/to/TIMES_PyPSA/data/scen_base_251129_0112.vd    data/walloon/
-ln -sfn /path/to/TIMES_PyPSA/data/scen_corrige_251129_0112.vd data/walloon/
+ln -sfn /path/to/TIMES_PyPSA/data/scen_demande_haute_v01_260727_fix_nuc_2807.vd data/walloon/
+ln -sfn /path/to/TIMES_PyPSA/data/scen_base_251129_0112.vd                      data/walloon/
 ```
+
+A scenario overlay is the right place for anything that varies per run — the
+`.vd`, cost overwrites, aggregate capacity limits, hurdle-rate variants. See
+[Sensitivity runs](#sensitivity-runs).
+
+The cluster scripts default to this config
+(`CONFIGFILE=config.walloon.yaml`, `RUN_NAME=scen_demande_haute`,
+`RUN_PREFIX=walloon` — see [`cluster/config.sh`](cluster/config.sh)) and are
+prefix-aware (`RUN_DIR_REL` in [`cluster/nic5.sh`](cluster/nic5.sh), so
+prepare/solve/pull/postprocess follow `results/walloon/<scenario>/`). To run a
+different scenario, uncomment it in `run.name` and set `EXPLORER_SCENARIOS` to
+match.
 
 > **Writing rules for a scenario run.** Because `RDIR` holds a wildcard, every
 > `expand()` over `RESULTS` or `resources()` needs `allow_missing=True`, or
 > Snakemake aborts at parse time with
-> `WildcardError: No values given for wildcard 'run'`. Any file name that
-> embeds the run name (the SEPIA `{study}` label) must use the `{run}` wildcard
-> — see `STUDY` / `study_dir()` in [`rules/postprocess.smk`](rules/postprocess.smk).
+> `WildcardError: No values given for wildcard 'run'`. Any file name that embeds
+> the run name (the SEPIA `{study}` label) must use the `{run}` wildcard — see
+> `STUDY` / `study_dir()` in [`rules/postprocess.smk`](rules/postprocess.smk).
+
 
 ### Output paths
 
-Intermediate files live under `resources/walloon-model/`. Final solved networks
-and plots are under `results/walloon-model/`. Network files follow the usual
-PyPSA-Eur wildcard pattern with empty `opts` and `sector_opts`:
+Intermediate files live under `resources/walloon/<scenario>/`, solved networks and
+plots under `results/walloon/<scenario>/`. Network files follow the usual PyPSA-Eur
+wildcard pattern with empty `opts` and `sector_opts`:
 
 ```
-results/walloon-model/networks/base_s_adm___2025.nc
-results/walloon-model/networks/base_s_adm___2030.nc
+results/walloon/scen_demande_haute/networks/base_s_adm___2025.nc
+results/walloon/scen_demande_haute/networks/base_s_adm___2030.nc
 …
 ```
 
-(Three underscores between `adm` and the year — both `opts` and `sector_opts` wildcards are empty strings.)
+(Three underscores between `adm` and the year — both `opts` and `sector_opts`
+wildcards are empty strings.)
 
-A scenario run puts the same tree under `results/walloon/<scenario>/`. What
-is in it, and which of it is worth opening first:
+What is in the tree, and which of it is worth opening first:
 
 | Subfolder | Contents |
 |-----------|----------|
@@ -319,6 +312,40 @@ Two config keys carry a TIMES-derived number that no script patches, so a
   reported heat-pump capacity falls while delivered heat rises.
   [`docs/heat-softlink.md`](docs/heat-softlink.md) §5.
 
+#### Hurdle-rate variants
+
+A scenario that needs different financial discount rates selects a generated
+variant file rather than editing the base rates:
+
+```yaml
+scen_car11:
+  costs:
+    hurdle_rate_fn: data/walloon/discount_rates_car11.csv
+```
+
+`discount_rates_car11.csv` reprices the 42 `TRA-processes` technologies at the
+PRIMES household-car 0.11 and nothing else. Add a variant with
+`hurdle:<variant>:<sector>` rows in the master CSV and
+`python scripts/build_common_parameters.py --write`; no code change is needed.
+[`docs/discount-rates.md`](docs/discount-rates.md) §2.4.
+
+#### EV flexibility variants
+
+`sector.bev_dsm_availability` and `sector.local_bev_dsm` are two halves of one
+Elia AdeqFlex row with different denominators, so **never hand-edit one of them**.
+Regenerate both together:
+
+```bash
+python scripts/walloon_scripts/build_ev_charging_weights.py                                    # base
+python scripts/walloon_scripts/build_ev_charging_weights.py --scenario "Current commitments - High Flex"
+```
+
+and paste both YAML blocks into `config.walloon.yaml`. The base is Elia's central
+case (market share 0.01 / 0.07 / 0.18 / 0.18); High Flex is the flexibility-rich
+one (0.030 / 0.131 / 0.280 / 0.280). `test_ev_charging.py` fails if the two keys
+end up on different Elia scenarios.
+[`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §4.
+
 Soft-linked **demands** (TIMES → PyPSA) are a separate path — see
 [`times_data_extraction.md`](times_data_extraction.md), not the common-parameters CSV.
 
@@ -345,10 +372,10 @@ with the TIMES one.
 > [`docs/heat-softlink.md`](docs/heat-softlink.md) §2.
 
 All switches live in
-[`config/config.walloon.yaml`](config/config.walloon.yaml), which since
-2026-08-21 is the only study config — `config.times-pypsa.yaml` was folded
-into it. The legacy and option-C variants are reached through the config
-overlays in `scripts/walloon_scripts/run_heat_softlink_comparison.sh`:
+[`config/config.walloon.yaml`](config/config.walloon.yaml), the only study config.
+The legacy and option-C variants are reached through the config overlays in
+`scripts/walloon_scripts/run_heat_softlink_comparison.sh`, not by editing this
+block:
 
 ```yaml
 sector:
@@ -397,17 +424,70 @@ invalidates the exports — it is declared as a rule input alongside the other
 mapping CSVs. **`times_pypsa` needs no variant of its own**: the same `share`
 column feeds both mechanisms.
 
-### Checking a heating soft-link run
+### Post-run sanity checks
+
+Three checks that catch a soft-link that ran, succeeded, and transferred the wrong
+thing. Run them before reading any results.
+
+**1. Heating profile fidelity** — the pinned dispatch against the exported
+profiles, per group, per bus, per snapshot:
 
 ```bash
 python scripts/walloon_scripts/check_heat_profile_fidelity.py scen_demande_haute live
 ```
 
-Compares the exported profiles against the realised dispatch, per group, per bus,
-per snapshot. Every pinned group should match to solver tolerance; only the
-absorber may deviate, and only within the horizon. This is the check that catches
-a wrong sign convention or a dropped vintage — both of which produce a perfectly
-feasible LP whose answer is silently *not* the TIMES mix.
+Every pinned group should match to solver tolerance; only the absorber may
+deviate. This catches a wrong sign convention or a dropped vintage — both of which
+give a perfectly feasible LP whose answer is silently *not* the TIMES mix. A
+2040 shortfall of ~0.46 TWh_th on the biomass boiler is **expected**: the TIMES
+2040 mix needs more solid biomass than Wallonia has
+([`docs/heat-softlink.md`](docs/heat-softlink.md) §4.2). Much more than that is new.
+
+**2. EV grid draw must equal the TIMES `electricity road` figure.** The two EV
+load branches sit on opposite sides of the charger, so an error here is a
+double-counted charger loss:
+
+```bash
+python - <<'PY'
+import pandas as pd, pypsa
+for y in (2025, 2030, 2040, 2050):
+    n = pypsa.Network(f"results/walloon/scen_demande_haute/networks/base_s_adm___{y}.nc")
+    w, ld = n.snapshot_weightings.generators, n.loads
+    sel = lambda c: ld.index[ld.index.str.startswith("BEWAL") & (ld.carrier == c)]
+    eff = 0.9  # sector.bev_charge_efficiency
+    grid = (n.loads_t.p_set[sel("land transport EV")].mul(w, axis=0).sum().sum() / eff
+            + n.loads_t.p_set[sel("land transport EV inflexible")].mul(w, axis=0).sum().sum()) / 1e6
+    times = pd.read_csv(f"resources/walloon/scen_demande_haute/wallon_demands_{y}.csv",
+                        index_col=0)["TWh"]["electricity road"]
+    print(f"{y}: PyPSA {grid:.3f} TWh vs TIMES {times:.3f}  ({grid/times-1:+.1%})")
+PY
+```
+
+Expect **±0.1 %**. +11 % means the inflexible branch is being grossed up by
+`bev_charge_efficiency` on top of TIMES's own 0.95 charger efficiency;
++5.6 % means only the flexible branch is
+([`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §3).
+
+**3. Heat-pump capacity must not fall across a horizon step.**
+
+```bash
+python - <<'PY'
+import pypsa
+for y in (2025, 2030, 2040, 2050):
+    n = pypsa.Network(f"results/walloon/scen_demande_haute/networks/base_s_adm___{y}.nc")
+    l = n.links
+    hp = l[l.index.str.startswith("BEWAL") & l.carrier.str.contains("heat pump", na=False)]
+    print(y, "BEWAL heat pumps, MW_th:", round(hp.p_nom_opt.sum(), 1))
+PY
+```
+
+A fall between 2025 and 2030 means `existing_capacities.heat_stock_age_profile` is
+missing from the config in use, so a third of the inherited fleet retires in 2028
+([`docs/heat-softlink.md`](docs/heat-softlink.md) §5). Under option B′ decentral
+capacity is a restatement of the pinned peak, so read heat **delivered** as the
+electrification indicator, not capacity.
+
+### Comparing the three heating mechanisms
 
 ```bash
 bash scripts/walloon_scripts/run_heat_softlink_comparison.sh scen_demande_haute
@@ -487,11 +567,26 @@ conda activate pypsa-eur
 > indentation is load-bearing — the previously over-indented version was invalid
 > YAML.
 
-Sanity check:
+Sanity check — the last line matters as much as the first: `times_pypsa` is an
+**editable** install, so pypsa-wal runs whatever is in the sibling checkout right
+now, including its branch. Running a new pypsa-wal against an old `TIMES_PyPSA` is
+a combination neither side was tested in.
 
 ```bash
 python -c "import pypsa, snakemake, gurobipy; print('OK')"
+python -c "import times_pypsa, pathlib; print(pathlib.Path(times_pypsa.__file__).resolve())"
+git -C ../TIMES_PyPSA log --oneline -1
 ```
+
+Then, before a long run:
+
+```bash
+python -m pytest test/ -q                            # unit + integration guards
+python scripts/build_common_parameters.py --check    # shared-parameter files in sync
+```
+
+`--check` failing means a generated file disagrees with
+`config/input_parameters_for_models.csv`; `--write` re-syncs it.
 
 ### Alternative: pixi
 
@@ -557,16 +652,14 @@ invites the OOM killer. Local runs use:
 | Gurobi threads (= Snakemake `threads` of the solve rule) | **12** | `solving.solver_options.gurobi-default.threads` |
 | `solving.cpus` | **12** | keep in sync with the above |
 | Memory per solve | **100 GB** (`mem_mb: 100000`) | `solving.mem_mb` |
-| Sector time aggregation | **6h** for local testing | `clustering.temporal.resolution_sector` |
+| Sector time aggregation | **1h** shipped, **6h** for local testing | `clustering.temporal.resolution_sector` |
 
-Threads and memory are set in [`config/config.walloon.yaml`](config/config.walloon.yaml).
-Both study configs currently use `resolution_sector: 6h` (the 18 Aug 2026
-nuclear diagnostic switched `config.walloon.yaml` back from the 14 Aug 1h
-study). Flip it to `1h` only deliberately: with option B′ on, hourly solves are
-hostile — see
+Threads and memory are set in [`config/config.walloon.yaml`](config/config.walloon.yaml),
+which ships `resolution_sector: 1h`. Hourly solves are expensive with option B′
+on — the measured comparison is in
 [`docs/logs/2026-08-18_scen_demande_haute_2010_6h.md`](docs/logs/2026-08-18_scen_demande_haute_2010_6h.md).
-Pass matching limits on the command line so Snakemake never schedules two
-solves at once:
+Pass matching limits on the command line so Snakemake never schedules two solves
+at once:
 
 ```bash
 snakemake --configfile config/config.walloon.yaml --cores 12 --resources mem_mb=100000 -call
@@ -579,7 +672,7 @@ and must run on NIC5 `hmem` (see the cluster section).
 
 ### Solve chain only
 
-If intermediate files already exist under `resources/walloon-model/`:
+If intermediate files already exist under `resources/walloon/<scenario>/`:
 
 ```bash
 snakemake --configfile config/config.walloon.yaml --cores 16 -call solve_sector_networks
@@ -610,7 +703,7 @@ The default Walloon config already uses a **6h** sector time aggregation
 
    ```bash
    snakemake --configfile config/config.walloon.yaml --cores 4 -call \
-     results/walloon-model/networks/base_s_adm___2050.nc
+     results/walloon/<scenario>/networks/base_s_adm___2050.nc
    ```
 
 3. Disable optional retrieval steps in a local override (`config/config.yaml`) if
@@ -631,7 +724,7 @@ Killing the parent does not reap them, and a plot rule that crash-loops on the Q
 backend will sit there at ~0 % CPU. Always kill the group and then verify:
 
 ```bash
-pkill -f 'snakemake .*config.times-pypsa'      # the orchestrator
+pkill -f 'snakemake .*config.walloon'          # the orchestrator
 pkill -f '\.snakemake/scripts/tmp'             # any rule script still running
 pgrep -af 'snakemake|gurobi|\.snakemake/scripts' || echo "clean"
 rm -f .snakemake/locks/*.lock                  # only once nothing is running
@@ -674,9 +767,9 @@ nothing to poll.
 
 | Location | Contents |
 |----------|----------|
-| `logs/walloon-model/` | Per-rule Snakemake logs |
-| `results/walloon-model/logs/*_solver.log` | Gurobi solver output per horizon |
-| `results/walloon-model/logs/*_python.log` | Python-side solve logs |
+| `logs/walloon/<scenario>/` | Per-rule Snakemake logs |
+| `results/walloon/<scenario>/logs/*_solver.log` | Gurobi solver output per horizon |
+| `results/walloon/<scenario>/logs/*_python.log` | Python-side solve logs |
 | `.snakemake/log/` | Master Snakemake run log |
 | `results/_heat_softlink_comparison/logs/` | `before.log` / `after.log` of the heating soft-link comparison run |
 
@@ -712,10 +805,10 @@ post-processing stay on your machine.
 
 Unlike pypsa-eur_negawatt, cluster commands do not take `<scenario>` or
 `<resolution>` arguments — the run, scenario and prefix are config defaults in
-[`cluster/config.sh`](cluster/config.sh) (currently the `times-pypsa` /
+[`cluster/config.sh`](cluster/config.sh) (currently the `walloon` /
 `scen_demande_haute` run) and can be overridden per command via environment
 variables, as described
-[above](#the-times-coupled-multi-scenario-config).
+[above](#scenarios).
 
 ### One-time setup
 
@@ -756,7 +849,7 @@ Or step by step:
 
 **Progress during `prepare`:** output is streamed to the terminal and logged in
 `cluster/logs/prepare.log`. Snakemake also writes to `.snakemake/log/` and
-`logs/walloon-model/`. The first local run downloads the data bundle and weather
+`logs/walloon/<scenario>/`. The first local run downloads the data bundle and weather
 cutout (~several GB) and can take hours; subsequent runs are incremental.
 
 ### Post-processing after pull
@@ -771,12 +864,12 @@ manually:
 The script:
 
 1. Aligns local brownfield mtimes with pulled solves when those files exist locally.
-2. Runs Snakemake **`--touch`** on the four solved `results/walloon-model/networks/*.nc`
+2. Runs Snakemake **`--touch`** on the four solved `results/walloon/<scenario>/networks/*.nc`
    files only (does not re-run Gurobi).
-3. Runs summary targets: `results/walloon-model/csvs/costs.csv`,
-   `results/walloon-model/graphs/costs.svg`, `results/walloon-model/csvs/cumulative_costs.csv`.
-4. Uploads to S3: the full `results/walloon-model/` tree to `pypsa_raw_results/`, and
-   `results/walloon-model/explorer/` CSVs to `scenarios/` when that folder is populated
+3. Runs summary targets: `results/walloon/<scenario>/csvs/costs.csv`,
+   `results/walloon/<scenario>/graphs/costs.svg`, `results/walloon/<scenario>/csvs/cumulative_costs.csv`.
+4. Uploads to S3: the full `results/walloon/<scenario>/` tree to `pypsa_raw_results/`, and
+   `results/walloon/<scenario>/explorer/` CSVs to `scenarios/` when that folder is populated
    (see [Publishing to Wallonie Explorer (S3)](#publishing-to-wallonie-explorer-s3)).
 
 To skip the S3 step: `SKIP_S3_UPLOAD=1 ./cluster/nic5.sh postprocess`
@@ -792,8 +885,8 @@ After `./cluster/nic5.sh run` (or individual steps):
 | Check | What to look for |
 |-------|------------------|
 | Cluster solve | `cluster/logs/orchestrate.log` ends with `5 of 5 steps (100%) done` or `Complete log` |
-| Solved networks | `results/walloon-model/networks/base_s_adm___*.nc` (four files) |
-| Gurobi optimality | `grep 'Optimal objective' results/walloon-model/logs/base_s_adm___*_solver.log` |
+| Solved networks | `results/walloon/<scenario>/networks/base_s_adm___*.nc` (four files) |
+| Gurobi optimality | `grep 'Optimal objective' results/walloon/<scenario>/logs/base_s_adm___*_solver.log` |
 | Postprocess | `cluster/logs/postprocess.log` completes without errors |
 | Local prepare | `cluster/logs/prepare.log` |
 
@@ -801,9 +894,9 @@ Quick commands:
 
 ```bash
 grep -E 'steps \(100%\) done|Complete log' cluster/logs/orchestrate.log
-ls -lh results/walloon-model/networks/base_s_adm___*.nc
-grep 'Optimal objective' results/walloon-model/logs/base_s_adm___*_solver.log
-ls -lt results/walloon-model/graphs/costs.svg
+ls -lh results/walloon/<scenario>/networks/base_s_adm___*.nc
+grep 'Optimal objective' results/walloon/<scenario>/logs/base_s_adm___*_solver.log
+ls -lt results/walloon/<scenario>/graphs/costs.svg
 ```
 
 To cancel a run in progress: `./cluster/nic5.sh stop`
@@ -1002,18 +1095,18 @@ in the `llm` notes repository.
 
 ```
 1. Run PyPSA-Wal (local Snakemake or cluster nic5.sh run)
-      ↓  results/walloon-model/networks/*.nc + csvs/ + graphs/
-2. Upload raw results → s3://intervectoriel/test/pypsa_raw_results/YYYYMMDD_walloon-model/
+      ↓  results/walloon/<scenario>/networks/*.nc + csvs/ + graphs/
+2. Upload raw results → s3://intervectoriel/test/pypsa_raw_results/YYYYMMDD_scen_demande_haute/
       ↓  ./cluster/nic5.sh upload   (automatic after postprocess)
 3. Extract Explorer CSVs (ClimAct tool, datapypsa env)
       ↓  49 pypsa/*.csv + strategy/*.csv
-4. Copy CSVs to results/walloon-model/explorer/ and stage TIMES .vd in explorer/times/
+4. Copy CSVs to results/walloon/<scenario>/explorer/ and stage TIMES .vd in explorer/times/
       ↓  ./cluster/nic5.sh upload   (syncs explorer/ → scenarios/ on S3)
 5. Open Explorer test site, pick scenario, click "Clear cache" if needed
 ```
 
 Steps 2 and 4 can be combined: run step 3 first, copy CSVs into
-`results/walloon-model/explorer/`, then run `./cluster/nic5.sh upload` once.
+`results/walloon/<scenario>/explorer/`, then run `./cluster/nic5.sh upload` once.
 
 ### S3 layout and naming
 
@@ -1023,11 +1116,11 @@ from the `test/` prefix.
 ```
 s3://intervectoriel/test/
 ├── pypsa_raw_results/                         ← full Snakemake results/ tree
-│   └── YYYYMMDD_<run_name>/                   e.g. 20260717_walloon-model/
+│   └── YYYYMMDD_<run_name>/                   e.g. 20260717_scen_demande_haute/
 │       ├── csvs/ graphs/ networks/ logs/ maps/ configs/
 │       └── run.json
 ├── scenarios/                                 ← Explorer scenario picker
-│   └── <type>__<scenario>__YYYYMMDD/          e.g. pypsa__walloon-model__20260717
+│   └── <type>__<scenario>__YYYYMMDD/          e.g. pypsa__scen_demande_haute__20260717
 │       ├── pypsa/                             ← 49 Streamlit CSVs
 │       ├── strategy/                          ← strategy_metrics*.csv
 │       └── times/                             ← TIMES .vd file(s) — see times_data_extraction.md
@@ -1039,9 +1132,9 @@ s3://intervectoriel/test/
 
 | S3 destination | Pattern | Walloon example |
 |----------------|---------|-----------------|
-| Raw results | `YYYYMMDD_<run_name>` | `20260717_walloon-model` |
-| Scenario folder | `<type>__<scenario>__YYYYMMDD` | `pypsa__walloon-model__20260717` |
-| Explorer display label | `{scenario} ({type}) - DD/MM/YYYY` | `walloon-model (pypsa) - 17/07/2026` |
+| Raw results | `YYYYMMDD_<run_name>` | `20260717_scen_demande_haute` |
+| Scenario folder | `<type>__<scenario>__YYYYMMDD` | `pypsa__scen_demande_haute__20260717` |
+| Explorer display label | `{scenario} ({type}) - DD/MM/YYYY` | `scen_demande_haute (pypsa) - 17/07/2026` |
 
 The `<type>` prefix comes from the extraction config `run_nickname`
 (`20260717_pypsa` → type `pypsa`). Other projects use `times-pypsa`, `sensibilité`, etc.
@@ -1056,7 +1149,7 @@ The `<type>` prefix comes from the extraction config `run_nickname`
   aws sts get-caller-identity --region eu-central-1
   ```
 
-- Solved results under `results/walloon-model/` (four `.nc` networks, solver logs with
+- Solved results under `results/walloon/<scenario>/` (four `.nc` networks, solver logs with
   `Optimal objective`).
 
 ### Step 1 — Upload raw results
@@ -1094,11 +1187,11 @@ scenario (`--dry-run` first; ~680 MB and ~1060 files per scenario):
 export PATH="$HOME/.local/bin:$PATH"
 DATE=$(date +%Y%m%d)
 for s in scen_base scen_corrige; do
-  RUN_NAME="times-pypsa_$s" \
+  RUN_NAME="$s" \
   RESULTS_DIR="$PWD/results/walloon/$s" \
   CONFIGFILE=config/config.walloon.yaml \
-  UPLOAD_ID="${DATE}_times-pypsa_$s" \
-  SCENARIO_ID="times-pypsa__${s}__${DATE}" \
+  UPLOAD_ID="${DATE}_$s" \
+  SCENARIO_ID="pypsa__${s}__${DATE}" \
   ./cluster/upload_s3.sh
 done
 ```
@@ -1110,7 +1203,7 @@ warns about.
 ### Step 2 — Extract Explorer CSVs (ClimAct tool)
 
 Snakemake postprocess produces summary CSVs (`costs.csv`, `energy.csv`, …) under
-`results/walloon-model/csvs/`. The **Streamlit Explorer expects a different set**
+`results/walloon/<scenario>/csvs/`. The **Streamlit Explorer expects a different set**
 of 49 CSV files (`balancing_capacities.csv`, `load_temporal_2025.csv`, …) generated
 by the ClimAct extraction repo, which on this workstation lives at:
 
@@ -1138,14 +1231,14 @@ Walloon run needs no source edit — see the run command below. (That one-line
 
 #### Per-run extraction
 
-Set `UPLOAD_DATE=$(date +%Y%m%d)` and `UPLOAD_ID="${UPLOAD_DATE}_walloon-model"`.
+Set `UPLOAD_DATE=$(date +%Y%m%d)` and `UPLOAD_ID="${UPLOAD_DATE}_${RUN_NAME}"`.
 
 1. **Symlink** local results into the extraction repo (folder name = `UPLOAD_ID`):
 
    ```bash
    EXTRA=/path/to/climact-pypsa-eur_results_extraction-88d352b59aa4
    mkdir -p "$EXTRA/results"
-   ln -sfn /path/to/pypsa-wal/results/walloon-model \
+   ln -sfn /path/to/pypsa-wal/results/walloon/scen_demande_haute \
      "$EXTRA/results/${UPLOAD_ID}"
    ```
 
@@ -1154,8 +1247,8 @@ Set `UPLOAD_DATE=$(date +%Y%m%d)` and `UPLOAD_ID="${UPLOAD_DATE}_walloon-model"`
    ```yaml
    scenario_extraction:
      run:
-       "20260717_walloon-model":          # must match UPLOAD_ID / symlink name
-         scenario_nickname: "walloon-model"
+       "20260717_scen_demande_haute":          # must match UPLOAD_ID / symlink name
+         scenario_nickname: "scen_demande_haute"
          run_nickname: "20260717_pypsa"   # YYYYMMDD_<type> → scenario folder prefix
          config_file: "config.base_s_adm___2050.yaml"
    ```
@@ -1177,20 +1270,20 @@ Set `UPLOAD_DATE=$(date +%Y%m%d)` and `UPLOAD_ID="${UPLOAD_DATE}_walloon-model"`
    Output:
 
    ```
-   analysis/graph_extraction_st/v6/pypsa__walloon-model__20260717/   ← 49 pypsa CSVs
-   analysis/strategy/v6/pypsa__walloon-model__20260717/               ← strategy CSVs
+   analysis/graph_extraction_st/v6/pypsa__scen_demande_haute__20260717/   ← 49 pypsa CSVs
+   analysis/strategy/v6/pypsa__scen_demande_haute__20260717/               ← strategy CSVs
    ```
 
 4. **Stage** for upload via pypsa-wal:
 
    ```bash
-   LABEL=pypsa__walloon-model__20260717   # from run_nickname + scenario_nickname + date
-   mkdir -p /path/to/pypsa-wal/results/walloon-model/explorer/pypsa
-   mkdir -p /path/to/pypsa-wal/results/walloon-model/explorer/strategy
+   LABEL=pypsa__scen_demande_haute__20260717   # from run_nickname + scenario_nickname + date
+   mkdir -p /path/to/pypsa-wal/results/walloon/<scenario>/explorer/pypsa
+   mkdir -p /path/to/pypsa-wal/results/walloon/<scenario>/explorer/strategy
    cp "$EXTRA/analysis/graph_extraction_st/v6/${LABEL}/"*.csv \
-      /path/to/pypsa-wal/results/walloon-model/explorer/pypsa/
+      /path/to/pypsa-wal/results/walloon/<scenario>/explorer/pypsa/
    cp "$EXTRA/analysis/strategy/v6/${LABEL}/"*.csv \
-      /path/to/pypsa-wal/results/walloon-model/explorer/strategy/
+      /path/to/pypsa-wal/results/walloon/<scenario>/explorer/strategy/
    ```
 
    Alternatively, upload directly with `aws s3 sync` (see below).
@@ -1234,14 +1327,14 @@ baked into the scripts:
 | `EXTRACTOR_GEN_CONFIG` | `config_extraction_pypsa-wal.generated.yaml` | Generated copy, selected via `EXTRACTION_CONFIG` |
 | `EXTRACTOR_CONFIG_FILE` | `config.base_s_adm___2050.yaml` | Per-horizon snapshot read from `results/<run>/configs/` |
 | `EXPLORER_TYPE` | `times-pypsa` (cleared → `pypsa`) | `<type>` in `<type>__<scenario>__YYYYMMDD` |
-| `RUN_PREFIX` | `times-pypsa` (cleared → single-run) | `run.prefix`; empty = single-run layout |
+| `RUN_PREFIX` | `walloon` (cleared → single-run) | `run.prefix`; empty = single-run layout |
 | `EXPLORER_SCENARIOS` | `scen_demande_haute:demande-haute-2010-1h` (cleared → single run) | `"<scenario>[:<label>] …"`; empty = one run named `RUN_NAME` |
 | `UPLOAD_DATE` | today | Shared by extract and upload so one `publish` stamps one date |
 
 The three scenario variables use `${VAR-default}` semantics in `config.sh`, so
 an exported **empty** value clears them (that is how the single-run Walloon
 command in
-[The TIMES-coupled multi-scenario config](#the-times-coupled-multi-scenario-config)
+[Scenarios](#scenarios)
 works).
 
 The template config is treated as read-only: the script copies it and rewrites
@@ -1276,13 +1369,13 @@ comes from a separate ClimAct reporting step and is not produced here.
 
 ```bash
 cd /path/to/pypsa-wal
-SCENARIO_ID=pypsa__walloon-model__20260717 ./cluster/nic5.sh upload
+SCENARIO_ID=pypsa__scen_demande_haute__20260717 ./cluster/nic5.sh upload
 ```
 
 **Option B** — direct `aws s3 sync` from extraction output:
 
 ```bash
-SCENARIO=pypsa__walloon-model__20260717
+SCENARIO=pypsa__scen_demande_haute__20260717
 LABEL="$SCENARIO"
 EXTRA=/path/to/climact-pypsa-eur_results_extraction-88d352b59aa4
 
@@ -1309,22 +1402,22 @@ Quick version:
 
 ```bash
 VD=data/walloon/scen_base_coherence_3110.vd   # must match sector.times_file in config
-mkdir -p results/walloon-model/explorer/times
-cp -L "$VD" "results/walloon-model/explorer/times/$(basename "$VD")"
-SCENARIO_ID=pypsa__walloon-model__20260717 ./cluster/nic5.sh upload
+mkdir -p results/walloon/<scenario>/explorer/times
+cp -L "$VD" "results/walloon/<scenario>/explorer/times/$(basename "$VD")"
+SCENARIO_ID=pypsa__scen_demande_haute__20260717 ./cluster/nic5.sh upload
 ```
 
 ### Step 4 — Verify in Explorer
 
 ```bash
 export AWS_PROFILE=intervectoriel
-aws s3 ls s3://intervectoriel/test/pypsa_raw_results/20260717_walloon-model/
-aws s3 ls s3://intervectoriel/test/scenarios/pypsa__walloon-model__20260717/pypsa/ | wc -l
+aws s3 ls s3://intervectoriel/test/pypsa_raw_results/20260717_scen_demande_haute/
+aws s3 ls s3://intervectoriel/test/scenarios/pypsa__scen_demande_haute__20260717/pypsa/ | wc -l
 # expect 49
 ```
 
 Open [https://explorer.test.wallonie.climact.com/](https://explorer.test.wallonie.climact.com/),
-select **`walloon-model (pypsa) - 17/07/2026`**, and click **Clear cache** if the
+select **`scen_demande_haute (pypsa) - 17/07/2026`**, and click **Clear cache** if the
 new scenario does not appear immediately.
 
 ### Troubleshooting Explorer
@@ -1333,11 +1426,11 @@ new scenario does not appear immediately.
 |---------|-------------------|
 | Scenario missing from dropdown | The dropdown is built from `test/scenarios/`, **never** from `pypsa_raw_results/` — a complete raw upload alone shows nothing. Check `aws s3 ls s3://intervectoriel/test/scenarios/<id>/pypsa/`: if it is empty, the ClimAct extraction (Step 2) has not been run for that scenario. |
 | Scenario folder exists but is empty | `upload_s3.sh` only syncs `explorer/{pypsa,strategy,times}/` when those folders contain files, and warns loudly when they do not — re-read the upload output. |
-| Scenario missing from dropdown (naming) | Folder name must be **three parts** separated by `__`: `<type>__<scenario>__YYYYMMDD`. A two-part name like `walloon-model__20260717` is ignored. |
+| Scenario missing from dropdown (naming) | Folder name must be **three parts** separated by `__`: `<type>__<scenario>__YYYYMMDD`. A two-part name like `scen_demande_haute__20260717` is ignored. |
 | Wrong display label | Check `run_nickname` in `config_extraction_walloon.yaml` — the part after `YYYYMMDD_` becomes the `(type)` label (e.g. `20260717_pypsa` → `(pypsa)`). |
 | Upload OK but Explorer empty | Click **Clear cache** on the test site; confirm 49 files under `.../scenarios/<id>/pypsa/`. |
 | Extraction fails with pypsa import error | Use the `datapypsa` env (pypsa 0.35.x), not `pypsa-eur` (pypsa 1.x). |
-| Only raw results on S3 | Run ClimAct extraction, copy CSVs to `results/walloon-model/explorer/`, then `./cluster/nic5.sh upload`. |
+| Only raw results on S3 | Run ClimAct extraction, copy CSVs to `results/walloon/<scenario>/explorer/`, then `./cluster/nic5.sh upload`. |
 | TIMES tab empty | Upload the `.vd` to `explorer/times/` — see [`times_data_extraction.md`](times_data_extraction.md) |
 
 ### Production promotion
@@ -1380,8 +1473,8 @@ S3_ENV=prod ./cluster/nic5.sh upload
 ├── scripts/                       # Python scripts (incl. walloon_scripts/)
 ├── data/                          # Static inputs + walloon/ overrides
 ├── cutouts/                       # Atlite weather cutouts (downloaded)
-├── resources/walloon-model/       # Intermediate build artefacts
-└── results/walloon-model/         # Solved networks, CSVs, plots
+├── resources/walloon/<scenario>/       # Intermediate build artefacts
+└── results/walloon/<scenario>/         # Solved networks, CSVs, plots
     ├── explorer/                  # Staged ClimAct CSVs + TIMES .vd for S3 (pypsa/, strategy/, times/)
     └── html/                      # pypsa2html report (see HTML report section)
 ```
@@ -1410,9 +1503,12 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | `Directory cannot be locked` | Another Snakemake instance is running, or a stale lock in `.snakemake/locks/` after a crash — stop the other run or remove the lock if no process is active |
 | `Config file must be given as JSON or YAML with keys at top level` | **Not a config problem.** `--configfile` takes `nargs="+"`, so any target written *immediately after* it is swallowed as an extra config file and Snakemake then tries to parse your `.csv`/`.nc` as YAML. Put a flag between them: `snakemake --configfile config/config.walloon.yaml --cores 4 <targets>`, never `--configfile <cfg> <targets> --cores 4` |
 | Snakemake silently runs the **whole `all` target** instead of the file you asked for | Same `nargs="+"` trap on a different flag — `--forcerun`, `--omit-from`, `--until`, `--allowed-rules` and `--resources` all swallow a following target, leaving no target at all so the default rule runs. **Safest habit: put targets first**, `snakemake <targets> --configfile ... --cores 12` |
+| A horizon sits at **~0 % CPU for hours** and the chain never advances | **An infeasible sector LP does not fail, it hangs.** `solve_network.py` reacts to `infeasible_or_unbounded` by calling `n.model.compute_infeasibilities()`, a Gurobi IIS over ~1.3 M rows that does not finish. Grep the solver log for `Infeasible model` and kill it rather than waiting. The heat-profile `penalty` keeps the soft-link from causing this, but any other infeasibility still can |
+| A horizon fails and you need to know **which constraint** | Look for the pre-solve budget report in the `prepare_sector_network` log before touching the solver — it names the group and the resource, e.g. `The biomass-boiler profile alone claims 70 % of the solid biomass ...`, and it is the only guard that fires *before* Gurobi |
+| `KeyError: sector.local_bev_dsm has no entry at or before <year>` | A planning horizon with no charging weights. Regenerate both weight blocks (see [EV flexibility variants](#ev-flexibility-variants)); a horizon present in `config.default.yaml` but absent here silently inherits the PyPSA-Eur default instead |
 | Gurobi `No Gurobi license` | Set `GRB_LICENSE_FILE` or install `~/gurobi.lic` |
 | Gurobi `Model too large for size-limited license` | The academic licence was not found and gurobipy fell back to its built-in demo licence. `GRB_LICENSE_FILE` is exported from `~/.bashrc`, which **non-interactive shells do not read** — export it explicitly when launching from a script, `cron`, `nohup`, or an agent: `export GRB_LICENSE_FILE=$HOME/.gurobi/gurobi.lic` |
-| `WildcardError: No values given for wildcard 'run'` | A rule `expand()`s over `RESULTS`/`resources()` without `allow_missing=True` while `run.scenarios.enable: true` — see [The TIMES-coupled multi-scenario config](#the-times-coupled-multi-scenario-config) |
+| `WildcardError: No values given for wildcard 'run'` | A rule `expand()`s over `RESULTS`/`resources()` without `allow_missing=True` while `run.scenarios.enable: true` — see [Scenarios](#scenarios) |
 | Plot rules die with `SIGABRT` and `Could not find the Qt platform plugin` | matplotlib picked an interactive backend in a session with no usable display. Run with `MPLBACKEND=Agg` (add `QT_QPA_PLATFORM=offscreen` if Qt is still probed) |
 | Cluster job pending on `hmem` | Partition busy (3 nodes, ~1 TB each) — check `squeue -p hmem`; wait for a slot or `./cluster/nic5.sh status` |
 | Gurobi / solve OOM on cluster | Raise `solving.mem_mb` in `cluster/config_cluster.yaml` (max ~1 000 000 MB on hmem); ensure `SOLVE_PARTITION=hmem` in `cluster/config.sh` |
@@ -1422,7 +1518,7 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | S3 upload dies on the `.nc` networks (`Could not connect to the endpoint URL`, `SSL validation failed`), and the Explorer folder stays empty | The four networks are ~250 MB of multipart upload; on a slow link they fail and **abort the sync before the Explorer steps run**, so `scenarios/<id>/` is never populated even though `pypsa_raw_results/` looks full. Publish in two passes: `UPLOAD_SKIP_NETWORKS=1 ./cluster/nic5.sh upload` first (small files, and the Explorer reads only those), then sync `networks/` on its own with `AWS_MAX_ATTEMPTS=10 AWS_RETRY_MODE=standard`. Always verify with `aws s3 ls s3://intervectoriel/test/scenarios/<id>/pypsa/ \| wc -l` (expect 49) rather than trusting the exit code |
 | Explorer scenario not in dropdown | See **Troubleshooting Explorer** under Publishing to Wallonie Explorer (S3) |
 | `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
-| First run hangs on the cutout download | The rules read `data/cutout/archive/<version>/europe-<year>-sarah3-era5.nc` (~6.6 GB), **not** the legacy `cutouts/` symlink. `config.walloon.yaml` needs the 2010 file, `config.walloon.yaml` the 2013 one — hardlink or symlink it in from another checkout if you have it, or wait for the download |
+| First run hangs on the cutout download | The rules read `data/cutout/archive/<version>/europe-<year>-sarah3-era5.nc` (~6.6 GB), **not** the legacy `cutouts/` symlink. Hardlink or symlink the file in from another checkout if you have it, or wait for the download |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |
 | `--resources mem_mb=... <target>` fails with `dictionary update sequence element #1 has length 1` | Same `nargs="+"` trap as `--configfile`: the target after `--resources` is parsed as another resource. Put `--cores` (or any flag) between them |
 | Solve is infeasible right after enabling `sector.times_heat.energy_mix` | Check which group binds in the solve log line `TIMES heat-mix constraints (…)`, then either raise `tolerance` or move that group to `slack_groups`. `solar thermal` is the usual suspect — it is the only group with a dispatch upper bound. See [`docs/heat-softlink.md`](docs/heat-softlink.md) §8 |
