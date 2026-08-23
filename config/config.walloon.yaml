@@ -241,6 +241,13 @@ sector:
       cloudy_noPV: 0.1381
       work: 0.1184
   v2g: false # turn off v2g
+  # Elia BE car BEV stock shares. **Applies to BEVLG, BEBRU, DE, FR, GB, NL and
+  # LU only** -- with `times_demand: true` the Walloon node takes both of its
+  # shares from TIMES instead: the energy ratio `electricity road / total road`
+  # for the load, and the BEV stock share by count for the BEV-charger `p_nom`
+  # and EV-battery `e_nom`. Elia and TIMES agree closely on the fleet (0.15 vs
+  # 0.152 in 2025), which is why the other nodes keep these.
+  # docs/ev-charging-softlink.md S2.
   land_transport_electric_share:
     2020: 0
     2025: 0.15

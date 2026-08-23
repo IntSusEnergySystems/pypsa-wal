@@ -46,6 +46,12 @@ def times_mapping_files(w):
             "mapping_commodities.csv",
             "extraction_rules.csv",
             "heat_softlink_groups.csv",
+            # Read by `extract_road_transport`. Listed since the EV fleet share
+            # became a rule output (E1-E3): without it, editing a vehicle-class
+            # definition leaves a stale `road_transport_*_shares.csv` on disk and
+            # Snakemake reuses it silently -- the same failure as the 2026 heat
+            # leak. `docs/ev-charging-softlink.md` S2.
+            "transport_softlink_groups.csv",
         )
     ]
 
@@ -64,6 +70,16 @@ rule build_wallon_demands:
         heating_capacities=resources("heating_capacities_{planning_horizons}.csv"),
         heating_targets=resources("heating_targets_{planning_horizons}.csv"),
         wallon_demands=resources("wallon_demands_{planning_horizons}.csv"),
+        # The road-vehicle fleet by class x drivetrain, and the same collapsed
+        # onto the three PyPSA engine types. `extract_road_transport` writes the
+        # `_shares` file alongside the first, so both are declared. The shares
+        # file is what `add_EVs` scales `p_nom`/`e_nom` on -- a fleet quantity
+        # that the TIMES energy ratio understates 3.7x at 2030.
+        # `docs/ev-charging-softlink.md` S2.
+        road_transport=resources("road_transport_{planning_horizons}.csv"),
+        road_transport_shares=resources(
+            "road_transport_{planning_horizons}_shares.csv"
+        ),
     log:
         logs("build_wallon_demands_{planning_horizons}.log"),
     resources:
@@ -1757,6 +1773,9 @@ rule prepare_sector_network:
         ),
         wallon_demands = resources("wallon_demands_{planning_horizons}.csv"),
         wallon_demands_baseyear=input_times_wallon_demands_baseyear,
+        road_transport_shares=resources(
+            "road_transport_{planning_horizons}_shares.csv"
+        ),
         pop_weighted_heat_totals=resources("pop_weighted_heat_totals_s_{clusters}_{planning_horizons}.csv"),
         shipping_demand=resources("shipping_demand_s_{clusters}_{planning_horizons}.csv"),
         transport_demand=resources("transport_demand_s_{clusters}_{planning_horizons}.csv"),

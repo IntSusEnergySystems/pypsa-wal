@@ -28,11 +28,14 @@ coupling_dir = snakemake.params.get("coupling_dir")
 times_use_preexported = snakemake.params.get("times_use_preexported", False)
 
 demands_src = heating_src = targets_src = None
+fleet_src = fleet_shares_src = None
 if coupling_dir:
     preexported_dir = Path(coupling_dir) / "pypsa_inputs"
     demands_src = preexported_dir / f"wallon_demands_{planning_horizon}.csv"
     heating_src = preexported_dir / f"heating_capacities_{planning_horizon}.csv"
     targets_src = preexported_dir / f"heating_targets_{planning_horizon}.csv"
+    fleet_src = preexported_dir / f"road_transport_{planning_horizon}.csv"
+    fleet_shares_src = preexported_dir / f"road_transport_{planning_horizon}_shares.csv"
 
 if coupling_dir and (times_use_preexported or demands_src.exists()):
     if not demands_src.exists():
@@ -47,9 +50,22 @@ if coupling_dir and (times_use_preexported or demands_src.exists()):
             "predates the option-C heating soft-link; re-export it with "
             "`times-pypsa export-coupling`."
         )
+    for src, label in (
+        (fleet_src, "road-vehicle fleet"),
+        (fleet_shares_src, "road-vehicle fleet shares"),
+    ):
+        if not src.exists():
+            raise FileNotFoundError(
+                f"Pre-exported {label} not found: {src}. The bundle predates the "
+                "EV fleet-share soft-link (E1-E3), which scales the BEV charger "
+                "and EV battery on the TIMES vehicle count rather than the energy "
+                "ratio; re-export it with `times-pypsa export-coupling`."
+            )
     shutil.copy2(demands_src, snakemake.output.wallon_demands)
     shutil.copy2(heating_src, snakemake.output.heating_capacities)
     shutil.copy2(targets_src, snakemake.output.heating_targets)
+    shutil.copy2(fleet_src, snakemake.output.road_transport)
+    shutil.copy2(fleet_shares_src, snakemake.output.road_transport_shares)
 else:
     mappings_dir = snakemake.params.get("mappings_dir")
     if mappings_dir:
@@ -64,4 +80,7 @@ else:
         wallon_demands_path=snakemake.output.wallon_demands,
         heating_capacities_path=snakemake.output.heating_capacities,
         heating_targets_path=snakemake.output.heating_targets,
+        # Writes `road_transport_<h>.csv` and, alongside it,
+        # `road_transport_<h>_shares.csv` -- both declared as rule outputs.
+        road_transport_path=snakemake.output.road_transport,
     )
