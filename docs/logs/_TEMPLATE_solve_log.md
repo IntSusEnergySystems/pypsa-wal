@@ -117,3 +117,12 @@ most useful part of the log for the next run.
 
 What remains to be done or watched: known limitations triggered by this run,
 comparisons to make, things to backport or commit.
+
+## 11. Critical review
+
+After the run is logged, append the review **here** — not a separate file.
+Same-vintage config diff, the three post-run sanity checks, biogas before
+any cost trend, and whatever else this run made worth reading (nuclear,
+batteries, heat mix). See
+[`2026-08-22_scen_demande_haute_2010_1h.md`](2026-08-22_scen_demande_haute_2010_1h.md)
+§11 for the expected level of detail.
