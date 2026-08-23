@@ -120,9 +120,61 @@ comparisons to make, things to backport or commit.
 
 ## 11. Critical review
 
-After the run is logged, append the review **here** — not a separate file.
-Same-vintage config diff, the three post-run sanity checks, biogas before
-any cost trend, and whatever else this run made worth reading (nuclear,
-batteries, heat mix). See
+Filled in when the run is reviewed against
+[`../run-review-checklist.md`](../run-review-checklist.md) — not when it is
+launched. A run is not reviewed until this section exists; a run whose §11 is
+missing must not be cited outside the team. Lives **in this file**, not a
+separate note. Filled examples:
+[`2026-08-18_scen_demande_haute_2010_1h.md`](2026-08-18_scen_demande_haute_2010_1h.md)
+§11 and
 [`2026-08-22_scen_demande_haute_2010_1h.md`](2026-08-22_scen_demande_haute_2010_1h.md)
-§11 for the expected level of detail.
+§11.
+
+Start from the scripted half:
+
+```bash
+python scripts/walloon_scripts/review_run.py results/<prefix>/<scenario> [--full]
+```
+
+then work through the judgement levels (5–8) of the checklist by hand.
+
+**Reviewed by / date:** who, when.
+
+**Headline counts:** `N PASS · N WARN · N FAIL` from `review_run.py`.
+
+| Level | Verdict |
+|---|---|
+| 0 provenance | pass / pass with caveats / fail |
+| 1 solve | |
+| 2 TIMES soft link | |
+| 3 accounting identities | |
+| 4 constraint compliance | |
+| 5 realism | |
+| 6 prices / costs | |
+| 7 TIMES consistency | |
+| 8 robustness | |
+
+### Findings
+
+One subsection per finding, numbered `R1`, `R2`, … and ranked by whether it
+changes a headline number. Each one states: what was observed **with the number**,
+what it should be, why it happens, and what to do about it. A finding without a
+number is an opinion.
+
+### What passed cleanly
+
+Worth writing down — it is what tells the next reviewer which parts they do not
+need to re-derive.
+
+### Numbers that must not be published as-is
+
+With the reason for each.
+
+### Review follow-ups
+
+| # | Action | Owner |
+|---|---|---|
+| 1 | | code / data / modeller / ops |
+
+Findings that turn out to be model defects belong in the code, not only here: add
+a regression test under `test/` so the next run fails loudly.

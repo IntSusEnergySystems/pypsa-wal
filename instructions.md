@@ -24,6 +24,11 @@ killed 1h attempts, 6h tests, and runs that skip postprocess/S3 — copy
 large constraint set changed (e.g. 1h vs 6h, option B′ heat-profile pinning),
 the log **must** record the runtime/feasibility comparison. See [Logs](#logs).
 
+**A run whose results leave the team also needs section 11 of its log filled in** —
+the critical review, following
+[`docs/run-review-checklist.md`](docs/run-review-checklist.md). Sections 1–10 say
+the run finished; section 11 says whether it is right.
+
 ---
 
 ## Model overview
@@ -227,6 +232,12 @@ MEUR/year when it runs. In 2040 the CO₂ shadow price can sit within ~1 EUR/MWh
 of its break-even, so the block flips on or off between otherwise similar
 scenarios and 2040 can look implausibly cheap. Check `biogas` dispatch before
 reading a dip as an economic trend.
+
+More reading traps of this kind — nodal attribution by `bus0` (so Walloon nuclear
+is absent from BEWAL's rows), reversed heat-pump links whose `p_nom` is MW_th,
+non-extendable capital included in `costs.csv` but not in the objective, and
+degenerate zero-capital-cost capacities — are collected in
+[`docs/run-review-checklist.md`](docs/run-review-checklist.md) level 6.
 
 ---
 
@@ -454,66 +465,35 @@ column feeds both mechanisms.
 
 ### Post-run sanity checks
 
-Three checks that catch a soft-link that ran, succeeded, and transferred the wrong
-thing. Run them before reading any results.
+Moved. The three soft-link checks that used to live here — heating profile
+fidelity, EV grid draw against the TIMES `electricity road` figure, and the
+heat-pump capacity trajectory — are now level 2 of
+[`docs/run-review-checklist.md`](docs/run-review-checklist.md), together with the
+rest of the review procedure (provenance, accounting identities, constraint
+compliance, realism, robustness).
 
-**1. Heating profile fidelity** — the pinned dispatch against the exported
-profiles, per group, per bus, per snapshot:
+**Run them before reading any results.** They catch a soft-link that ran,
+succeeded, and transferred the wrong thing.
 
-```bash
-python scripts/walloon_scripts/check_heat_profile_fidelity.py scen_demande_haute live
-```
-
-Every pinned group should match to solver tolerance; only the absorber may
-deviate. This catches a wrong sign convention or a dropped vintage — both of which
-give a perfectly feasible LP whose answer is silently *not* the TIMES mix. A
-2040 shortfall of ~0.46 TWh_th on the biomass boiler is **expected**: the TIMES
-2040 mix needs more solid biomass than Wallonia has
-([`docs/heat-softlink.md`](docs/heat-softlink.md) §4.2). Much more than that is new.
-
-**2. EV grid draw must equal the TIMES `electricity road` figure.** The two EV
-load branches sit on opposite sides of the charger, so an error here is a
-double-counted charger loss:
+The mechanical checks are scripted:
 
 ```bash
-python - <<'PY'
-import pandas as pd, pypsa
-for y in (2025, 2030, 2040, 2050):
-    n = pypsa.Network(f"results/walloon/scen_demande_haute/networks/base_s_adm___{y}.nc")
-    w, ld = n.snapshot_weightings.generators, n.loads
-    sel = lambda c: ld.index[ld.index.str.startswith("BEWAL") & (ld.carrier == c)]
-    eff = 0.9  # sector.bev_charge_efficiency
-    grid = (n.loads_t.p_set[sel("land transport EV")].mul(w, axis=0).sum().sum() / eff
-            + n.loads_t.p_set[sel("land transport EV inflexible")].mul(w, axis=0).sum().sum()) / 1e6
-    times = pd.read_csv(f"resources/walloon/scen_demande_haute/wallon_demands_{y}.csv",
-                        index_col=0)["TWh"]["electricity road"]
-    print(f"{y}: PyPSA {grid:.3f} TWh vs TIMES {times:.3f}  ({grid/times-1:+.1%})")
-PY
+python scripts/walloon_scripts/review_run.py results/walloon/<scenario>
 ```
 
-Expect **±0.1 %**. +11 % means the inflexible branch is being grossed up by
-`bev_charge_efficiency` on top of TIMES's own 0.95 charger efficiency;
-+5.6 % means only the flexible branch is
-([`docs/ev-charging-softlink.md`](docs/ev-charging-softlink.md) §3).
-
-**3. Heat-pump capacity must not fall across a horizon step.**
+and the profile-fidelity check, which needs the exported right-hand sides, stays
+separate:
 
 ```bash
-python - <<'PY'
-import pypsa
-for y in (2025, 2030, 2040, 2050):
-    n = pypsa.Network(f"results/walloon/scen_demande_haute/networks/base_s_adm___{y}.nc")
-    l = n.links
-    hp = l[l.index.str.startswith("BEWAL") & l.carrier.str.contains("heat pump", na=False)]
-    print(y, "BEWAL heat pumps, MW_th:", round(hp.p_nom_opt.sum(), 1))
-PY
+python scripts/walloon_scripts/check_heat_profile_fidelity.py <scenario> live
 ```
 
-A fall between 2025 and 2030 means `existing_capacities.heat_stock_age_profile` is
-missing from the config in use, so a third of the inherited fleet retires in 2028
-([`docs/heat-softlink.md`](docs/heat-softlink.md) §5). Under option B′ decentral
-capacity is a restatement of the pinned peak, so read heat **delivered** as the
-electrification indicator, not capacity.
+Write the judgement calls into **section 11 of the run's own solve log**
+(`docs/logs/YYYY-MM-DD_<scenario>_<tags>.md`) — one file per run, so provenance,
+timings, issues and review stay together. If the run was never logged, create the
+log from [`docs/logs/_TEMPLATE_solve_log.md`](docs/logs/_TEMPLATE_solve_log.md)
+first. Worked example:
+[`docs/logs/2026-08-18_scen_demande_haute_2010_1h.md`](docs/logs/2026-08-18_scen_demande_haute_2010_1h.md) §11.
 
 ### Comparing the three heating mechanisms
 
@@ -804,8 +784,12 @@ nothing to poll.
 **Solve log:** after each solve run, fill in a copy of
 [`docs/logs/_TEMPLATE_solve_log.md`](docs/logs/_TEMPLATE_solve_log.md) and save
 it as `docs/logs/YYYY-MM-DD_<scenario>_<tags>.md` — goal, parameters, timings,
-cluster queue, memory, issues/fixes, S3/Explorer publication. See
-[`docs/logs/`](docs/logs/) for examples.
+cluster queue, memory, issues/fixes, S3/Explorer publication (§1–10), and the
+critical review of the results (§11, see
+[`docs/run-review-checklist.md`](docs/run-review-checklist.md)). See
+[`docs/logs/`](docs/logs/) for examples;
+[`2026-08-18_scen_demande_haute_2010_1h.md`](docs/logs/2026-08-18_scen_demande_haute_2010_1h.md)
+is the first log with §11 filled in.
 
 After a successful local solve, publish results to the Wallonie Explorer with
 `./cluster/nic5.sh upload` (raw results) followed by the ClimAct CSV extraction
@@ -928,6 +912,10 @@ ls -lt results/walloon/<scenario>/graphs/costs.svg
 ```
 
 To cancel a run in progress: `./cluster/nic5.sh stop`
+
+These checks answer *did the run finish*. They do not answer *is the run right* —
+for that, work through [`docs/run-review-checklist.md`](docs/run-review-checklist.md)
+before publishing anything to the Explorer.
 
 ### Slurm resource settings
 
@@ -1488,7 +1476,10 @@ S3_ENV=prod ./cluster/nic5.sh upload
 │   ├── input_parameters_for_models.csv  # Shared TIMES/PyPSA assumptions (EUR2025)
 │   └── common_parameters_meta.yaml # EUR_REF + technology-data pin
 ├── common_parameters.md            # How the shared CSV is audited and wired into pypsa-wal
-├── docs/logs/                      # REQUIRED human solve log per run (see _TEMPLATE_solve_log.md)
+├── docs/
+│   ├── logs/                       # REQUIRED human solve log per run (see _TEMPLATE_solve_log.md);
+│   │                               #   §11 of each log holds that run's critical review
+│   └── run-review-checklist.md     # Critical-review procedure for a solved run
 ├── cluster/
 │   ├── nic5.sh                    # Local ↔ cluster orchestration (+ extract/publish)
 │   ├── upload_s3.sh               # Publish results/ to Intervectoriel S3
