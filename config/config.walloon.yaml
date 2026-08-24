@@ -265,6 +265,24 @@ sector:
   times_file: data/walloon/scen_base_coherence_3110.vd
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
+  # TIMES Sankey diagrams into results/<prefix>/<run>/html/, next to the
+  # pypsa2html report: one interactive page per planning horizon and aggregation
+  # level, from the same `times_file` the demands are extracted from.
+  # `rules/postprocess.smk` reads this block at PARSE time (the outputs are one
+  # file per horizon x level), so do NOT move it into a scenario overlay --
+  # `times_file` may vary per scenario, this block may not.
+  # docs/times-sankey.md
+  times_sankey:
+    enable: true
+    # `custom` is the readable working level; `Aggregation Level 2` is the grain
+    # the process mapping and extraction_rules.csv filter on, i.e. the flows as
+    # the soft-link extraction sees them. TIMES_PyPSA/aggregation.md.
+    levels:
+    - custom
+    - Aggregation Level 2
+    units: twh
+    # Minimum ribbon in `units`; null keeps every flow (small ribbons included).
+    threshold: null
   # TIMES heating soft-link. Every switch defaults to the pre-2026-08 behaviour,
   # so removing this block reproduces the old results. Two ALTERNATIVE mix
   # mechanisms — `energy_mix` (option C, annual constraint) and `profile`

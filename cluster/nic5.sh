@@ -101,6 +101,14 @@ postprocess_targets() {
     echo "results/${RUN_DIR_REL}/csvs/costs.csv"
     echo "results/${RUN_DIR_REL}/graphs/costs.svg"
     echo "results/${RUN_DIR_REL}/csvs/cumulative_costs.csv"
+    # TIMES Sankey pages into results/<run>/html/ (rule build_times_sankey).
+    # The index is a sufficient sentinel: all pages and the index are one job,
+    # and the index is written last. Set TIMES_SANKEY=0 when the config has
+    # sector.times_sankey disabled -- the rule then does not exist and Snakemake
+    # aborts with "no rule to produce target".
+    if [ "${TIMES_SANKEY:-1}" = "1" ]; then
+        echo "results/${RUN_DIR_REL}/html/times_sankey_index.html"
+    fi
 }
 
 verify_run_success() {

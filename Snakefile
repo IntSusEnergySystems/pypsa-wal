@@ -222,6 +222,9 @@ rule all:
         ),
         lambda w: balance_map_paths("static", w),
         lambda w: balance_map_paths("interactive", w),
+        # TIMES Sankey diagrams into results/<run>/html/ (empty list when
+        # sector.times_sankey is off or times_pypsa is not installed).
+        times_sankey_targets(),
     default_target: True
 
 

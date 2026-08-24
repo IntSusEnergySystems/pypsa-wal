@@ -843,3 +843,121 @@ rule plot_interactive_bus_balance:
         mem_mb=20000,
     script:
         scripts("plot_interactive_bus_balance.py")
+
+
+# --- TIMES Sankey diagrams (times_pypsa) --------------------------------------
+# The TIMES side of the report: one interactive Sankey per planning horizon and
+# per aggregation level, written into the scenario's own `html/` folder next to
+# the pypsa2html pages, so `./cluster/nic5.sh upload` publishes them with
+# everything else and the relative links keep working from S3.
+# See `docs/times-sankey.md`.
+#
+# The gate below runs at PARSE time, deliberately: the rule's outputs are one
+# file per (horizon x level), so the list has to exist before the DAG is built.
+# `config` here is the merged config *before* scenario overlays, which is why
+# `sector.times_sankey` must not be scenario-varied. `sector.times_file` may be
+# -- it is a rule input, resolved per {run} through config_provider -- and the
+# script cross-checks the horizons it was given against the run's own
+# `scenario.planning_horizons` rather than rendering years nobody asked for.
+
+
+def _times_sankey_settings():
+    """Resolved `sector.times_sankey` block, or None when the report is off.
+
+    None means "define no rule and add no target": a workflow with no TIMES .vd,
+    or one where `times_pypsa` is not installed, is left exactly as it was
+    instead of failing at parse time on an import it does not need.
+    """
+    import importlib.util
+
+    sector_cfg = config.get("sector", {}) or {}
+    cfg = sector_cfg.get("times_sankey", {}) or {}
+    if not cfg.get("enable", False):
+        return None
+    if not sector_cfg.get("times_file"):
+        logger.warning(
+            "sector.times_sankey.enable is true but sector.times_file is unset — "
+            "no TIMES Sankey diagrams will be built."
+        )
+        return None
+    if importlib.util.find_spec("times_pypsa") is None:
+        logger.warning(
+            "sector.times_sankey.enable is true but times_pypsa is not importable "
+            "(pip install -e ../TIMES_PyPSA) — no TIMES Sankey diagrams will be "
+            "built. The rest of the workflow is unaffected."
+        )
+        return None
+
+    from times_pypsa import DEFAULT_PAGE_LEVELS, sankey_page_names
+
+    horizons = [int(y) for y in config["scenario"]["planning_horizons"]]
+    levels = [str(lvl) for lvl in (cfg.get("levels") or DEFAULT_PAGE_LEVELS)]
+    return {
+        "horizons": horizons,
+        "levels": levels,
+        "units": cfg.get("units", "twh"),
+        "threshold": cfg.get("threshold", None),
+        # Pages only; the index is declared separately so it is not listed twice.
+        "pages": sankey_page_names(horizons, levels, index_name=None),
+    }
+
+
+TIMES_SANKEY = _times_sankey_settings()
+
+
+def times_sankey_targets():
+    """`rule all` targets for the TIMES Sankey report ([] when it is off)."""
+    if not TIMES_SANKEY:
+        return []
+    return expand(
+        RESULTS + "html/{page}",
+        page=TIMES_SANKEY["pages"] + ["times_sankey_index.html"],
+        run=config["run"]["name"],
+    )
+
+
+if TIMES_SANKEY:
+
+    rule build_times_sankey:
+        message:
+            "Rendering TIMES Sankey diagrams for {wildcards.run} "
+            "({params.n_pages} pages, aggregation levels: {params.agg_levels})"
+        params:
+            # Parse-time horizons: the same list the outputs were expanded from,
+            # so the rendered years and the declared files cannot disagree.
+            planning_horizons=TIMES_SANKEY["horizons"],
+            # This run's own horizons. The script raises when the two differ,
+            # which is the only way `scenario.planning_horizons` can be
+            # scenario-varied without silently rendering the wrong years.
+            scenario_horizons=config_provider("scenario", "planning_horizons"),
+            agg_levels=TIMES_SANKEY["levels"],
+            units=TIMES_SANKEY["units"],
+            threshold=TIMES_SANKEY["threshold"],
+            n_pages=len(TIMES_SANKEY["pages"]),
+            mappings_dir=config_provider("sector", "times_mappings_dir", default=None),
+        input:
+            times_file=config_provider("sector", "times_file"),
+            # Same mapping CSVs as build_wallon_demands: a label fix must
+            # invalidate the diagrams too, or the report keeps showing the flow
+            # the way the old mapping saw it.
+            times_mappings=times_mapping_files,
+        output:
+            index=RESULTS + "html/times_sankey_index.html",
+            pages=expand(
+                RESULTS + "html/{page}",
+                page=TIMES_SANKEY["pages"],
+                allow_missing=True,
+            ),
+        log:
+            RESULTS + "logs/build_times_sankey.log",
+        benchmark:
+            RESULTS + "benchmarks/build_times_sankey"
+        threads: 1
+        resources:
+            # ~0.9 GB peak for the four Walloon horizons at both levels
+            # (benchmarks/build_times_sankey); headroom for a larger .vd.
+            mem_mb=8000,
+        conda:
+            "../envs/environment.yaml"
+        script:
+            scripts("build_times_sankey.py")
