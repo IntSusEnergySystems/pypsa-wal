@@ -4,13 +4,38 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  name: "walloon-model"
+  prefix: "master-20260807"
+  # RDIR is "walloon/{run}/", so one entry in `name` is
+  # a single run and several are a multi-scenario run — the only difference is how
+  # many names are listed. Every name must be a key of run.scenarios.file;
+  # `name: all` expands to all of them.
+  name:
+  - scen_demande_haute
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
-    file: config/scenarios.yaml
+    enable: true
+    file: config/scenarios.walloon.yaml
+  shared_cutouts: true
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
+
+# WEATHER YEAR — the only place to change it. Keep the three years in step:
+# snapshots.start / snapshots.end pick the hours, default_cutout supplies the
+# weather for them, and a mismatch silently pairs one year's demand with
+# another year's wind and sun. Switching to a year whose cutout is not in
+# data/cutout/archive/<version>/ triggers a multi-GB download (~6.6 GB) of
+# europe-<year>-sarah3-era5.nc.
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
+snapshots:
+  start: "2010-01-01"
+  end: "2011-01-01"
+  inclusive: left
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
+atlite:
+  default_cutout: "europe-2010-sarah3-era5"
+  nprocesses: 4
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight
 foresight: myopic
@@ -85,7 +110,7 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    resolution_sector: 6h
+    resolution_sector: 1h
   exclude_carriers:
     - nuclear
 
@@ -95,27 +120,58 @@ sector:
   times_file: data/walloon/scen_base_coherence_3110.vd
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
-  # TIMES heating soft-link, option C — see docs/heat_soft_linking.md. Left on the
-  # legacy path here; config.times-pypsa.yaml enables it.
+  # TIMES heating soft-link. Every switch defaults to the pre-2026-08 behaviour,
+  # so removing this block reproduces the old results. Two ALTERNATIVE mix
+  # mechanisms — `energy_mix` (option C, annual constraint) and `profile`
+  # (option B', pinned hourly profile). Enabling both raises.
+  # docs/heat_soft_linking.md and docs/heat_softlink_option_b.md.
   times_heat:
     node: BEWAL
-    urban_rural_split: times      # times | times_base_year | pypsa
-    base_year_capacities: false
-    # Option B' — reconstructed hourly profiles. Mutually exclusive with
-    # `energy_mix` below. docs/heat_softlink_option_b.md
+    # times | times_base_year | pypsa — how the TIMES residential decentral heat
+    # is divided between the rural and urban decentral buses. `times` (the old
+    # behaviour) lets the TIMES archetype labelling drift the rural share from
+    # 59 % (2025) to 37 % (2050), i.e. dwellings move between PyPSA buses.
+    urban_rural_split: times_base_year
+    # Replace the BEWAL row of existing_heating_distribution (EU 2012 dataset,
+    # population-scaled) with the TIMES base-year stock. Both are in MW_th.
+    base_year_capacities: true
+    # --- option B' (active on this branch): reconstructed hourly profiles ---
+    # The TIMES technology shares combined with PyPSA's own heat-load shape give
+    # one heat profile per group and bus; the dispatch is pinned to it. The mix
+    # is then exactly TIMES's at every hour, with no tolerance, no senses and no
+    # zero-target special case. Solar thermal follows its own collector
+    # availability instead of the load, because it is the only group with a
+    # dispatch ceiling. docs/heat_softlink_option_b.md
     profile:
-      enable: false
-      absorber: heat pump         # group left unpinned, takes the bus residual
-      penalty: 1000.0             # EUR/MWh_th undelivered; 0 = hard constraints
+      enable: true
+      # The group left unpinned, so the heat-bus balance determines it. The heat
+      # pump is the only group with no fuel or CO2 limit upstream, so it can
+      # always take the residual — and any relaxation shows up as visible extra
+      # electrification rather than as an infeasibility.
+      absorber: heat pump
+      # EUR/MWh_th of TIMES profile not delivered, one scalar per group. The
+      # Walloon CO2 cap and the EU solid-biomass limit both already bind in 2040
+      # before any heat constraint exists, so this is what keeps that horizon
+      # from failing. 0 = hard constraints (and no relaxation variables at all).
+      penalty: 1000.0
+      # Groups not pinned at all: they pool with the absorber and split their
+      # combined residual freely. The escape hatch if 2040 relaxes too far.
       free_groups: []
       export: true
-    # Option C — annual energy-mix constraints. docs/heat_soft_linking.md
+    # --- option C (this branch keeps it for the A/B comparison, off) ---
     energy_mix:
       enable: false
-      mode: share                 # share | absolute
+      # share | absolute. `share` constrains each technology group against the
+      # realised decentral heat supply, so the ~4 % of the load that is cooking
+      # fuel / tertiary other-energy / agriculture heat cannot distort the mix,
+      # and the constraint set cannot over-determine the LP.
+      mode: share
       tolerance: 0.05
       slack_groups: []
-      zero_target: forbid         # forbid | free
+      # forbid | free — a technology TIMES has fully retired (oil boilers in
+      # 2050) is forbidden rather than left free, which is where the mix
+      # constraint would otherwise leak worst.
+      zero_target: forbid
       # EUR/MWh_th of unmet TIMES mix. A finite penalty makes the constraints
       # SOFT, so a mix Wallonia physically cannot deliver (2040: the gas floor
       # against a binding CO2 cap) relaxes at a price instead of making the LP
@@ -135,6 +191,8 @@ sector:
     2040: 90  # 180 * 0.5
     2045: 125  # 250 * 0.5
     2050: 125  # 250 * 0.5
+  agriculture_machinery_electric_share: 0.5
+  agriculture_machinery_oil_share: 0.5
   shipping_methanol_share:
     2020: 0
     2025: 0
@@ -153,7 +211,14 @@ sector:
     2050: 0.20
   district_heating:
     potential: 0.3
+  electrobiofuels: false
 
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#co2-budget
+co2_budget:
+  2025: 0.648
+  2030: 0.450 
+  2040: 0.250
+  2050: 0.050
 co2_budget_national: true
 co2_price_national: false
 budget_national:
@@ -205,6 +270,16 @@ costs:
   social_discountrate: 0.035
 
 solving:
+  # Local workstation allocation: 12 Gurobi threads and 100 GB per solve
+  # (the pypsa-eur defaults, 32 threads / 128 GB, exceed a 24-core / 124 GB box).
+  # Keep cpus and gurobi-default.threads in sync. NIC5 overrides both via
+  # cluster/config_cluster.yaml.
+  mem_mb: 100000
+  cpus: &local_cpus 12
+  solver_options:
+    gurobi-default:
+      threads: *local_cpus
+
   agg_p_nom_limits:
     agg_offwind: true
     agg_solar: true
