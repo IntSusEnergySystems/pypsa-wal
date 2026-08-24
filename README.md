@@ -56,7 +56,51 @@ them within each model region:
 
 ![sector diagram](doc/img/multisector_figure.png)
 
+# Install and run using `pixi`
 
+## Clone repository
+
+```shell
+git clone https://github.com/IntSusEnergySystems/pypsa-wal
+```
+
+## Install `pypsa-wal` environment
+
+```shell
+cd pypsa-wal # this cloned repo
+pixi install -e pypsa-wal
+pixi shell -e pypsa-wal
+```
+
+## Install `times_pypsa` within pixi environment
+
+In any folder, clone the TIMES-PyPSA repo (assuming one has access):
+
+```shell
+git clone https://github.com/IntSusEnergySystems/TIMES_PyPSA.git # assuming this gets cloned to /path/to/TIMES_PyPSA
+```
+
+At the moment, the `TIMES_PyPSA` package needs to be run from the `heat-softlink-option-c` branch:
+
+```shell
+git checkout heat-softlink-option-c
+```
+
+Install TIMES-PyPSA (replace path to TIMES_PyPSA folder to where you cloned the repo):
+
+```shell
+cd pypsa-wal # this cloned repo
+pixi shell -e pypsa-wal
+pixi run -e pypsa-wal python -m pip install -e /path/to/TIMES_PyPSA[dev]
+```
+
+## Run workflow
+
+To run the Walloon-specific model, which uses `config/config.walloon.yaml`, use the `pixi` command:
+
+```shell
+pixi run walloon-model
+```
 
 # Warnings
 
