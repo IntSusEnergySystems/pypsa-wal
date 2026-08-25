@@ -182,7 +182,8 @@ and every downstream number is suspect.
 - [ ] **Every bus balances.** For each BEWAL bus carrier, the sum of generator
       dispatch, storage, store, load, link ports and line flows over the year is
       zero to within ~1e-3 TWh. `review_run.py` does this for
-      `AC`, `low voltage`, `H2`, `gas`, `solid biomass`, `biogas`, and each heat bus.
+      `AC`, `low voltage`, `EV battery`, and under `--full` also `H2`, `gas`,
+      `solid biomass`, `biogas`, and each heat bus.
       *Traverse every link port* (`bus0`…`bus4`, `p0`…`p4`) — links with `bus2`/`bus3`
       (CHP, DAC, CC units) will not balance otherwise.
 - [ ] **Belgium-wide electricity balance closes** (three nodes, `AC` + `low voltage`)
@@ -198,7 +199,27 @@ and every downstream number is suspect.
       rate, not the annual potential — never read `p_nom` as TWh/yr even though the
       custom-potentials file is written in GWh/an.
 - [ ] **Store SoC returns to its start** over the year (cyclic stores), or the
-      annual net store flow is zero.
+      annual net store flow is zero. Include the **EV-battery** bus — it is a
+      cyclic Store like any other, and `review_run.py` checks it with the AC /
+      low-voltage buses (not only under `--full`).
+- [ ] **Energy-Sankey transformation nodes balance.** Open the pypsa2html energy
+      Sankey (BEWAL). Every intermediate node (Electricity grid, BEV, hydrogen,
+      district heat, …) must have inflow ≈ outflow. Sources (`prod` / imports)
+      and sinks (demand sectors, losses, exports) are allowed to be one-sided.
+      `review_run.py` recomputes the graph when pypsa2html is installed and
+      **FAILs** a hole on BEV / stationary battery / TES (no trade residual to
+      hide behind). Other unbalanced transformation nodes currently **WARN**
+      (solid-biomass `prod` on a regional node, DAC, district heat — known
+      mapping holes, not this bug).
+      *The BEV node is the one that has already bitten:* with
+      `bev_natural_charging_split`, both EV loads are booked as demand leaving
+      BEV, but only the charger Link feeds that node. The inflexible load sits
+      on the AC bus. The report must draw **Smart charging** (charger) *and*
+      **Natural charging** (the inflexible load) as inflows. A BEV node with
+      more going out than in is that inflow missing — not a solve failure; the
+      EV-battery bus still closes. On the 2026-08-18 run the hole was exactly
+      the natural-charging volume (0.47 TWh in 2025, 8.4 TWh in 2050).
+
 
 ## Level 4 — Were the model's own constraints respected?
 

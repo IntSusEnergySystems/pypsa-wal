@@ -31,6 +31,7 @@ import logging
 import re
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -369,7 +370,7 @@ def check_softlink(nets, run: Path, scenario: str, rep: Report) -> None:
 
 def check_identities(nets, rep: Report, full: bool) -> None:
     sec = "3 · accounting"
-    carriers = ["AC", "low voltage"]
+    carriers = ["AC", "low voltage", "EV battery"]
     if full:
         carriers += ["H2", "gas", "solid biomass", "biogas",
                      "rural heat", "urban decentral heat", "urban central heat"]
@@ -416,6 +417,184 @@ def check_identities(nets, rep: Report, full: bool) -> None:
                 rep.ok(sec, msg)
             else:
                 rep.fail(sec, msg, "annual-energy potential exceeded")
+
+
+def _annual_twh(n, frame, names) -> float:
+    if not len(names):
+        return 0.0
+    known = names.intersection(frame.columns)
+    if not len(known):
+        return 0.0
+    return float(frame[known].mul(n.snapshot_weightings.generators, axis=0).sum().sum()) / 1e6
+
+
+def bev_sankey_terms(n, node: str = WAL) -> dict[str, float] | None:
+    """
+    TWh terms of the energy-Sankey BEV node, reconstructed from the network.
+
+    Inflows the report must draw into BEV: charger delivery (smart) plus the
+    inflexible load (natural). Outflows: both EV loads plus V2G energy leaving
+    the fleet battery.  The two sides differ by exactly the natural-charging
+    volume when that inflow is omitted — the 2026-08-18 BEWAL hole.
+    """
+    loc = n.buses.location == node
+    is_fleet = n.buses.carrier.astype(str).str.lower().str.contains("ev battery", na=False)
+    fleet = n.buses.index[loc & is_fleet]
+    if not len(fleet):
+        return None
+    ld = n.loads[n.loads.bus.map(n.buses.location) == node]
+    flex = ld.index[ld.carrier == "land transport EV"]
+    infl = ld.index[ld.carrier == "land transport EV inflexible"]
+    charge = n.links.index[n.links.bus1.isin(fleet)]
+    v2g = n.links.index[n.links.bus0.isin(fleet)]
+    smart = -_annual_twh(n, n.links_t.p1, charge)
+    natural = load_energy(n, infl) / 1e6 if len(infl) else 0.0
+    demand = (load_energy(n, flex) if len(flex) else 0.0) / 1e6 + natural
+    v2g_out = _annual_twh(n, n.links_t.p0, v2g)
+    return {
+        "smart": smart,
+        "natural": natural,
+        "demand": demand,
+        "v2g": v2g_out,
+        "in": smart + natural,
+        "out": demand + v2g_out,
+    }
+
+
+def _energy_graph_imbalances(run: Path, nets: dict):
+    """Recompute the pypsa2html energy graph for BEWAL; None if unavailable."""
+    from pypsa2html.datafiles import load_taxonomy
+    from pypsa2html.extract.flows import energy_flows
+    from pypsa2html.indicators import (
+        _close_energy_graph,
+        _graph,
+        flows_from_long,
+        graph_imbalances,
+    )
+    from pypsa2html.nodes import NodeResolver, build_node_set, detect_locations
+
+    class _Nets:
+        def __init__(self, data):
+            self._data = data
+
+        @property
+        def horizons(self):
+            return sorted(self._data)
+
+        def __contains__(self, h):
+            return h in self._data
+
+        def __getitem__(self, h):
+            return self._data[h]
+
+    n0 = nets[min(nets)]
+    detected = detect_locations(n0)
+    resources = Path(str(run.resolve()).replace("/results/", "/resources/"))
+    ctx = SimpleNamespace(
+        taxonomy=load_taxonomy(),
+        nodes=build_node_set(
+            detected, include=detected, labels={}, focus=WAL,
+            aggregate_code="ALL", aggregate_label="All",
+        ),
+        networks=_Nets(nets),
+        results_dir=run,
+        resources_dir=resources if resources.exists() else run,
+        year_columns=[str(y) for y in sorted(nets)],
+        horizons=sorted(nets),
+        _files={},
+        config=SimpleNamespace(
+            model=SimpleNamespace(flow_threshold=0.0, clusters="adm", base_year=None),
+            raw={},
+        ),
+    )
+    ctx.resolver = lambda horizon, _n=nets: NodeResolver(_n[horizon], "location")
+    ctx.is_aggregate = lambda node: node == "ALL"
+    ctx.is_study_wide = lambda node: node == "ALL"
+    ctx.members_of = lambda node: None
+    ctx.locations_for = lambda node: None if node == "ALL" else [node]
+    ctx.read_csv = lambda *a, **k: None
+    ctx.cost = lambda *a, default=float("nan"), **k: default
+    ctx.horizon_weights = lambda: pd.Series(1.0, index=sorted(nets))
+
+    def component_index(horizon, component, node, *, bus_attr=None):
+        resolver = ctx.resolver(horizon)
+        locations = ctx.locations_for(node)
+        static = getattr(nets[horizon], component)
+        if locations is None:
+            return static.index
+        if component == "links" and bus_attr is None and resolver.strategy == "location":
+            assigned = resolver.first_real_link_nodes()
+            return static.index[assigned.isin(locations)]
+        return resolver.select_locations(component, locations, bus_attr=bus_attr)
+
+    ctx.component_index = component_index
+    energy = energy_flows(ctx, WAL)
+    values = flows_from_long(energy, ctx.year_columns)
+    flows = _graph(
+        values, ctx.taxonomy.processes_energy, ctx.taxonomy.rename_map(),
+        what="energy flows",
+    )
+    flows = _close_energy_graph(ctx, WAL, flows)
+    return graph_imbalances(flows, ctx.taxonomy)
+
+
+def check_sankey_nodes(nets, run: Path, rep: Report) -> None:
+    """Energy-Sankey transformation nodes must balance (level 3)."""
+    sec = "3 · Sankey node balance"
+    for y, n in nets.items():
+        terms = bev_sankey_terms(n)
+        if terms is None:
+            continue
+        split = (
+            f"smart {terms['smart']:.3f} + natural {terms['natural']:.3f} TWh in; "
+            f"EV demand {terms['demand']:.3f} + V2G {terms['v2g']:.3f} TWh out"
+        )
+        gap = terms["out"] - terms["in"]
+        msg = f"{y} BEWAL BEV node: {split}; gap {gap:+.3f} TWh"
+        if abs(gap) < 0.05:
+            rep.ok(sec, msg)
+        elif abs(gap) < 0.2:
+            rep.warn(sec, msg)
+        else:
+            rep.fail(
+                sec, msg,
+                "inflows must be Smart charging (BEV charger) plus Natural charging "
+                "(land transport EV inflexible). A hole equal to the natural volume "
+                "means that inflow is missing from the Sankey — the EV-battery bus "
+                "can still close. See docs/run-review-checklist.md level 3.",
+            )
+
+    try:
+        imb = _energy_graph_imbalances(run, nets)
+    except ImportError:
+        rep.info(sec, "pypsa2html not installed — energy-graph node balance skipped")
+        return
+    except Exception as exc:
+        logger.warning("pypsa2html energy graph failed: %s", exc, exc_info=True)
+        rep.warn(sec, f"pypsa2html energy graph not recomputed ({type(exc).__name__}: {exc})")
+        return
+
+    if imb is None or imb.empty:
+        rep.ok(sec, "pypsa2html energy graph: every primary/secondary/final node balances")
+        return
+    # Storage-class nodes have no trade residual to hide a hole behind; a gap
+    # here is the BEV-style mapping bug. Other holes (biomass prod on a
+    # regional node, DAC, DH) currently WARN so they stay visible without
+    # drowning the check that just bit us.
+    storage = {"bev_se", "batt_se", "tes_se"}
+    for row in imb.itertuples(index=False):
+        msg = (
+            f"{row.year} {row.node}: in {row.incoming:.3f} out {row.outgoing:.3f} "
+            f"gap {row.gap:+.3f} TWh"
+        )
+        if row.node in storage:
+            detail = (
+                "a transformation node in the energy Sankey must conserve energy. "
+                "For bev_se, the missing inflow is Natural charging."
+            )
+            rep.fail(sec, msg, detail)
+        else:
+            rep.warn(sec, msg, "open the energy Sankey and check this node")
 
 
 # --------------------------------------------------------------------------- #
@@ -708,6 +887,7 @@ def main(argv=None) -> int:
         if nets:
             check_softlink(nets, run, scenario, rep)
             check_identities(nets, rep, args.full)
+            check_sankey_nodes(nets, run, rep)
             agg = args.agg_limits
             if agg is None:
                 cfg = next((run / "configs").glob("config.*_*.yaml"), None)
