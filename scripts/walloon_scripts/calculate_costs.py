@@ -87,7 +87,9 @@ def _categorise_main_tech(carrier: str) -> str | None:
     # Keep renewables disaggregated: do not bucket RES together.
     if "nuclear" in name or carrier in {"uranium"}:
         return "nuclear"
-    if "ccgt" in name and "cc" in name:
+    # "cc" is a substring of "ccgt", so match the CCS variant by token, not
+    # by `"cc" in name`.
+    if "ccgt cc" in name or "ccgt+ccs" in name or "ccgt-ccs" in name:
         return "CCGT+CCS"
     if "ccgt" in name:
         return "CCGT"

@@ -1008,6 +1008,113 @@ def add_allam_gas(
     )
 
 
+# Post-combustion capture train attached to condensing CCGT-CC.
+# DEA sheets already in technology-data: "biomass CHP capture" (401.a, small CHP)
+# or "biomass boiler capture" (401.b, large — better scale for a CCGT).
+# Change here, or pass capture_tech= into add_ccgt_cc. Documented in
+# docs/ccs_halignment.md.
+CCGT_CC_CAPTURE_TECH = "biomass CHP capture"
+
+
+def ccgt_cc_link_params(
+    costs: pd.DataFrame,
+    capture_tech: str = CCGT_CC_CAPTURE_TECH,
+) -> dict:
+    """Techno-economic Link parameters for a gas CCGT with post-combustion CC.
+
+    Same algebra as PyPSA-Eur ``coal_cc`` and methanol ``CCGT methanol CC``:
+    plant CAPEX/VOM from ``CCGT``, capture CAPEX from ``capture_tech`` sized on
+    the fuel's CO2 intensity, net electrical efficiency reduced by the capture
+    train's electricity + compression demand. Steam extraction for the amine
+    reboiler is **not** included (see docs/ccs_halignment.md).
+    """
+    required = [
+        ("CCGT", "efficiency"),
+        ("CCGT", "capital_cost"),
+        ("CCGT", "VOM"),
+        ("CCGT", "lifetime"),
+        ("gas", "CO2 intensity"),
+        (capture_tech, "capture_rate"),
+        (capture_tech, "capital_cost"),
+        (capture_tech, "electricity-input"),
+        (capture_tech, "compression-electricity-input"),
+    ]
+    missing = [
+        f"costs.at[{tech!r}, {col!r}]"
+        for tech, col in required
+        if tech not in costs.index
+        or col not in costs.columns
+        or pd.isna(costs.at[tech, col])
+    ]
+    if missing:
+        raise KeyError(
+            "CCGT-CC is missing cost-table entries: "
+            + ", ".join(missing)
+            + f". Capture sheet is {capture_tech!r} (CCGT_CC_CAPTURE_TECH)."
+        )
+
+    co2 = float(costs.at["gas", "CO2 intensity"])
+    eta = float(costs.at["CCGT", "efficiency"])
+    capture_rate = float(costs.at[capture_tech, "capture_rate"])
+    elec_penalty = (
+        float(costs.at[capture_tech, "electricity-input"])
+        + float(costs.at[capture_tech, "compression-electricity-input"])
+    ) * co2
+
+    return {
+        "efficiency": eta - elec_penalty,
+        "efficiency2": co2 * (1.0 - capture_rate),
+        "efficiency3": co2 * capture_rate,
+        "capital_cost": eta * float(costs.at["CCGT", "capital_cost"])
+        + float(costs.at[capture_tech, "capital_cost"]) * co2,
+        "marginal_cost": eta * float(costs.at["CCGT", "VOM"]),
+        "lifetime": float(costs.at["CCGT", "lifetime"]),
+        "capture_rate": capture_rate,
+        "capture_tech": capture_tech,
+        "co2_intensity": co2,
+        "elec_penalty": elec_penalty,
+    }
+
+
+def add_ccgt_cc(
+    n: pypsa.Network,
+    costs: pd.DataFrame,
+    pop_layout: pd.DataFrame,
+    spatial: SimpleNamespace,
+    capture_tech: str = CCGT_CC_CAPTURE_TECH,
+) -> None:
+    """Add extendable gas CCGT links with post-combustion carbon capture.
+
+    Four-bus Link per node: gas → electricity, residual CO2 to atmosphere,
+    captured CO2 to the regional store. New-build only; existing unabated
+    CCGTs are untouched. Gated by ``sector.ccgt_cc``.
+    """
+    logger.info(
+        "Adding CCGT power plants with post-combustion carbon capture "
+        f"(capture tech: {capture_tech})."
+    )
+    nodes = pop_layout.index
+    params = ccgt_cc_link_params(costs, capture_tech=capture_tech)
+
+    n.add(
+        "Link",
+        nodes,
+        suffix=" CCGT CC",
+        bus0=spatial.gas.df.loc[nodes, "nodes"].values,
+        bus1=nodes,
+        bus2="co2 atmosphere",
+        bus3=spatial.co2.df.loc[nodes, "nodes"].values,
+        carrier="CCGT CC",
+        p_nom_extendable=True,
+        capital_cost=params["capital_cost"],
+        marginal_cost=params["marginal_cost"],
+        efficiency=params["efficiency"],
+        efficiency2=params["efficiency2"],
+        efficiency3=params["efficiency3"],
+        lifetime=params["lifetime"],
+    )
+
+
 def add_biomass_to_methanol(n, costs):
     n.add(
         "Link",
@@ -7029,6 +7136,11 @@ if __name__ == "__main__":
         options=options,
         cf_industry=cf_industry,
     )
+
+    if options.get("ccgt_cc"):
+        add_ccgt_cc(
+            n, costs, pop_layout=pop_layout, spatial=spatial
+        )
 
     add_h2_gas_infrastructure(
         n=n,

@@ -4482,6 +4482,11 @@
           "description": "Add option for coal CHPs with carbon capture.",
           "type": "boolean"
         },
+        "ccgt_cc": {
+          "default": false,
+          "description": "Add option for combined-cycle gas turbines with post-combustion carbon capture (natural gas, not methanol). See docs/ccs_halignment.md.",
+          "type": "boolean"
+        },
         "dac": {
           "default": true,
           "description": "Add option for Direct Air Capture (DAC).",
@@ -10747,6 +10752,11 @@
         "coal_cc": {
           "default": false,
           "description": "Add option for coal CHPs with carbon capture.",
+          "type": "boolean"
+        },
+        "ccgt_cc": {
+          "default": false,
+          "description": "Add option for combined-cycle gas turbines with post-combustion carbon capture (natural gas, not methanol). See docs/ccs_halignment.md.",
           "type": "boolean"
         },
         "dac": {

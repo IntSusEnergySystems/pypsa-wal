@@ -427,7 +427,7 @@ REN_AGG = {"offwind-ac": "offwind-all", "offwind-dc": "offwind-all",
            "solar": "solar-all", "solar-utility": "solar-all",
            "solar-hsat": "solar-all", "solar rooftop": "solar-all",
            "nuclear": "nuclear-all", "nuclear (SMR)": "nuclear-all"}
-LINK_AGG = {"nuclear-all", "CCGT", "CCGT-all"}
+LINK_AGG = {"nuclear-all", "CCGT", "CCGT CC", "CCGT-all"}
 
 
 def check_agg_limits(nets, agg_file: Path, rep: Report) -> None:

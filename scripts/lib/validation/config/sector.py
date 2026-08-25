@@ -756,6 +756,10 @@ class SectorConfig(BaseModel):
     coal_cc: bool = Field(
         False, description="Add option for coal CHPs with carbon capture."
     )
+    ccgt_cc: bool = Field(
+        False,
+        description="Add option for combined-cycle gas turbines with post-combustion carbon capture (natural gas, not methanol). See docs/ccs_halignment.md.",
+    )
     dac: bool = Field(True, description="Add option for Direct Air Capture (DAC).")
     co2_vent: bool = Field(
         False,

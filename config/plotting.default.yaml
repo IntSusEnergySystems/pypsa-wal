@@ -370,6 +370,7 @@ plotting:
   nice_names:
     OCGT: "Open-Cycle Gas"
     CCGT: "Combined-Cycle Gas"
+    CCGT CC: "CCGT with CCS"
     offwind-ac: "Offshore Wind (AC)"
     offwind-dc: "Offshore Wind (DC)"
     offwind-float: "Offshore Wind (Floating)"
@@ -444,6 +445,7 @@ plotting:
     biogas to gas CC: '#e51245'
     CCGT: '#a85522'
     CCGT marginal: '#a85522'
+    CCGT CC: '#c44c3a'
     allam: '#B98F76'
     gas for industry co2 to atmosphere: '#692e0a'
     gas for industry co2 to stored: '#8a3400'

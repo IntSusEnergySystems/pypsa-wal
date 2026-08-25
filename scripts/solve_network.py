@@ -652,7 +652,7 @@ def add_CCL_constraints(
             }
             links = links.replace(rename_nuclear)
     if config["solving"]["agg_p_nom_limits"]["agg_ccgt"]:
-        links = links.replace({"CCGT": "CCGT-all"})
+        links = links.replace({"CCGT": "CCGT-all", "CCGT CC": "CCGT-all"})
     grouper = pd.concat([gens.bus.map(n.buses.country), gens.carrier], axis=1)
     grouper_links = pd.concat([links.bus1.map(n.buses.country), links.carrier], axis=1)
     lhs = p_nom.groupby(grouper).sum().rename(bus="country")
@@ -689,7 +689,7 @@ def add_CCL_constraints(
             else:
                 links_cst = links_cst.replace(rename_nuclear)
         if config["solving"]["agg_p_nom_limits"]["agg_ccgt"]:
-            links_cst = links_cst.replace({"CCGT": "CCGT-all"})
+            links_cst = links_cst.replace({"CCGT": "CCGT-all", "CCGT CC": "CCGT-all"})
         rhs_cst = (
             pd.concat(
                 [gens_cst.bus.map(n.buses.country), gens_cst[["carrier", "p_nom"]]],

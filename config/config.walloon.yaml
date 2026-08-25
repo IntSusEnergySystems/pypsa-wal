@@ -353,6 +353,13 @@ sector:
   retrofitting:
     interest_rate: 0.12
   oil_boilers: true
+  # Natural-gas CCGT with post-combustion capture. Distinct from
+  # methanol.methanol_to_power.ccgt_cc. Costs are composed from the CCGT
+  # row plus the DEA "biomass CHP capture" sheet — docs/ccs_halignment.md.
+  ccgt_cc: true
+  # TIMES does not offer DAC. PyPSA-Eur default is true; this overlay turns
+  # it off so Walloon runs match. Flip to true to restore. docs/ccs_halignment.md.
+  dac: false
   solid_biomass_import:
     enable: true
   regional_coal_demand: true
