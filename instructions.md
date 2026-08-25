@@ -988,6 +988,8 @@ nodes:
   detect: true            # reads n.buses.location from the first solved network
   focus: BEWAL            # region the report opens on
   labels: {BEWAL: Wallonia, BEVLG: Flanders, BEBRU: Brussels, …}
+  groups:
+    - {code: BE, label: Belgium, members: [BEVLG, BEWAL, BEBRU]}
 
 scenarios:
   - {name: scen_demande_haute, label: High demand, results_dir: results/walloon/scen_demande_haute}
@@ -1004,7 +1006,10 @@ output:
 ```
 
 Nothing lists the horizons or the eight nodes — both are read from the
-networks. Add a scenario by appending three lines to `scenarios:`.
+networks. Add a scenario by appending three lines to `scenarios:`. The `BE`
+group is an extra synthetic node (explicit members, never a prefix match) so
+self-sufficiency and every other nodal chart can be read for Belgium as a
+whole; see pypsa2html [D18](https://github.com/squoilin/pypsa2html/blob/main/docs/DESIGN_DECISIONS.md).
 
 ### Where the output goes
 
