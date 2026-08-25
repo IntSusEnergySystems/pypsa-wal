@@ -1,20 +1,87 @@
-# CCGT with carbon capture in PyPSA-Wal
+# CCS alignment — TIMES-WAL vs PyPSA-WAL
 
-**Date:** 2026-08-25
-**Purpose:** record whether a combined-cycle gas turbine with post-combustion
-capture (CCGT-CC) can live in this fork, which parameters it needs, how that
-compares to the Allam cycle, what other PyPSA projects already do, and where
-the generic values wired on 2026-08-25 can be changed.
+**Date:** 2026-08-25 (CCGT-CC wiring); TIMES vs last-solve snapshot 2026-08-24
+**TIMES run:** `data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd`
+(the `scen_demande_haute` coupling file)
+**PyPSA last solve:** [`logs/2026-08-22_scen_demande_haute_2010_1h.md`](logs/2026-08-22_scen_demande_haute_2010_1h.md)
+(`results/walloon/scen_demande_haute/`, 1 h / weather year 2010) — **before**
+`sector.ccgt_cc` and with DAC still on
+**Earlier review of the same physics:** [`logs/2026-08-18_scen_demande_haute_2010_1h.md`](logs/2026-08-18_scen_demande_haute_2010_1h.md) §11 (R9–R10)
+**Purpose:** (1) where carbon capture exists in each model, whether it is
+switched on, and whether it ran; (2) whether a combined-cycle gas turbine with
+post-combustion capture (CCGT-CC) can live in this fork, which parameters it
+needs, how that compares to the Allam cycle, what other PyPSA projects already
+do, and where the generic values wired on 2026-08-25 can be changed.
 **Wired into:** `sector.ccgt_cc` (on in `config/config.walloon.yaml`, off in
 `config/config.default.yaml`) → `scripts/prepare_sector_network.py`
 (`add_ccgt_cc`). DAC is **off** in the same Walloon overlay (`sector.dac:
-false`) because TIMES does not have it.
+false`). TIMES lists `CO2DAC-01` but does not build it in this vd.
 
-This is **new-build only**. Existing Walloon TGVs stay unabated. Overnight
-EUR/kW_e is **not** a single TIMES/PyPSA cell yet — the Link is composed from
-the CCGT row plus a DEA capture sheet. Fill
+CCGT-CC in PyPSA is **new-build only**. Existing Walloon TGVs stay unabated.
+Overnight EUR/kW_e is **not** a single TIMES/PyPSA cell yet — the Link is
+composed from the CCGT row plus a DEA capture sheet. Fill
 `config/input_parameters_for_models.csv` when both models agree a dedicated
 figure; until then do not `--write` those placeholder rows.
+
+The soft-link does **not** transfer power-plant or hydrogen-supply technology;
+both models choose those independently. Where the menus differ, the solved
+systems diverge even with identical demands.
+
+---
+
+## 0. TIMES vs PyPSA — bottom line
+
+| Technology | TIMES-WAL (`scen_demande_haute`) | PyPSA-WAL (Walloon config, 2026-08-25) | Soft-link |
+|---|---|---|---|
+| **CCGT + CCS** | On. Flemalle + Seraing New (1.74 GW) retrofitted from **2035**, ~86 % capture. New-build post-combustion CCGT CCS is in the dictionary and **not built**. | **New-build** `sector.ccgt_cc: true`. Existing TGVs stay unabated. Closest other switch (`allam_cycle_gas`) is **off**. Shared-CSV costs are empty placeholders. Last solve (22 Aug) had no `CCGT CC`. | Power generation is not transferred. Heat export was patched so the CCS plant is not mistaken for a boiler. |
+| **Biomass → H₂ + CCS** | Dictionary has `SBIOH2GCC01` (gasification + CC). **Absent from this vd** (not built). What *does* run is black-liquor gasification `BBLQH2G110` from 2035, with biogenic CO₂ out. | Option `sector.bioH2` **is** biomass→H₂ **with CCS** (there is no unabated twin). Default and Walloon overlay: **`false`**. Not in the last-run network. | Black liquor is deliberately **not** exported as `solid biomass`. `SBIOH2*` is unmapped. |
+| **DAC** | Process `CO2DAC-01` exists; **not built** (duals only). | `sector.dac: false` (TIMES-aligned). Last solve still had `true`: unused until 2050, then a large plant (system 1.1 GW_e, 23.5 TWh_e). | Not transferred. |
+| **CO₂ storage** | `STORAGEMINELC` + `STORAGEMININD` store ~7.1 Mt in 2050 (Wallonia-only model). | `co2_sequestration_potential` 0 / 20 / 90 / 125 Mt on the last-run years that bound. Last run **hits the cap exactly** every year it is non-zero. | Not transferred. |
+
+The menus now overlap on **new-build** CCGT-CC, but TIMES uses **retrofit** from
+2035 and PyPSA does not. They still do not share a used biomass-to-hydrogen+CCS
+option. PyPSA’s CCS volume in the last solve is industrial biomass CC + DAC +
+the sequestration cap, not power-plant CCS. DAC has since been turned off and
+CCGT-CC turned on; there is no new solve yet.
+
+### TIMES CCGT+CCS — retrofit, not new-build
+
+Two families in the vd:
+
+| Process | Role | In this vd |
+|---|---|---|
+| `ETSTP_CCGT-CCS_PostC_GAS_N` | New-build post-combustion CCGT CCS | Duals (`VAR_ActM`) only — **not built** |
+| `ETSTP_CCGT_CCS_E12/E13_N` + `ETSTP_Retrofit_CCGT_CCS_E12/E13_N` | CCS on Flemalle (E12) and Seraing New (E13) | **Built from 2035** |
+
+The two plants are 870 + 870 = **1 740 MW**. They run as unabated CCGT
+(`ETSTP_TGV_GAS_New_E12/E13`) in 2025/2030, then the whole 1.74 GW is on the
+CCS processes from 2035. Capacity split in every year 2035–2050:
+
+| GW | E12 (Flemalle) | E13 (Seraing New) | sum |
+|---|---:|---:|---:|
+| `ETSTP_CCGT_CCS_*` | 0.100 | 0.222 | 0.322 |
+| `ETSTP_Retrofit_CCGT_CCS_*` | 0.770 | 0.648 | 1.418 |
+| **total** | 0.870 | 0.870 | **1.740** |
+
+Only the **retrofit** processes capture. 2035 E12 retrofit: 1 347 kt `ELCCO2c`
+(captured) vs 226 kt `ELCCO2N` (stack) → **capture fraction ≈ 86 %**. Electricity
+out (`ELCHIG`) is 14.9 PJ (E12 retrofit) + 12.8 PJ (E13 retrofit) in 2035, still
+~15 + 11 PJ in 2050 — they keep running.
+
+`TIMES_PyPSA/data/techs/mapping_tech.csv` maps `ETSTP_CCGT-CCS_PostC_GAS_N` to an
+**empty** PyPSA name.
+
+Those 1 740 MW appear in PyPSA as **unabated** CCGT (the new `CCGT CC` link is
+extendable new-build, not a retrofit of these units):
+
+- `data/walloon/wal_2021_existing_capacities_2.csv`: Flemalle 2025, Seraing New
+  2026, carrier `CCGT`
+- `data/walloon/custom_potentials.csv`: `BEWAL CCGT p_nom_min = 1740 MW_el` at
+  every horizon (re-imposed on the *new* vintage — see the 18 Aug log R3)
+
+Last-run system CCGT (unabated, no `CCGT CC`): 100 / 101 / 65 / 51 GW nameplate;
+82 / 80 / 47 / 20 TWh gas in. No `allam gas` carrier exists in that
+`energy.csv`.
 
 ---
 
@@ -180,7 +247,8 @@ moves residual emissions, capture sizing and the electricity penalty together.
    extra energy vs high-CO₂ flue gas). Gas CHP CC in this codebase dumps that
    heat onto district heating; a condensing CCGT cannot.
 2. **No retrofit.** Saint-Ghislain, Amercoeur, Marcinelle, Seraing, Flémalle stay
-   unabated. A retrofit would be a second Link with `p_nom` tied to existing
+   unabated. TIMES retrofits Flemalle (E12) and Seraing New (E13) from 2035
+   (§0). A PyPSA retrofit would be a second Link with `p_nom` tied to existing
    capacity, not done here.
 3. **No part-load / minimum-load** specific to the capture train.
 4. **TIMES cost cell still empty.** PyPSA and TIMES will diverge on CCGT-CCS
@@ -213,9 +281,9 @@ No full Snakemake solve was run (too slow). Checks: `test/test_ccgt_cc.py` and
 
 ## 8. Direct air capture (DAC) — how to turn it on or off
 
-TIMES does not have a DAC process (no matching name in the Walloon `.vd`
-files; the shared CSV rows for *Captage direct du CO₂ dans l'air* are
-PyPSA-only). Earlier Walloon solves with DAC on used the urban-central heat
+TIMES lists process `CO2DAC-01` (solid amine DAC) in the dictionary; it is
+**not built** in `scen_demande_haute` (duals only). Shared CSV rows for
+*Captage direct du CO₂ dans l'air* are PyPSA-only. Earlier Walloon solves with DAC on used the urban-central heat
 bus as a free heat source for capture: in 2050 more district heat went to DAC
 than to buildings (`docs/logs/2026-08-18_scen_demande_haute_2010_1h.md`,
 `docs/heat-softlink.md`). From 2026-08-25 the Walloon overlay **turns DAC
@@ -268,3 +336,138 @@ add one `carrier_flows_carbon.csv` row (`{tech} CC_2` → a code) and one
 `processes_carbon.csv` edge to `stm`. Residual emissions and energy flows
 inherit from the parent automatically. Do not add `if carrier == "CCGT CC"`
 in Python.
+
+---
+
+## 10. Biomass → hydrogen
+
+### PyPSA — CCS-only, and switched off
+
+`sector.bioH2` (default **`false`**) adds one link, named
+`solid biomass to hydrogen CC`. Capture fraction `cc_fraction` is 0.9
+(`config.default.yaml`). Capture CAPEX is borrowed from `biomass CHP capture`.
+There is **no unabated** biomass-to-hydrogen link; the schema text is
+*“transforming solid biomass into hydrogen with carbon capture.”*
+
+`config.walloon.yaml` does not override `bioH2`, so the Walloon study inherits
+`false`. The last-run `energy.csv` link-carrier list has no
+`solid biomass to hydrogen`. The process cannot have been used: it is not in
+the LP.
+
+Related biomass conversion switches, also **off**: `biosng`, `biosng_cc`,
+`biomass_to_liquid_cc`, `biogas_upgrading_cc`,
+`methanol.biomass_to_methanol_cc`. Unabated `biomass_to_liquid` and
+`biomass-to-methanol` are on but ran at noise level in the last solve
+(≤ 0.3 MW / ≤ 0.3 GWh until methanol 3.7 MW in 2050).
+
+### TIMES — CCS variant exists, not chosen; black liquor is what runs
+
+| Process | Description | In this vd |
+|---|---|---|
+| `SBIOH2GCC01` | Biomass gasification + carbon capture, medium, central | **Absent** |
+| `SBIOH2GC01` | Same without capture | **Absent** |
+| `SBIOH2GD01` | Small decentral gasification | **Absent** |
+| `SBIOH2RC01` | Biomass steam reforming | **Absent** |
+| `BBLQH2G110` | Black-liquor gasification → H₂ | **Used from 2035** |
+
+`SBIOH2GCC01` is the TIMES analogue of PyPSA `bioH2`. It is in
+`AllProcesses.csv` / `mapping_tech.csv` with an empty PyPSA name, and this
+scenario does not invest in it.
+
+`BBLQH2G110` is a pulp-mill closed loop (`INDBLQ` in, `SYNH2CT` + biogenic
+`INDCO2b` out):
+
+| | 2035 | 2040 | 2045 | 2050 |
+|---|---:|---:|---:|---:|
+| Capacity (GW) | 0.009 | 0.063 | 0.101 | 0.101 |
+| Black liquor in (PJ) | 0.45 | 1.79 | 3.13 | **3.99** |
+| H₂ out `SYNH2CT` (PJ) | 0.26 | 1.06 | 1.85 | **2.36** |
+| Biogenic CO₂ `INDCO2b` (kt) | 42 | 170 | 298 | **380** |
+
+PyPSA cannot source that residue from the wood potential. The extraction rule
+for `solid biomass` **excludes** black liquor on purpose
+([TIMES_PyPSA README](../../TIMES_PyPSA/README.md) / `aggregation.md`). So even
+the biomass-H₂ path TIMES *does* use is not a PyPSA demand and has no PyPSA
+twin.
+
+---
+
+## 11. Other CCS on the PyPSA side (last solve, 22 Aug)
+
+Switches as inherited by `config.walloon.yaml` from `config.default.yaml` at
+the time of the last solve (DAC was still on; `ccgt_cc` did not exist yet).
+Figures are **system-wide** from
+`results/walloon/scen_demande_haute/csvs/{energy,capacities}.csv`
+(energy in MWh of the link; capacity in MW of the link, or t for the CO₂ store).
+
+| Option | Config (last solve) | Last run 2025 → 2050 |
+|---|---|---|
+| Direct air capture | `dac: true` then; **`false` now** | Capacity 0.02 → **1 105 MW**; electricity 0.2 GWh → **23.5 TWh**. 18 Aug BEWAL review: 6.14 TWh_th heat + 2.41 TWh_e → 4.39 Mt captured (2.6× the Walloon 2050 cap). |
+| SMR + CCS | `SMR_cc: true` | Capacity **< 1 MW**; energy < 0.4 GWh — unused. Unabated SMR keeps ~14.5 GW and runs 5.3 → 0.08 TWh. |
+| SMR (no CCS) | `SMR: true` | See above. |
+| Allam cycle (gas CCS power) | `allam_cycle_gas: false` | Not in the network. |
+| Coal + CCS | `coal_cc: false` | Off. |
+| Methanol CCGT + CC | `methanol.methanol_to_power.ccgt_cc: false` | Off. |
+| BioSNG ± CC | `biosng` / `biosng_cc: false` | Off. |
+| Biomass-to-liquid + CC | `biomass_to_liquid_cc: false` | Off. |
+| Biogas upgrading + CC | `biogas_upgrading_cc: false` | Off. |
+| Biomass → methanol + CC | `methanol.biomass_to_methanol_cc: false` | Off. |
+| Urban-central **biomass CHP CC** | always added when `chp.enable` (not `scen_suff`) | Capacity **< 0.2 MW**; energy ~25 MWh — unused. Unabated biomass CHP is large until 2050 (43 → 0.3 GW). |
+| Urban-central **gas CHP CC** | same | Noise until 2050 (**3.4 GW**, 0.53 TWh). |
+| **Solid biomass for industry CC** | always added | The one industrial BECCS that binds: 0.2 MW → **36.9 GW**; energy 0.1 GWh → **32.3 TWh**. |
+| Gas for industry CC | always added | 0.3 MW → **10.4 GW**; 0.1 GWh → **8.9 TWh**. |
+| Process-emissions CC | always added | Capacity 0.8 → 7.8 GW, **energy 0** (built, not used). |
+| CO₂ network | `co2_network: true` | Pipeline capacity 0.25 → 7.1 GW; pipeline *energy* 0. |
+| Sequestration cap | Walloon overlay: 0 / 0 / **20** / 90 / 125 Mt (half the PyPSA-Eur default) | Store `co2 sequestered`: **0, 20, 90, 125 Mt** — the cap, every year. Dual binds (18 Aug R9). |
+
+`cc_fraction: 0.9` is the capture rate on SMR CC and on `bioH2`. Biomass CHP /
+industry CC use the technology-data `capture_rate` of `biomass CHP capture` or
+`cement capture`.
+
+TIMES storage in the same vd: `STORAGEMINELC` 2.3 Mt + `STORAGEMININD` 4.8 Mt
+in 2050 (**~7.1 Mt**, Wallonia only). TIMES DAC (`CO2DAC-01`) is not built.
+
+---
+
+## 12. Soft-linking
+
+The TIMES→PyPSA transfer is final-energy **demand** (plus the heating mix and
+the EV fleet). Electricity *generation* and hydrogen *supply* are re-optimised
+in PyPSA. Consequences:
+
+1. **CCGT+CCS activity is not exported** and should not be. No extraction rule
+   reads `ELCHIG` from power plants.
+2. The heating payload used to pick up `Thermal Public - Retrofitting CCGT CCS`
+   via a `thermal` regex (1 740 MW of power plant counted as heat stock).
+   Selection is now an explicit label list
+   (`TIMES_PyPSA/times_pypsa/heat_softlink.py`).
+3. **`SBIOH2GCC01` is unmapped**; even if TIMES built it, PyPSA would not see
+   it as a demand.
+4. **Black liquor → H₂ is excluded** from `solid biomass` so PyPSA does not
+   charge a forestry potential for a mill residue.
+
+The pipeline is consistent with “PyPSA chooses the supply mix.” It is **not**
+yet consistent with “both models may use the same CCS plants”: TIMES retrofits
+CCGT from 2035 and runs black-liquor H₂ from 2035; PyPSA now has new-build
+CCGT-CC (unsolved) and keeps `bioH2` off.
+
+---
+
+## 13. Open decisions
+
+1. **CCGT retrofit vs new-build.** PyPSA now has a new-build CCGT-CC link
+   (§4). TIMES uses retrofit on Flemalle/Seraing from 2035. The 1 740 MW
+   `p_nom_min` can be met with CCS plants when `agg_ccgt` is on; it should stay
+   explicit whether that floor is unabated CCGT or CCS-equipped.
+2. **`sector.bioH2`.** Turning it on would give PyPSA biomass→H₂ **with CCS
+   only**, which matches `SBIOH2GCC01` (unused in this TIMES scenario) and does
+   **not** match `BBLQH2G110` (the path TIMES actually runs). Enabling it
+   without a black-liquor supply still leaves the mill loop on the TIMES side
+   only.
+3. **Sequestration cap.** PyPSA’s European 125 Mt cap binds and therefore
+   writes every CCS/DAC number. TIMES-WAL stores ~7 Mt in Wallonia. The two
+   figures are not comparable without a Belgium/Europe split on the PyPSA side.
+4. **DAC.** Off in the Walloon overlay as of 2026-08-25 so the menus match
+   (TIMES does not build `CO2DAC-01`). Under option B′ with DAC on, the Walloon
+   district-heat expansion largely fed DAC (18 Aug R10). That was a PyPSA
+   outcome, not a transferred TIMES choice.
