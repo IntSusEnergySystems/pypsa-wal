@@ -1,6 +1,6 @@
 # Nuclear alignment with the TIMES vd — scen_demande_haute
 
-**Date:** 2026-08-17
+**Date:** 2026-08-17 (capacity alignment); 2026-08-25 (must-run / §6)
 **Scenario:** `scen_demande_haute` (`config/config.times-pypsa.yaml` +
 `config/scenarios.walloon.yaml`)
 **TIMES run:** `scen_demande_haute_v01_260727_fix_nuc_2807.vd`
@@ -127,10 +127,15 @@ Wallonia. 2025/2030 stay empty — the legacy fleet already reproduces the vd.
    2045 caps column is inert in this chain but is authored so a future 2045
    run inherits the correct intermediate state (new build 720 MW = 1 750 −
    1 030 existing retrofit).
-6. **Availability stays 0.883 flat** (`data/nuclear_p_max_pu.csv`). At
-   3 000 MW_e this yields ≈ 23.2 TWh/a vs the vd's 24.44 TWh (FLH 7 900–
-   8 320 h). ≈ −5 % energy at the aligned capacity; not material for the
-   capacity alignment itself.
+6. **Availability CSV is 0.883 for BE, not 1.0 — but until 2026-08-25 it
+   did not bind on the solved network.** `data/nuclear_p_max_pu.csv` is
+   country-specific (BE 0.883, FR 0.616, GB 0.684, NL 0.901). It is applied
+   to **Generators** in `attach_conventional_generators`. Sector-coupling
+   then deletes those generators (`pypsa_eur.Generator` does not keep
+   `nuclear`) and rebuilds nuclear as **Links**, which inherit PyPSA's
+   default `p_max_pu = 1`, `p_min_pu = 0`. The 23.2 TWh/a figure quoted
+   here assumed the 0.883 cap; the Aug-14/Aug-17 solves could dispatch
+   nuclear at 100 % of nameplate. See §6 for the fix.
 7. **Re-solve scope: 2040 and 2050 only.** 2025/2030 carry no nuclear caps
    and no link maxima, and the corrected maximum leaves their optima
    feasible and optimal (verified numerically against the solved networks:
@@ -147,3 +152,88 @@ Wallonia. 2025/2030 stay empty — the legacy fleet already reproduces the vd.
 | 2050 BEVLG+BEBRU nuclear | ≈ 0 (placeholders only, ≤ 0.1 MW_e) |
 | 2050 FR/GB/NL | unchanged vs Aug-14 (mins binding as before) |
 | objectives 2025/2030 | bit-identical networks reused, not re-solved |
+
+## 6. Operational inflexibility (2026-08-25)
+
+**Trigger:** nuclear should be must-run (legacy *and* new-build), not a
+flexible thermal plant that can ramp to zero.
+
+### 6.1 What the availability factor actually is
+
+Not 100 %. `conventional.nuclear.p_max_pu` points at
+`data/nuclear_p_max_pu.csv` (a flat country factor, no intra-year
+profile):
+
+| country | `p_max_pu` |
+|---|---:|
+| BE | 0.883 |
+| NL | 0.901 |
+| DE | 0.926 |
+| FR | 0.616 |
+| GB | 0.684 |
+| LU | *not in the CSV* → 1.0 |
+
+On an electricity-only network this derate is on the Generator. On the
+sector-coupled network that pypsa-wal actually solves, nuclear is a Link
+(`{node} nuclear-{year}`, `{node} nuclear-2025` for new-build,
+`… retrofit` for LTO). Until this change those links had `p_max_pu = 1`
+and `p_min_pu = 0`: fully flexible, 100 % available. That is why a
+hardcoded 90 % floor would have been the wrong number — it would sit
+*above* French (and British) availability and make the LP infeasible.
+
+### 6.2 What was wired
+
+`conventional.inflexible_nuclear` in `config/config.walloon.yaml`
+(default **off** in `config.default.yaml`, so unmodified PyPSA-Eur is
+unchanged):
+
+```yaml
+conventional:
+  inflexible_nuclear:
+    enable: true
+    p_min_pu_margin: 0.10
+```
+
+`scripts/walloon_scripts/nuclear_helper.py` →
+`apply_nuclear_inflexibility`, called at the end of
+`add_existing_baseyear`, `add_brownfield` (after retrofits are added) and
+`prepare_sector_network` (overnight). For every component whose carrier
+starts with `nuclear`:
+
+* `p_max_pu` ← the CSV value for the electricity-bus country (1.0 if the
+  country is missing, e.g. LU)
+* `p_min_pu` ← `max(0, p_max_pu − p_min_pu_margin)`
+
+The 0.10 is **percentage points**, not 90 % of the capacity factor, and
+is an expert-judgement operating band (must-run ≈ 10 pp below the
+historical availability). BE therefore runs in [0.783, 0.883], FR in
+[0.516, 0.616]. Electrical output is `p_min_pu × p_nom × efficiency`,
+so the fraction applies to MW_e as well as to the link's thermal `p0`.
+
+At 3 000 MW_e of Walloon nuclear this caps annual energy at
+≈ 0.883 × 8 760 h ≈ 23.2 TWh (vs the vd's 24.44 TWh, same −5 % as in
+§4 item 6) and floors it at ≈ 20.6 TWh if the plant sits on its must-run
+all year.
+
+### 6.3 How to restore the unconstrained formulation
+
+Do **not** just delete the block. `add_brownfield` copies attributes
+from the previous solved network; an absent key is a no-op and the
+copied `p_min_pu` would survive. Set the flag to false and rebuild the
+brownfield networks (Snakemake retriggers: `conventional` is a param of
+`add_existing_baseyear` / `add_brownfield`, and the CSV is an input):
+
+```yaml
+conventional:
+  inflexible_nuclear:
+    enable: false
+```
+
+That writes `p_max_pu = 1`, `p_min_pu = 0` on every nuclear **link**
+(the previous unconstrained defaults). Generators keep the CSV
+`p_max_pu` from `add_electricity`; they are stripped before the sector
+solve, so they do not affect results.
+
+Changing `p_min_pu_margin` (or the CSV) likewise retriggers those two
+rules. Do not hard-code a 90 % floor in the network: the next country
+whose factor is below 0.90 would fail.

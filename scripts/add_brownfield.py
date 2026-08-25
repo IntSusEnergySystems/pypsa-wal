@@ -24,7 +24,11 @@ from scripts.add_electricity import flatten, sanitize_carriers
 from scripts.prepare_network import set_transmission_limit
 from scripts.add_existing_baseyear import add_build_year_to_new_assets
 
-from scripts.walloon_scripts.nuclear_helper import add_BEWAL_nuclear, retrofit_retired_nuclear
+from scripts.walloon_scripts.nuclear_helper import (
+    add_BEWAL_nuclear,
+    apply_nuclear_inflexibility,
+    retrofit_retired_nuclear,
+)
 from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
 
 logger = logging.getLogger(__name__)
@@ -419,6 +423,7 @@ if __name__ == "__main__":
         retrofit_nuclear_once=snakemake.config["electricity"].get("retrofit_nuclear_once", False),
         MILP = False,
     )
+    apply_nuclear_inflexibility(n, snakemake.config)
 
     update_BEWAL_potentials(
         n=n,

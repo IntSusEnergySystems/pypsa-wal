@@ -85,6 +85,22 @@ electricity:
     2050: v1.0
   apply_ntc_constraints: True
 
+# Nuclear must-run. Sector-coupled nuclear is a Link (uranium → electricity).
+# ``conventional.nuclear.p_max_pu`` (data/nuclear_p_max_pu.csv) is applied to
+# Generators in add_electricity and those generators are then stripped, so
+# without this block the solved links have p_max_pu = 1 and p_min_pu = 0
+# (fully flexible, 100 % available). enable: true copies the country factor
+# onto every nuclear link — legacy vintages, 2025 new-build, retrofits —
+# and sets p_min_pu = p_max_pu − p_min_pu_margin. The margin is in
+# percentage points (not × 0.9) so a plant whose CF is already below 90 %
+# (FR 0.616, GB 0.684) stays feasible. docs/nuclear-alignment-20260816.md §6.
+# Revert to the unconstrained formulation: enable: false (not merely
+# deleting the key — brownfield copies would keep the old bounds).
+conventional:
+  inflexible_nuclear:
+    enable: true
+    p_min_pu_margin: 0.10
+
 # docs
 # TODO: PyPSA-Eur merge issue in prepare_sector_network.py
 # regulate what components with which carriers are kept from PyPSA-Eur;

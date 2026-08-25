@@ -17,7 +17,10 @@ import powerplantmatching as pm
 import pypsa
 import xarray as xr
 
-from scripts.walloon_scripts.nuclear_helper import add_BEWAL_nuclear
+from scripts.walloon_scripts.nuclear_helper import (
+    add_BEWAL_nuclear,
+    apply_nuclear_inflexibility,
+)
 from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
 
 from scripts._helpers import (
@@ -930,7 +933,7 @@ if __name__ == "__main__":
             .get("extendable_nuclear_links", {})
         ),
     )
-
+    apply_nuclear_inflexibility(n, snakemake.config)
 
     update_BEWAL_potentials(
         n=n,

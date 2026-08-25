@@ -46,6 +46,7 @@ from scripts.definitions.heat_sector import HeatSector
 from scripts.definitions.heat_system import HeatSystem
 from scripts.prepare_network import maybe_adjust_costs_and_potentials
 from scripts.walloon_scripts.nuclear_helper_overnight import add_BEWAL_nuclear
+from scripts.walloon_scripts.nuclear_helper import apply_nuclear_inflexibility
 from scripts.walloon_scripts.BEWAL_potentials_overnight import update_BEWAL_potentials
 from scripts.walloon_scripts.set_NTCs import set_line_s_nom_to_ntc
 
@@ -7432,5 +7433,7 @@ if __name__ == "__main__":
         planning_horizons=int(snakemake.wildcards.planning_horizons),
         walloon_potentials=snakemake.input.get("walloon_potentials"),
     )
+
+    apply_nuclear_inflexibility(n, snakemake.config)
 
     n.export_to_netcdf(snakemake.output[0])
