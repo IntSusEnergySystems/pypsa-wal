@@ -57,6 +57,67 @@ def _current_horizon_index(index, bus, kind, planning_horizons):
     return index[(index == exact) | (index == vintage)]
 
 
+def _link_fleet(n, bus, carrier):
+    """Every vintage of `carrier` links whose electricity bus is `bus`."""
+    if n.links.empty:
+        return n.links.iloc[0:0]
+    mask = (n.links.carrier == carrier) & (
+        n.links.index.str.startswith(f"{bus} {carrier}-")
+        | (n.links.index == f"{bus} {carrier}")
+    )
+    return n.links.loc[mask]
+
+
+def apply_link_p_nom_min(n, bus, carrier, p_min, planning_horizons, electrical=True):
+    """Force a *fleet* floor on the `carrier` links at `bus`.
+
+    Earlier vintages already contribute to the floor, so only the
+    current-horizon extendable link has to cover the residual. Writing the full
+    floor onto every new vintage instead makes the fleet grow by `p_min` at
+    each myopic horizon.
+
+    `p_min` is MW_el when `electrical` (the link `p_nom` is on the fuel bus, so
+    it is divided by the efficiency on the way in), otherwise MW of `p_nom`.
+    """
+    p_min = float(p_min)
+    fleet = _link_fleet(n, bus, carrier)
+    current = _current_horizon_index(fleet.index, bus, carrier, planning_horizons)
+
+    if current.empty:
+        logger.warning(
+            "No %s link at bus %s for horizon %s; cannot apply p_nom_min=%.0f.",
+            carrier,
+            bus,
+            planning_horizons,
+            p_min,
+        )
+        return
+
+    older = fleet.drop(index=current)
+    if electrical:
+        existing = float((older.p_nom * older.efficiency).sum())
+    else:
+        existing = float(older.p_nom.sum())
+    residual = max(p_min - existing, 0.0)
+
+    if electrical:
+        efficiency = float(n.links.loc[current, "efficiency"].iloc[0])
+        n.links.loc[current, "p_nom_min"] = residual / efficiency
+    else:
+        n.links.loc[current, "p_nom_min"] = residual
+
+    logger.info(
+        "%s floor at %s: %.0f MW%s total (existing %.0f, current-horizon "
+        "residual %.0f).",
+        carrier,
+        bus,
+        p_min,
+        "_el" if electrical else "",
+        existing,
+        residual,
+    )
+
+
 def apply_battery_p_nom_min(n, bus, p_min_mw, planning_horizons):
     """Force a fleet floor on the utility battery at `bus`.
 
@@ -272,9 +333,21 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             logger.info(logger_msg_success)
             apply_battery_p_nom_min(n, bus, potential, planning_horizons)
             continue
-        if carrier in ['CCGT']:
+        if carrier in ["CCGT", "CCGT CC"]:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}
             assert attr in allowed, f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
+
+            if attr == "p_nom_min":
+                # fleet floor, not a per-vintage floor
+                apply_link_p_nom_min(
+                    n,
+                    bus,
+                    carrier,
+                    potential,
+                    planning_horizons,
+                    electrical="el" in unit,
+                )
+                continue
 
             link_name = f"{bus} {carrier}-{planning_horizons}"
             if "el" in unit:

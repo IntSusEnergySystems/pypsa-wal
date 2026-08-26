@@ -170,6 +170,9 @@ def add_land_use_constraint(n: pypsa.Network, planning_horizons: str) -> None:
         )
         existing = n.generators.loc[ext_i, "p_nom"].groupby(grouper).sum()
         existing.index += f" {carrier}-{planning_horizons}"
+        # a bus can carry existing capacity without a current-vintage extendable
+        # twin (retired carrier, custom busmap); indexing those would raise
+        existing = existing.reindex(existing.index.intersection(n.generators.index))
         n.generators.loc[existing.index, "p_nom_max"] -= existing
 
     # check if existing capacities are larger than technical potential
@@ -514,7 +517,7 @@ def prepare_network(
         n.set_snapshots(n.snapshots[:nhours])
         n.snapshot_weightings[:] = 8760.0 / nhours
 
-    if not config['solving']['constraints']['CCL'] and foresight == "myopic" and planning_horizons:
+    if foresight == "myopic" and planning_horizons:
         add_land_use_constraint(n, planning_horizons)
 
     if foresight == "perfect":
@@ -779,7 +782,21 @@ def add_CCL_constraints(
         rhs_links = rhs_links.clip(
             lower=lower_bounds_links.reindex(rhs_links.index).fillna(0)
         )
-        maximum = xr.DataArray(rhs_max).rename(dim_0="group")
+        # generators need the same treatment as links above. Without it the cap
+        # bound only the extendable tranche, so a myopic cap reset at every
+        # horizon and the fleet grew past the aggregate limit.
+        rhs_gens = (rhs_max - rhs_cst.reindex(idx_max).fillna(0).p_nom).dropna()
+        lower_bounds_gens = (
+            pd.concat([grouper, gens.p_nom_min.rename("p_nom")], axis=1)
+            .groupby(["bus", "carrier"])
+            .sum()
+            .p_nom
+        )
+        lower_bounds_gens.index = lower_bounds_gens.index.rename({"bus": "country"})
+        rhs_gens = rhs_gens.clip(
+            lower=lower_bounds_gens.reindex(rhs_gens.index).fillna(0)
+        )
+        maximum = xr.DataArray(rhs_gens).rename(dim_0="group")
         maximum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:
         maximum = xr.DataArray(agg_p_nom_minmax["max"].dropna()).rename(dim_0="group")
