@@ -237,13 +237,17 @@ extrapolation: TYNDP stops at 2040.
 | BEL–DEU | 1 000 | 2 000 | 3 200 | 2nd BE–DE HVDC +1 000 (FDP 2037–38) |
 | BEL–GBR | 1 000 | 2 400 | 3 800 | Nautilus +1 400 (not before 2032) |
 | BEL–LUX (mean) | 240 | 740 | 1 200 | TYNDP Real 1 +500 |
-| BEWAL–BEVLG | 9 600 | 13 200 | 14 400 | Boucle du Hainaut 6 GW, then HTLS |
+| BEWAL–BEVLG | 3 600 | 13 200 | 14 400 | Boucle du Hainaut 6 GW (2032–33), then HTLS |
 | BEWAL–BEBRU | 2 400 | 2 400 | 2 400 | no 380 kV corridor; held at clustered base |
 | BEVLG–BEBRU | 2 400 | 3 400 | 4 800 | three Flanders 380/150 kV infeeds |
 
 Internal rows are keyed on region bus names so they are not swallowed by the
 national BEL bucket. A corridor with **no row** is still bounded only by
-`lines.max_extension` (20 GW).
+`lines.max_extension` (20 GW). Wallonia–Flanders stays at the clustered base
+through 2030: Boucle du Hainaut (Avelgem–Courcelles, 6 GW) has slipped from
+the original 2029–2030 FDP date to **2032–2033** (Elia follow-up; final
+environmental report filed March 2026), so the step belongs in the 2040
+horizon.
 
 `_bus_selector` treats `BEWAL` / `BEVLG` / `BEBRU` as Belgium when the NTC file
 says `BEL`. Walloon clustering (and later `add_CCL_constraints`) can rewrite
