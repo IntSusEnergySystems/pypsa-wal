@@ -24,6 +24,13 @@ optimiser may build up to, not a fixed value.
 Region codes (``BEWAL``, ``BEVLG``, ``BEBRU``) are accepted alongside ISO-3
 country codes, so the internal Belgian corridors can be bounded in the same
 file rather than being left to the 20 GW ``lines.max_extension`` default.
+
+Third, a border is represented by whichever frame carries it. The DC frame
+holds TYNDP candidate projects at ``p_nom = 0`` (``DC2`` on DE-FR,
+``TYNDP2020_32`` on DE-GB), and the AC lines used to be dropped against those
+placeholders as "already represented" -- which deleted DE-FR's real 6.3 GW
+corridor and left the border at zero once the NTC stopped being written into
+``p_nom``.
 """
 
 import logging
@@ -91,8 +98,10 @@ def apply_ntc_limits(n, ntc_fn):
       i.e. the *usable* capacity matches the file.
     * ``s_nom`` / ``p_nom`` keep their clustered values, scaled down only where
       the existing grid already exceeds the cap.
-    * Where a border has both DC links and AC lines, the AC lines are dropped,
-      as before, so the corridor is not counted twice.
+    * Where a border has both DC links and AC lines, only one frame is kept so
+      the corridor is not counted twice: the DC links if they carry any
+      capacity (AC lines are then dropped, as before), otherwise the AC lines
+      with the zero-capacity DC candidates held at 0.
 
     Borders with an NTC of 0 are left untouched.
 
@@ -144,7 +153,13 @@ def apply_ntc_limits(n, ntc_fn):
             " or (bus0 in @buses2 and bus1 in @buses1))"
         )
 
-        if not links_between.empty:
+        # Prefer whichever frame actually carries the border today. The DC frame
+        # also holds TYNDP candidate projects at p_nom = 0 (`DC2` on DE-FR,
+        # `TYNDP2020_32` on DE-GB); letting one of those stand for the border
+        # would delete a real AC corridor and leave the border at zero.
+        dc_carries_border = float(links_between.p_nom.sum()) > 0 or lines_between.empty
+
+        if not links_between.empty and dc_carries_border:
             _cap_dc_links(n, links_between, ntc, code1, code2)
             if not lines_between.empty:
                 logger.info(
@@ -154,6 +169,16 @@ def apply_ntc_limits(n, ntc_fn):
                 n.remove("Line", lines_between.index)
         elif not lines_between.empty:
             _cap_ac_lines(n, lines_between, ntc, code1, code2)
+            if not links_between.empty:
+                # the AC lines carry the cap, so hold the candidate HVDC at zero
+                # rather than adding a second, uncapped corridor
+                n.links.loc[
+                    links_between.index, ["p_nom", "p_nom_min", "p_nom_max"]
+                ] = 0.0
+                logger.info(
+                    f"Holding candidate DC links {list(links_between.index)} at "
+                    f"0 MW on the {code1}-{code2} border: the AC lines carry the NTC."
+                )
         else:
             logger.warning(f"No interconnections found between {code1} and {code2}")
 

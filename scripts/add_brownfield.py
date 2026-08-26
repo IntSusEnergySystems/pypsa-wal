@@ -185,14 +185,27 @@ def carry_forward_built_grid(n, n_p):
     its lower bound rather than by copying an asset. The maximum guards against
     the caller having already set a higher floor, and against a previous
     optimum that came back below today's grid.
+
+    The floor is then clipped to the NTC ceiling. Two things can push it above:
+    a previous optimum on a corridor whose cap has since been lowered, and
+    `set_transmission_limit`, which rebuilds `s_nom_min` from the conductor type
+    (`n.lines.type` is non-empty here) and so does not know about the derating
+    `apply_ntc_limits` wrote into `s_nom` / `s_nom_max`. PyPSA only warns about
+    the resulting inverted bounds; Gurobi returns `infeasible_or_unbounded`.
     """
     prev_lines = n_p.lines.s_nom_opt.reindex(n.lines.index).fillna(0.0)
-    n.lines["s_nom_min"] = np.maximum(n.lines.s_nom_min.fillna(0.0), prev_lines)
+    floor_lines = np.maximum(n.lines.s_nom_min.fillna(0.0), prev_lines)
+    n.lines["s_nom_min"] = np.minimum(
+        floor_lines, n.lines.s_nom_max.fillna(np.inf)
+    )
 
     dc_i = n.links.index[n.links.carrier == "DC"]
     prev_links = n_p.links.p_nom_opt.reindex(dc_i).fillna(0.0)
-    n.links.loc[dc_i, "p_nom_min"] = np.maximum(
+    floor_links = np.maximum(
         n.links.loc[dc_i, "p_nom_min"].fillna(0.0), prev_links
+    )
+    n.links.loc[dc_i, "p_nom_min"] = np.minimum(
+        floor_links, n.links.loc[dc_i, "p_nom_max"].fillna(np.inf)
     )
 
 

@@ -184,7 +184,14 @@ to**, not a fixed capacity. For each border in the file:
    capacity is what matches the file.
 4. `s_nom` / `p_nom` keep their clustered values and are scaled down **only** where
    today's grid already exceeds the cap.
-5. If DC links exist, parallel AC lines are still **removed** (avoid double counting).
+5. Where both frames are present, only the one that **carries** the border is
+   kept, so the corridor is not counted twice. If the DC links hold any
+   capacity, the parallel AC lines are **removed** (as before). If they hold
+   none — the DC frame also carries TYNDP *candidate* projects at `p_nom = 0`,
+   `DC2` on DE–FR and `TYNDP2020_32` on DE–GB — the AC lines take the cap and
+   the candidates are held at 0. Dropping a real corridor against a placeholder
+   is what left DE–FR with no base capacity at all (4 379 MW usable deleted)
+   once the NTC stopped being written into `p_nom`.
 
 **Important modelling implications**:
 
@@ -208,6 +215,17 @@ that had to be fixed together:
 | `transmission_limit: v1.0` capped the AC+DC volume×length product at 100 % of today | `set_transmission_limit` made every line and link non-extendable |
 | `set_line_s_nom_to_ntc` wrote the NTC into `s_nom` / `p_nom` | even where extendable, capacity was pinned at the NTC |
 | `add_brownfield` ran `set_transmission_limit` *after* carrying forward the built grid | `s_nom_min` was reset to today's `s_nom`, discarding the previous horizon's build |
+
+One consequence of `vopt` needed a guard of its own. `set_transmission_limit`
+writes `s_nom_min = n.lines.s_nom.where(n.lines.type == "", _lines_s_nom)` — a
+branch that never ran under `v1.0`. Here `n.lines.type` is **not** empty (it
+stays `Al/St 240/40 4-bundle 380.0` through clustering), so the floor is rebuilt
+from the conductor rating and the NTC derating is discarded. On the 2030 network
+that inverted the bounds of six of ten AC lines; PyPSA only warns
+("smaller maximum than minimum expansion limit") before Gurobi returns
+`infeasible_or_unbounded`. `add_brownfield.carry_forward_built_grid` runs
+immediately afterwards and clips the floor back under `s_nom_max`
+(`test/test_transmission_carry_forward.py`).
 
 The symptoms were unambiguous: eight of ten cross-border AC lines at **96–99 %**
 loading, DC links at their limit 23–51 % of hours, and **12.3 bn EUR/a** of

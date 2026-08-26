@@ -120,3 +120,87 @@ def test_read_ntc_pairs_averages_asymmetric_borders(tmp_path: Path):
     )
     pairs = read_ntc_pairs(ntc)
     assert pairs[tuple(sorted(["BEL", "FRA"]))] == pytest.approx(3550.0)
+
+
+def _placeholder_border_network(dc_p_nom: float) -> pypsa.Network:
+    """A DE-FR-shaped border: one real AC corridor plus one HVDC candidate.
+
+    `dc_p_nom` is what the candidate carries. In the real clustered network
+    `DC2` carries 0 -- it is a TYNDP project placeholder, not an asset.
+    """
+    n = pypsa.Network()
+    n.add("Carrier", ["AC", "DC"])
+    n.add("Bus", "DE", carrier="AC", country="DE")
+    n.add("Bus", "FR", carrier="AC", country="FR")
+    n.add(
+        "Line",
+        "DE-FR-ac",
+        bus0="DE",
+        bus1="FR",
+        s_nom=6256.0,
+        s_nom_max=26256.0,
+        s_max_pu=0.7,
+        s_nom_extendable=True,
+        x=0.1,
+        r=0.01,
+    )
+    n.add(
+        "Link",
+        "DC2",
+        bus0="DE",
+        bus1="FR",
+        carrier="DC",
+        p_nom=dc_p_nom,
+        p_nom_max=20000.0 + dc_p_nom,
+        p_nom_extendable=True,
+        reversed=False,
+    )
+    return n
+
+
+def _ntc_file(tmp_path: Path, a: str, b: str, mw: float) -> Path:
+    f = tmp_path / f"ntc_{a}_{b}.csv"
+    f.write_text(
+        "source_country_code,target_country_code,NTC_MW\n"
+        f"{a},{b},{mw}\n{b},{a},{mw}\n"
+    )
+    return f
+
+
+def test_zero_capacity_dc_candidate_does_not_displace_a_real_ac_corridor(tmp_path):
+    """The DE-FR regression: `DC2` carries nothing, so it is not the border.
+
+    Dropping the AC line against a zero-capacity placeholder left DE-FR with no
+    base capacity at all -- 4 379 MW usable deleted -- once `apply_ntc_limits`
+    stopped writing the NTC into `p_nom`.
+    """
+    n = _placeholder_border_network(dc_p_nom=0.0)
+    apply_ntc_limits(n, _ntc_file(tmp_path, "DEU", "FRA", 4800))
+
+    assert "DE-FR-ac" in n.lines.index, "the real AC corridor was deleted"
+    # usable capacity survives, and the ceiling is the NTC
+    assert n.lines.at["DE-FR-ac", "s_nom"] * 0.7 == pytest.approx(4379.2)
+    assert n.lines.at["DE-FR-ac", "s_nom_max"] * 0.7 == pytest.approx(4800.0)
+    # the candidate is held at zero so the border is not counted twice
+    assert n.links.at["DC2", "p_nom_max"] == 0.0
+    assert n.links.at["DC2", "p_nom_min"] == 0.0
+
+
+def test_a_dc_link_that_carries_the_border_still_replaces_the_ac_lines(tmp_path):
+    """The pre-existing convention must survive for real DC interconnectors."""
+    n = _placeholder_border_network(dc_p_nom=1000.0)
+    apply_ntc_limits(n, _ntc_file(tmp_path, "DEU", "FRA", 4800))
+
+    assert "DE-FR-ac" not in n.lines.index
+    assert n.links.at["DC2", "p_nom_max"] == pytest.approx(4800.0)
+    assert n.links.at["DC2", "p_nom"] == pytest.approx(1000.0)
+
+
+def test_a_dc_only_border_keeps_its_zero_base(tmp_path):
+    """DE-GB has no AC line and no asset in service: 0 base, NTC ceiling."""
+    n = _placeholder_border_network(dc_p_nom=0.0)
+    n.remove("Line", "DE-FR-ac")
+    apply_ntc_limits(n, _ntc_file(tmp_path, "DEU", "FRA", 1400))
+
+    assert n.links.at["DC2", "p_nom"] == 0.0
+    assert n.links.at["DC2", "p_nom_max"] == pytest.approx(1400.0)
