@@ -37,12 +37,18 @@ logger = logging.getLogger(__name__)
 # a line with no security margin recorded should not silently get an infinite cap
 DEFAULT_S_MAX_PU = 0.7
 
+# Walloon clustering names the three Belgian AC buses after the regions. Their
+# `country` field may still be BE, or it may have been rewritten to the region
+# name (custom_clustering, add_CCL_constraints). A BEL/BE selector must catch
+# all three, or Wallonia's FR/LU/DE branches are left at lines.max_extension.
+BE_REGION_BUSES = ("BEWAL", "BEVLG", "BEBRU")
+
 
 def read_ntc_pairs(ntc_fn):
     """Undirected border -> NTC in MW, as the model applies it.
 
     The file may hold both directions of a border with different values (it
-    does: BEL->FRA is 6 000 MW in 2050 while FRA->BEL is 4 300 MW), so the two
+    does: BEL->FRA is 6 100 MW in 2050 while FRA->BEL is 8 500 MW), so the two
     are averaged into one symmetric figure. Exposed so that `review_run.py`
     checks the number the model actually used rather than one direction of it.
     """
@@ -61,7 +67,11 @@ def _bus_selector(n, code, iso2_by_code):
     iso2 = iso2_by_code.get(code)
     if iso2 is None:
         return pd.Index([])
-    return n.buses.index[n.buses.country == iso2]
+    buses = n.buses.index[n.buses.country == iso2]
+    if iso2 == "BE":
+        extra = [b for b in BE_REGION_BUSES if b in n.buses.index]
+        buses = buses.union(extra)
+    return buses
 
 
 def _share(current, total, cap, count):
