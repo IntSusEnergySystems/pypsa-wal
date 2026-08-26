@@ -136,7 +136,7 @@ Start from the scripted half:
 python scripts/walloon_scripts/review_run.py results/<prefix>/<scenario> [--full]
 ```
 
-then work through the judgement levels (5–8) of the checklist by hand.
+then work through the judgement levels (0b, then 5–8) of the checklist by hand.
 
 **Reviewed by / date:** who, when.
 
@@ -145,6 +145,7 @@ then work through the judgement levels (5–8) of the checklist by hand.
 | Level | Verdict |
 |---|---|
 | 0 provenance | pass / pass with caveats / fail |
+| 0b commit intent | |
 | 1 solve | |
 | 2 TIMES soft link | |
 | 3 accounting identities | |
@@ -153,6 +154,12 @@ then work through the judgement levels (5–8) of the checklist by hand.
 | 6 prices / costs | |
 | 7 TIMES consistency | |
 | 8 robustness | |
+
+### Commit intent (level 0b)
+
+Previous production log: `docs/logs/YYYY-MM-DD_….md` at SHA `<prev>`.
+Table of `git log <prev>..HEAD` for pypsa-wal / TIMES_PyPSA / pypsa2html:
+commit, class, intended behaviour, observable in this tree, pass/fail.
 
 ### Findings
 

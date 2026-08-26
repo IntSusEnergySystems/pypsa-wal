@@ -14,6 +14,8 @@ the soft-link transferred the wrong quantity, there is no point reading capaciti
 Companion script: [`scripts/walloon_scripts/review_run.py`](../scripts/walloon_scripts/review_run.py)
 automates the mechanical checks (levels 0–4) and prints a pass/fail table. It reads
 `results/<prefix>/<scenario>/` — networks *and* CSVs — and needs no solver.
+Level 0b (commit intent since the previous production log) is a **human** step:
+the script can only verify mechanisms it already knows about.
 
 ```bash
 python scripts/walloon_scripts/review_run.py results/walloon/scen_demande_haute
@@ -51,7 +53,8 @@ Cheapest checks, and the ones that most often invalidate a whole afternoon.
       model. Grep the effective config for the keys that have changed recently —
       today that means `heat_stock_age_profile`, `bev_natural_charging_split`,
       `local_bev_dsm`, `retrofit_nuclear_once`, `agg_p_nom_limits.file`,
-      `resolution_sector`.
+      `resolution_sector`, `conventional.inflexible_nuclear`, `sector.ccgt_cc`,
+      `sector.dac`.
 - [ ] **All four horizon configs identical apart from `planning_horizons`.**
       ```bash
       for y in 2030 2040 2050; do diff results/<run>/configs/config.base_s_adm___2025.yaml \
@@ -69,6 +72,51 @@ Cheapest checks, and the ones that most often invalidate a whole afternoon.
       `agg_p_nom_minmax_*.csv`.
 - [ ] **Only compare runs of the same vintage.** Before any cross-scenario chart,
       diff the two `configs/` snapshots.
+
+## Level 0b — Commit intent: did the new code do what the commits said?
+
+A run that is the right vintage can still miss the *reason it was launched*.
+Level 0 asks "is this the config you think?". This level asks "did each commit
+since the last production solve actually change the model the way the commit
+message and its docs said it would?" A nuclear must-run commit that leaves
+`p_min_pu = 0` is a failed run even if Gurobi is optimal.
+
+`review_run.py` can only check mechanisms it already knows about (today:
+nuclear inflexibility, `CCGT CC` present, DAC off). **The git-history table is
+a human step** and lives in section 11 of the solve log.
+
+- [ ] **Identify the previous significant logged run** of this scenario — the
+      last production solve in [`docs/logs/`](logs/), not a docs-only commit.
+      Read its `Code version` SHA (pypsa-wal **and** sibling checkouts named in
+      that log: TIMES_PyPSA, pypsa2html).
+- [ ] **List every commit since that SHA**, in each repo that feeds the run:
+      ```bash
+      git -C /sylvain/git/pypsa-wal log --oneline <prev>..HEAD
+      git -C /sylvain/git/TIMES_PyPSA log --oneline <prev>..HEAD
+      git -C /sylvain/git/pypsa2html log --oneline --since='<prev run date>'
+      ```
+      Use `git show --stat <commit>` to see what actually moved. Classify each
+      commit as one of: **physics / config**, **postprocess / report**,
+      **review tooling**, **docs / CI only**.
+- [ ] **One intended-behaviour check per physics, config, or postprocess
+      commit.** Write a row: commit, what the author claimed, the observable
+      in *this* results tree, pass / fail. The observable is whatever the
+      commit's own docs or tests named — a `p_min_pu` band, a new carrier
+      that must exist (and often must *not* be built), a CSV that must be
+      present, an HTML page that must appear. Do not invent a new indicator;
+      quote the commit or its note.
+- [ ] **Docs-only / CI / review-process commits** get a one-line `n/a` — they
+      cannot show up in the network. Do not skip a physics commit because it
+      looks small (`minor edit` on `instructions.md` is n/a; a 7-line change
+      to `prepare_sector_network.py` is not).
+- [ ] **Fail this level** if a physics commit's mechanism is absent or
+      inverted (flag off in the effective config, attribute not applied on
+      the solved network, postprocess file missing). A mechanism that is
+      present and unused (extendable `CCGT CC` at ~0 MW because TIMES does
+      not build it in Wallonia) is a **pass**, and the unused quantity belongs
+      in the "must not publish" list only if someone might plot it.
+- [ ] Copy the table into the run's §11. The next run's previous-SHA is
+      *this* run's `git_commit`.
 
 ## Level 1 — Did the solve actually converge?
 
@@ -476,11 +524,14 @@ run was never logged), and add a one-line pointer to it from section 10. Cover:
 1. **Provenance** — only what differs from what sections 1 and 3 of the log already
    record: the commit the run *actually* came from, the config it was built with,
    and which HEAD features it predates.
-2. **Verdict** per level: pass / pass-with-caveats / fail.
-3. **Findings**, each as: what was observed (with the number), what it should be,
+2. **Commit intent (level 0b)** — the table of commits since the previous
+   production log, each with the observable that shows the model behaved as
+   that commit intended.
+3. **Verdict** per level: pass / pass-with-caveats / fail.
+4. **Findings**, each as: what was observed (with the number), what it should be,
    why it happens, and what to do. Rank by whether it changes a headline number.
-4. **Numbers that must not be published as-is**, with the reason.
-5. **Follow-up actions**, as issues or TODOs.
+5. **Numbers that must not be published as-is**, with the reason.
+6. **Follow-up actions**, as issues or TODOs.
 
 Findings that turn out to be model defects belong in the code, not only in the
 review: add a regression test under `test/` so the next run fails loudly.
