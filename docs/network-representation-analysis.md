@@ -222,23 +222,57 @@ which is the "AC borders deliver 41–73 % of their stated NTC" finding of the
 upstream: per-border ceilings now come from the NTC files rather than from a
 global volume cap.
 
-Example entries relevant to Belgium (MW, symmetric pairs in file):
+Belgian ceilings actually applied by the model (MW). The file stores both
+directions; `read_ntc_pairs` averages them. 2030 is the TYNDP 2024 reference
+grid (BE–FR kept asymmetric: 2 800 export / 4 300 import). 2040 adds the
+identified TYNDP "Real" projects that match Elia's Federal Development Plan.
+2050 is 2040 × 1.6 (Elia's internal 380 kV doubling-over-15-years statement
+and the Belgian TYNDP project sum both land on 1.6× per decade). 2050 is an
+extrapolation: TYNDP stops at 2040.
 
-| Pair | NTC_2030_MW |
-|------|-------------|
-| BEL–DEU | 1000 |
-| BEL–FRA | 2800–4300 (duplicate rows averaged) |
-| BEL–GBR | 2400 |
-| BEL–LUX | 680 |
-| BEL–NLD | 3400 |
+| Pair | 2030 | 2040 | 2050 | 2040 addition |
+|------|------|------|------|----------------|
+| BEL–FRA (mean) | 3 550 | 4 550 | 7 300 | Lonny–Achêne–Gramme +1 000 |
+| BEL–NLD | 3 400 | 5 400 | 8 600 | Van Eyck–Maasbracht +2 000 |
+| BEL–DEU | 1 000 | 2 000 | 3 200 | 2nd BE–DE HVDC +1 000 (FDP 2037–38) |
+| BEL–GBR | 1 000 | 2 400 | 3 800 | Nautilus +1 400 (not before 2032) |
+| BEL–LUX (mean) | 240 | 740 | 1 200 | TYNDP Real 1 +500 |
+| BEWAL–BEVLG | 9 600 | 13 200 | 14 400 | Boucle du Hainaut 6 GW, then HTLS |
+| BEWAL–BEBRU | 2 400 | 2 400 | 2 400 | no 380 kV corridor; held at clustered base |
+| BEVLG–BEBRU | 2 400 | 3 400 | 4 800 | three Flanders 380/150 kV infeeds |
 
-**Data source note:** Cross-border NTC values come from `data/walloon/ntc_<horizon>.csv`, documented as European country-pair NTCs (aligned with TYNDP-style figures in `doc/data-walloon.rst`).
+Internal rows are keyed on region bus names so they are not swallowed by the
+national BEL bucket. A corridor with **no row** is still bounded only by
+`lines.max_extension` (20 GW).
+
+`_bus_selector` treats `BEWAL` / `BEVLG` / `BEBRU` as Belgium when the NTC file
+says `BEL`. Walloon clustering (and later `add_CCL_constraints`) can rewrite
+`buses.country` from `BE` to the region name; without that union, Wallonia's
+FR / LU / DE branches would be left at the 20 GW default.
+
+**Data source note:** Cross-border NTC values live in `data/walloon/ntc_<horizon>.csv`.
+2030 matches ENTSO-E TYNDP 2024 `ReferenceGrid_Electricity.xlsx` sheet 2030.
+The master CSV (`ntc:BE-*`) holds the *export* direction only; `--write` does
+not touch the reverse rows, which is why both directions are maintained in the
+file. Intra-BE rows are not in the master CSV (`ntc:` targets only accept
+2–3 letter codes).
 
 ### 3.2 Elia data in the current workflow
 
-A codebase search shows **no Elia grid data** (topology, line ratings, hosting capacity, or official NTC publications) is ingested anywhere in the Snakemake workflow. The transmission mesh is built from the generic PyPSA-Eur **ENTSO-E / OSM** extract (`scripts/base_network.py`), then simplified and clustered as described above.
+A codebase search shows **no Elia grid topology** (line ratings, hosting
+capacity, or official GTC tables) is ingested anywhere in the Snakemake
+workflow. The transmission mesh is built from the generic PyPSA-Eur
+**ENTSO-E / OSM** extract (`scripts/base_network.py`), then simplified and
+clustered as described above. Elia *is* used as a source for the **ceilings**:
+Boucle du Hainaut, Ventilus, Nautilus and the 380 kV HTLS programme come from
+the Federal Development Plan 2024–2034 and AdeqFlex'25, and the per-border
+2030 numbers come from the TYNDP 2024 reference grid that AdeqFlex itself cites
+for links outside the Core flow-based region.
 
-The **only** Elia-related input today is indirect: aggregated solar capacity bounds in `data/agg_p_nom_minmax.csv` (`BE,solar-all` and `BEWAL,solar-all`), where the BEWAL values are documented in `doc/data-walloon.rst` as coming from Climact based on the **Elia ADEXFLEX** study — a RES potential ceiling, not a network model.
+The other Elia-related input is aggregated solar capacity bounds in
+`data/agg_p_nom_minmax.csv` (`BE,solar-all` and `BEWAL,solar-all`), documented
+in `doc/data-walloon.rst` as coming from Climact based on the **Elia ADEXFLEX**
+study — a RES potential ceiling, not a network model.
 
 ### 3.3 Power flow vs NTC modelling approach (current)
 
