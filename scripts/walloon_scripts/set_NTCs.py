@@ -3,117 +3,191 @@
 #
 # SPDX-License-Identifier: MIT
 
-import country_converter as coco
-import pandas as pd
+"""Turn the NTC tables into *upper bounds* on usable cross-border capacity.
+
+This used to write the NTC straight into ``s_nom`` / ``p_nom`` and pin the
+capacity there. Two things went wrong with that.
+
+First, the number the model delivered was not the number in the file. PyPSA
+derates AC lines by ``lines.s_max_pu`` (0.7 here) as an N-1 margin, so writing
+an NTC of 5 150 MW into ``s_nom`` leaves only 3 605 MW usable — the
+"AC borders deliver 41-73 % of their stated NTC" finding of
+``docs/logs/2026-08-18_scen_demande_haute_2010_1h.md``. The NTC is a transfer
+capability, so it is compared against the *usable* figure and ``s_nom_max`` is
+raised by ``1 / s_max_pu`` to compensate.
+
+Second, pinning the capacity meant the grid could not grow. Every corridor came
+out non-extendable, eight of ten AC lines sat at 96-99 % loading, and the 2050
+solve carried 12.3 bn EUR/a of congestion rent. The NTC is now a ceiling the
+optimiser may build up to, not a fixed value.
+
+Region codes (``BEWAL``, ``BEVLG``, ``BEBRU``) are accepted alongside ISO-3
+country codes, so the internal Belgian corridors can be bounded in the same
+file rather than being left to the 20 GW ``lines.max_extension`` default.
+"""
+
 import logging
+
+import country_converter as coco
+import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-def set_line_s_nom_to_ntc(n, ntc_fn):
+# a line with no security margin recorded should not silently get an infinite cap
+DEFAULT_S_MAX_PU = 0.7
+
+
+def read_ntc_pairs(ntc_fn):
+    """Undirected border -> NTC in MW, as the model applies it.
+
+    The file may hold both directions of a border with different values (it
+    does: BEL->FRA is 6 000 MW in 2050 while FRA->BEL is 4 300 MW), so the two
+    are averaged into one symmetric figure. Exposed so that `review_run.py`
+    checks the number the model actually used rather than one direction of it.
     """
-    Scale interconnection capacities between country pairs to match target NTCs.
+    df = pd.read_csv(ntc_fn)
+    df["pair"] = [
+        tuple(sorted([row.source_country_code, row.target_country_code]))
+        for row in df.itertuples()
+    ]
+    return df.groupby("pair")["NTC_MW"].mean()
 
-    This function reads a CSV of Net Transfer Capacities (NTC) between countries
-    and then enforces the target NTC (MW) for each country pair found in both the
-    CSV and the network.
 
-    If DC Links exist between the two country bus sets:
-        * Treat directions separately
-        * For each direction, set the sum of all p_nom over links in that direction
-          to the target NTC by uniformly scaling existing `p_nom` values.
-          If current sum is zero, distribute the NTC evenly across links.
-        * If DC links are found, remove any AC Lines connecting the same pair
-           (to avoid double counting parallel AC when a DC representation exists).
-    Else if AC Lines exist between the country bus sets (but no DC Links):
-         * Uniformly scale their `s_nom` such that the sum of s_nom equals
-           the target NTC. If the current sum is zero, distribute NTC evenly.
+def _bus_selector(n, code, iso2_by_code):
+    """Buses a border code refers to: a single region bus, or a whole country."""
+    if code in n.buses.index:
+        return pd.Index([code])
+    iso2 = iso2_by_code.get(code)
+    if iso2 is None:
+        return pd.Index([])
+    return n.buses.index[n.buses.country == iso2]
 
-    Pairs with NTC == 0 are skipped.
+
+def _share(current, total, cap, count):
+    """Split `cap` across parallel branches in proportion to what is there."""
+    if total > 0:
+        return cap * current / total
+    return pd.Series(cap / count, index=current.index)
+
+
+def apply_ntc_limits(n, ntc_fn):
+    """Bound usable cross-border transfer capability by the NTC table.
+
+    For every border listed in `ntc_fn` and present in the network:
+
+    * DC links are capped per direction: ``p_nom_max`` sums to the NTC.
+    * AC lines are capped so that ``sum(s_nom_max * s_max_pu)`` equals the NTC,
+      i.e. the *usable* capacity matches the file.
+    * ``s_nom`` / ``p_nom`` keep their clustered values, scaled down only where
+      the existing grid already exceeds the cap.
+    * Where a border has both DC links and AC lines, the AC lines are dropped,
+      as before, so the corridor is not counted twice.
+
+    Borders with an NTC of 0 are left untouched.
 
     Parameters
     ----------
     n : pypsa.Network
-        The network to modify.
+        Modified in place.
     ntc_fn : str or pathlib.Path
-        Path to CSV with columns:
-        - `source_country_code` (ISO3),
-        - `target_country_code` (ISO3),
-        - `NTC_2030_MW` (numeric, MW).
-
-    Returns
-    -------
-    None
-        The network `n` is modified in place.
+        CSV with `source_country_code`, `target_country_code` (ISO-3, or a
+        region bus name) and `NTC_MW`. The two directions of a border are
+        averaged, as they were before.
     """
+    pair_to_ntc = read_ntc_pairs(ntc_fn)
 
-    df = pd.read_csv(ntc_fn)
+    codes = pd.unique(np.concatenate([list(p) for p in pair_to_ntc.index]))
+    region_codes = [c for c in codes if c in n.buses.index]
+    country_codes = [c for c in codes if c not in n.buses.index]
 
     cc = coco.CountryConverter()
-    
-    df['source_iso2'] = cc.convert(names=df['source_country_code'], src="ISO3", to="ISO2")
-    df['target_iso2'] = cc.convert(names=df['target_country_code'], src="ISO3", to="ISO2")
-    df = df.dropna(subset=['source_iso2', 'target_iso2'])
-    pairs = []
-    for _, row in df.iterrows():
-        pair = tuple(sorted([row['source_iso2'], row['target_iso2']]))
-        pairs.append(pair)
-    df['pair'] = pairs
-    pair_to_ntc = df.groupby('pair')['NTC_MW'].mean()
-    focus_countries = list(set(df['source_iso2']).union(df['target_iso2']).intersection(set(n.buses.country.unique())))
-    for pair, ntc in pair_to_ntc.items():
+    iso2_by_code = {}
+    if country_codes:
+        converted = cc.convert(names=list(country_codes), src="ISO3", to="ISO2")
+        if isinstance(converted, str):
+            converted = [converted]
+        iso2_by_code = {
+            code: iso2
+            for code, iso2 in zip(country_codes, converted)
+            if isinstance(iso2, str) and iso2 != "not found"
+        }
+    if region_codes:
+        logger.info(f"NTC file addresses region buses directly: {region_codes}")
+
+    for (code1, code2), ntc in pair_to_ntc.items():
         if ntc == 0:
             continue
-        country1, country2 = pair
-        if country1 not in focus_countries and country2 not in focus_countries:
-            continue
-        if country1 not in focus_countries or country2 not in focus_countries:
+
+        buses1 = _bus_selector(n, code1, iso2_by_code)
+        buses2 = _bus_selector(n, code2, iso2_by_code)
+        if buses1.empty or buses2.empty:
             continue
 
-        buses1 = n.buses.query('country == @country1').index
-        buses2 = n.buses.query('country == @country2').index
-        lines_between = n.lines.query('(bus0 in @buses1 and bus1 in @buses2) or (bus0 in @buses2 and bus1 in @buses1)')
-        links_between = n.links.query("carrier == 'DC' and ((bus0 in @buses1 and bus1 in @buses2) or (bus0 in @buses2 and bus1 in @buses1))")
+        lines_between = n.lines.query(
+            "(bus0 in @buses1 and bus1 in @buses2)"
+            " or (bus0 in @buses2 and bus1 in @buses1)"
+        )
+        links_between = n.links.query(
+            "carrier == 'DC' and ("
+            "(bus0 in @buses1 and bus1 in @buses2)"
+            " or (bus0 in @buses2 and bus1 in @buses1))"
+        )
 
-        updated = False
-        removed = False
-        line_or_link = None
         if not links_between.empty:
-            current_total_p_nom_1 = links_between.query("reversed == False")['p_nom'].sum()
-            current_total_p_nom_2 = links_between.query("reversed == True")['p_nom'].sum()
-            if current_total_p_nom_1 > 0:
-                scale_factor = ntc / current_total_p_nom_1
-                direction = links_between.query("reversed == False").index
-                n.links.loc[direction, ['p_nom', 'p_nom_min']] *= scale_factor
-            else:
-                direction = links_between.query("reversed == False").index
-                n.links.loc[direction, ['p_nom', 'p_nom_min']] = ntc / len(direction)
-            if current_total_p_nom_2 > 0:
-                scale_factor = ntc / current_total_p_nom_2
-                direction = links_between.query("reversed == True").index
-                n.links.loc[direction, ['p_nom', 'p_nom_min']] *= scale_factor
-            else:
-                direction = links_between.query("reversed == True").index
-                n.links.loc[direction, ['p_nom', 'p_nom_min']] = ntc / len(direction)
-            updated = True
-            line_or_link = "Link"
-        if (updated) and (not lines_between.empty):
-            removed = True
-            removed_lines = lines_between.index
-            n.remove("Line", removed_lines)
-            # lines_between should be empty now
-            lines_between = n.lines.query('(bus0 in @buses1 and bus1 in @buses2) or (bus0 in @buses2 and bus1 in @buses1)')
-        if (not updated) and (not lines_between.empty):
-            current_total_s_nom = lines_between['s_nom'].sum()
-            if current_total_s_nom > 0:
-                scale_factor = ntc / current_total_s_nom
-                n.lines.loc[lines_between.index, ['s_nom', 's_nom_min']] *= scale_factor
-            else:
-                n.lines.loc[lines_between.index, ['s_nom', 's_nom_min']] = ntc / len(lines_between)
-            updated = True
-            line_or_link = "Line"
-        if updated:
-            logger.info(f"Set {line_or_link} capacity to a total of {ntc} MW for interconnections between {country1} and {country2}")
+            _cap_dc_links(n, links_between, ntc, code1, code2)
+            if not lines_between.empty:
+                logger.info(
+                    f"Removing AC lines {list(lines_between.index)} on the "
+                    f"{code1}-{code2} border: DC links already represent it."
+                )
+                n.remove("Line", lines_between.index)
+        elif not lines_between.empty:
+            _cap_ac_lines(n, lines_between, ntc, code1, code2)
         else:
-            logger.warning(f"No interconnections found between {country1} and {country2}")
-        if removed:
-            logger.info(f"Removed lines {removed_lines}, because there was already a valid link connection {links_between.index}.")
+            logger.warning(f"No interconnections found between {code1} and {code2}")
+
+
+def _cap_dc_links(n, links_between, ntc, code1, code2):
+    """Cap each direction of a DC border at `ntc` MW."""
+    for reverse in (False, True):
+        direction = links_between.query("reversed == @reverse").index
+        if direction.empty:
+            continue
+        current = n.links.loc[direction, "p_nom"]
+        cap = _share(current, current.sum(), ntc, len(direction))
+        n.links.loc[direction, "p_nom_max"] = cap
+        # only shrink; a border below its NTC may grow up to it
+        excess = current > cap
+        if excess.any():
+            n.links.loc[direction[excess], "p_nom"] = cap[excess]
+            n.links.loc[direction[excess], "p_nom_min"] = np.minimum(
+                n.links.loc[direction[excess], "p_nom_min"], cap[excess]
+            )
+    logger.info(
+        f"Capped DC border {code1}-{code2} at {ntc:.0f} MW per direction "
+        f"(base {links_between.query('reversed == False').p_nom.sum():.0f} MW)."
+    )
+
+
+def _cap_ac_lines(n, lines_between, ntc, code1, code2):
+    """Cap an AC border so that the *usable* capacity equals `ntc` MW."""
+    idx = lines_between.index
+    s_max_pu = n.lines.loc[idx, "s_max_pu"].replace(0, np.nan).fillna(DEFAULT_S_MAX_PU)
+
+    usable = lines_between.s_nom * s_max_pu
+    cap_usable = _share(usable, usable.sum(), ntc, len(idx))
+    cap_nominal = cap_usable / s_max_pu
+
+    n.lines.loc[idx, "s_nom_max"] = cap_nominal
+    excess = lines_between.s_nom > cap_nominal
+    if excess.any():
+        n.lines.loc[idx[excess], "s_nom"] = cap_nominal[excess]
+        n.lines.loc[idx[excess], "s_nom_min"] = np.minimum(
+            n.lines.loc[idx[excess], "s_nom_min"], cap_nominal[excess]
+        )
+    logger.info(
+        f"Capped AC border {code1}-{code2} at {ntc:.0f} MW usable "
+        f"({cap_nominal.sum():.0f} MW nominal at s_max_pu={s_max_pu.mean():.2f}; "
+        f"base {usable.sum():.0f} MW usable)."
+    )

@@ -63,10 +63,7 @@ def add_brownfield(
     """
     logger.info(f"Preparing brownfield for the year {year}")
 
-    # electric transmission grid set optimised capacities of previous as minimum
-    n.lines.s_nom_min = n_p.lines.s_nom_opt
-    dc_i = n.links[n.links.carrier == "DC"].index
-    n.links.loc[dc_i, "p_nom_min"] = n_p.links.loc[dc_i, "p_nom_opt"]
+    carry_forward_built_grid(n, n_p)
 
     decomissioned_assets = {"Link": None, "Generator": None, "Store": None}
     for c in n_p.iterate_components(["Link", "Generator", "Store"]):
@@ -179,6 +176,24 @@ def add_brownfield(
             n.links.loc[gas_pipes_i, "p_nom_max"] = remaining_capacity
 
     return decomissioned_assets
+
+
+def carry_forward_built_grid(n, n_p):
+    """Make the previous horizon's optimised grid the floor for this one.
+
+    Transmission is not vintaged, so a corridor is carried forward by raising
+    its lower bound rather than by copying an asset. The maximum guards against
+    the caller having already set a higher floor, and against a previous
+    optimum that came back below today's grid.
+    """
+    prev_lines = n_p.lines.s_nom_opt.reindex(n.lines.index).fillna(0.0)
+    n.lines["s_nom_min"] = np.maximum(n.lines.s_nom_min.fillna(0.0), prev_lines)
+
+    dc_i = n.links.index[n.links.carrier == "DC"]
+    prev_links = n_p.links.p_nom_opt.reindex(dc_i).fillna(0.0)
+    n.links.loc[dc_i, "p_nom_min"] = np.maximum(
+        n.links.loc[dc_i, "p_nom_min"].fillna(0.0), prev_links
+    )
 
 
 def disable_grid_expansion_if_limit_hit(n):
@@ -435,7 +450,12 @@ if __name__ == "__main__":
     factor = snakemake.params.transmission_limit[planning_horizon][1:]
     set_transmission_limit(n, kind, factor, load_costs(snakemake.input.costs))
 
-    if float(factor) == 1.0:
+    # set_transmission_limit rewrites s_nom_min/p_nom_min from today's grid,
+    # undoing the carry-forward add_brownfield established above. Re-apply it,
+    # or every horizon would be free to tear down what the last one built.
+    carry_forward_built_grid(n, n_p)
+
+    if factor != "opt" and float(factor) == 1.0:
         disable_grid_expansion_if_limit_hit(n)
 
     n.export_to_netcdf(snakemake.output[0])

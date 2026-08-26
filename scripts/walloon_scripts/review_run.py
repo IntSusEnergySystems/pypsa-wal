@@ -36,11 +36,18 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 
+from scripts.walloon_scripts.set_NTCs import read_ntc_pairs
+
 logger = logging.getLogger(__name__)
 
 HORIZONS = (2025, 2030, 2040, 2050)
 WAL = "BEWAL"
 BE_NODES = ("BEWAL", "BEVLG", "BEBRU")
+
+# a corridor counts as congested within 1 % of its limit: the LP leaves AC flows
+# at ~99.6 % of the bound, so a tighter tolerance reports zero congested hours
+# on lines that are saturated all year
+CONGESTION_TOL = 1e-2
 
 # Level 5.4 plausibility windows. Deliberately wide: these are lie-detectors, not
 # calibration targets.
@@ -720,7 +727,88 @@ def check_potentials(nets, pot_file: Path, rep: Report) -> None:
             rep.ok(sec, msg)
 
 
+def _border_branches(n, code_a: str, code_b: str):
+    """AC lines and DC links between two locations, matched either way round."""
+    def sides(df):
+        left = df.bus0.map(n.buses.location).fillna(df.bus0)
+        right = df.bus1.map(n.buses.location).fillna(df.bus1)
+        a, b = left.eq(code_a) | left.str.startswith(code_a), right.eq(code_b) | right.str.startswith(code_b)
+        c, d = left.eq(code_b) | left.str.startswith(code_b), right.eq(code_a) | right.str.startswith(code_a)
+        return df[(a & b) | (c & d)]
+
+    lines = sides(n.lines)
+    links = sides(n.links[n.links.carrier.eq("DC")]) if not n.links.empty else n.links.iloc[0:0]
+    return lines, links
+
+
+def _forward_links(links):
+    """Drop the mirrored half of each DC interconnector.
+
+    `prepare_sector_network` duplicates every DC link with a `-reversed` twin of
+    the same `p_nom`, so summing the frame counts each corridor twice.
+    """
+    if links.empty:
+        return links
+    if "reversed" in links:
+        return links[~links["reversed"].fillna(False).astype(bool)]
+    return links[~links.index.str.contains("reversed")]
+
+
+def _usable_capacity(n, lines, links) -> tuple[float, float]:
+    """(usable MW, nominal MW) of a corridor, honouring the AC N-1 derating."""
+    dc = float(_forward_links(links).p_nom_opt.sum())
+    usable = float((lines.s_nom_opt * lines.s_max_pu).sum()) + dc
+    nominal = float(lines.s_nom_opt.sum()) + dc
+    return usable, nominal
+
+
+def _congestion(n, lines, links) -> tuple[float, float]:
+    """(share of hours at the limit, congestion rent in MEUR) of a corridor."""
+    w = n.snapshot_weightings.objective
+    total = float(w.sum())
+    if total == 0:
+        return 0.0, 0.0
+
+    prices = n.buses_t.marginal_price
+    at_cap = pd.Series(False, index=n.snapshots)
+    rent = 0.0
+
+    def _rent(bus0, bus1, flow):
+        if prices.empty or bus0 not in prices or bus1 not in prices:
+            return 0.0
+        return float(((prices[bus1] - prices[bus0]).abs() * flow.abs() * w).sum() / 1e6)
+
+    if not lines.empty:
+        s_max_pu = n.get_switchable_as_dense("Line", "s_max_pu")
+        for name in lines.index:
+            if name not in n.lines_t.p0:
+                continue
+            flow = n.lines_t.p0[name]
+            cap = s_max_pu[name] * n.lines.at[name, "s_nom_opt"]
+            at_cap |= (cap > 0) & (flow.abs() >= cap * (1 - CONGESTION_TOL))
+            rent += _rent(lines.at[name, "bus0"], lines.at[name, "bus1"], flow)
+
+    for name in _forward_links(links).index:
+        if name not in n.links_t.p0:
+            continue
+        flow = n.links_t.p0[name]
+        cap = float(links.at[name, "p_nom_opt"])
+        at_cap |= (cap > 0) & (flow.abs() >= cap * (1 - CONGESTION_TOL))
+        rent += _rent(links.at[name, "bus0"], links.at[name, "bus1"], flow)
+
+    return float(w[at_cap].sum()) / total, rent
+
+
 def check_ntc(nets, ntc_dir: Path, rep: Report) -> None:
+    """NTCs are ceilings on *usable* capacity, so check they are not exceeded.
+
+    They used to be written straight into `s_nom`, which the AC N-1 derating
+    then cut to 70 %, so the check demanded equality and reported the shortfall.
+    `set_NTCs.apply_ntc_limits` now caps `s_nom_max` at `NTC / s_max_pu`
+    instead: the corridor may come out anywhere up to the NTC, and only
+    exceeding it is a defect. The build-out fraction and the congestion are
+    reported so an undersized ceiling is still visible.
+    """
     sec = "4.3 · interconnection / NTC"
     iso = {"DE": "DEU", "FR": "FRA", "GB": "GBR", "LU": "LUX", "NL": "NLD"}
     for y, n in nets.items():
@@ -728,33 +816,54 @@ def check_ntc(nets, ntc_dir: Path, rep: Report) -> None:
         if not f.exists():
             rep.warn(sec, f"{f.name} missing — skipped")
             continue
-        ntc = pd.read_csv(f)
-        ntc = ntc[ntc.source_country_code == "BEL"].set_index("target_country_code")["NTC_MW"]
+        pairs = read_ntc_pairs(f)
+
         for c, code in iso.items():
-            if code not in ntc.index:
+            pair = tuple(sorted(["BEL", code]))
+            if pair not in pairs.index:
                 continue
-            li = n.lines.copy()
-            li["l"] = li.bus0.map(n.buses.location)
-            li["r"] = li.bus1.map(n.buses.location)
-            m = li[(li.l.str.startswith("BE") & li.r.eq(c)) | (li.l.eq(c) & li.r.str.startswith("BE"))]
-            lk = n.links.copy()
-            lk["l"] = lk.bus0.map(n.buses.location)
-            lk["r"] = lk.bus1.map(n.buses.location)
-            md = lk[lk.carrier.eq("DC")
-                    & ((lk.l.str.startswith("BE") & lk.r.eq(c)) | (lk.l.eq(c) & lk.r.str.startswith("BE")))]
-            # OSM DC interconnectors are split fwd/reversed — count the pair once
-            dc = float(md.p_nom_opt.sum() / max(len(md), 1)) if len(md) else 0.0
-            usable = float((m.s_nom_opt * m.s_max_pu).sum()) + dc
-            nominal = float(m.s_nom_opt.sum()) + dc
-            want = float(ntc[code])
-            msg = (f"{y} BE-{c}: NTC file {want:,.0f} MW | network nominal {nominal:,.0f} | "
-                   f"usable (after s_max_pu) {usable:,.0f}")
-            if abs(usable - want) <= 0.02 * want:
-                rep.ok(sec, msg)
+            want = float(pairs[pair])
+            if want == 0:
+                continue
+
+            lines, links = _border_branches(n, "BE", c)
+            if lines.empty and links.empty:
+                rep.warn(sec, f"{y} BE-{c}: no branches found in the network")
+                continue
+            usable, nominal = _usable_capacity(n, lines, links)
+            hours, rent = _congestion(n, lines, links)
+
+            msg = (f"{y} BE-{c}: cap {want:,.0f} MW | usable {usable:,.0f} "
+                   f"({usable / want:.0%}) | nominal {nominal:,.0f} | "
+                   f"at limit {hours:.0%} of hours | rent {rent:,.0f} MEUR")
+            if usable > want * 1.02:
+                rep.fail(sec, "usable capacity exceeds the NTC cap — " + msg,
+                         "apply_ntc_limits sets s_nom_max = NTC / s_max_pu; a breach "
+                         "means something rewrote s_nom_max after it ran")
             else:
-                rep.warn(sec, f"usable capacity is {usable/want:.0%} of the NTC — " + msg,
-                         "AC lines carry s_max_pu=0.7 and DC links do not; decide which "
-                         "convention set_NTCs.py should implement")
+                rep.ok(sec, msg)
+
+        # internal Belgian corridors: capped in the same file, or left to
+        # lines.max_extension if no row exists
+        for a, b in (("BEWAL", "BEVLG"), ("BEWAL", "BEBRU"), ("BEBRU", "BEVLG")):
+            lines, links = _border_branches(n, a, b)
+            if lines.empty and links.empty:
+                continue
+            usable, nominal = _usable_capacity(n, lines, links)
+            hours, rent = _congestion(n, lines, links)
+            pair = tuple(sorted([a, b]))
+            want = float(pairs[pair]) if pair in pairs.index else float("nan")
+            cap = f"cap {want:,.0f} MW" if want == want else "no cap row"
+            msg = (f"{y} {a}-{b}: {cap} | usable {usable:,.0f} | "
+                   f"at limit {hours:.0%} of hours | rent {rent:,.0f} MEUR")
+            if want == want and usable > want * 1.02:
+                rep.fail(sec, "usable capacity exceeds the cap — " + msg)
+            elif hours > 0.5:
+                rep.warn(sec, "internal corridor saturated over half the year — " + msg,
+                         "raise its row in data/walloon/ntc_<year>.csv if the "
+                         "reinforcement is credible")
+            else:
+                rep.ok(sec, msg)
 
 
 def check_co2(nets, rep: Report) -> None:

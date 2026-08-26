@@ -155,30 +155,72 @@ From `config/config.walloon.yaml`:
 ```yaml
 countries: [BE, FR, GB, NL, DE, LU]
 electricity:
-  transmission_limit: v1.0
+  transmission_limit: vopt          # was v1.0 until 2026-08-26
   transmission_limit_myopic:
-    2030: v1.0
-    2040: v1.1
-    2050: v1.1
+    2030: vopt
+    2040: vopt
+    2050: vopt
   apply_ntc_constraints: True
 ```
 
+> **Changed 2026-08-26.** This section previously described a grid that could not
+> grow. Both mechanisms below were rewritten; see 3.1.1 for what was wrong.
+
 ### 3.1 NTC constraints (`scripts/walloon_scripts/set_NTCs.py`)
 
-Called at the **end** of `prepare_sector_network` when `apply_ntc_constraints: True`, using `data/walloon/ntc_2030.csv`.
+Called at the **end** of `prepare_sector_network` when `apply_ntc_constraints: True`,
+using `data/walloon/ntc_<horizon>.csv` (one file per planning horizon).
 
-For each country pair (ISO-3 → ISO-2, e.g. BEL–DEU):
+`apply_ntc_limits` turns each NTC into an **upper bound the optimiser may build up
+to**, not a fixed capacity. For each border in the file:
 
-1. Sum existing cross-border **DC link** capacities (each direction separately) **or**, if no DC, sum **AC line** `s_nom`.
-2. Scale all parallel interconnections uniformly so the **total equals the target NTC** (MW).
-3. If DC links exist, **remove parallel AC lines** between the same pair (avoid double counting).
+1. Both directions of a border are averaged into one symmetric figure
+   (`read_ntc_pairs`) — the file holds e.g. BEL→FRA 6 000 MW and FRA→BEL 4 300 MW
+   for 2050.
+2. **DC links**: `p_nom_max` is shared across parallel links so it sums to the NTC
+   per direction.
+3. **AC lines**: `s_nom_max` is set so that `sum(s_nom_max × s_max_pu)` equals the
+   NTC. Because `s_max_pu = 0.7`, the nominal cap is `NTC / 0.7` — the **usable**
+   capacity is what matches the file.
+4. `s_nom` / `p_nom` keep their clustered values and are scaled down **only** where
+   today's grid already exceeds the cap.
+5. If DC links exist, parallel AC lines are still **removed** (avoid double counting).
 
 **Important modelling implications**:
 
 - NTC is enforced at **country-pair** level, not BEWAL–FR or BEWAL–DE level.
-- Belgian regions share one national NTC bucket (buses retain `country == 'BE'` while index is `BEWAL` etc.).
-- Capacities are scaled, not re-routed; internal Belgian topology is already collapsed to three nodes.
-- File is labelled 2030 but applied across myopic horizons unless extended.
+- Belgian regions share one national NTC bucket (buses retain `country == 'BE'`
+  while index is `BEWAL` etc.).
+- The file may also address **region buses directly** (`BEWAL`, `BEVLG`, `BEBRU`),
+  which is how internal Belgian corridors get a ceiling. A corridor with **no row**
+  is bounded only by `lines.max_extension` (20 GW) — effectively unlimited.
+- Borders with `NTC_MW == 0` are left untouched.
+
+#### 3.1.1 Why this changed
+
+The 2050 solve of
+[`2026-08-25_scen_demande_haute_2010_1h.md`](logs/2026-08-25_scen_demande_haute_2010_1h.md)
+had **no extendable branch anywhere in the network**, from two independent causes
+that had to be fixed together:
+
+| Cause | Effect |
+|---|---|
+| `transmission_limit: v1.0` capped the AC+DC volume×length product at 100 % of today | `set_transmission_limit` made every line and link non-extendable |
+| `set_line_s_nom_to_ntc` wrote the NTC into `s_nom` / `p_nom` | even where extendable, capacity was pinned at the NTC |
+| `add_brownfield` ran `set_transmission_limit` *after* carrying forward the built grid | `s_nom_min` was reset to today's `s_nom`, discarding the previous horizon's build |
+
+The symptoms were unambiguous: eight of ten cross-border AC lines at **96–99 %**
+loading, DC links at their limit 23–51 % of hours, and **12.3 bn EUR/a** of
+congestion rent in 2050. The grid was not growing slowly — it was frozen.
+
+Writing the NTC into `s_nom` also meant the delivered capacity was never the
+number in the file: `s_max_pu = 0.7` cut an NTC of 5 150 MW to 3 605 MW usable,
+which is the "AC borders deliver 41–73 % of their stated NTC" finding of the
+18 Aug log. Capping `s_nom_max` at `NTC / s_max_pu` fixes the convention.
+
+`vopt` is the PyPSA-Eur default, so this also moves the overlay **closer** to
+upstream: per-border ceilings now come from the NTC files rather than from a
+global volume cap.
 
 Example entries relevant to Belgium (MW, symmetric pairs in file):
 
@@ -190,7 +232,7 @@ Example entries relevant to Belgium (MW, symmetric pairs in file):
 | BEL–LUX | 680 |
 | BEL–NLD | 3400 |
 
-**Data source note:** Cross-border NTC values come from `data/walloon/ntc_2030.csv`, documented as European country-pair NTCs for 2030 (aligned with TYNDP-style figures in `doc/data-walloon.rst`), **not** from Elia.
+**Data source note:** Cross-border NTC values come from `data/walloon/ntc_<horizon>.csv`, documented as European country-pair NTCs (aligned with TYNDP-style figures in `doc/data-walloon.rst`).
 
 ### 3.2 Elia data in the current workflow
 
@@ -204,7 +246,7 @@ The current analysis uses **both** concepts, but at different levels:
 
 | Aspect | What the model does |
 |--------|---------------------|
-| **Cross-border limits** | **NTC-style capacity caps** — before the solve, `set_line_s_nom_to_ntc` scales (or sets) the sum of border line/link capacities to match country-pair NTC values. There is no separate NTC market-coupling algorithm or flow-based NTC computation at runtime. |
+| **Cross-border limits** | **NTC-style capacity ceilings** — before the solve, `apply_ntc_limits` caps `s_nom_max` / `p_nom_max` on border branches so that *usable* capacity cannot exceed the country-pair NTC. The optimiser chooses where inside that envelope to build. There is no separate NTC market-coupling algorithm or flow-based NTC computation at runtime. |
 | **Within-network dispatch** | **Linear Optimal Power Flow (LOPF)** — `scripts/solve_network.py` calls PyPSA `network.optimize()`, which solves a **linearised** DC-style OPF on AC lines (susceptance-based) plus transport-model HVDC links, **not** a full AC Newton–Raphson power flow. |
 | **Losses** | Optional AC loss linearisation (`solving.options.transmission_losses: 2` in default config); HVDC losses via `lossy_bidirectional_links` when enabled in `sector.transmission_efficiency`. |
 | **Security** | Thermal headroom only: `lines.s_max_pu = 0.7` (~N‑1 margin on nominal capacity). No contingency-constrained OPF or PTDF-based branch limits (`electricity.operational_reserve.activate` is `false` by default). |

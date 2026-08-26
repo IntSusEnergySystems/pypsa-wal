@@ -48,7 +48,7 @@ from scripts.prepare_network import maybe_adjust_costs_and_potentials
 from scripts.walloon_scripts.nuclear_helper_overnight import add_BEWAL_nuclear
 from scripts.walloon_scripts.nuclear_helper import apply_nuclear_inflexibility
 from scripts.walloon_scripts.BEWAL_potentials_overnight import update_BEWAL_potentials
-from scripts.walloon_scripts.set_NTCs import set_line_s_nom_to_ntc
+from scripts.walloon_scripts.set_NTCs import apply_ntc_limits
 
 spatial = SimpleNamespace()
 logger = logging.getLogger(__name__)
@@ -7416,7 +7416,7 @@ if __name__ == "__main__":
     sanitize_carriers(n, snakemake.config)
     sanitize_locations(n)
     if snakemake.config["electricity"].get("apply_ntc_constraints", False):
-        set_line_s_nom_to_ntc(n, snakemake.input.ntc_csv)
+        apply_ntc_limits(n, snakemake.input.ntc_csv)
     if foresight == "overnight":
      add_BEWAL_nuclear(
         n=n,
