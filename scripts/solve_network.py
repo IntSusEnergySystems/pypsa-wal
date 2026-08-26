@@ -43,7 +43,7 @@ import yaml
 from linopy.remote.oetc import OetcCredentials, OetcHandler, OetcSettings
 from pypsa.descriptors import get_activity_mask
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
-from prepare_sector_network import determine_emission_sectors
+from scripts.prepare_sector_network import determine_emission_sectors
 from scripts._benchmark import memory_logger
 from scripts._helpers import (
     PYPSA_V1,
@@ -1462,6 +1462,110 @@ def add_selfsufficiency_constraints(n, level):
       imported_elec <= (1 - level) * local_energy,
       name="import_energy_limit")
       
+NATIONAL_CO2_COUNTRIES = ["BEBRU", "BEVLG", "BEWAL", "DE", "FR", "NL", "GB", "LU"]
+
+# Aviation is out of scope for the *national* CO2 targets, on both sides of the
+# constraint. Three reasons, in order of weight:
+#   1. the authoritative trajectory in config/input_parameters_for_models.csv is
+#      defined "hors aviation internationale & UTCATF";
+#   2. international bunkers are memo items outside national inventories, and
+#      the EU Effort Sharing Regulation excludes them;
+#   3. it cannot be charged nationally without error. Kerosene is drawn from the
+#      single `EU oil` bus, a large share of which is carbon-neutral
+#      Fischer-Tropsch product, but that negative sits on location "EU" and the
+#      attribution below drops "EU" — so the consumer pays a fossil factor for
+#      fuel nobody is credited with decarbonising.
+# Aviation stays in the global `CO2Limit`, where the carbon balance does close.
+# Domestic aviation goes with it: the model has a single kerosene carrier and
+# cannot separate the two (it is 0.4 % of Belgian aviation emissions).
+AVIATION_SECTORS = ["domestic aviation", "international aviation"]
+AVIATION_CARRIER = "kerosene for aviation"
+
+# emissions of these are accounted for at the European level, not nationally
+NATIONAL_CO2_EXCLUDE = ["EU oil refining", "EU methanol import", "EU oil import"]
+
+# carriers whose location sits on the input side rather than on bus1
+NATIONAL_CO2_SOURCE_PATTERNS = [
+    "process emissions",
+    "HVC to air",
+    "electrobiofuels",
+    "unsustainable bioliquids",
+    "biomass-to-methanol",
+    "biomass to liquid",
+]
+
+
+def national_co2_country(n):
+    """Country each link's CO2 is booked to, for the national accounts.
+
+    Most country-specific links keep their locational information in ``bus1``.
+    DAC is the exception (``bus3``), as are the source patterns, whose location
+    sits on ``bus0``. Links that end up on ``EU`` are dropped: no national
+    account can claim them.
+    """
+    country = n.links.bus1.map(n.buses.location)
+
+    if "bus3" in n.links:
+        country_DAC = n.links[n.links.carrier == "DAC"].bus3.map(n.buses.location)
+        country[country_DAC.index] = country_DAC
+
+    for pattern in NATIONAL_CO2_SOURCE_PATTERNS:
+        source = n.links[n.links.carrier.str.contains(pattern)].bus0.map(
+            n.buses.location
+        )
+        country[source.index] = source
+
+    mask = country.isna() | (country == "")
+    country[mask] = country[mask].index
+    return country[country != "EU"]
+
+
+def national_co2_expression(n):
+    """Linopy expression for annual CO2 per country, in t.
+
+    Shared by the national cap and the national CO2 price so the two can never
+    disagree on scope. Sums every link port that touches the ``co2`` carrier —
+    i.e. ``co2 atmosphere`` — weighted by that port's efficiency.
+    """
+    p = n.model["Link-p"]  # dimension: (time, component)
+    country = national_co2_country(n)
+
+    exclude = np.append(
+        NATIONAL_CO2_EXCLUDE,
+        n.links.index[
+            n.links.carrier.astype(str).str.contains(AVIATION_CARRIER, na=False)
+        ].values,
+    )
+
+    lhs = []
+    for port in [col[3:] for col in n.links if col.startswith("bus")]:
+        if port == str(0):
+            efficiency = (
+                n.links["efficiency"].apply(lambda x: 1.0).rename("efficiency0")
+            )
+        elif port == str(1):
+            efficiency = n.links["efficiency"]
+        else:
+            efficiency = n.links[f"efficiency{port}"]
+        mask = n.links[f"bus{port}"].map(n.buses.carrier).eq("co2")
+
+        idx = n.links[mask].index
+        idx = idx[~np.isin(idx, exclude)]
+        idx = idx[idx.isin(country.index)]
+        grouping = country.loc[idx]
+
+        if not grouping.isnull().all():
+            expr = (
+                (p.loc[:, idx] * efficiency[idx])
+                .groupby(grouping, axis=1)
+                .sum()
+                * n.snapshot_weightings.generators
+            ).sum(dims="snapshot")
+            lhs.append(expr)
+
+    return sum(lhs)  # dimension: (country)
+
+
 def add_co2limit_country(n, limit_countries, nyears=1.0):
     """
     Add a set of emissions limit constraints for specified countries.
@@ -1476,14 +1580,15 @@ def add_co2limit_country(n, limit_countries, nyears=1.0):
     """
     logger.info(f"Adding CO2 budget limit for each country as per unit of 1990 levels")
 
-    countries = ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'NL', 'GB', 'LU']
+    countries = NATIONAL_CO2_COUNTRIES
 
     # TODO: import function from prepare_sector_network? Move to common place?
     sectors = determine_emission_sectors(options)
-    
+    national_sectors = [s for s in sectors if s not in AVIATION_SECTORS]
+
     # convert Mt to tCO2
     co2_totals = 1e6 * pd.read_csv(snakemake.input.co2_totals_name, index_col=0)
-    co2_limit_countries = co2_totals.loc[countries, sectors].sum(axis=1)
+    co2_limit_countries = co2_totals.loc[countries, national_sectors].sum(axis=1)
     if foresight == "overnight":
         updates = {
             "BEBRU": 9000000,
@@ -1509,52 +1614,7 @@ def add_co2limit_country(n, limit_countries, nyears=1.0):
         co2_limit_countries *= co2_limit_countries.index.map(limit_countries) * nyears
         co2_limit_countries = (co2_limit_countries)
 
-    p = n.model["Link-p"]  # dimension: (time, component)
-
-    # NB: Most country-specific links retain their locational information in bus1 (except for DAC, where it is in bus2, and pattern sources, where it is in bus0)
-    country = n.links.bus1.map(n.buses.location)
-    
-    country_DAC = (
-        n.links[n.links.carrier == "DAC"]
-        .bus3.map(n.buses.location)
-    )
-    country[country_DAC.index] = country_DAC
-    patterns = ["process emissions", "HVC to air", "electrobiofuels","unsustainable bioliquids","biomass-to-methanol","biomass to liquid"]
-
-    for pattern in patterns:
-      source = n.links[n.links.carrier.str.contains(pattern)].bus0.map(n.buses.location)
-      country[source.index] = source
-    mask = country.isna() | (country == '')
-    country[mask] = country[mask].index
-    country = country[country != 'EU']
-    lhs = []
-    for port in [col[3:] for col in n.links if col.startswith("bus")]:
-        if port == str(0):
-            efficiency = (
-                n.links["efficiency"].apply(lambda x: 1.0).rename("efficiency0")
-            )
-        elif port == str(1):
-            efficiency = n.links["efficiency"]
-        else:
-            efficiency = n.links[f"efficiency{port}"]
-        mask = n.links[f"bus{port}"].map(n.buses.carrier).eq("co2")
-
-        idx = n.links[mask].index
-        exclude = ["EU oil refining", "EU methanol import", "EU oil import"]
-        idx = idx[~np.isin(idx, exclude)]
-        idx = idx[idx.isin(country.index)]
-        grouping = country.loc[idx]
-
-        if not grouping.isnull().all():
-            expr = (
-                (p.loc[:, idx] * efficiency[idx])
-                .groupby(grouping, axis=1)
-                .sum()
-                * n.snapshot_weightings.generators
-            ).sum(dims="snapshot")
-            lhs.append(expr)
-
-    lhs = sum(lhs)  # dimension: (country)
+    lhs = national_co2_expression(n)  # dimension: (country)
     lhs = lhs.rename({list(lhs.dims)[0]: "snapshot"})
     rhs = pd.Series(co2_limit_countries)  # dimension: (country)
     for ct in lhs.indexes["snapshot"]:
@@ -1584,52 +1644,8 @@ def add_co2price_country(n, co2_price_countries, nyears=1.0):
     """
 
     logger.info("Adding CO2 price per country to objective function")
-    p = n.model["Link-p"]  # dimension: (time, component)
 
-    # NB: Most country-specific links retain their locational information in bus1 (except for DAC, where it is in bus2, and pattern sources, where it is in bus0)
-    country = n.links.bus1.map(n.buses.location)
-    
-    country_DAC = (
-        n.links[n.links.carrier == "DAC"]
-        .bus3.map(n.buses.location)
-    )
-    country[country_DAC.index] = country_DAC
-    patterns = ["process emissions", "HVC to air", "electrobiofuels","unsustainable bioliquids","biomass-to-methanol","biomass to liquid"]
-
-    for pattern in patterns:
-      source = n.links[n.links.carrier.str.contains(pattern)].bus0.map(n.buses.location)
-      country[source.index] = source
-    mask = country.isna() | (country == '')
-    country[mask] = country[mask].index
-    country = country[country != 'EU']
-    lhs = []
-    for port in [col[3:] for col in n.links if col.startswith("bus")]:
-        if port == str(0):
-            efficiency = (
-                n.links["efficiency"].apply(lambda x: 1.0).rename("efficiency0")
-            )
-        elif port == str(1):
-            efficiency = n.links["efficiency"]
-        else:
-            efficiency = n.links[f"efficiency{port}"]
-        mask = n.links[f"bus{port}"].map(n.buses.carrier).eq("co2")
-
-        idx = n.links[mask].index
-        exclude = ["EU oil refining", "EU methanol import", "EU oil import"]
-        idx = idx[~np.isin(idx, exclude)]
-        idx = idx[idx.isin(country.index)]
-        grouping = country.loc[idx]
-
-        if not grouping.isnull().all():
-            expr = (
-                (p.loc[:, idx] * efficiency[idx])
-                .groupby(grouping, axis=1)
-                .sum()
-                * n.snapshot_weightings.generators
-            ).sum(dims="snapshot")
-            lhs.append(expr)
-
-    lhs = sum(lhs)  # dimension: (country)
+    lhs = national_co2_expression(n)  # dimension: (country)
     dim = list(lhs.dims)[0]
     price = pd.Series(co2_price_countries)
     # align with lhs countries

@@ -339,6 +339,8 @@ every horizon.
 
 - [ ] Realised emissions vs each `co2_limit_per_country*` constraint, and vs the
       system `CO2Limit`.
+- [ ] **Aviation is in the global cap only** (see 4.4.1). A national LHS that
+      includes `kerosene for aviation` is the old, broken behaviour.
 - [ ] **Both bind simultaneously.** The per-country caps sum to exactly the global
       cap, so the *effective* carbon price in Wallonia is
       `|mu(CO2Limit)| + |mu(co2_limit_per_countryBEWAL)|`, not either alone. Report
@@ -353,6 +355,52 @@ every horizon.
       `biomass limit` is `<= 0` — sustainable solid biomass is *banned* Europe-wide
       in 2025 and all biomass must be "unsustainable". Read 2025 biomass numbers
       with that in mind.
+
+#### 4.4.1 Aviation: global cap yes, national cap no (2026-08-26)
+
+Aviation emissions are counted in the system `CO2Limit` and **excluded from every
+`co2_limit_per_country*` constraint** — on both sides, so the BEWAL cap drops both
+the aviation term from its left-hand side and the aviation baseline from its
+right-hand side. `scripts/solve_network.py` does this in
+`national_co2_expression`, which is now shared by `add_co2limit_country` and
+`add_co2price_country` so a cap and a price can never disagree about scope.
+
+The reason is that national accounting and a single EU oil bus are structurally
+incompatible. Kerosene is drawn from one shared `EU oil` bus whose fossil share
+falls to 59.5 % by 2050. The Fischer-Tropsch and biomass-to-liquid links that
+supply the other 40.5 % sit at `EU`, so their negative CO₂ term is booked to `EU`
+and then dropped from national accounting, while the withdrawing aviation link
+sits in Wallonia and is charged the **full fossil intensity** of the fuel it
+burns. Wallonia pays for carbon that the synthetic pathway already paid to
+remove. In the 2050 solve of
+[`2026-08-25_scen_demande_haute_2010_1h.md`](logs/2026-08-25_scen_demande_haute_2010_1h.md)
+that single term was **2.23 Mt against a 1.717 Mt national cap** — the cap was
+unsatisfiable from aviation alone, which is what produced the 573 EUR/t national
+dual and the ~1 200 EUR/t effective Walloon price. It was an accounting artefact,
+not scarcity.
+
+Two further reasons to prefer this scope:
+
+- **It matches the agreed trajectory.** `config/input_parameters_for_models.csv`
+  defines the CO₂ anchors as *hors aviation internationale & UTCATF*. The old
+  national LHS contradicted the very target it was compared against.
+- **It matches how aviation is governed.** International aviation sits in
+  CORSIA/EU-ETS aviation, not in national effort-sharing inventories.
+
+What to watch, since this is a real loosening:
+
+- [ ] Aviation must not become a **free** sink. Check that `CO2Limit` still binds
+      and that its dual is non-zero; that is the only thing now pricing kerosene.
+- [ ] Domestic aviation is excluded too. This is broader than the trajectory's
+      "international" wording, and is deliberate: both draw from the same shared
+      oil bus and are therefore mis-attributed identically. Domestic aviation is
+      small (Wallonia has no significant domestic air traffic), so the practical
+      difference is negligible — but if a scenario ever makes it material, split
+      the carriers rather than re-adding both.
+- [ ] The proper fix is nodal oil (`regional_oil_demand: true`) with per-node
+      synthetic-fuel balances, which would let the credit and the debit meet at
+      the same bus. Until then this exclusion is the honest option, not the ideal
+      one.
 
 ## Level 5 — Is it realistic for Wallonia?
 
