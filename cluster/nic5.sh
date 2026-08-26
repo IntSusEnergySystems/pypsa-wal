@@ -220,9 +220,13 @@ cmd_solve() {
     # rules whose log paths contain an unbindable {run} wildcard) and aborts
     # with WildcardError in rules/postprocess.smk. The default source cache
     # already lands on scratch via XDG_CACHE_HOME=$REMOTE_DIR/.cache.
+    # Snakemake merges --configfile in order and the last one wins, so the
+    # cluster overlay has to come *after* the study config. The other way round
+    # config.walloon.yaml's workstation allocation (12 threads, 100 GB) silently
+    # replaced the hmem allocation this file exists to request.
     rssh "cd '$REMOTE_DIR' && $REMOTE_ENV && mkdir -p cluster/logs && \
-        setsid bash -c \"snakemake --configfile cluster/config_cluster.yaml \
-            --configfile $CONFIGFILE \
+        setsid bash -c \"snakemake --configfile $CONFIGFILE \
+            --configfile cluster/config_cluster.yaml \
             --executor slurm --jobs $MAX_SLURM_JOBS \
             --rerun-triggers mtime --keep-going --printshellcmds \
             --envvars XDG_CACHE_HOME TMPDIR GRB_LICENSE_FILE \
@@ -346,10 +350,14 @@ cmd_wait() {
 cmd_pull() {
     msg "Pulling results + logs from cluster"
     mkdir -p "$REPO/results" "$HERE/logs"
-    rssync -arh --no-g --info=progress2 \
+    # -K/--keep-dirlinks: results/ (or a scenario dir inside it) is often a
+    # symlink onto a bigger disk. Without it rsync sees a real directory in the
+    # source, deletes the local symlink and writes the networks onto the small
+    # disk instead.
+    rssync -arhK --no-g --info=progress2 \
         "${REMOTE}:${REMOTE_DIR}/results/" "$REPO/results/" \
         || msg "(no results dir yet)"
-    rssync -arh --no-g \
+    rssync -arhK --no-g \
         "${REMOTE}:${REMOTE_DIR}/cluster/logs/" "$HERE/logs/" || true
     msg "Pull complete. Solved networks are in results/${RUN_DIR_REL}/networks/."
 }
@@ -414,6 +422,19 @@ cmd_upload() {
 }
 
 cmd_extract() {
+    # Extraction loads every solved network in turn and has been OOM-killed
+    # mid-run, which leaves a half-written Explorer CSV set that looks valid.
+    # Both guards below are what actually saved the last two attempts.
+    local swap_kb
+    swap_kb=$(awk '/^SwapTotal:/{print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    if [ "${swap_kb:-0}" -lt 1048576 ] && [ "${NIC5_ALLOW_NO_SWAP:-0}" != "1" ]; then
+        die "swap is off (SwapTotal=${swap_kb} kB). Extraction peaks above RAM;
+     enable swap first (sudo swapon -a) or set NIC5_ALLOW_NO_SWAP=1 to override."
+    fi
+    if pgrep -f 'review_run\.py' >/dev/null 2>&1; then
+        die "review_run.py is running. It also holds several networks in memory;
+     wait for it to finish, or the two together will exhaust RAM."
+    fi
     bash "$HERE/extract_explorer.sh" "$@"
 }
 
