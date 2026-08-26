@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Nuclear capacity caps: master CSV → agg_p_nom_minmax_demande_haute.csv."""
+"""Aggregate capacity caps: master CSV → agg_p_nom_minmax_demande_haute.csv."""
 
 from __future__ import annotations
 
@@ -26,6 +26,12 @@ EXPECTED = {
     ("BE", "nuclear-all", "max"): {2035: 2030, 2040: 2030, 2045: 1750, 2050: 3000},
 }
 
+# Walloon dispatchable-gas floor, technology-neutral over CCGT + CCGT CC. Unlike
+# nuclear this one does anchor 2025/2030: the legacy gas fleet is well below it.
+EXPECTED_GAS = {
+    ("BEWAL", "CCGT-all", "min"): {2025: 1740, 2030: 1740, 2040: 1740, 2050: 1740},
+}
+
 
 def _cells(path: Path, country: str, carrier: str) -> dict[tuple[int, str], str]:
     lines = path.read_text().splitlines()
@@ -44,7 +50,7 @@ def _cells(path: Path, country: str, carrier: str) -> dict[tuple[int, str], str]
 
 def test_master_csv_anchors_match_alignment():
     targets = collect_targets(load_master(), "agg", planning_horizons(), nparts=3)
-    assert set(targets) == set(EXPECTED)
+    assert set(targets) == set(EXPECTED) | set(EXPECTED_GAS)
     for key, anchors in EXPECTED.items():
         got = {int(y): v for y, v in targets[key].anchors.items()}
         assert got == anchors, key
@@ -53,11 +59,28 @@ def test_master_csv_anchors_match_alignment():
         assert 2030 not in targets[key].anchors
 
 
+def test_walloon_gas_floor_is_technology_neutral():
+    """The floor must sit on CCGT-all, not on unabated CCGT.
+
+    A floor on `CCGT` alone forced 1 740 MW_e of unabated capacity into
+    Wallonia at every horizon and left no room for `CCGT CC`, which the 2050
+    run built in Germany (8 465 MW_e) and Brussels (1 116 MW_e) but not in
+    Wallonia. `agg_ccgt` folds both carriers into `CCGT-all`, so the adequacy
+    requirement no longer picks the technology.
+    """
+    targets = collect_targets(load_master(), "agg", planning_horizons(), nparts=3)
+    for key, anchors in EXPECTED_GAS.items():
+        assert key in targets, key
+        got = {int(y): v for y, v in targets[key].anchors.items()}
+        assert got == anchors, key
+    assert ("BEWAL", "CCGT", "min") not in targets
+
+
 def test_demande_haute_file_already_in_sync():
     patch = patch_agg_p_nom(load_master(), planning_horizons(), dry_run=True)
     assert patch.ok, patch.errors
     assert patch.changes == []
-    assert patch.managed == 4
+    assert patch.managed == len(EXPECTED) + len(EXPECTED_GAS)
 
 
 def test_write_restores_scrambled_caps(tmp_path: Path):

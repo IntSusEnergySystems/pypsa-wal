@@ -249,7 +249,11 @@ moves residual emissions, capture sizing and the electricity penalty together.
 2. **No retrofit.** Saint-Ghislain, Amercoeur, Marcinelle, Seraing, Flémalle stay
    unabated. TIMES retrofits Flemalle (E12) and Seraing New (E13) from 2035
    (§0). A PyPSA retrofit would be a second Link with `p_nom` tied to existing
-   capacity, not done here.
+   capacity, not done here. What stands in for it is the technology-neutral
+   `CCGT-all` floor (§13.1): the adequacy requirement can be met with capture,
+   so the model may reach a TIMES-like capacity mix through new-build. It does
+   not reproduce a retrofit's economics — a retrofit reuses the existing power
+   island and so is cheaper per kW than the greenfield CCGT-CC costed in §2.
 3. **No part-load / minimum-load** specific to the capture train.
 4. **TIMES cost cell still empty.** PyPSA and TIMES will diverge on CCGT-CCS
    overnight cost until that row is filled and `--write`n.
@@ -273,6 +277,16 @@ moves residual emissions, capture sizing and the electricity penalty together.
 | `scripts/walloon_scripts/calculate_costs.py` | CCS bucket no longer matches every CCGT |
 | `config/input_parameters_for_models.csv` | placeholder notes point here |
 | `test/test_ccgt_cc.py` | algebra, four-bus wiring, cost-row guard, categorise |
+
+Added 2026-08-26, moving the Walloon gas floor off unabated CCGT (§13.1):
+
+| File | Change |
+|---|---|
+| `data/walloon/custom_potentials.csv` | dropped the four `BEWAL,CCGT,p_nom_min` rows |
+| `data/walloon/agg_p_nom_minmax_*.csv` | added `BEWAL,CCGT-all` min = 1 740 at every horizon |
+| `config/input_parameters_for_models.csv` | *Minimum CCGT installé* retargeted to `agg:BEWAL:CCGT-all:min` |
+| `scripts/walloon_scripts/BEWAL_potentials.py` | `apply_link_p_nom_min` — floors are fleet-wide, not per-vintage |
+| `test/test_common_parameters_agg.py` | `test_walloon_gas_floor_is_technology_neutral` |
 
 No full Snakemake solve was run (too slow). Checks: `test/test_ccgt_cc.py` and
 `test/test_config_schema.py`.
@@ -455,10 +469,26 @@ CCGT-CC (unsolved) and keeps `bioH2` off.
 
 ## 13. Open decisions
 
-1. **CCGT retrofit vs new-build.** PyPSA now has a new-build CCGT-CC link
-   (§4). TIMES uses retrofit on Flemalle/Seraing from 2035. The 1 740 MW
-   `p_nom_min` can be met with CCS plants when `agg_ccgt` is on; it should stay
-   explicit whether that floor is unabated CCGT or CCS-equipped.
+1. ~~**CCGT retrofit vs new-build.**~~ **Decided 2026-08-26: the floor is
+   technology-neutral.** The 1 740 MW_e Walloon floor moved from
+   `potential:BEWAL:CCGT:p_nom_min` (a floor on *unabated* CCGT, written onto
+   the new vintage of `custom_potentials.csv`) to `agg:BEWAL:CCGT-all:min` in
+   `agg_p_nom_minmax_*.csv`. Because `agg_ccgt` folds `CCGT` and `CCGT CC` into
+   `CCGT-all`, the adequacy requirement no longer picks the technology.
+
+   Why it had to change: in the 2050 solve of
+   `docs/logs/2026-08-25_scen_demande_haute_2010_1h.md` the old floor forced
+   1 740 MW_e of unabated CCGT into Wallonia *at every horizon* — 5 640 MW_e of
+   fleet by 2050 — and left no residual demand for capture, so Wallonia built
+   **0 MW of CCGT CC** while Germany built 8 465 MW_e and Brussels 1 116 MW_e.
+   The technology was not uneconomic: its break-even against unabated CCGT is
+   about 103 EUR/tCO2 at 4 000 full-load hours, against a global CO2 dual of
+   625 EUR/t. It was crowded out by the mandate.
+
+   This is still not a retrofit (§6.2): PyPSA's `CCGT CC` is new-build only, so
+   a technology-neutral floor is an exogenous stand-in. It reproduces TIMES'
+   *outcome* — captured gas capacity meeting the adequacy requirement — without
+   hard-coding it, and it lets the solve say whether capture is worth it.
 2. **`sector.bioH2`.** Turning it on would give PyPSA biomass→H₂ **with CCS
    only**, which matches `SBIOH2GCC01` (unused in this TIMES scenario) and does
    **not** match `BBLQH2G110` (the path TIMES actually runs). Enabling it
