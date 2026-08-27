@@ -42,6 +42,8 @@ def _cells(path: Path, country: str, carrier: str) -> dict[tuple[int, str], str]
             continue
         out: dict[tuple[int, str], str] = {}
         for i, (year, bound) in enumerate(columns):
+            if not str(year).isdigit():
+                continue  # trailing `source`/`tag` documentation column
             val = parts[2 + i] if 2 + i < len(parts) else ""
             out[(int(year), bound)] = val
         return out
@@ -50,7 +52,9 @@ def _cells(path: Path, country: str, carrier: str) -> dict[tuple[int, str], str]
 
 def test_master_csv_anchors_match_alignment():
     targets = collect_targets(load_master(), "agg", planning_horizons(), nparts=3)
-    assert set(targets) == set(EXPECTED) | set(EXPECTED_GAS)
+    # the RES envelope (docs/renewable-potentials-analysis.md) contributes many
+    # more agg: targets; these are the TIMES-driven ones this file owns
+    assert set(EXPECTED) | set(EXPECTED_GAS) <= set(targets)
     for key, anchors in EXPECTED.items():
         got = {int(y): v for y, v in targets[key].anchors.items()}
         assert got == anchors, key
@@ -80,7 +84,7 @@ def test_demande_haute_file_already_in_sync():
     patch = patch_agg_p_nom(load_master(), planning_horizons(), dry_run=True)
     assert patch.ok, patch.errors
     assert patch.changes == []
-    assert patch.managed == len(EXPECTED) + len(EXPECTED_GAS)
+    assert patch.managed >= len(EXPECTED) + len(EXPECTED_GAS)
 
 
 def test_write_restores_scrambled_caps(tmp_path: Path):

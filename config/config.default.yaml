@@ -1255,7 +1255,11 @@ solving:
     agg_offwind: false
     agg_solar: false
     include_existing: false
+    agg_nuclear: false
+    agg_ccgt: false
     file: data/agg_p_nom_minmax.csv
+    growth_multiplier:
+    build_rates_file:
   constraints:
     CCL: false
     EQ: false

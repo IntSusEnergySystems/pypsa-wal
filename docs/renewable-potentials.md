@@ -1,0 +1,273 @@
+# Renewable capacity limits: decisions and justification
+
+**Decided 2026-08-27.** Supersedes the ad-hoc `agg_p_nom_minmax` overrides that
+produced a flat 6 500 MW Walloon onshore-wind trajectory and an infeasible 2050
+horizon in [`logs/2026-08-26_scen_demande_haute_2010_1h.md`](logs/2026-08-26_scen_demande_haute_2010_1h.md).
+
+This scenario is a **techno-economic optimum**, not a simulation of stated
+policy. The limits below exist to keep that optimum inside what is physically
+and industrially achievable — not to prescribe the answer.
+
+---
+
+## 1. Three limits, three different jobs
+
+| Limit | Encodes | Where it comes from | Written in a CSV? |
+|---|---|---|---|
+| **Land / sea potential** | what the resource could physically host | **calculated** by atlite, per node and technology | no — only where the calculation is unusable (§2) |
+| **Max growth rate** | how fast an industry can actually build | **calculated** from IRENA annual statistics × a multiplier | no — only the multiplier |
+| **2030 corridor** | near-term commitments already in motion | national targets | yes — this is the only routine override |
+
+The previous design confused these. A *policy minimum* was being used to repair
+a broken *potential maximum*, and once a minimum has to exceed a maximum the LP
+is empty — which is exactly how the 2050 horizon was lost.
+
+**Design rule: minimise stored overrides.** Potentials and growth caps are
+computed at run time. The CSV carries only the 2025 base year, the 2030
+corridor, and the offshore potentials of §2.
+
+## 2. Offshore potential comes from marine spatial plans, not atlite
+
+PyPSA-Eur's offshore potential is unusable in the southern North Sea. It returns
+**less than the capacity already standing**:
+
+| node | atlite potential | installed 2024 |
+|---|---:|---:|
+| BE (BEVLG) | 689 MW | **2 262 MW** |
+| NL | 4 504 MW | **4 748 MW** |
+| DE | 5 154 MW | **9 215 MW** |
+
+The cause is a single parameter: `capacity_per_sqkm: 2` MW/km², set deliberately
+upstream ([PR #280](https://github.com/PyPSA/pypsa-eur/pull/280),
+[issue #210](https://github.com/PyPSA/pypsa-eur/issues/210)) as a conservative
+*deployment* prior, haircutting the ~10 MW/km² technical density of its own cited
+reference. The offshore regions and exclusions are fine — BEVLG covers the full
+3 492 km² Belgian EEZ, and the eligible area that survives is the same order as
+what national plans actually designate.
+
+That prior is reasonable for continental scenario exploration, where the model
+picks sites out of an ocean. It fails for a Belgium-focused study, because for
+these three countries the question it hedges — *how much of the sea gets
+developed?* — is already answered by policy. Belgium's Princess Elisabeth Zone
+alone is **285 km² designated for 3 500 MW** (12.3 MW/km²), on 83 % of the area
+atlite deems eligible in the entire Belgian EEZ.
+
+**Decision.** Override offshore `p_nom_max` per coastal node from national
+marine spatial plans, in `custom_potentials.csv`. Leave PyPSA-Eur's global
+`capacity_per_sqkm` untouched — raising it would give GB 586 GW and FR 184 GW,
+no more meaningful than 2 MW/km² was.
+
+| node | offshore potential | source |
+|---|---:|---|
+| BEVLG | 8 000 | Belgian NECP 5.8 GW + PEZ repowering headroom |
+| DE | 70 000 | WindSeeG (30 GW 2030 / 40 GW 2035 / 70 GW 2045) |
+| NL | 50 000 | North Sea Wind Energy Infrastructure Plan, Jul 2025 |
+| GB | 80 000 | Clean Power 2030 trajectory extended |
+| FR | 45 000 | PPE3 / SNBC long-run |
+
+These replace four *undocumented* `BEVLG,offwind,p_nom_max,inf` rows that carried
+no source at all.
+
+Onshore and solar potentials are **left as PyPSA-Eur calculates them**. They are
+ordinary technical potentials — 3.0× Germany's 2045 ambition, 24× France's PPE3
+target — which is what a technical potential should look like. The only local
+overrides are Wallonia's, where PNEC-PACE / EDORA data is better than the raster:
+`BEWAL onwind 6 500`, `BEWAL solar 13 000`, `BEWAL solar rooftop 46 000` MW.
+
+## 3. Growth rate: 2 × the IRENA annual record
+
+`add_existing_baseyear.py` already reads `pm.data.IRENASTAT()` and computes
+annual capacity additions per country and technology (`df.diff(axis=1)`), then
+discards the annual resolution by binning into five-year vintages. The workflow
+re-uses that same series to derive the build-rate limit — same source, no new
+data, and it covers Belgium (which `powerplants.csv` does not: 0 % coverage for
+Belgian wind and solar).
+
+**Decision.** The limit is `2 × the single best annual addition observed
+2000-2024`, applied as a ceiling on new build per horizon:
+
+```
+fleet(horizon) ≤ fleet(previous horizon) + 2 × record_annual × years_elapsed
+```
+
+Rationale for each choice:
+
+- **Absolute MW/yr, not a growth fraction.** A relative rule cannot start a ramp
+  from near-zero (French offshore at 1 486 MW would need ~25 %/yr for 25 years to
+  reach 45 GW) and gives absurd allowances at the top (10 %/yr on 400 GW of German
+  solar is 40 GW/yr). For mature onshore and solar markets the binding constraint
+  is land, permitting and social acceptance, which does not scale with the fleet.
+- **Single best year, not a multi-year average.** Five-year averages blend
+  ramp-up with collapse years — Germany's 2019 crash sits inside its 2016-20
+  window — and understate what the industry has demonstrated. Record year is the
+  honest measure of demonstrated capability.
+- **Multiplier 2 ×.** Chosen to keep this run comparable with the previous one
+  rather than from first principles. It puts German 2050 onshore wind at 308 GW
+  against the 365 GW the unconstrained run built — a real but modest tightening.
+  It is a **configuration parameter**, and it is the one number in this document
+  that is a judgement call rather than a measurement. Sensitivity-test it.
+
+Observed records (MW/yr, IRENASTAT 2000-2024):
+
+| | onwind | solar | offwind |
+|---|---:|---:|---:|
+| DE | 4 891 (2017) | 15 061 (2024) | 2 289 (2015) |
+| FR | 1 933 (2017) | 4 129 (2024) | 986 (2023) |
+| GB | 1 764 (2017) | 4 073 (2015) | 2 672 (2022) |
+| NL | 998 (2021) | 3 918 (2023) | 1 502 (2020) |
+| BE | 355 (2022) | 1 571 (2023) | 706 (2020) |
+| LU | 56 (2016) | 129 (2024) | — |
+
+IRENASTAT is country-level, so the Belgian rate is apportioned to BEWAL by its
+share of existing capacity — the same apportionment `add_existing_baseyear`
+already uses. Walloon onshore is 70.7 % of the Belgian fleet, giving 251 MW/yr.
+
+## 4. The 2030 corridor
+
+2030 is five years out. Most of what will stand then is already permitted,
+tendered or under construction, so leaving it to the optimiser produces a
+counterfactual rather than a forecast.
+
+**Decision.** For every node and technology:
+
+```
+max(2030) = min( land potential , growth cap )
+min(2030) = min( land potential , growth cap , national target )
+```
+
+The `min` takes the minimum of all three so it can never exceed the `max` — the
+infeasibility that cost the 2050 horizon on 26 Aug cannot recur by construction.
+Where a national target is reachable, the target *is* the floor; where it is not,
+the floor falls back to what is achievable, and the model is told to build as
+fast as the industry can.
+
+## 5. 2040 and 2050
+
+**Decision.** No policy limits at all. Both bounds are calculated:
+
+```
+max(horizon) = min( land potential , growth cap )
+no minimum
+```
+
+Beyond 2030 stated policy is weak evidence anyway — PPE3 stops at 2035, the
+Netherlands cut its 2040 offshore target from 50 to 30-40 GW in July 2025, and
+Britain has nothing legislated past 2030. Using extrapolated policy as a hard
+ceiling would assume the answer; a technical potential plus a demonstrated build
+rate does not.
+
+The base year is the one exception in the other direction: **2025 is pinned to
+the historical fleet** (`min = max`), so it is a calibration, not an
+optimisation. Without it the model built 4 796 MW of Walloon onshore wind in a
+single year.
+
+## 6. What this produces
+
+### 2030 — the corridor
+
+| node | carrier | 2025 | rate MW/yr | growth cap | land | **max** | binds | target | **min** |
+|---|---|---:|---:|---:|---:|---:|---|---:|---:|
+| BE | onwind | 3 337 | 355 | 6 887 | 10 976 | **6 887** | growth | 5 000 | **5 000** |
+| BE | solar-all | 9 751 | 1 571 | 25 458 | 136 591 | **25 458** | growth | 16 500 | **16 500** |
+| BE | offwind-all | 2 262 | 706 | 9 325 | 8 000 | **8 000** | land | 5 800 | **5 800** |
+| BEWAL | onwind | 2 359 | 251 | 4 869 | 6 500 | **4 869** | growth | 3 000 | **3 000** |
+| BEWAL | solar-all | 4 088 | 658 | 10 673 | 13 000 | **10 673** | growth | 6 500 | **6 500** |
+| DE | onwind | 63 608 | 4 891 | 112 518 | 487 837 | **112 518** | growth | 115 000 | **112 518** ⚠ |
+| DE | solar-all | 89 829 | 15 061 | 240 439 | 1 249 280 | **240 439** | growth | 215 000 | **215 000** |
+| DE | offwind-all | 9 215 | 2 289 | 32 105 | 70 000 | **32 105** | growth | 30 000 | **30 000** |
+| FR | onwind | 23 105 | 1 933 | 42 433 | 968 581 | **42 433** | growth | 31 000 | **31 000** |
+| FR | solar-all | 21 521 | 4 129 | 62 811 | 1 811 328 | **62 811** | growth | 48 000 | **48 000** |
+| FR | offwind-all | 1 486 | 986 | 11 343 | 45 000 | **11 343** | growth | 3 600 | **3 600** |
+| GB | onwind | 16 230 | 1 764 | 33 870 | 438 656 | **33 870** | growth | 29 000 | **29 000** |
+| GB | solar-all | 17 879 | 4 073 | 58 609 | 980 997 | **58 609** | growth | 47 000 | **47 000** |
+| GB | offwind-all | 15 916 | 2 672 | 42 636 | 80 000 | **42 636** | growth | 50 000 | **42 636** ⚠ |
+| NL | onwind | 6 987 | 998 | 16 963 | 46 852 | **16 963** | growth | 10 000 | **10 000** |
+| NL | solar-all | 24 035 | 3 918 | 63 217 | 170 144 | **63 217** | growth | 30 000 | **30 000** |
+| NL | offwind-all | 4 748 | 1 502 | 19 773 | 50 000 | **19 773** | growth | 12 000 | **12 000** |
+| LU | onwind | 227 | 56 | 786 | 2 253 | **786** | growth | 453 | **453** |
+| LU | solar-all | 524 | 129 | 1 814 | 7 017 | **1 814** | growth | 1 236 | **1 236** |
+
+⚠ **Two corridors collapse to a point**, where the national target is *above*
+what 2 × the record allows: German onshore wind (target 115 000, cap 112 518) and
+British offshore wind (target 50 000, cap 42 636). Those two are pinned at
+maximum growth with no optimiser freedom in 2030. See §7.
+
+The growth cap binds nearly everywhere in 2030 — land binds only for Belgian
+offshore. That is the expected shape five years out: the constraint is how fast
+you can build, not whether there is room.
+
+### 2050 — the envelope
+
+| node | carrier | growth cap | land | **max** | binds |
+|---|---|---:|---:|---:|---|
+| BE | onwind | 21 087 | 10 976 | **10 976** | land |
+| BE | solar-all | 88 286 | 136 591 | **88 286** | growth |
+| BE | offwind-all | 37 577 | 8 000 | **8 000** | land |
+| BEWAL | onwind | 14 907 | 6 500 | **6 500** | land |
+| BEWAL | solar-all | 37 013 | 13 000 | **13 000** | land |
+| DE | onwind | 308 158 | 487 837 | **308 158** | growth |
+| DE | solar-all | 842 879 | 1 249 280 | **842 879** | growth |
+| DE | offwind-all | 123 665 | 70 000 | **70 000** | land |
+| FR | onwind | 119 744 | 968 581 | **119 744** | growth |
+| FR | solar-all | 227 969 | 1 811 328 | **227 969** | growth |
+| FR | offwind-all | 50 771 | 45 000 | **45 000** | land |
+| GB | onwind | 104 430 | 438 656 | **104 430** | growth |
+| GB | solar-all | 221 529 | 980 997 | **221 529** | growth |
+| GB | offwind-all | 149 516 | 80 000 | **80 000** | land |
+| NL | onwind | 56 869 | 46 852 | **46 852** | land |
+| NL | solar-all | 219 944 | 170 144 | **170 144** | land |
+| LU | onwind | 3 022 | 2 253 | **2 253** | land |
+| LU | solar-all | 6 974 | 7 017 | **6 974** | growth |
+
+The two limits divide the work cleanly:
+
+- **Offshore is land-bound everywhere** — the §2 marine-spatial-plan ceilings are
+  the operative limit, which is the intent.
+- **Onshore and solar are growth-bound in the large countries** (DE, FR, GB) and
+  land-bound in the small, dense ones (BE, BEWAL, NL, LU). Also the intent:
+  France is not short of farmland, it is short of decades.
+- **Wallonia reaches its PNEC/EDORA ceilings** — 6 500 MW onshore and 13 000 MW
+  ground-mounted solar — but now on a trajectory (2 359 → 4 869 → … → 6 500)
+  instead of jumping to the ceiling in 2025.
+
+Relative to the 26 Aug run, the neighbours tighten substantially: German onshore
+wind 365 018 → 308 158 MW, British 181 886 → 104 430, French 145 412 → 119 744,
+Dutch 46 852 → 46 852 (unchanged, already at the land bound). The 2050 CO₂ dual,
+import prices and congestion rent all move with that.
+
+## 7. Open questions
+
+3. **`BEWAL low voltage` maps to country `BE`**, so Walloon rooftop PV is governed
+   by the Belgian cap rather than the Walloon one. There is commented-out
+   aliasing code in `add_CCL_constraints` intended to fix exactly this. Worth
+   repairing before any Walloon rooftop question is asked of the model — and note
+   that rooftop currently comes out at 0 MW for cost reasons (19 % dearer per MW
+   than ground-mounted), not because of any cap.
+5. **The envelope is duplicated across three `agg_p_nom_minmax_*` files** that now
+   differ in only 2 of 54 rows (the nuclear caps). Nothing checks them against
+   each other, and `build_common_parameters.py` manages only the demande-haute
+   one. Proposed fix — scenario values as override files layered on the master
+   table — in [`scenario-handling-proposal.md`](scenario-handling-proposal.md).
+   **Not implemented.**
+
+## 8. Files
+
+| File | Role |
+|---|---|
+| `config/input_parameters_for_models.csv` | the assumptions of record — 2025 base year and 2030 corridor floor, with `source` and `note` per row. 57 rows, down from 152 once the ceilings became calculated. |
+| `data/walloon/agg_p_nom_minmax_<scenario>.csv` | generated from the above by `scripts/build_common_parameters.py --write`. Three values per row: 2025 min, 2025 max, 2030 min. |
+| `data/walloon/custom_potentials.csv` | offshore per-node ceilings (§2) and the Walloon PNEC/EDORA potentials |
+| `data/walloon/res_build_rates.csv` | IRENA annual records, generated by `scripts/walloon_scripts/build_res_build_rates.py --network <2025 net>`. Committed rather than fetched at solve time: `add_CCL_constraints` runs on the cluster, where IRENASTAT has neither internet nor a cache. Refresh when IRENA publishes. |
+| `config/config.walloon.yaml` | `solving.agg_p_nom_limits.growth_multiplier` (2.0) and `build_rates_file` |
+| `scripts/solve_network.py` | `res_growth_allowance()` and its use in both branches of `add_CCL_constraints` |
+| `scripts/walloon_scripts/check_res_envelope.py` | validates the stored overrides against this design; `test/test_res_envelope.py` runs it over every scenario |
+
+### Reproducing the inputs
+
+```bash
+python scripts/walloon_scripts/build_res_build_rates.py \
+    --network resources/<prefix>/<run>/networks/base_s_adm___2025.nc
+python scripts/build_common_parameters.py --check
+python scripts/walloon_scripts/check_res_envelope.py \
+    data/walloon/agg_p_nom_minmax_demande_haute.csv
+```

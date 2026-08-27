@@ -491,6 +491,14 @@ solving:
     agg_ccgt: true
     include_existing: true
     file: data/agg_p_nom_minmax.csv
+    # Build-rate limit on new RES per planning period (docs/renewable-potentials.md
+    # section 3): growth_multiplier x the best annual addition IRENA has observed
+    # 2000-2024 x the length of the period. Applies from the second horizon on; the
+    # base year is pinned to the historical fleet by the agg CSV. 2.0 is a
+    # judgement call, chosen to keep this run comparable with 2026-08-26 -- it is
+    # the one number here that is not a measurement, so sensitivity-test it.
+    growth_multiplier: 2.0
+    build_rates_file: data/walloon/res_build_rates.csv
 
   constraints:
     CCL: true

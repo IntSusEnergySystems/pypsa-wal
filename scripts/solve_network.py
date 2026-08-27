@@ -37,6 +37,7 @@ from typing import Any
 import linopy
 import numpy as np
 import pandas as pd
+from pathlib import Path
 import pypsa
 import xarray as xr
 import yaml
@@ -533,6 +534,56 @@ def prepare_network(
     
 
 
+def res_growth_allowance(config, planning_horizons):
+    """MW of new RES build allowed in this planning period, per (country, carrier).
+
+    The build-rate limit of ``docs/renewable-potentials.md`` section 3:
+
+        new build in a period <= growth_multiplier x record annual addition x years
+
+    ``record annual addition`` is the best single year observed 2000-2024 in IRENA
+    statistics, precomputed into ``build_rates_file`` by
+    ``scripts/walloon_scripts/build_res_build_rates.py`` (IRENASTAT needs internet
+    and a populated cache, which a cluster compute node does not have).
+
+    Returns MW of *new* capacity, which is directly comparable to the
+    ``agg_p_nom_max`` right-hand side because ``include_existing`` has already
+    subtracted the standing fleet from it. Returns ``None`` when the limit is not
+    configured, or for the first planning horizon, which is pinned to the
+    historical fleet by the CSV rather than bounded by a growth rate.
+    """
+    opts = config["solving"]["agg_p_nom_limits"]
+    multiplier = opts.get("growth_multiplier")
+    path = opts.get("build_rates_file")
+    if not multiplier or not path or not Path(path).exists():
+        if multiplier or path:
+            logger.warning(
+                "RES growth limit not applied: growth_multiplier=%r build_rates_file=%r",
+                multiplier,
+                path,
+            )
+        return None
+
+    horizons = sorted(int(y) for y in config["scenario"]["planning_horizons"])
+    year = int(planning_horizons)
+    if year not in horizons or horizons.index(year) == 0:
+        return None  # base year: pinned by the CSV, no previous horizon to grow from
+    years = year - horizons[horizons.index(year) - 1]
+
+    rates = pd.read_csv(path, comment="#")
+    allowance = (
+        rates.set_index(["node", "carrier"]).record_annual_MW * multiplier * years
+    )
+    allowance.index = allowance.index.rename(["country", "carrier"])
+    logger.info(
+        "RES growth limit: %.1f x IRENA record x %d yr for %d (country, carrier) groups",
+        multiplier,
+        years,
+        len(allowance),
+    )
+    return allowance
+
+
 def add_CCL_constraints(
     n: pypsa.Network, config: dict, planning_horizons: str | None
 ) -> None:
@@ -659,6 +710,7 @@ def add_CCL_constraints(
     grouper = pd.concat([gens.bus.map(n.buses.country), gens.carrier], axis=1)
     grouper_links = pd.concat([links.bus1.map(n.buses.country), links.carrier], axis=1)
     lhs = p_nom.groupby(grouper).sum().rename(bus="country")
+    lhs_groups = lhs.indexes["group"] if "group" in lhs.indexes else pd.Index([])
 
     if not links.empty:
         eff_links = xr.DataArray(
@@ -757,6 +809,14 @@ def add_CCL_constraints(
         rhs_links = rhs_links.clip(
             upper=remaining_max_links.reindex(rhs_links.index).fillna(np.inf)
         )
+        # ...and no more than the build-rate limit allows, or the floor would sit
+        # above the ceiling the max branch applies below. Where a national 2030
+        # target exceeds what the industry has ever built (German onshore wind,
+        # British offshore), the growth limit therefore *defines* 2030: the
+        # corridor collapses to a point at maximum achievable build.
+        growth_min = res_growth_allowance(config, planning_horizons)
+        if growth_min is not None:
+            rhs = rhs.clip(upper=growth_min.reindex(rhs.index).fillna(np.inf))
         minimum = xr.DataArray(rhs).rename(dim_0="group")
         minimum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:
@@ -827,6 +887,21 @@ def add_CCL_constraints(
         rhs_gens = rhs_gens.clip(
             lower=lower_bounds_gens.reindex(rhs_gens.index).fillna(0)
         )
+        # The build-rate limit is the operative ceiling past the base year: it
+        # applies to every (country, carrier) in the rate table, whether or not
+        # the CSV states a max, so the CSV only has to carry the 2025 base year
+        # and the 2030 corridor. The land/sea potential is enforced separately as
+        # `p_nom_max` by add_land_use_constraint, so a group ends up bounded by
+        # min(potential, growth) exactly as intended.
+        growth = res_growth_allowance(config, planning_horizons)
+        if growth is not None:
+            union = rhs_gens.index.union(growth.index.intersection(lhs_groups))
+            rhs_gens = rhs_gens.reindex(union)
+            g = growth.reindex(union)
+            rhs_gens = pd.concat([rhs_gens, g], axis=1).min(axis=1).dropna()
+            rhs_gens = rhs_gens.clip(
+                lower=lower_bounds_gens.reindex(rhs_gens.index).fillna(0)
+            )
         maximum = xr.DataArray(rhs_gens).rename(dim_0="group")
         maximum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:

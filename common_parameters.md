@@ -95,6 +95,15 @@ Residual quirk (pre-existing, not addressed here): `BEWAL_potentials.py` handles
 `CCGT` in a second `if` chain that logs neither success nor failure, and warns
 `… is currently not a supported or valid technology` for carriers it *did* apply.
 
+> **Open design item (2026-08-27).** This table is written as though the master CSV
+> were scenario-independent. It is not: `build_common_parameters.py` hardcodes
+> `AGG_FILE` to the demande-haute file, so `scen_base` and `scen_corrige` have
+> **unmanaged** inputs — which is where the four decimal-shift typos found on
+> 2026-08-26 were. A proposal to fix this by splitting the scenario *registry*
+> from the scenario *values* is in
+> [`docs/scenario-handling-proposal.md`](docs/scenario-handling-proposal.md).
+> **Not implemented.**
+
 ---
 
 ## 3. Divergences the audit surfaced

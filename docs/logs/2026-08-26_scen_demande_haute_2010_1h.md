@@ -222,8 +222,10 @@ overshoot. Walloon onshore wind sits on **6 500 MW** every horizon. Nemo is
 **2 740 → 1 272 EUR/t** after aviation left the national cap — still not a
 price forecast. 2050 first solve was infeasible (CCL min vs remaining
 `p_nom_max`); the uncommitted clip made it feasible. Do **not** publish the
-2050 dual, zero-capital-cost water pits (25.8 GW), or 2025 capacities as
-“today”.
+2050 dual, the water-pits capacity (25.8 GW), or 2025 capacities as
+“today”. **Root causes and recommended fixes for the flat onshore wind, the
+water pits, the 2050 carbon price, and a new finding on neighbour offshore
+wind: §11.14.**
 
 | Level | Verdict |
 |---|---|
@@ -439,7 +441,8 @@ against rural+urban-decentral ~28 → 21 TWh. **DAC in Wallonia: 0 links / 0 MW
 all horizons.** Urban-central air HP **0 / 1 / 1 / 5 MW** (25 Aug 2050 was
 84 MW; 22 Aug 1 067 MW) — degenerate DH, not an electrification forecast.
 Water-pits charger/discharger **25 754 MW** with `capital_cost = 0` — **not
-a result**.
+a result**; it is `e_nom_opt / etpr` on a 628 GWh_th store (§11.14 B), i.e.
+**23 × Walloon urban-central peak heat demand (1 105 MW_th)**.
 
 **Hydrogen.** Electrolysis **0 / 0.2 / 0.2 / 0.3 MW**. H2 pipeline (nodal)
 28 / 134 / 605 / **663 MW** (25 Aug 2050 was 2 029). Transit, not production.
@@ -451,6 +454,12 @@ H2 bus residual 0.00 TWh.
 **Zero-cost capacities (2050, do not plot):** urban central water pits
 25 754, electricity distribution grid 9 496, gas pipeline 7 500, BEV charger
 4 194, battery discharger 2 738, …
+
+> **Correction 2026-08-27.** The water-pits number is *not* a free-variable
+> degeneracy — see [§11.14 B](#1114-recommendations-added-2026-08-27). The
+> charger/discharger `p_nom` is pinned by `TES_energy_to_power_ratio` to
+> `e_nom / 22.5`, and the store pays 99–116 EUR/MWh (62.4 MEUR/yr in
+> Wallonia). The defect is the **unbounded store** (`e_nom_max = inf`).
 
 ### 11.7 Prices, costs, duals (level 6)
 
@@ -535,7 +544,10 @@ Zero-capital-cost links, `solar` vs `solar-hsat`, and anything whose dual is
    Better than 2 740, still a cap diagnostic on ~1.67 Mt with pinned heat.
 2. **2025 capacities as “today”** — onwind 6.5 GW, CO₂ dual 313 EUR/t.
 3. **Any `capital_cost = 0` capacity**, especially urban-central water pits
-   **25.8 GW**, BEV charger, distribution grid, battery discharger.
+   **25.8 GW**, BEV charger, distribution grid, battery discharger. For the
+   pits, neither the 25.8 GW_th *nor* the 628 GWh_th behind it is publishable:
+   that is 10.5 million m³ of pit, **52 × the largest ever built** (Vojens, DK,
+   0.20 Mm³) — see §11.14 B.
 4. **2050 urban-central air heat pump 5 MW** (and the 3 238 MW_th HP total
    if used as an electrification forecast). Decentral delivered heat 7.89
    TWh_th is the B′ indicator.
@@ -552,9 +564,13 @@ potential; 25 Aug’s 12.4 GW must not.
 ### 11.11 Findings (ranked by whether they change a headline)
 
 **R1 — Generator-max CCL `include_existing` worked.** 9 FAILs → 2. Walloon
-onwind is 6.5 GW every year. Remaining +201 MW is 2025 solar-all only.
-**Do:** investigate the 201 MW (existing-count vs `solar-all` membership);
-until then footnote 2025 BE PV as 12.8 vs 12.6 GW.
+onwind is 6.5 GW every year. Remaining +201 MW is 2025 solar-all only, and it
+is **traced** (§11.14 E1): a data conflict, not a constraint bug — the 2025
+agg cap (3 887) is 201 MW *below* the PV the model already has standing
+(2 286 non-extendable + a 1 802 brownfield `p_nom_min` floor = 4 088), and
+`add_CCL_constraints` correctly raises the cap to the floor rather than going
+infeasible. **Do:** raise the 2025 `solar-all` anchors, or correct the
+existing-capacity input. Footnote 2025 BE PV as 12.8 vs 12.6 GW meanwhile.
 
 **R2 — Aviation out of national CO₂ halved the 2050 Walloon dual
 (2 740 → 1 272 EUR/t).** `CO2Limit` still binds. **Do:** still do not
@@ -576,9 +592,10 @@ builds 463 MW_e CCGT-CC inside 1 740. Unabated no longer stacks per vintage.
 **R7 — `vopt` grew internal `s_nom`; NTC kept usable ~3.6 GW WAL–VLG.**
 Report usable capacity, not `s_nom_opt`.
 
-**R8 — 2050 `tes_se` Sankey FAIL (−0.187 TWh) with 25.8 GW zero-cost water
-pits.** Buses still close. **Do:** drop water pits from published charts;
-Sankey TES node is not trustworthy this vintage.
+**R8 — 2050 `tes_se` Sankey FAIL (−0.187 TWh) with 25.8 GW water pits.**
+Buses still close. The pits are a **priced but unbounded** seasonal store, not
+a zero-cost degeneracy (§11.14 B). **Do:** drop water pits from published
+charts; Sankey TES node is not trustworthy this vintage; add an `e_nom_max`.
 
 **R9 — Coal-for-industry +8 / +13 % in 2025/2030; 2040/2050 electric-load vs
 TIMES −0.8 / −0.9 %.** Unchanged known items.
@@ -588,17 +605,43 @@ TIMES −0.8 / −0.9 %.** Unchanged known items.
 
 ### 11.12 Follow-up actions
 
+Recommendations with diagnosis and proposed fixes: **§11.14**.
+
 1. Commit `cluster/nic5.sh` (one `--configfile` flag) and
    `scripts/solve_network.py` + `test/test_myopic_potentials.py` (CCL min
-   clip) so `run.json` matches the solve.
-2. Trace the 201 MW 2025 `solar-all` overshoot.
+   clip) so `run.json` matches the solve. Reviewed in §11.14 F.
+2. ~~Trace the 201 MW 2025 `solar-all` overshoot.~~ **Closed** — §11.14 E1.
+   It is a data conflict (2025 agg cap below the installed base), not a
+   constraint bug. Remaining action: raise the 2025 `solar-all` anchors or
+   correct the installed-capacity input.
 3. Visual check of Explorer dropdown for `demande-haute-2010-1h (times-pypsa)
    - 27/08/2026`.
 4. Unset `SKIP_S3_UPLOAD` before `nic5.sh upload` (or have the script ignore
    it on the upload verb).
 5. 2040 solid-biomass conflict remains a parameter decision
    (`none:solid_biomass_2040_conflict`).
-6. Water-pits / TES Sankey degeneracy — still open; do not plot.
+6. Water pits — **§11.14 B**. Add an `e_nom_max` to
+   `urban central water pits`; the MW figure is a consequence of the
+   unbounded store, not a free variable. Do not plot meanwhile.
+
+**Before the next production run** (ordered by how much they change results):
+
+7. Audit `offwind-*` `p_nom_max` on the NL and DE nodes — 4.5 and 5.1 GW in
+   2050 against 50 and 70 GW targets (**§11.14 D**). Likely an
+   availability-matrix / clustering problem, not a CSV value. This is the
+   largest single distortion in the 2050 European system and the root cause of
+   the 2050 infeasibility.
+8. Give `BEWAL,onwind,p_nom_max` a rising trajectory and set
+   `sector.max_growth.onwind` (**§11.14 A**). Without a build-rate cap every
+   RES trajectory will keep jumping to its ceiling in horizon 1.
+9. Decide whether option B′ or the 5 %-of-1990 Walloon cap wins in 2050
+   (**§11.14 C**). The pinned heat mix alone is 86 % of the cap. Promote the
+   `times_heat_profiles` warning to a hard error above ~70 %.
+10. Record Belgium's zero CO₂ sequestration potential as an explicit scenario
+    choice, or give it a value (**§11.14 C2**). All three Belgian nodes have
+    `e_nom_max = 0` and the nearest sink (NL) is 100 % full.
+11. Add the min-clip `logger.warning` (**§11.14 E2**) and mirror the aviation
+    exclusion in `diagnose_binding_constraints.py` (**E3**).
 
 ### 11.13 How the numbers were read
 
@@ -613,3 +656,353 @@ TIMES −0.8 / −0.9 %.** Unchanged known items.
   forward+reversed links.
 - Comparison vintage: archive
   `/sylvain/mount/pypsa-wal-data/archive/walloon-20260825`.
+
+### 11.14 Recommendations (added 2026-08-27)
+
+Reviewed against the solved networks pulled from
+`s3://intervectoriel/test/pypsa_raw_results/20260827_walloon_scen_demande_haute/`
+(1.7 GB, all four horizons), `review_run.py --full` (**161 PASS · 26 INFO ·
+20 WARN · 3 FAIL**) and `diagnose_binding_constraints.py` on 2050.
+
+The three items the review flags as unacceptable — flat onshore wind,
+zero-cost pit storage, a 1 272 EUR/t carbon price — share a property worth
+stating plainly: **the constraint code is now doing exactly what it was fixed
+to do. What is left is scenario data that disagrees with itself.** None of the
+four recommendations below is a code fix to the CCL, NTC or CO₂ machinery.
+
+---
+
+#### A. Onshore wind is flat at 6 500 MW because a **2030** potential is applied to 2050
+
+Not a residual myopic bug. `p_nom_opt` by vintage, BEWAL onwind:
+
+| Horizon | extendable vintage `p_nom_max` | built | fleet | what set the ceiling |
+|---|---:|---:|---:|---|
+| 2025 | **4 795.8** | 4 795.8 | **6 500** | 6 500 − 1 704 standing (2000–2020) |
+| 2030 | 9.9 | 9.8 | **6 500** | = onwind-2000 retiring |
+| 2040 | 489.8 | 489.8 | **6 500** | = onwind-2005 + 2010 retiring |
+| 2050 | 1 204.5 | 1 204.5 | **6 500** | = onwind-2015 + 2020 retiring |
+
+The optimiser takes the *entire* remaining potential in the first horizon
+(+4 796 MW in 2025), after which every later vintage can only replace what
+retires. Hence 0 MW/yr growth and a flat 13–15 TWh at CF 23–26 %.
+
+Two independent data defects:
+
+1. **A 2030 figure used for all horizons.** All four rows of
+   `data/walloon/custom_potentials.csv` read
+   `BEWAL,onwind,p_nom_max,6500,MW,<year>` and the provenance column says
+   *"ce qui est plausible d'atteindre en 2030 comme capacité et des projets à
+   l'étude"* (PNEC Wallon / EDORA). That is a **2030 deployment expectation**,
+   not a 2050 technical potential, and it is the same number in 2050.
+2. **No build-rate limit.** Nothing stops horizon 1 from exhausting a
+   multi-decade resource in one step. 4 796 MW in a single year against a
+   historical Walloon build rate of ~100–150 MW/yr.
+
+**Recommended:**
+
+- Give `BEWAL,onwind,p_nom_max` a **rising trajectory** — 2030 on the PNEC/EDORA
+  6 500, then a genuine technical potential for 2040/2050 (the land-eligibility
+  raster, or an EDORA/ELIA long-run figure). Until that number exists, an
+  explicit placeholder with a source is better than silently reusing 2030.
+- Add a **build-rate cap**. `add_max_growth` already exists in
+  `scripts/solve_network.py:348` and is driven by
+  `sector.max_growth.<carrier>`; it is unset for `onwind`. A ceiling of
+  ~300–400 MW/yr would make the 2025 jump impossible and force a trajectory.
+  This is the single highest-value change for the *shape* of every RES result.
+- Until both are in, publish 6 500 MW only as **"the model's capped
+  potential, reached in the first horizon"** — never as a 2050 projection, and
+  never as a 2025 capacity (§11.10 item 2).
+
+> **Implemented 2026-08-27** — see
+> [`docs/renewable-potentials-analysis.md`](../renewable-potentials-analysis.md)
+> §4b. The fix is not a rising *technical* potential but the separation of two
+> things that had been conflated: 6 500 MW stays in `custom_potentials.csv` as
+> the time-invariant PNEC/EDORA **technical** potential, and a new
+> **deployment ceiling** in `agg_p_nom_minmax_*.csv` carries the trajectory —
+> BEWAL onwind 2 359 (2025, historical, `min = max`) → 3 000 (2030) → 4 200
+> (2040) → 5 400 (2050), each step at ≈ 120-130 MW/yr, i.e. Wallonia's own
+> fastest observed five-year build rate. 2025 is now pinned to the historical
+> fleet for every node and carrier, so the base year is a calibration and the
+> 4 796 MW single-year jump is impossible. `sector.max_growth.onwind` is
+> therefore *not* needed: the ceiling trajectory does the same work with
+> sourced numbers rather than a rate parameter.
+
+#### B. Water pits: an **unbounded store**, not a zero-cost degeneracy
+
+The review (§11.6, §11.10 item 3, R8) calls the 25 754 MW a zero-capital-cost
+artefact. That framing is wrong and it points at the wrong fix. Measured on
+the 2050 network:
+
+| quantity | BEWAL 2050 | note |
+|---|---:|---|
+| pit store `e_nom_opt` | **628 269 MWh_th** | `e_nom_max = inf`, all 4 vintages |
+| charger = discharger `p_nom_opt` | **25 754 MW_th** | exactly `e_nom_opt / etpr` |
+| `energy to power ratio` (etpr) | 22.5 / 22.5 / 30 / 150 h | by vintage |
+| store `capital_cost` | 99.3–116.2 EUR/MWh/a | **not zero** — 62.4 MEUR/yr |
+| urban-central heat demand | peak **1 105 MW_th**, 2 693 GWh_th/yr | |
+| throughput / full cycles | 1 382 GWh_th, **2.5 cycles/yr** | seasonal |
+
+`add_TES_energy_to_power_ratio_constraints` ([solve_network.py:1063](../../scripts/solve_network.py))
+imposes `Store-e_nom − etpr · Link-p_nom == 0` — an **equality**, and it *is*
+enforced (`e_nom_opt / p_nom_opt = 22.5` to 4 significant figures on every node).
+So the power rating is not a free variable at all; it is a rigid function of
+the store. The chain is:
+
+> `e_nom_max = inf` → a 628 GWh_th store is optimal → the 22.5 h equality
+> *forces* 25.8 GW_th of charger/discharger → and because the charger costs
+> nothing, that forcing is never penalised.
+
+628 GWh_th is ≈ **10.5 million m³** of water pit at 60 kWh/m³, against 0.20
+Mm³ for the largest ever built (Vojens, Denmark) — **52 ×**. It is also 23 ×
+Walloon peak DH demand and 85 days of average demand.
+
+**Recommended, in order:**
+
+1. **Bound the store.** Give `urban central water pits` an `e_nom_max` per
+   node. Pit storage is land- and geology-limited; a defensible proxy is
+   ≤ 2–4 weeks of that node's urban-central heat demand (≈ 100–200 GWh_th for
+   BEWAL), or an explicit site list. This single bound removes the artefact.
+2. **Price the power side.** `central water pit charger` / `discharger` carry
+   `investment = 0` in `costs_<year>_processed.csv` (inherited from
+   technology-data, which puts the whole cost on the storage volume). With the
+   E/P *equality* that makes seasonal storage cheaper than it is. Either put a
+   heat-exchanger/pump cost on the charger, or relax the equality to
+   `e_nom ≤ etpr · p_nom` so the model can build a big store with a small
+   charger and the reported MW stops being fictitious.
+3. **Check the etpr trajectory.** 22.5 h (2040/2050 vintages), 30 h (2030),
+   **150 h** (2025) is a 6.7 × swing across horizons in what should be a
+   technology constant. Worth confirming against technology-data before the
+   next run — it changes how much power capacity each MWh of store drags in.
+4. Meanwhile: exclude the pits from every capacity chart *and* from any
+   "storage installed" total, not just the MW column.
+
+#### C. The 2050 CO₂ price is the **pinned heat mix** meeting a 5 %-of-1990 cap with **four exhausted escape valves**
+
+The aviation exclusion worked (2 740 → 1 272 EUR/t) but it treated a
+symptom. The run's own solve log states the cause outright
+(`logs/base_s_adm___2050_python.log:12-13`):
+
+> `decentral heating CO2 (upper estimate) 1.432 Mt against the BEWAL cap of
+> 1.667 Mt = 85.9 % of the whole node's budget.`
+> `WARNING … The TIMES heating mix alone would use 86 % of the BEWAL CO2 budget.`
+
+Option B′ pins 7.13 TWh_th of **gas** boiler heat from TIMES. At 0.198 t/MWh
+that is 1.432 Mt — leaving **0.235 Mt** of the 1.667 Mt cap for all of
+transport, industry and power. The BEWAL CO₂ balance (aviation excluded, as
+the constraint now does) closes *exactly* on the cap:
+
+| gross emitters (Mt) | | removals (Mt) | |
+|---|---:|---|---:|
+| land transport oil | 0.828 | biogas to gas | **−1.643** |
+| urban decentral gas boiler | 0.777 | solid biomass for industry CC | −0.732 |
+| rural gas boiler | 0.655 | urban central solid biomass CHP CC | −0.011 |
+| coal for industry | 0.612 | | |
+| HVC to air | 0.559 | | |
+| other (biomass import, agri oil, process CC, shipping, gas CC, CHP CC, CCGT CC) | 0.622 | | |
+| **gross** | **4.053** | **removals** | **−2.386** |
+
+Net **1.667 Mt = the cap**, binding, dual **−684.93 EUR/t**, on top of a
+system `CO2Limit` dual of −587.28 → **1 272 EUR/t**. Wallonia is the *only*
+region whose national cap binds meaningfully (BEVLG, DE, FR, GB, NL duals are
+all 0.00; LU −71, BEBRU −0.9), despite every region getting the same
+`budget_national: 0.05` factor.
+
+It costs 1 272 EUR/t because **every escape valve is at its limit at once**:
+
+| escape valve | state in 2050 | dual |
+|---|---|---:|
+| Walloon biogas | **8 300 of 8 300 GWh — 100 % of `e_sum_max`** | (marginal cost 78.8) |
+| solid biomass | `biomass limit` binding, 330.9 TWh | **−475.62** |
+| CO₂ sequestration | `co2_sequestration_limit` binding | **+360.44** |
+| Belgian CO₂ storage | **`e_nom_max = 0` for BEWAL, BEVLG, BEBRU** (also FR, LU) | — |
+| NL storage (nearest sink) | 9.095 of 9.095 Mt — **100 % full**, 2040 *and* 2050 | — |
+
+So Wallonia must abate to 5 % of 1990 while its heat mix is fixed exogenously,
+its entire biogas potential is already consumed, biomass is rationed
+system-wide, it owns no CO₂ storage, and the nearest sink is full. The dual is
+the price of an over-determined system, not a carbon price.
+
+**Recommended:**
+
+1. **Make the heat pinning and the CO₂ cap mutually consistent, or say which
+   one wins.** These are two exogenous inputs asserting incompatible things
+   about 2050 Wallonia. Options, best first:
+   - relax option B′ in 2050 only (let the model choose the heat mix once the
+     cap is this tight) and report the TIMES mix as a *comparison*, not a
+     constraint;
+   - or keep B′ and raise the 2050 Walloon cap to what the pinned mix admits;
+   - or keep both and **stop reporting the dual entirely** for 2050.
+     The `times_heat_profiles` warning already predicts this — promote it to a
+     hard error when the pinned mix exceeds ~70 % of the node cap, so the
+     conflict is caught before an 8-hour solve.
+2. **Give Belgium a CO₂ storage entry or an explicit export route with a
+   price.** `e_nom_max = 0` for all three Belgian nodes plus FR and LU, with
+   NL 100 % full, means Walloon CCS is a hostage to German and British
+   geology. Whether or not Belgium gets domestic storage, this should be a
+   *documented scenario choice*, not a silent zero. It is currently one of the
+   largest single drivers of the 2050 price.
+3. **Re-check the two big unabated residuals** before anyone quotes the cap as
+   binding: `coal for industry` 0.612 Mt (37 % of the cap) in 2050 — the
+   soft-link is known to overstate coal by 8–13 % in 2025/2030 (R9), and
+   nobody has checked 2050; and `HVC to air` 0.559 Mt, which is governed by
+   `HVC_environment_sequestration_fraction: 0.0`.
+4. Keep §11.10 item 1 as it stands. 1 272 EUR/t is a cap diagnostic.
+
+#### D. **New finding — neighbour offshore wind is an order of magnitude too small**
+
+This is why 2050 was infeasible in the first place, and it is not in the
+review. 2050 fleets and remaining potential (MW):
+
+| node | offwind fleet | potential left | onwind fleet | reality check (offshore) |
+|---|---:|---:|---:|---|
+| **NL** | **4 504** | 0 (exhausted) | 46 852 | 4.7 GW today, **50 GW** 2040 target |
+| **DE** | **5 097** | 2 769 | **365 018** | 9.2 GW today, **70 GW** 2045 (WindSeeG) |
+| GB | 76 842 | 101 090 | 181 886 | 15 GW today, 50+ GW 2030 |
+| FR | 27 778 | 18 141 | 145 412 | 1.5 GW today, ~18 GW 2035 |
+| BEVLG | 8 000 | 0 (at the agg cap) | 4 252 | 2.3 GW today, 8 GW — **plausible** |
+
+The Netherlands ends 2050 with **4.5 GW** of offshore wind and Germany with
+**5.1 GW**, roughly **11 × and 14 × below** their legislated targets, while the
+same countries carry **365 GW** (DE) and 182 GW (GB) of *onshore* wind — far
+above any credible land-constrained figure. The model substitutes onshore wind
+and solar for offshore wind it is not allowed to build.
+
+That matters for a Walloon study because these are the nodes that set Belgian
+import prices and the European CO₂ dual. A neighbour fleet with the wrong
+technology mix has the wrong winter capacity factor, which propagates straight
+into Belgian scarcity hours, the 587 EUR/t system dual, and the 11 571 MEUR of
+congestion rent.
+
+It is also the direct cause of R3: NL's TYNDP `agg_p_nom_min` of 5 054 MW
+exceeded the remaining land-use `p_nom_max` of 1 163 MW, which made 2050
+infeasible until the min was clipped. **Both numbers are wrong** — the real NL
+2050 figure is ~50 GW — so the clip papers over a data error rather than
+resolving it.
+
+**Audit done 2026-08-27** — full write-up in
+[`docs/renewable-potentials-analysis.md`](../renewable-potentials-analysis.md).
+It is an **input** problem, not a clustering one, and it explains the whole
+history of potential-pinning in this repo. Read off `profile_adm_*.nc`:
+
+| bus | model offshore `p_nom_max` | installed 2024 | target | eligible km² | % of EEZ |
+|---|---:|---:|---:|---:|---:|
+| **BEVLG** | **689** | **2 262** | 8 000 | 345 | 10 % |
+| **NL** | **4 504** | **4 700** | 50 000 | 2 252 | 4 % |
+| **DE** | **5 154** | **9 200** | 70 000 | 2 577 | 6 % |
+| FR | 45 905 | 1 500 | 18 000 | 22 953 | 6 % |
+| GB | 146 515 | 15 000 | 50 000 | 73 258 | 10 % |
+
+Belgium's modelled offshore potential is **less than a third of what it has
+already built**. Three compounding causes: `capacity_per_sqkm: 2` against a
+real Belgian build density of ~9.5 MW/km²; the `offwind-ac`
+`max_shore_distance: 30 km` / `offwind-dc` `min_shore_distance: 30 km` split,
+which strands the Princess Elisabeth Zone (~45 km out) in a DC band whose
+availability matrix finds **0.00** eligible cells for BEVLG; and
+`natura`/`ship_threshold` exclusions that bite hardest in the busiest sea in
+the world.
+
+**Corrected 2026-08-27.** An earlier version of this paragraph also said the
+onshore potential was "45.5 % of German land area against a 2 % legal
+designation target". That comparison was invalid — eligible land carries
+3 MW/km² in the model while Germany's *designated* land carries 22–36 MW/km²,
+so the two fractions are not comparable. Like for like: 2 % of German land at
+the observed density is ~159 GW, Germany's own 2045 ambition is 160 GW, and the
+model's potential is 488 GW — **3.0x, not 23x**. Onshore the potential is a
+normal technical potential; what was missing was a **deployment ceiling**, which
+is why DE absorbed the shortfall at 365 GW (2.3x its 2045 ambition).
+
+**Recommended:**
+
+1. **`capacity_per_sqkm: 2 → 8` for `offwind-ac/dc/float`.** One line, well
+   sourced, fixes Belgium outright (689 → ~2 760 MW).
+2. **Give offshore its area back** — point offshore potential at designated
+   marine wind zones rather than depth/distance/shipping rasters; at minimum
+   widen the AC/DC shore bands so the Belgian zone is reachable.
+3. **Bound neighbour `onwind`/`solar`** with a land-availability factor or an
+   agg `max` row from TYNDP/national law.
+4. Do **not** raise the neighbour offshore `min`s further while the `max` is
+   broken — that is what caused this run's 2050 infeasibility, and each
+   increase pushes the floor closer to the ceiling it is fighting.
+5. Until 1–3 land, treat every 2050 European quantity — system CO₂ dual,
+   import prices, congestion rent — as **conditional on an under-built
+   offshore fleet**, and say so in §11.10. The neighbour `offwind-all` mins
+   must stay meanwhile, but as *documented workarounds*, not policy targets.
+6. Separately, and unrelated to potentials: the **`BEBRU` bus region is
+   1 676 km², 10.35 × the administrative Brussels region (162 km²), while the
+   `BEWAL` bus region is 15 150 km², 10 % *smaller* than Wallonia** (≈ 1 750 km²
+   short). The three sum to Belgium correctly, so no area is lost — but Walloon
+   land, and the wind and solar potential on it, is being credited to the
+   Brussels node. That is a `custom_busmap_BE` question and deserves its own
+   look; it is what produced the "861 % of Brussels" figure in the first version
+   of this section.
+
+> **Implemented 2026-08-27 (items 3-5; 1-2 partly).** Every modelled node now
+> has a sourced `max` for `onwind`, `offwind-all` and `solar-all` at every
+> horizon, and a `min` at 2025/2030 only — full table and citations in
+> [`docs/renewable-potentials-analysis.md`](../renewable-potentials-analysis.md)
+> §4b, assumptions in `config/input_parameters_for_models.csv` (172 rows with
+> `source`/`description`/`note`), propagated by `build_common_parameters.py`
+> (`managed=43`, was 5).
+>
+> The offshore raster is **bypassed, not fixed**: `custom_potentials.csv` now
+> carries a documented per-node offshore ceiling (BEVLG 8 000, DE 70 000,
+> FR 45 000, GB 80 000, NL 50 000 MW) replacing four *undocumented*
+> `BEVLG,offwind,p_nom_max,inf` rows. Items 1-2 of this list — the
+> `capacity_per_sqkm` correction and pointing offshore potential at designated
+> marine wind zones — remain open.
+>
+> The 2030 minima are deliberately **not** the national targets. Using the
+> targets as floors demands 2.5-4.9x each node's fastest observed build rate
+> (DE onwind 3.6x, DE offshore 4.6x, GB offshore 4.9x), and these countries are
+> officially projected to miss them. The rule is
+> `min(2030) = min(target, 2025 fleet + 5 yr x 1.5 x peak observed rate)`, with
+> the target kept as the `max`. Enforced by
+> `scripts/walloon_scripts/check_res_envelope.py` and
+> `test/test_res_envelope.py`.
+>
+> **Expect the neighbours to change a lot.** Measured against the new envelope
+> this run's 2050 fleet breaks 51 caps: DE onwind 365 018 → max 180 000, GB
+> onwind 181 886 → 35 000, FR onwind 145 412 → 45 000, FR solar 175 907 →
+> 120 000, NL onwind 46 852 → 14 000, LU onwind 2 253 → 700. The 2050 CO₂ dual,
+> import prices and congestion rent all move with that. **`resources/` and
+> `results/` must be rebuilt from scratch** — an mtime-only rerun would carry
+> the old fleet forward through `add_brownfield`.
+
+#### E. Smaller items
+
+1. **2025 `solar-all` +201 MW is closed** (follow-up #2). Mechanism, exactly:
+   non-extendable Walloon PV 2 286.1 MW + a brownfield `p_nom_min` floor of
+   1 802.2 MW on `BEWAL 0 solar-2025` = 4 088.3 MW, against an agg 2025 max of
+   3 887. `add_CCL_constraints` clips the max rhs up to the floor
+   (`lower_bounds_gens`, added in `8d1d6e10`) instead of going infeasible —
+   which is the right behaviour. The **data** is what disagrees: the 2025 cap
+   is below the installed base. Fix the anchor (or the installed-capacity
+   input), not the code. Same +201 MW appears in the BE row because BEWAL is
+   subtracted from its parent.
+2. **The CCL min-clip should log what it weakened.** NL offwind ends 2050 at
+   4 504 MW against a 5 054 MW TYNDP floor — the floor is **missed by 550 MW
+   (11 %) silently**. Add a `logger.warning` naming each clipped group and the
+   shortfall, so a scenario cannot quietly under-deliver a policy minimum.
+   The clip itself is correct and should be committed as-is.
+3. **`diagnose_binding_constraints.py` still counts aviation** in its §3 BEWAL
+   CO₂ decomposition, so it prints "net 3.897 Mt" against a 1.667 Mt cap and
+   looks like a violation. It should reuse
+   `solve_network.national_co2_expression`'s exclusion list
+   (`AVIATION_CARRIER`) so the table matches the constraint it is explaining.
+   3.897 − 2.230 = 1.667 = the cap.
+4. **`solar rooftop` is 0 MW in all four horizons** against a 46 GW potential,
+   while 6.9 GW of `solar-hsat` (single-axis tracking) is built — a technology
+   with essentially no Walloon deployment. Real Walloon PV is overwhelmingly
+   rooftop. If rooftop is to stay at zero, that is a cost-assumption finding
+   worth stating; if not, it needs a floor or a cost correction.
+
+#### F. Review of the two changes that made the run possible
+
+| change | verdict |
+|---|---|
+| `cluster/nic5.sh` — one `--configfile` flag | **Correct, and my 26 Aug review missed it.** I verified that later files override earlier ones, which is true *within* one flag, but not that argparse `nargs="+"` makes a second `--configfile` **replace** rather than extend. `bea83bde` therefore introduced a regression that only surfaced at launch. The one-flag form is what Snakemake documents. |
+| `scripts/solve_network.py` — clip agg `min` residual to remaining `p_nom_max` | **Correct and necessary.** It is the required companion to un-gating `add_land_use_constraint` in `8d1d6e10`: land-use lowers `p_nom_max`, and nothing previously stopped the TYNDP min from demanding more than the leftover. `.replace(np.inf, np.nan)` after the groupby leaves a group unclipped if any member is unbounded — the safe direction. Ordering is right (land-use runs in `prepare_network`, before `extra_functionality`). Two notes: it needs the log line in E2, and it treats a data conflict (D) as a feasibility problem. |
+
+Both should be committed before the next solve so `run.json` describes the code
+that actually ran (follow-up #1).

@@ -54,7 +54,10 @@ DEFAULT_CONFIG = ROOT / "config" / "config.default.yaml"
 COSTS_FILE = ROOT / "data" / "walloon" / "custom_costs.csv"
 POTENTIALS_FILE = ROOT / "data" / "walloon" / "custom_potentials.csv"
 # TIMES-aligned nuclear (and other) country/carrier caps for scen_demande_haute.
-# Other scenarios keep their own agg files; this patch does not touch them.
+# Other scenarios keep their own agg files; this patch does not touch them --
+# which is why the decimal-shift typos of 2026-08-26 were in the *unmanaged*
+# base/corrige files. Proposed fix (not implemented): per-scenario override files
+# layered on the master table, see docs/scenario-handling-proposal.md.
 AGG_FILE = ROOT / "data" / "walloon" / "agg_p_nom_minmax_demande_haute.csv"
 NTC_GLOB = "ntc_*.csv"
 COST_ARCHIVE_GLOB = "costs_*.csv"
