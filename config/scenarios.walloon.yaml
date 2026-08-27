@@ -43,6 +43,10 @@ scen_demande_haute_2010:
     end: "2011-01-01"
     inclusive: left
 
+  atlite:
+    default_cutout: "europe-2010-sarah3-era5"
+    nprocesses: 4
+
   sector:
     times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
   electricity:
@@ -57,6 +61,10 @@ scen_demande_haute_2013:
     start: "2013-01-01"
     end: "2014-01-01"
     inclusive: left
+
+  atlite:
+    default_cutout: "europe-2013-sarah3-era5"
+    nprocesses: 4
 
   sector:
     times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
