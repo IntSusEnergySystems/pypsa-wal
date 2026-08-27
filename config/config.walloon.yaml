@@ -4,7 +4,7 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "walloon"
+  prefix: "walloon-20260827"
   # RDIR is "walloon/{run}/", so one entry in `name` is
   # a single run and several are a multi-scenario run — the only difference is how
   # many names are listed. Every name must be a key of run.scenarios.file;
