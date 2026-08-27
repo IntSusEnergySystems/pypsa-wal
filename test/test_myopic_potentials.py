@@ -157,6 +157,27 @@ def test_ccl_generator_max_never_binds_below_the_brownfield_floor(
     assert _agg_max_rhs(n) == pytest.approx(300.0)
 
 
+def _agg_min_rhs(n: pypsa.Network) -> float:
+    return float(n.model.constraints["agg_p_nom_min"].rhs.values.ravel()[0])
+
+
+def test_ccl_generator_min_never_exceeds_remaining_p_nom_max(tmp_path, monkeypatch):
+    """Land-use leftover must cap the residual TYNDP min, or the LP is empty.
+
+    2050 NL offwind-all: min residual 1713 MW, remaining p_nom_max 1163 MW.
+    """
+    monkeypatch.setattr(sn, "foresight", "myopic", raising=False)
+    n = _ccl_network(existing=4000.0)
+    n.generators.loc["BEWAL 0 onwind-2050", "p_nom_max"] = 1000.0
+    add_CCL_constraints(
+        n,
+        _ccl_config(_agg_file(tmp_path, maximum=1e6, minimum=6000.0)),
+        "2050",
+    )
+    # 6000 min − 4000 standing = 2000, clipped to remaining 1000
+    assert _agg_min_rhs(n) == pytest.approx(1000.0)
+
+
 def _ccgt_network(carrier: str, efficiency: float, existing_el: float) -> pypsa.Network:
     n = pypsa.Network()
     n.add("Bus", "BEWAL", carrier="AC", country="BE")

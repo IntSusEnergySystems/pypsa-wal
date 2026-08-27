@@ -726,6 +726,37 @@ def add_CCL_constraints(
         ).dropna()
         rhs[rhs < 0] = 0
         rhs_links[rhs_links < 0] = 0
+        # A TYNDP min cannot demand more new-build than remaining p_nom_max
+        # (land-use already subtracted existing). 2050 NL offwind-all IIS:
+        # min 1713 MW vs remaining potential 1163 MW → infeasible_or_unbounded.
+        remaining_max = (
+            pd.concat([grouper, gens.p_nom_max.rename("p_nom")], axis=1)
+            .groupby(["bus", "carrier"])
+            .sum()
+            .p_nom
+            .replace(np.inf, np.nan)
+        )
+        remaining_max.index = remaining_max.index.rename({"bus": "country"})
+        rhs = rhs.clip(upper=remaining_max.reindex(rhs.index).fillna(np.inf))
+        remaining_max_links = (
+            pd.concat(
+                [
+                    grouper_links,
+                    (links.p_nom_max * links.efficiency).rename("p_nom_e"),
+                ],
+                axis=1,
+            )
+            .groupby(["bus1", "carrier"])
+            .sum()
+            .p_nom_e
+            .replace(np.inf, np.nan)
+        )
+        remaining_max_links.index = remaining_max_links.index.rename(
+            {"bus1": "country"}
+        )
+        rhs_links = rhs_links.clip(
+            upper=remaining_max_links.reindex(rhs_links.index).fillna(np.inf)
+        )
         minimum = xr.DataArray(rhs).rename(dim_0="group")
         minimum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:

@@ -220,13 +220,14 @@ cmd_solve() {
     # rules whose log paths contain an unbindable {run} wildcard) and aborts
     # with WildcardError in rules/postprocess.smk. The default source cache
     # already lands on scratch via XDG_CACHE_HOME=$REMOTE_DIR/.cache.
-    # Snakemake merges --configfile in order and the last one wins, so the
-    # cluster overlay has to come *after* the study config. The other way round
-    # config.walloon.yaml's workstation allocation (12 threads, 100 GB) silently
-    # replaced the hmem allocation this file exists to request.
+    # --configfile takes nargs="+". Two separate --configfile flags do not
+    # merge: argparse keeps only the last flag, so `--configfile walloon.yaml
+    # --configfile cluster/config_cluster.yaml` loads the overlay alone and
+    # Snakemake dies with MissingRuleException (seen 2026-08-26). Put both
+    # files on ONE flag; later files overwrite overlapping keys, so the
+    # cluster mem/threads overlay must come second.
     rssh "cd '$REMOTE_DIR' && $REMOTE_ENV && mkdir -p cluster/logs && \
-        setsid bash -c \"snakemake --configfile $CONFIGFILE \
-            --configfile cluster/config_cluster.yaml \
+        setsid bash -c \"snakemake --configfile $CONFIGFILE cluster/config_cluster.yaml \
             --executor slurm --jobs $MAX_SLURM_JOBS \
             --rerun-triggers mtime --keep-going --printshellcmds \
             --envvars XDG_CACHE_HOME TMPDIR GRB_LICENSE_FILE \
