@@ -36,7 +36,28 @@ scen_corrige:
 # retired); 2050 = 3.0 GW all in BEWAL. Details and vd extraction:
 # docs/nuclear-alignment-20260816.md. `retrofit_nuclear_once: false` allows the
 # 2040->2050 Tihange retrofit repeat, mirroring the vd.
-scen_demande_haute:
+scen_demande_haute_2010:
+
+  snapshots:
+    start: "2010-01-01"
+    end: "2011-01-01"
+    inclusive: left
+
+  sector:
+    times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
+  electricity:
+    retrofit_nuclear_once: false
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_demande_haute.csv
+
+scen_demande_haute_2013:
+
+  snapshots:
+    start: "2013-01-01"
+    end: "2014-01-01"
+    inclusive: left
+
   sector:
     times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
   electricity:

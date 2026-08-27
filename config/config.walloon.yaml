@@ -10,7 +10,8 @@ run:
   # many names are listed. Every name must be a key of run.scenarios.file;
   # `name: all` expands to all of them.
   name:
-  - scen_demande_haute
+  - scen_demande_haute_2010
+  - scen_demande_haute_2013
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
