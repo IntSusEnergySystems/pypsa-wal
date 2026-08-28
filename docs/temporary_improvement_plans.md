@@ -27,7 +27,7 @@ Companion notes: [ccs_alignment.md](ccs_alignment.md),
 | 1 | Gas storage in Wallonia | data | medium | **Done** → [gas-storage-20260829.md](gas-storage-20260829.md) |
 | 2 | CCGT-CC only in 2050 | physics / TIMES | high | Do **not** hard-pin 2040; first give BE a CO₂ sink |
 | 3 | No WAL grid expansion 2025→2030 | already correct | low | Keep the freeze; decide if Boucle du Hainaut is a *floor* in 2040 |
-| 4 | Biogas 6.9 / 4 TWh | data | medium | Confirm with ICEDD: 6.9 is not in the vd |
+| 4 | Biogas 6.9 / 4 TWh | data | medium | **Done 29 Aug** — 4.0 (2040) / 6.9 (2050) applied; **source still owed by ICEDD** |
 | 5 | Flanders P2H falling | expected | low | Document; not a bug |
 | 6 | Energy independence dropped | physics | **high** | Diagnose after neighbour-offshore fix; import cap is a scenario choice |
 | 7 | Flanders heat demand rising | expected / Explorer | medium | Total heat *falls*; DH is what rises — check the chart |
@@ -252,8 +252,66 @@ If (ii), implement **C** as a named sensitivity, not the demande-haute
 default, and expect a higher 2050 BEWAL CO₂ dual. If the goal is TIMES
 alignment, **D** is the move, not a cut.
 
-Until then, keep 8.3 and keep checking biogas dispatch before reading 2040
-opex dips (`instructions.md` operational-cost note).
+### Implemented — 29 Aug 2026: **C**, on instruction, source still open
+
+Applied as directed at the 27 Aug meeting: the new caps are in, and the
+provenance gap is recorded in the data rather than left implicit.
+
+| Horizon | Cap before | Cap now | Source cell |
+|---|---:|---:|---|
+| 2025 | 8 300 GWh | **8 300** (unchanged) | Valbiom |
+| 2030 | 8 300 | **8 300** (unchanged) | Valbiom |
+| 2040 | 8 300 | **4 000** | `ICEDD meeting 2026-08-27 - SOURCE TO BE PROVIDED` |
+| 2050 | 8 300 | **6 900** | `ICEDD meeting 2026-08-27 - SOURCE TO BE PROVIDED` |
+
+**Route.** The edit is in the *shared* master table,
+[`config/input_parameters_for_models.csv`](../config/input_parameters_for_models.csv),
+not in the derived file. The single yearless `potential_wal` row
+(`year` empty, one value for every horizon) had to be **split into four
+per-year `potential` rows**, because `--write` refuses to let a
+`planning_horizon: all` row hold a year-varying value — exactly the failsafe
+this file predicted. `data/walloon/custom_potentials.csv` was then regenerated
+with `python scripts/build_common_parameters.py --write`; only the two value
+cells moved. `--check` passes.
+
+Because `--write` patches *values* only, the `source` and
+`further_description` cells of the two changed rows were edited by hand so the
+derived file also carries the warning. **Only `custom_potentials.csv` was
+touched** — the `_alternatif` (7 700), `_alternatif_biolow` (7 700) and
+`_imppel` (7 800) variants carry their own ICEDD biogas assumptions and belong
+to other scenarios.
+
+**Two caveats recorded in the CSV notes and repeated here:**
+
+1. **The source is still missing.** 6.9 / 4 TWh appear only in the meeting
+   list — not in the TIMES vd, `aggregation.md` or `common_parameters.md`. The
+   vd runs **7.67 TWh in 2040 and 8.07 in 2050**, so this is a deliberate
+   *divergence* from TIMES, not an alignment. Do not publish it as
+   TIMES-consistent until ICEDD supplies the citation.
+2. **The cap is now non-monotonic** (8.3 / 8.3 / 4.0 / 6.9). The meeting gave
+   figures for 2040 and 2050 only; 2025/2030 keep Valbiom's 8.3. If 6.9/4 is a
+   *deployment* trajectory rather than a *potential*, the early horizons should
+   probably come down too — ask in the same round.
+
+### Expected effect — correcting the dispatch table above
+
+Re-measured on the 26 Aug 1-hour networks
+(`results/_diagnostics/20260826/base_s_adm___{2040,2050}.nc`):
+
+| Horizon | Cap before | Dispatch before | New cap | Effect |
+|---|---:|---:|---:|---|
+| 2040 | 8.30 TWh | **1.45 TWh** | 4.00 | **none** — still slack by 2.55 TWh |
+| 2050 | 8.30 | **8.30 (binds)** | 6.90 | **−1.40 TWh** of a binding CO₂ valve |
+
+So 2040 is untouched and 2050 loses 1.4 TWh of the cheapest remaining
+decarbonisation headroom. Expect the **2050 BEWAL CO₂ dual to rise** and total
+system cost with it; the 2050 gas balance must find that 1.4 TWh elsewhere.
+
+⚠️ **Do not read biogas dispatch from
+`results/times-pypsa/scen_demande_haute/networks/`** — those files are dated
+**14 August** and 6-hourly, and they show 2040 biogas *binding* at 8.30 TWh,
+which is not what the 26 Aug run does. The vintage trap is documented in
+[gas-storage-20260829.md](gas-storage-20260829.md).
 
 ---
 
@@ -672,7 +730,7 @@ next production solve  ←  measure independence again (item 6.A)
         ├─ item 8  LV country alias + TIMES rooftop energy share at BEWAL
         ├─ item 2.C / 9.C  Belgian CO₂ sink, then industry-CC pin
         │     (not DAC; not 2040 CCGT-CC floor until the sink exists)
-        └─ item 4  only after ICEDD sources 6.9 / 4
+        └─ item 4  ✔ caps applied 29 Aug (source still owed by ICEDD)
         │
         ▼
 scenario overlays, not the base

@@ -6,8 +6,24 @@ once it grew past a roadmap entry into a data correction with Europe-wide
 reach. That file now carries a one-line pointer.
 
 **Status: implemented and committed** (branch `fix/run-review-20260825`),
-*not yet re-solved*. Every number below is measured on the 26 Aug
-`scen_demande_haute` networks, i.e. the state *before* these fixes.
+*not yet re-solved*. Every number below describes the state *before* these fixes.
+
+**Vintage warning.** Two sets of solved networks are on this machine and they
+are **not** interchangeable:
+
+| Path | Date | Resolution | Coverage |
+|---|---|---|---|
+| `results/_diagnostics/20260826/base_s_adm___{2040,2050}.nc` | 26 Aug | 8 760 h (1 h) | 2040, 2050 only |
+| `results/times-pypsa/scen_demande_haute/networks/*.nc` | **14 Aug** | 1 460 snapshots (6 h) | all four horizons |
+
+`results/walloon/scen_demande_haute/networks/` — the path
+[temporary_improvement_plans.md](temporary_improvement_plans.md) names as its
+evidence — holds no networks locally. Numbers below are labelled **26 Aug**
+where they come from the diagnostics pair and **14 Aug** otherwise. They differ
+enough to matter: 2040 Walloon gas store is 447 GWh on 26 Aug against 184 GWh
+on 14 Aug, and 2040 biogas dispatch is 1.45 TWh on 26 Aug against a binding
+8.30 TWh on 14 Aug. Cost and potential tables are structural (cost data +
+salt-cavern file), identical in both, and carry no label.
 
 | Change | Commit | File |
 |---|---|---|
@@ -115,7 +131,8 @@ Belgian mining history is not a negotiated TIMES/PyPSA parameter.
 
 **Verification** (no full workflow — a solve is hours):
 
-- `update_BEWAL_potentials` replayed against the four solved 26 Aug networks:
+- `update_BEWAL_potentials` replayed against the four solved **14 Aug** networks
+  (the only vintage with all four horizons on disk):
   `BEWAL gas Store e_nom_max` `inf → 0` at 2025/2030/2040/2050, while
   `BEVLG gas Store` keeps `e_nom_min = 545 280 MWh` and `e_nom_max = inf`.
 - 5 new unit tests, including an LP smoke test: a two-bus toy network with a
@@ -233,32 +250,38 @@ separate modelling decision, not part of this data fix.
 Raised in review: with methanation available, large seasonal methane storage is
 how a system carries summer renewables into winter. The model does implement
 that loop (`sector.methanation: true`, H₂ + CO₂ → CH₄ at η = 0.8, `p_min_pu =
-0.3`, waste heat to DH), and it is not idle — 2030 BEVLG Sabatier is **2 415 MW
-consuming 18.8 TWh of H₂**.
+0.3`, waste heat to DH), and it is not idle — **26 Aug 2040 Sabatier is
+3 700 MW consuming 9.86 TWh of H₂** across the model.
 
 The store cycle counts show the model using gas storage seasonally wherever it
 has enough of it, and thrashing where it does not:
 
-| gas store, 2050 | size | cycles/yr |
-|---|---:|---:|
-| DE | 264 TWh | **0.91** — seasonal fill/drain |
-| NL | 318 TWh | 0.13 |
-| **BEVLG** | **545 GWh** | **14.5** (24.4 in 2030) |
+| gas store (**26 Aug**) | size | cycles/yr 2040 | cycles/yr 2050 |
+|---|---:|---:|---:|
+| DE | 264 TWh | 0.52 | **0.98** — seasonal fill/drain |
+| FR | 178 TWh | 0.02 | 0.33 |
+| GB | 143 TWh | 0.32 | 0.27 |
+| NL | 318 TWh | 0.10 | 0.16 |
+| **BEVLG** | **545 GWh** | **20.2** | **11.8** |
+| BEWAL | 447 / 0.6 GWh | 43.5 | 516 |
 
-Belgium's 14–24 cycles/year was the *symptom* of a store 15× too small to do a
-seasonal job, not evidence that Belgium had no seasonal need.
+Belgium's 12–20 cycles/year was the *symptom* of a store 15× too small to do a
+seasonal job, not evidence that Belgium had no seasonal need. The Walloon
+store's 43–516 cycles/year is the same signal on a store that should not exist
+at all.
 
 And Belgium had no fallback. It has **no salt caverns**
 (`build_salt_cavern_potentials`: DE/FR/GB/NL only), so its `H2 Store` costs
-**2 912 EUR/MWh/a against 120** at cavern nodes. 2050 H₂ storage built: GB 4.9,
-DE 2.9, NL 2.3, FR 1.7 TWh — **Belgium 0.0009 TWh**. Both seasonal routes were
+**2 912 EUR/MWh/a against 120** at cavern nodes. 2050 H₂ storage built
+(**26 Aug**): DE 4.01, GB 3.70, NL 3.24, FR 2.09 TWh — **Belgium 0.0000 TWh**
+across all three nodes. Both seasonal routes were
 shut: methane by this data bug, hydrogen by real geology. Loenhout's true
 8.2 TWh is Belgium's only large seasonal store, which is why this correction is
 not cosmetic.
 
 Expect the fix to bite hardest in **2030/2040**, when Sabatier is actually
-running (18.8 / 6.3 TWh of H₂ through BEVLG). In 2050 Sabatier collapses to
-0.2 MW — **not** for lack of CO₂ (110 Mt captured against 125 Mt of
+running (9.86 TWh of H₂ in 2040). In 2050 Sabatier collapses to
+0.1 MW — **not** for lack of CO₂ (110 Mt captured against 125 Mt of
 sequestration) but because permanent sequestration outbids methanation for the
 same molecules under the carbon budget. That competition belongs with item 9;
 it is the reason the 2050 gas bus is pure fossil at a flat 36.35 EUR/MWh and
@@ -282,8 +305,9 @@ salt-cavern asymmetry, which is real geology rather than a bug.
 
 ## Appendix — H₂ storage by node (asked in review, 29 Aug)
 
-Context for "Belgium has no seasonal fallback". Measured on the same 26 Aug
-networks; unaffected by the gas-storage commits.
+Context for "Belgium has no seasonal fallback". Vintages labelled per table;
+unaffected by the gas-storage commits. Cost and potential figures are
+structural and identical across vintages.
 
 ### Price — two technologies, ~24× apart
 
@@ -321,17 +345,29 @@ infinite — the constraint is purely price.
 
 ### Size actually built (TWh)
 
+**26 Aug** (the two horizons that exist at that vintage):
+
+| node | 2040 | 2050 |
+|---|---:|---:|
+| DE | 0.0001 | **4.01** |
+| GB | 0.132 | **3.70** |
+| NL | 0.194 | **3.24** |
+| FR | 0.0004 | **2.09** |
+| BEWAL / BEVLG / BEBRU / LU | 0.0000 | **0.0000** |
+
+**14 Aug**, for the shape across all four horizons — treat as indicative only:
+
 | node | 2025 | 2030 | 2040 | 2050 |
 |---|---:|---:|---:|---:|
-| GB | 0 | 0.030 | 0.136 | **4.92** |
-| DE | 0 | 0 | 0 | **2.85** |
-| NL | 0 | 0.077 | 0.077 | **2.29** |
-| FR | 0 | 0.001 | 0.001 | **1.67** |
-| BEWAL / BEVLG / BEBRU / LU | 0 | ~0 | ~0 | **~0.0000002** |
+| GB | 0 | 0.030 | 0.136 | 4.92 |
+| DE | 0 | 0 | 0 | 2.85 |
+| NL | 0 | 0.077 | 0.077 | 2.29 |
+| FR | 0 | 0.001 | 0.001 | 1.67 |
+| BEWAL / BEVLG / BEBRU / LU | 0 | ~0 | ~0 | ~0.0000002 |
 
 Belgium's three nodes together hold under 1 MWh across all four vintages.
-Utilisation against potential is low everywhere — GB uses 1.1 % of its 441 TWh,
-DE 0.3 % of 1 000 TWh — so caps are nowhere near binding. **Price separates the
+Utilisation against potential is low everywhere — GB uses 0.8 % of its 441 TWh,
+DE 0.4 % of 1 000 TWh — so caps are nowhere near binding. **Price separates the
 nodes, not geology; geology only decides which price you get.**
 
 ### Latent issue: myopic vintage headroom
