@@ -173,6 +173,39 @@ def apply_battery_p_nom_min(n, bus, p_min_mw, planning_horizons):
     )
 
 
+def apply_gas_store_cap(n, bus, attr, value):
+    """Write `attr` on the gas Store at `bus`.
+
+    `prepare_sector_network.add_carrier_buses` creates one extendable gas Store
+    per gas bus with `e_nom_max = inf`, and `add_gas_network` then writes
+    `e_nom_min` from the SciGRID_gas inventory. Neither is a site-specific
+    ceiling: a region with no underground store at all still gets an unbounded
+    one, and the optimiser will happily build a seasonal inventory there. A
+    region without the geology therefore needs the ceiling written here.
+
+    The store has `lifetime = inf`, so `add_brownfield` drops it from the
+    previous network and `prepare_sector_network` rebuilds it unconstrained at
+    every horizon — the cap has to be re-applied each time, which is what the
+    per-year rows in `custom_potentials.csv` do.
+    """
+    name = f"{bus} gas Store"
+    if name not in n.stores.index:
+        logger.warning(
+            "No gas Store at bus %s; cannot apply %s=%s.", bus, attr, value
+        )
+        return
+
+    n.stores.loc[name, attr] = value
+
+    if attr == "e_nom_max":
+        # an inherited floor above the new ceiling would be infeasible
+        for floor in ["e_nom_min", "e_nom"]:
+            if n.stores.at[name, floor] > value:
+                n.stores.loc[name, floor] = value
+
+    logger.info("Gas store at %s: %s = %s MWh_LHV.", bus, attr, value)
+
+
 def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
     if walloon_potentials == None:
         return
@@ -332,6 +365,14 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             )
             logger.info(logger_msg_success)
             apply_battery_p_nom_min(n, bus, potential, planning_horizons)
+            continue
+        if carrier == "gas storage":
+            allowed = {"e_nom", "e_nom_min", "e_nom_max"}
+            assert attr in allowed, (
+                f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
+            )
+            logger.info(logger_msg_success)
+            apply_gas_store_cap(n, bus, attr, potential)
             continue
         if carrier in ["CCGT", "CCGT CC"]:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}

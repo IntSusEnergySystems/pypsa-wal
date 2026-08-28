@@ -8,7 +8,10 @@ import logging
 import numpy as np
 import pandas as pd
 
-from scripts.walloon_scripts.BEWAL_potentials import apply_battery_p_nom_min
+from scripts.walloon_scripts.BEWAL_potentials import (
+    apply_battery_p_nom_min,
+    apply_gas_store_cap,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +175,14 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             )
             logger.info(logger_msg_success)
             apply_battery_p_nom_min(n, bus, potential, planning_horizons)
+            continue
+        if carrier == "gas storage":
+            allowed = {"e_nom", "e_nom_min", "e_nom_max"}
+            assert attr in allowed, (
+                f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
+            )
+            logger.info(logger_msg_success)
+            apply_gas_store_cap(n, bus, attr, potential)
             continue
         if carrier in ['CCGT']:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}

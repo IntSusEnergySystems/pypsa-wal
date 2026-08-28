@@ -23,7 +23,7 @@ Companion notes: [ccs_alignment.md](ccs_alignment.md),
 
 | # | Item | Kind | Severity | Recommended default |
 |---|---|---|---|---|
-| 1 | Gas storage in Wallonia | data | medium | Pin BEWAL `e_nom_max = 0`; keep Loenhout on BEVLG |
+| 1 | Gas storage in Wallonia | data | medium | **Done 28 Aug** — BEWAL `e_nom_max = 0`; Loenhout kept on BEVLG |
 | 2 | CCGT-CC only in 2050 | physics / TIMES | high | Do **not** hard-pin 2040; first give BE a CO₂ sink |
 | 3 | No WAL grid expansion 2025→2030 | already correct | low | Keep the freeze; decide if Boucle du Hainaut is a *floor* in 2040 |
 | 4 | Biogas 6.9 / 4 TWh | data | medium | Confirm with ICEDD: 6.9 is not in the vd |
@@ -84,10 +84,81 @@ is not a result.
 
 ### Recommended
 
-**A**, plus the **D** audit. Implementation: a Walloon overlay in
-`add_gas_network` / `BEWAL_potentials.py` (same pattern as other BEWAL
-`e_nom_max`), or a row in `custom_potentials.csv` if stores are patched there.
-Do not publish BEWAL gas-store capacity from this vintage.
+**A**, plus the **D** audit.
+
+### Implemented — 28 Aug 2026
+
+**A is done.** `BEWAL gas Store` is pinned to `e_nom_max = 0` at every horizon,
+through the existing `custom_potentials.csv` overlay rather than a new code
+path.
+
+| Change | File |
+|---|---|
+| `apply_gas_store_cap(n, bus, attr, value)` — writes `e_nom`/`e_nom_min`/`e_nom_max` on `{bus} gas Store` | [`scripts/walloon_scripts/BEWAL_potentials.py`](../scripts/walloon_scripts/BEWAL_potentials.py) |
+| `technology: gas storage` branch dispatching to it | same, + [`BEWAL_potentials_overnight.py`](../scripts/walloon_scripts/BEWAL_potentials_overnight.py) (overnight foresight) |
+| 4 rows `BEWAL,gas storage,e_nom_max,0,MWh,<year>` | `data/walloon/custom_potentials{,_alternatif,_alternatif_biolow,_imppel}.csv` |
+| 5 unit tests | [`test/test_gas_store_potential.py`](../test/test_gas_store_potential.py) |
+
+Three implementation points worth recording:
+
+1. **Per-horizon rows are required, not redundant.** The gas Store carries
+   `lifetime = inf`, so `add_brownfield` removes it from the previous network
+   (`n_p.remove(c.name, c.df.index[c.df.lifetime == np.inf])`) and
+   `prepare_sector_network` rebuilds it unconstrained at each horizon. A single
+   2025 row would leave 2030–2050 free. The cap therefore rides the myopic hook
+   already in place — `update_BEWAL_potentials` in `add_existing_baseyear.py`
+   (2025) and `add_brownfield.py` (2030/2040/2050).
+2. **`e_nom_max` also pulls down `e_nom_min`/`e_nom`.** At BEWAL the floor is
+   already 0, so this is inert today; it exists so that pinning a bus that *did*
+   inherit a SciGRID floor cannot silently produce `e_nom_min > e_nom_max`, an
+   infeasible LP rather than a rejected cap.
+3. **The technology label is `gas storage`, not `gas`.** `gas` is a live
+   *generator* carrier, so it would be captured by the generator branch of
+   `update_BEWAL_potentials` before reaching the store.
+
+The rows were added to all four `custom_potentials_*.csv` variants: the closure
+of Anderlues and Péronnes is geology, not a scenario assumption. They are
+*unmanaged rows* for `build_common_parameters.py` (no `potential:BEWAL:gas
+storage:e_nom_max` target in the master CSV) — deliberate: a hard zero from
+Belgian mining history is not a negotiated TIMES/PyPSA parameter.
+`--check` still passes.
+
+**Verification** (no full workflow — a solve is hours):
+
+- `update_BEWAL_potentials` replayed against the four solved 26 Aug networks:
+  `BEWAL gas Store e_nom_max` `inf → 0` at 2025/2030/2040/2050, while
+  `BEVLG gas Store` keeps `e_nom_min = 545 280 MWh` and `e_nom_max = inf`.
+- 5 new unit tests, including an LP smoke test: a two-bus toy network with a
+  winter price spread builds a Walloon store when uncapped, and with the cap
+  solves to `status == "ok"` with `e_nom_opt = 0` — the gas bus balances from
+  the pipeline, so removing the store does not make the region infeasible.
+- Full suite `pytest test/` — 222 passed.
+- `python scripts/build_common_parameters.py --check` — CHECK PASSED.
+- `snakemake --configfile config/config.walloon.yaml -n` — DAG builds.
+
+Expected effect on the next solve: 0.13–0.20 TWh of phantom Walloon seasonal
+inventory disappears in 2025/2030 (2050 was already abandoning it at 0.06 GWh).
+Walloon seasonal gas flexibility then comes only from the pipeline — 7.5 GW at
+zero `capital_cost`, which remains a separate open issue.
+
+### Audit of **D** (Loenhout's 545 GWh) — not a unit error
+
+`build_gas_input_locations.py:133` reads
+`sto["capacity"] = sto["max_cushionGas_M_m3"] * 11.36` (MCM → GWh). The column
+is **cushion gas** — the base inventory that stays in the reservoir — not
+*working* gas. Loenhout appears once in
+`gas_input_locations_s_adm.geojson` at POINT (4.699, 51.391), i.e. the real
+site, with 545.28 GWh = 48.0 Mm³ of cushion gas. Fluxys's 7.6 TWh / 770 Mm³ is
+the **working** volume.
+
+So the 545 GWh floor is not a `MWh`/`GWh`/quantile-clip mistake: the scale is
+right (DE gets 264 TWh, close to Germany's real ~245 TWh working gas), the
+*column* is wrong. That is an upstream PyPSA-Eur choice affecting every country
+— NL's raw 457 TWh is even clipped down to 318 TWh by the 0.98-quantile at
+`prepare_sector_network.py:2127`. **Not changed here:** raising BEVLG alone
+would make Belgium the only country on working gas while its neighbours stay on
+cushion gas, which is worse than a consistent bias. Log it as a PyPSA-Eur
+upstream item; it does not block item 1.
 
 ---
 
@@ -704,7 +775,8 @@ already in tree, not in this solve
         ▼
 next production solve  ←  measure independence again (item 6.A)
         │
-        ├─ item 1  gas store e_nom_max = 0 at BEWAL (+ Loenhout audit)
+        ├─ item 1  gas store e_nom_max = 0 at BEWAL  ✔ done 28 Aug
+        │     (Loenhout audit done: upstream cushion-vs-working gas, not fixed)
         ├─ item 8  LV country alias + TIMES rooftop energy share at BEWAL
         ├─ item 2.C / 9.C  Belgian CO₂ sink, then industry-CC pin
         │     (not DAC; not 2040 CCGT-CC floor until the sink exists)
