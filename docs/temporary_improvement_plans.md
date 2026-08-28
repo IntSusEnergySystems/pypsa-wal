@@ -28,9 +28,9 @@ Companion notes: [ccs_alignment.md](ccs_alignment.md),
 | 2 | CCGT-CC only in 2050 | physics / TIMES | high | Do **not** hard-pin 2040; first give BE a CO₂ sink |
 | 3 | No WAL grid expansion 2025→2030 | already correct | low | Keep the freeze; decide if Boucle du Hainaut is a *floor* in 2040 |
 | 4 | Biogas 6.9 / 4 TWh | data | medium | **Done 29 Aug** — 4.0 (2040) / 6.9 (2050) applied; **source still owed by ICEDD** |
-| 5 | Flanders P2H falling | expected | low | Document; not a bug |
+| 5 | Flanders P2H falling | expected + **plot bug** | low | **Done 29 Aug** — trend real; P2H panel mixed MW_th/MW_e, fixed |
 | 6 | Energy independence dropped | physics | **high** | Diagnose after neighbour-offshore fix; import cap is a scenario choice |
-| 7 | Flanders heat demand rising | expected / Explorer | medium | Total heat *falls*; DH is what rises — check the chart |
+| 7 | Flanders heat demand rising | **plot bug** | medium | **Done 29 Aug** — chart dropped urban-decentral heat and inverted the sign |
 | 8 | No rooftop PV | physics | high | Impose TIMES rooftop *energy* share at BEWAL |
 | 9 | BECCS → DAC / industry CC | physics / TIMES | high | Pin industry-CC volumes; do **not** turn DAC back on |
 | 10 | 3 GW nuclear min in Flanders 2050 | scenario | **high** | New overlay, not the TIMES-aligned base — decide 3 vs 6 GW Belgium |
@@ -370,6 +370,44 @@ Drivers in Flanders, not a solver bug:
 rise in lockstep with Wallonia — that would be manufacturing TIMES-like
 electrification in a region TIMES does not model.
 
+### Implemented — 29 Aug 2026: the *number* was wrong, the *trend* is real
+
+Checked the hypothesis that pypsa2html was mis-aggregating. It was — but not in
+the way that would change the answer.
+
+**Grouping is complete.** `tech_groups.csv` matches `heat pump` and
+`resistive heater` as substrings, so rural, urban-decentral **and**
+urban-central carriers all land in the `power-to-heat` group. Nothing central
+or decentral is missing from that panel. Likewise the heat *balance* page
+selects buses with `carrier.str.contains("heat")`, so it sees all three.
+
+**But the panel added MW_th to MW_e.** In PyPSA-Eur a heat pump is a
+**reversed** link — `bus0` is the heat bus, `bus1` electricity, `efficiency`
+is 1/COP — so its `p_nom` is **thermal**. A resistive heater is a normal link,
+so its `p_nom` is **electric**. Verified on the 26 Aug 2050 network:
+
+| carrier | bus0 → bus1 | efficiency | `p_nom` is |
+|---|---|---:|---|
+| urban central air heat pump | urban central heat → low voltage | 0.30 | **MW_th** |
+| urban decentral air heat pump | urban decentral heat → low voltage | 0.39 | **MW_th** |
+| rural ground heat pump | rural heat → low voltage | 0.29 | **MW_th** |
+| urban central resistive heater | low voltage → urban central heat | 0.99 | **MW_e** |
+| urban decentral resistive heater | low voltage → urban decentral heat | 0.90 | **MW_e** |
+
+Summing them overstates heat pumps by the COP relative to resistive heaters.
+`extract/flows.py` already knew the orientation for the Sankey; the capacity
+path did not. **Fixed** in pypsa2html (`0d1b904`): `heat_output_scaling()`
+restates power-to-heat capacity on the **heat** side — the side needing no
+assumption, since heat-pump `p_nom` is already thermal while its *electrical*
+rating has no fixed value (`efficiency` is a time series). The panel is
+retitled **“Power-to-heat (thermal)”** so a GW_th axis is not read as GW_e.
+
+**This does not change the conclusion.** On the 26 Aug numbers the Flemish
+decline survives every accounting: mixed −13 %, consistent MW_th −13 %,
+consistent MW_e −27 %. The fall is renovation plus the decentral→DH shift
+described above, exactly as **A** says. What changed is that the plotted
+quantity is now a quantity.
+
 ---
 
 ## 6. Energy independence has dropped — model issue? TIMES 10 TWh import cap?
@@ -495,6 +533,55 @@ is gone. Flanders never had that mechanism.
 
 **A** now. **B** if Explorer users keep reading Flemish DH as a forecast.
 Do not try to make Flemish *total* heat “rise” — it does not.
+
+### Implemented — 29 Aug 2026: it *was* a pypsa2html bug, and it inverted the sign
+
+The meeting's reading was not a misread chart. The chart was wrong.
+
+`carrier_flows_energy.csv` emits one code per residential/tertiary heat bus:
+
+| bus | code |
+|---|---|
+| `rural heat` | `demandheat` |
+| `urban decentral heat` | **`demandheatc`** |
+| `urban central heat` | `presvapcfdhs` (plotted as “DH demand”) |
+
+`_DEMAND_CODES` in `extract/tables.py` listed `demandheat`, `demandheata`,
+`demandheatb`, `demandheats` — **not `demandheatc`**. The `a`/`b`/`s` variants
+are emitted by nothing. The chart is a *whitelist*, so `urban decentral heat`
+disappeared with no error and no warning.
+
+It is the **largest** block — 42.0 of 59.2 TWh of Flemish heat in 2040 (71 %).
+And because the dropped block shrinks while district heating grows, the chart
+**inverted the trend it was meant to show**:
+
+| Sectoral demands, res+tertiary heat | chart before | truth |
+|---|---|---|
+| **Flanders** 2025 → 2050 | 10.9 → 20.6 TWh **(+89 %)** | 59.8 → 49.2 TWh **(−18 %)** |
+| **Wallonia** 2025 → 2050 | 13.3 → 12.2 TWh (−9 %) | 28.3 → 23.4 TWh (−17 %) |
+
+That is the meeting note verbatim — “heat demand increases a lot in Flanders,
+stable in Wallonia”. Both halves were artefacts of the same missing line.
+
+**Fixed** in pypsa2html (`0d1b904`): `demandheatc` added, plus a tripwire that
+warns whenever `carrier_flows_energy.csv` emits a code whose label says
+“demand” and no `_DEMAND_CODES` entry claims it. Secondary link ports (entry
+names ending `_2`, “X *to demand*”) are excluded — they restate energy already
+counted on the primary row, so plotting them would double-count; six exist and
+none is a real gap.
+
+**Not changed:** the FEC pages. `processes_energy.csv` has no `vap_fe` node for
+decentral heat because FEC counts it at the *fuel* boundary (gas, biomass,
+electricity into the appliance), which is the standard convention. Adding it
+there would double-count.
+
+Verified end to end by rebuilding the report and decoding the plotted series,
+not by reading the code. Note the rebuild used the **14 Aug** vintage (the only
+one with all four horizons and a `csvs/` tree); the 26 Aug figures in the
+Evidence table above tell the same story.
+
+**Option A is still worth doing** — the Flanders-is-PyPSA-Eur / Wallonia-is-TIMES
+label is a separate point from this bug, and both regions' *totals* fall.
 
 ---
 
@@ -716,8 +803,9 @@ Rebuild brownfield from 2040 (2030 still has Doel 4).
 
 ## Sequencing for the next solves
 
-Items 3 and 5 need no code. Item 7 is a labelling/DH-cap decision. The rest
-stack:
+Item 3 needs no code. Items 5 and 7 were pypsa2html bugs and are fixed
+(`0d1b904` in that repo) — **the report must be rebuilt** before the heat
+charts are read again. The rest stack:
 
 ```
 already in tree, not in this solve
@@ -737,7 +825,7 @@ scenario overlays, not the base
         ├─ item 10  Flanders nuclear (3+3 vs split-3) 
         ├─ item 6.B  Walloon 10 TWh import cap
         ├─ item 2.A  TIMES CCGT-CC MW in 2040 (after sink)
-        └─ item 7.B / 5.C  Flemish DH cap
+        └─ item 7.B / 5.C  Flemish DH cap (policy choice, separate from the plot fix)
 ```
 
 **Do not combine the Flanders-nuclear overlay, the 10 TWh import cap, and the
