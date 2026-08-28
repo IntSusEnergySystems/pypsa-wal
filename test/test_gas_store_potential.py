@@ -139,3 +139,77 @@ def test_capped_store_solves_and_stays_empty():
     assert status == "ok"  # the gas bus still balances without a local store
     assert n.stores.at["BEWAL gas Store", "e_nom_opt"] == pytest.approx(0.0, abs=1e-6)
     assert n.stores.at["BEVLG gas Store", "e_nom_opt"] >= 545_280.0
+
+
+# --------------------------------------------------------------------------
+# Working gas vs cushion gas in build_gas_input_locations
+# --------------------------------------------------------------------------
+
+
+def _sto_frame():
+    """Two SciGRID_gas sites whose cushion/working ratio runs opposite ways.
+
+    Loenhout is real: an aquifer store, 48 Mm3 cushion against 720 Mm3 working.
+    The NL-style depleted field is the opposite case, and is why reading the
+    cushion column is not a uniform under-statement that a scale factor
+    could repair.
+    """
+    import geopandas as gpd
+
+    return gpd.GeoDataFrame(
+        {
+            "name": ["Loenhout", "Depleted field"],
+            "country_code": ["BE", "NL"],
+            "max_cushionGas_M_m3": [48.0, 3000.0],
+            "max_workingGas_M_m3": [719.905789, 500.0],
+        },
+        geometry=gpd.points_from_xy([4.69902, 5.0], [51.39128, 52.0]),
+        crs="EPSG:4326",
+    )
+
+
+def test_storage_capacity_reads_working_gas_not_cushion_gas(monkeypatch):
+    import geopandas as gpd
+
+    import scripts.build_gas_input_locations as m
+
+    empty = gpd.GeoDataFrame(
+        {"capacity": [], "mcm_per_year": [], "CapacityInMtpa": []},
+        geometry=[],
+        crs="EPSG:4326",
+    )
+    entry = gpd.GeoDataFrame(
+        {
+            "name": ["x"],
+            "from_country": ["NO"],
+            "to_country": ["BE"],
+            "max_cap_from_to_M_m3_per_d": [1.0],
+        },
+        geometry=gpd.points_from_xy([4.0], [51.0]),
+        crs="EPSG:4326",
+    )
+    # read_scigrid_gas serves both the border points and the storages
+    monkeypatch.setattr(
+        m, "read_scigrid_gas", lambda fn: _sto_frame() if fn == "sto" else entry
+    )
+    monkeypatch.setattr(m, "build_gem_lng_data", lambda fn: empty)
+    monkeypatch.setattr(m, "build_gem_prod_data", lambda fn: empty)
+
+    out = m.build_gas_input_locations("gem", "entry", "sto", ["BE", "NL"])
+    # `out.type` is geopandas's geometry-type property, not the column
+    sto = out[out["type"] == "storage"].reset_index(drop=True)
+
+    # 719.905789 Mm3 * 11.36 GWh/Mm3 = 8178 GWh, i.e. Fluxys's ~7.6-8.2 TWh
+    assert sto.at[0, "capacity"] == pytest.approx(8178.13, rel=1e-4)
+    # not the 545 GWh the cushion column gives
+    assert sto.at[0, "capacity"] != pytest.approx(48.0 * 11.36, rel=1e-3)
+    # and the depleted field shrinks rather than grows
+    assert sto.at[1, "capacity"] == pytest.approx(500.0 * 11.36, rel=1e-6)
+
+
+def test_cushion_and_working_gas_are_not_proportional():
+    """A scale factor cannot repair the cushion proxy — the ratio inverts."""
+    sto = _sto_frame()
+    ratio = sto["max_workingGas_M_m3"] / sto["max_cushionGas_M_m3"]
+    assert ratio.iloc[0] > 10  # aquifer: working >> cushion
+    assert ratio.iloc[1] < 1  # depleted field: working < cushion

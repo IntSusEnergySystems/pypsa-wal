@@ -23,7 +23,7 @@ Companion notes: [ccs_alignment.md](ccs_alignment.md),
 
 | # | Item | Kind | Severity | Recommended default |
 |---|---|---|---|---|
-| 1 | Gas storage in Wallonia | data | medium | **Done 28 Aug** — BEWAL `e_nom_max = 0`; Loenhout kept on BEVLG |
+| 1 | Gas storage in Wallonia | data | medium | **Done 28–29 Aug** — BEWAL `e_nom_max = 0`; Loenhout corrected to 8.2 TWh on BEVLG |
 | 2 | CCGT-CC only in 2050 | physics / TIMES | high | Do **not** hard-pin 2040; first give BE a CO₂ sink |
 | 3 | No WAL grid expansion 2025→2030 | already correct | low | Keep the freeze; decide if Boucle du Hainaut is a *floor* in 2040 |
 | 4 | Biogas 6.9 / 4 TWh | data | medium | Confirm with ICEDD: 6.9 is not in the vd |
@@ -141,24 +141,152 @@ inventory disappears in 2025/2030 (2050 was already abandoning it at 0.06 GWh).
 Walloon seasonal gas flexibility then comes only from the pipeline — 7.5 GW at
 zero `capital_cost`, which remains a separate open issue.
 
-### Audit of **D** (Loenhout's 545 GWh) — not a unit error
+### **D** implemented — 29 Aug 2026: cushion gas → working gas
 
-`build_gas_input_locations.py:133` reads
-`sto["capacity"] = sto["max_cushionGas_M_m3"] * 11.36` (MCM → GWh). The column
-is **cushion gas** — the base inventory that stays in the reservoir — not
-*working* gas. Loenhout appears once in
-`gas_input_locations_s_adm.geojson` at POINT (4.699, 51.391), i.e. the real
-site, with 545.28 GWh = 48.0 Mm³ of cushion gas. Fluxys's 7.6 TWh / 770 Mm³ is
-the **working** volume.
+The 545 GWh floor was never a `MWh`/`GWh` or quantile mistake. The *column* was
+wrong. `build_gas_input_locations.py` read
 
-So the 545 GWh floor is not a `MWh`/`GWh`/quantile-clip mistake: the scale is
-right (DE gets 264 TWh, close to Germany's real ~245 TWh working gas), the
-*column* is wrong. That is an upstream PyPSA-Eur choice affecting every country
-— NL's raw 457 TWh is even clipped down to 318 TWh by the 0.98-quantile at
-`prepare_sector_network.py:2127`. **Not changed here:** raising BEVLG alone
-would make Belgium the only country on working gas while its neighbours stay on
-cushion gas, which is worse than a consistent bias. Log it as a PyPSA-Eur
-upstream item; it does not block item 1.
+```python
+sto["capacity"] = sto["max_cushionGas_M_m3"] * mcm_to_gwh   # 11.36 GWh/Mm³
+```
+
+**Cushion gas** is the base inventory that stays in the reservoir permanently.
+It is not storage capacity at all. SciGRID_gas carries both columns for every
+one of its 203 sites, with no missing values:
+
+| Loenhout (the only Belgian site, POINT 4.699/51.391) | Mm³ | → GWh |
+|---|---:|---:|
+| `max_cushionGas_M_m3` — what was read | 48.0 | **545** |
+| `max_workingGas_M_m3` — the storable volume | 719.9 | **8 178** |
+
+8 178 GWh matches Fluxys's 7.6 TWh. **Changed to `max_workingGas_M_m3`.**
+
+The earlier note in this file said the bias was uniform enough to leave alone.
+That was wrong. Cushion gas is not a scaled-down proxy — the two are not even
+proportional, because the cushion/working ratio is set by reservoir type.
+Aquifer stores (Loenhout) need little cushion; depleted fields (NL, GB, PL)
+need a great deal:
+
+| node | cushion (was) | working (now) | factor |
+|---|---:|---:|---:|
+| **BEVLG** | 545 GWh | **8 178 GWh** | **×15.0** |
+| DE | 264 496 | 320 084 | ×1.21 |
+| FR | 177 711 | 116 392 | ×0.65 |
+| NL | 456 976 | 103 615 | ×0.23 |
+| GB | 142 500 | 50 729 | ×0.36 |
+
+In aggregate the countries in scope go from 1 708 TWh of cushion to 1 406 TWh
+of working gas — the old numbers were 22 % too *high* overall while Belgium,
+the single worst-hit node in the dataset, was 15× too low. No scale factor
+could have repaired that; only the column swap does.
+
+### Second bug: the 0.98-quantile clip (removed)
+
+`prepare_sector_network.py` then ran
+
+```python
+e_nom.clip(upper=e_nom.quantile(0.98), inplace=True)  # limit extremely large storage
+```
+
+on a series `reindex`ed to **`n.stores.index` and padded with zeros**. The clip
+level is therefore decided by how many *unrelated* stores happen to exist at
+that point in the script, which is neither documented nor stable:
+
+| stores in the network when the line runs | clip level | effect |
+|---|---:|---|
+| 37 (where `add_gas_network` actually sits) | 318 TWh | clipped NL 457 → 318 |
+| 281 (what the network ends with) | **0 GWh** | **every gas-storage floor in Europe erased** |
+
+Only five of those 37 entries are non-zero, so the "98th percentile" is a
+percentile of padding. It happened to produce a plausible number for the
+cushion data by coincidence. On working gas the same line would cut **Germany —
+the largest genuine store in Europe — from 320 to 173 TWh**.
+
+**Removed.** The values are now physical, so an outlier guard is guarding
+against nothing, and the one it had was index-dependent. An `INFO` line now
+logs the resulting floors each run (`Existing gas storage floors (TWh_LHV)`),
+which is the check that the clip was pretending to be.
+
+### What this does and does not decide
+
+Loenhout is legacy plant, in service through 2050, so it enters as an
+`e_nom_min` floor exactly as before — the model is **forced to have it** and
+**free to decide whether to cycle it**. Nothing about dispatch is pinned.
+
+**Caveat to carry into the next solve — the objective moves.** `capital_cost`
+in PyPSA applies to the whole `e_nom_opt`, including the part forced by
+`e_nom_min` (verified: an extendable store with `e_nom_min = e_nom_max = 1000`
+and `capital_cost = 10` returns `objective = 10 000`, `objective_constant = 0`).
+So every floor is charged a **greenfield annuity of 23.92 EUR/MWh/a** (Danish
+Energy Agency underground storage, 297 EUR/kWh over 100 y) against stores that
+were built decades ago:
+
+| node | Δ capex |
+|---|---:|
+| BEVLG | **+183 MEUR/a** |
+| DE | +1 330 |
+| FR | −1 467 |
+| GB | −2 195 |
+| NL | −5 137 |
+| **net** | **−7 287 MEUR/a** |
+
+The net is a ~7.3 BEUR/a *reduction* in reported European system cost, almost
+all of it NL's phantom 214 TWh disappearing. This does **not** change any
+dispatch decision — for a forced floor the term is effectively constant — but
+it does mean **total system cost is not comparable with runs before this
+change**. Charging sunk assets a greenfield annuity is a pre-existing PyPSA-Eur
+convention affecting every `e_nom_min` floor in the model; correcting it is a
+separate modelling decision, not part of this data fix.
+
+### Why this matters more than "one number" — the P2G seasonal loop
+
+Raised in review: with methanation available, large seasonal methane storage is
+how a system carries summer renewables into winter. The model does implement
+that loop (`sector.methanation: true`, H₂ + CO₂ → CH₄ at η = 0.8, `p_min_pu =
+0.3`, waste heat to DH), and it is not idle — 2030 BEVLG Sabatier is **2 415 MW
+consuming 18.8 TWh of H₂**.
+
+The store cycle counts show the model using gas storage seasonally wherever it
+has enough of it, and thrashing where it does not:
+
+| gas store, 2050 | size | cycles/yr |
+|---|---:|---:|
+| DE | 264 TWh | **0.91** — seasonal fill/drain |
+| NL | 318 TWh | 0.13 |
+| **BEVLG** | **545 GWh** | **14.5** (24.4 in 2030) |
+
+Belgium's 14–24 cycles/year was the *symptom* of a store 15× too small to do a
+seasonal job, not evidence that Belgium had no seasonal need.
+
+And Belgium had no fallback. It has **no salt caverns**
+(`build_salt_cavern_potentials`: DE/FR/GB/NL only), so its `H2 Store` costs
+**2 912 EUR/MWh/a against 120** at cavern nodes. 2050 H₂ storage built: GB 4.9,
+DE 2.9, NL 2.3, FR 1.7 TWh — **Belgium 0.0009 TWh**. Both seasonal routes were
+shut: methane by this data bug, hydrogen by real geology. Loenhout's true
+8.2 TWh is Belgium's only large seasonal store, which is why this correction is
+not cosmetic.
+
+Expect the fix to bite hardest in **2030/2040**, when Sabatier is actually
+running (18.8 / 6.3 TWh of H₂ through BEVLG). In 2050 Sabatier collapses to
+0.2 MW — **not** for lack of CO₂ (110 Mt captured against 125 Mt of
+sequestration) but because permanent sequestration outbids methanation for the
+same molecules under the carbon budget. That competition belongs with item 9;
+it is the reason the 2050 gas bus is pure fossil at a flat 36.35 EUR/MWh and
+therefore has nothing seasonal to store.
+
+### Verification
+
+- `build_gas_input_locations` re-run against the live SciGRID/GEM data with the
+  existing `base_s_adm` regions: BEVLG storage 545 → 8 178 GWh, other nodes as
+  tabled above.
+- 7 unit tests in [`test/test_gas_store_potential.py`](../test/test_gas_store_potential.py),
+  two of them new: the builder reads the working-gas column, and cushion/working
+  are shown to be non-proportional (ratio inverts between an aquifer and a
+  depleted field) so that nobody "fixes" this later with a scale factor.
+- Full suite, `build_common_parameters.py --check`, and the snakemake DAG all pass.
+
+**Not done:** the sunk-capex convention above, and the `H2 Store` /
+salt-cavern asymmetry, which is real geology rather than a bug.
 
 ---
 
@@ -776,7 +904,7 @@ already in tree, not in this solve
 next production solve  ←  measure independence again (item 6.A)
         │
         ├─ item 1  gas store e_nom_max = 0 at BEWAL  ✔ done 28 Aug
-        │     (Loenhout audit done: upstream cushion-vs-working gas, not fixed)
+        │     (+ Loenhout 545 GWh → 8.2 TWh: cushion→working gas, clip removed)
         ├─ item 8  LV country alias + TIMES rooftop energy share at BEWAL
         ├─ item 2.C / 9.C  Belgian CO₂ sink, then industry-CC pin
         │     (not DAC; not 2040 CCGT-CC floor until the sink exists)

@@ -130,7 +130,14 @@ def build_gas_input_locations(gem_fn, entry_fn, sto_fn, countries):
     lng["capacity"] = lng["CapacityInMtpa"] * mtpa_to_mw
     entry["capacity"] = entry["max_cap_from_to_M_m3_per_d"] * mcm_per_day_to_mw
     prod["capacity"] = prod["mcm_per_year"] * mcm_per_year_to_mw
-    sto["capacity"] = sto["max_cushionGas_M_m3"] * mcm_to_gwh
+    # working gas, not cushion gas: cushion is the base inventory that stays in
+    # the reservoir permanently and is not storage capacity at all. The two are
+    # not even proportional -- across the countries in scope they sum to 1708 vs
+    # 1406 TWh, but per country the ratio runs from 0.2x (NL, depleted fields, huge
+    # cushion) to 15x (BE: Loenhout is an aquifer store, 48 Mm3 cushion against
+    # 720 Mm3 working). Belgium was the worst-hit node in the dataset: 545 GWh
+    # instead of Fluxys's 7.6-8.2 TWh. docs/temporary_improvement_plans.md item 1.
+    sto["capacity"] = sto["max_workingGas_M_m3"] * mcm_to_gwh
 
     lng["type"] = "lng"
     entry["type"] = "pipeline"

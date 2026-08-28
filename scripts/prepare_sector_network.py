@@ -2124,10 +2124,25 @@ def add_h2_gas_infrastructure(
             .fillna(0.0)
             * 1e3
         )  # MWh_LHV
-        e_nom.clip(
-            upper=e_nom.quantile(0.98), inplace=True
-        )  # limit extremely large storage
+        # No outlier clip. Upstream had `e_nom.clip(upper=e_nom.quantile(0.98))`
+        # here to "limit extremely large storage", but (a) it guarded against
+        # artefacts of the cushion-gas proxy that `build_gas_input_locations.py`
+        # no longer uses, and (b) the quantile was taken over `n.stores.index`
+        # *padded with zeros*, so the clip level was decided by however many
+        # non-gas stores happened to exist at this point in the script: 37 here
+        # gives 318 TWh, while the 281 stores the network ends with would give a
+        # clip level of 0 and silently erase every gas-storage floor in Europe.
+        # On working gas the values are physical (DE 320, FR 116, NL 104, GB 51,
+        # BE 8.2 TWh) and that same clip would cut Germany, the largest genuine
+        # store on the continent, to 173 TWh.
+        # docs/temporary_improvement_plans.md item 1.
         n.stores.loc[gas_i, "e_nom_min"] = e_nom
+        floors = e_nom[e_nom > 0] / 1e6
+        if not floors.empty:
+            logger.info(
+                "Existing gas storage floors (TWh_LHV): %s",
+                floors.round(2).to_dict(),
+            )
 
         # add candidates for new gas pipelines to achieve full connectivity
 
