@@ -20,12 +20,13 @@ Companion notes: [ccs_alignment.md](ccs_alignment.md),
 [heat-softlink.md](heat-softlink.md),
 [renewable-potentials.md](renewable-potentials.md),
 [discount-rates.md](discount-rates.md),
-[gas-storage-20260829.md](gas-storage-20260829.md).
+[gas-storage-20260829.md](gas-storage-20260829.md),
+[co2-sequestration-20260829.md](co2-sequestration-20260829.md).
 
 | # | Item | Kind | Severity | Recommended default |
 |---|---|---|---|---|
 | 1 | Gas storage in Wallonia | data | medium | **Done** → [gas-storage-20260829.md](gas-storage-20260829.md) |
-| 2 | CCGT-CC only in 2050 | physics / TIMES | high | Do **not** hard-pin 2040; first give BE a CO₂ sink |
+| 2 | CCGT-CC only in 2050 | physics / TIMES | high | Do **not** hard-pin 2040; first give BE a CO₂ sink. **Half done 29 Aug** — the pooled EU cap that masked the sink question is gone ([co2-sequestration-20260829.md](co2-sequestration-20260829.md)); BE's own `e_nom_max = 0` is still open |
 | 3 | No WAL grid expansion 2025→2030 | already correct | low | Keep the freeze; decide if Boucle du Hainaut is a *floor* in 2040 |
 | 4 | Biogas 6.9 / 4 TWh | data | medium | **Done 29 Aug** — 4.0 (2040) / 6.9 (2050) applied; **source still owed by ICEDD** |
 | 5 | Flanders P2H falling | expected + **plot bug** | low | **Done 29 Aug** — trend real; P2H panel mixed MW_th/MW_e, fixed |
@@ -96,6 +97,15 @@ Why 2040 does not build capture, despite a 243 EUR/t effective CO₂ price
    2050** (solve log §11.14 C). 2050 still finds a German/British sink for
    0.41 Mt from Walloon CCGT-CC; 2040’s European sequestration cap is tighter
    (90 vs 125 Mt).
+
+   **Update 29 Aug.** That last clause was an artefact, not a fact about 2040:
+   the 90 Mt was an unsourced whole-Europe scalar applied to a six-country
+   model, binding in all four horizons at up to 360 EUR/t. It has been demoted
+   to a deployment ramp and the per-node CO₂StoP store now limits
+   ([co2-sequestration-20260829.md](co2-sequestration-20260829.md)). The other
+   half of this reason — Belgium's own zero — **stands unchanged**, which is
+   the point: option C below is now the only thing between Wallonia and a
+   sink, and the next solve will say cleanly whether it is the binding one.
 4. **Pinned heat already eats the Walloon cap.** Option B′ claims 86 % of the
    2050 BEWAL budget before power CCS is asked to help.
 
@@ -108,7 +118,7 @@ will dump captured CO₂ into an already-binding European store at a huge dual.
 |---|---|---|
 | **A. Hard-pin TIMES capacity in 2040** | `agg:BEWAL:CCGT CC:min = 1740` from 2040 (and keep the `CCGT-all` floor, or replace it) | Reproduces TIMES *MW*. Ignores retrofit economics. Needs a CO₂ export/storage assumption or the LP will struggle. Still not a retrofit of the existing TGVs. |
 | **B. Retrofit link** (correct TIMES analogue) | Second Link per existing CCGT, `p_nom` tied to standing capacity, cheaper than greenfield (power island reused) | Matches TIMES physically. Non-trivial code (new carrier, brownfield carry-forward, tests). Best long-term, not a next-run patch. |
-| **C. Give Belgium a CO₂ sink first** (recommended sequencing) | Documented `e_nom_max` on BEWAL/BEVLG/BEBRU, or a priced export to NL/NO (solve log §11.14 C2) | Makes capture *eligible* in 2040. Then look at whether the model builds it. If it still does not, the gap is the missing retrofit, not the sink. |
+| **C. Give Belgium a CO₂ sink first** (recommended sequencing) | Documented `e_nom_max` on BEWAL/BEVLG/BEBRU, or a priced export to NL/NO (solve log §11.14 C2) | Makes capture *eligible* in 2040. Then look at whether the model builds it. If it still does not, the gap is the missing retrofit, not the sink. **Prerequisite done 29 Aug** — the pooled EU cap no longer binds, so a Belgian sink would now actually be usable. C itself is untouched. |
 | **D. Leave 2040 free, footnote the gap** | status quo | Honest: PyPSA new-build CCS ≠ TIMES retrofit from 2035. Do not plot 2040 CCGT-CC as 0 for policy. |
 
 ### Recommended
@@ -818,6 +828,8 @@ next production solve  ←  measure independence again (item 6.A)
         ├─ item 8  LV country alias + TIMES rooftop energy share at BEWAL
         ├─ item 2.C / 9.C  Belgian CO₂ sink, then industry-CC pin
         │     (not DAC; not 2040 CCGT-CC floor until the sink exists)
+        │     EU-wide cap ✔ fixed 29 Aug — co2-sequestration-20260829.md;
+        │     BE e_nom_max = 0 still open, and now unmasked
         └─ item 4  ✔ caps applied 29 Aug (source still owed by ICEDD)
         │
         ▼

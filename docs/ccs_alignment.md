@@ -36,7 +36,7 @@ systems diverge even with identical demands.
 | **CCGT + CCS** | On. Flemalle + Seraing New (1.74 GW) retrofitted from **2035**, ~86 % capture. New-build post-combustion CCGT CCS is in the dictionary and **not built**. | **New-build** `sector.ccgt_cc: true`. Existing TGVs stay unabated. Closest other switch (`allam_cycle_gas`) is **off**. Shared-CSV costs are empty placeholders. Last solve (22 Aug) had no `CCGT CC`. | Power generation is not transferred. Heat export was patched so the CCS plant is not mistaken for a boiler. |
 | **Biomass → H₂ + CCS** | Dictionary has `SBIOH2GCC01` (gasification + CC). **Absent from this vd** (not built). What *does* run is black-liquor gasification `BBLQH2G110` from 2035, with biogenic CO₂ out. | Option `sector.bioH2` **is** biomass→H₂ **with CCS** (there is no unabated twin). Default and Walloon overlay: **`false`**. Not in the last-run network. | Black liquor is deliberately **not** exported as `solid biomass`. `SBIOH2*` is unmapped. |
 | **DAC** | Process `CO2DAC-01` exists; **not built** (duals only). | `sector.dac: false` (TIMES-aligned). Last solve still had `true`: unused until 2050, then a large plant (system 1.1 GW_e, 23.5 TWh_e). | Not transferred. |
-| **CO₂ storage** | `STORAGEMINELC` + `STORAGEMININD` store ~7.1 Mt in 2050 (Wallonia-only model). | `co2_sequestration_potential` 0 / 20 / 90 / 125 Mt on the last-run years that bound. Last run **hits the cap exactly** every year it is non-zero. | Not transferred. |
+| **CO₂ storage** | `STORAGEMINELC` + `STORAGEMININD` store ~7.1 Mt in 2050 (Wallonia-only model). | **Changed 29 Aug** — the pooled `co2_sequestration_potential` cap (0 / 20 / 90 / 125 Mt) bound in every horizon of the 26 Aug run; it is now a deployment ramp (0 / 60) then non-binding, and the per-node CO₂StoP store limits instead. Belgium's node ceiling is still **0**. [co2-sequestration-20260829.md](co2-sequestration-20260829.md). | Not transferred. |
 
 The menus now overlap on **new-build** CCGT-CC, but TIMES uses **retrofit** from
 2035 and PyPSA does not. They still do not share a used biomass-to-hydrogen+CCS
@@ -324,8 +324,9 @@ and services urban-decentral heat buses. Nothing else instantiates DAC
 Snakemake overlay.
 
 Turning DAC off does **not** disable other carbon management: CCGT-CC, gas
-CHP CC, SMR CC, industry capture, the CO₂ network and the sequestration cap
-stay as configured. Plot colours and the `"co2 Store": "DAC"` label in
+CHP CC, SMR CC, industry capture, the CO₂ network and the sequestration limits
+stay as configured (for the limits, see
+[co2-sequestration-20260829.md](co2-sequestration-20260829.md)). Plot colours and the `"co2 Store": "DAC"` label in
 `scripts/_helpers.py` are leftover names for the stored-CO₂ carrier, not the
 DAC plant.
 
@@ -432,7 +433,7 @@ Figures are **system-wide** from
 | Gas for industry CC | always added | 0.3 MW → **10.4 GW**; 0.1 GWh → **8.9 TWh**. |
 | Process-emissions CC | always added | Capacity 0.8 → 7.8 GW, **energy 0** (built, not used). |
 | CO₂ network | `co2_network: true` | Pipeline capacity 0.25 → 7.1 GW; pipeline *energy* 0. |
-| Sequestration cap | Walloon overlay: 0 / 0 / **20** / 90 / 125 Mt (half the PyPSA-Eur default) | Store `co2 sequestered`: **0, 20, 90, 125 Mt** — the cap, every year. Dual binds (18 Aug R9). |
+| Sequestration cap | Was: Walloon overlay 0 / 0 / **20** / 90 / 125 Mt, half the PyPSA-Eur default. **Since 29 Aug:** 0 / 0 / 60 then 1000 (non-binding), with `regional_co2_sequestration_potential.max_size` 25 → 2.5 Gt. | Store `co2 sequestered` used to hit **0, 20, 90, 125 Mt** — the cap, every year; dual bound in all four horizons (18 Aug R9, 26 Aug §11.5). The limiter is now the per-node CO₂StoP store: GB 100 / DE 79 / NL 9 Mt/a, **BE 0**. [co2-sequestration-20260829.md](co2-sequestration-20260829.md). |
 
 `cc_fraction: 0.9` is the capture rate on SMR CC and on `bioH2`. Biomass CHP /
 industry CC use the technology-data `capture_rate` of `biomass CHP capture` or
