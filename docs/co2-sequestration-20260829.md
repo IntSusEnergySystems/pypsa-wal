@@ -7,9 +7,17 @@
 [ccs_alignment.md](ccs_alignment.md), which describes the CCS *technologies*;
 this file is about the *limit* on how much of their output can be buried.
 
-**Status: implemented in `config/config.walloon.yaml`, not yet re-solved.**
-Every number describing model behaviour below is from the 26 Aug run, i.e.
-*before* this change.
+> ## Status: REVERTED on 30 Aug 2026
+>
+> The change described below was implemented in `config/config.walloon.yaml` on
+> 29 Aug and **never solved**. When it was first run, on 30 Aug, the 2040 horizon
+> failed with `Numerical trouble encountered` / *"Model may be infeasible or
+> unbounded"*. The config is back to the pooled global cap; the analysis in this
+> file stands, and the underlying criticism of the number is still valid, but the
+> replacement does not work as written. See [§9](#9-why-it-was-reverted).
+>
+> Every number describing model behaviour below is from the 26 Aug run, i.e.
+> *before* this change and before the revert.
 
 **One-paragraph summary.** The binding constraint on carbon capture in every
 horizon of the 26 Aug run was `co2_sequestration_limit`, a single pooled
@@ -27,11 +35,11 @@ does the limiting. Belgium's zero is **unchanged and still an open item**; this
 change makes the constraint that was masking it go away, it does not give
 Wallonia a sink.
 
-| Change | File |
-|---|---|
-| Global cap → deployment ramp (0/0/60) then non-binding (1000) | `config/config.walloon.yaml` |
-| `regional_co2_sequestration_potential.max_size` 25 → 2.5 Gt | `config/config.walloon.yaml` |
-| This write-up | `docs/co2-sequestration-20260829.md` |
+| Change | File | Status |
+|---|---|---|
+| Global cap → deployment ramp (0/0/60) then non-binding (1000) | `config/config.walloon.yaml` | **reverted 30 Aug** |
+| `regional_co2_sequestration_potential.max_size` 25 → 2.5 Gt | `config/config.walloon.yaml` | **reverted 30 Aug** |
+| This write-up | `docs/co2-sequestration-20260829.md` | kept, with §9 added |
 
 ---
 
@@ -325,3 +333,71 @@ and delete the `regional_co2_sequestration_potential:` block (which restores
 - [EU Net-Zero Industry Act: 50 Mt/a CO₂ injection capacity by 2030](https://www.newcivilengineer.com/latest/eu-targets-50m-tonnes-per-year-of-co2-storage-by-2030-12-02-2024/)
 - [UK CCUS targets: 20–30 Mt/a by 2030, >50 Mt/a by 2035 (CCSA)](https://www.ccsassociation.org/news/government-commits-to-establishing-carbon-capture-and-storage-industry/)
 - [North Sea Transition Authority — UK Continental Shelf storage capacity](https://www.nstauthority.co.uk/the-move-to-net-zero/ccs/)
+
+---
+
+## 9. Why it was reverted
+
+Written 30 Aug 2026, after the first attempt to solve the change.
+
+### 9.1 What happened
+
+The 2040 horizon would not converge. Gurobi ran the barrier to completion and
+returned `Numerical trouble encountered`, with the message *"Model may be
+infeasible or unbounded. Consider using the homogeneous algorithm"*. Dual
+infeasibility parked at `4.19e-04` and complementarity plateaued instead of
+falling. 2025 and 2030 were unaffected — consistent with the change, whose 2025
+value is unaltered (0) and whose 2030 value moves only 20 → 60.
+
+### 9.2 The cap value is not a threshold
+
+The obvious reading — that lifting the cap forces the optimiser to reach GB's
+100 Mt of storage over the `CO2 pipeline … -> GB` links, which are extendable
+with `p_nom_max = inf` across 495–802 km of sea at 242–333 kEUR/MW — predicts a
+clean threshold at DE + NL = 88.2 Mt/a. It is wrong. Holding everything else
+fixed and varying only `sector.co2_sequestration_potential` at 2040:
+
+| cap | outcome |
+|---:|---|
+| 85 Mt/a | **FAIL** — 252 iter / 3086 s |
+| 90 Mt/a | optimal — 263 iter / 3650 s, objective 3.12850428e+11 |
+| 100 Mt/a | **FAIL** — 191 iter / 2360 s |
+| 1000 Mt/a | **FAIL** — 288 iter / 3754 s |
+
+A structural threshold cannot be non-monotone. The cap value perturbs a model
+that is numerically fragile at 2040; 90 Mt/a is simply the point that happens to
+land well, and it is the value this file's predecessor already carried.
+
+`max_size` is exonerated separately: at a 90 Mt/a cap, `max_size` 2.5 and 25 give
+byte-identical results — same objective to nine figures, same 263 iterations,
+same 4506.89 work units. With a binding global cap below GB's ceiling the
+regional clip never binds, so that half of the commit changes nothing.
+
+### 9.3 What is still true
+
+* The criticism of `sector.co2_sequestration_potential` in §§1–8 stands: it is an
+  unsourced whole-Europe scalar, upstream changed it twice without a release
+  note, the `* 0.5` is justified only by a comment, and it binds at up to
+  360 EUR/t. Improvement-plan item 2 stays open.
+* The cap is not decorative. At 90 Mt/a it binds at **100 %** utilisation with a
+  shadow price of **68.6 EUR/t**, and the 2040 vintage splits DE 51.15 / NL 9.09
+  (saturated) / GB 0.70 Mt against ceilings of 79.15 / 9.09 / 100.
+* Belgium's `e_nom_max = 0` is still a `fillna(0.0)` on a missing CO2StoP row
+  rather than a documented choice — item 2.C, untouched by any of this.
+* Every `CO2 pipeline … -> GB` link being freely extendable with
+  `p_nom_max = inf`, when no such pipeline exists or is planned, is a real
+  modelling artefact of PyPSA-Eur's `co2_network: true`. It is not what broke
+  2040, but it is worth bounding.
+
+### 9.4 What a second attempt would need
+
+Not another cap value — the table above rules that out. Either bound the CO₂
+transport layer so the relaxed problem is well posed, or establish why the 2040
+model is fragile in the first place, which is a separate investigation. Sourced
+anchors for a deployment ramp, if one is wanted later: EU Net-Zero Industry Act
+50 Mt/a by 2030 (binding); Industrial Carbon Management Strategy ambition
+~250 Mt/a EEA-wide by 2040; 250 Mt/a stored EU-wide by 2050 in the 2040
+climate-target communication; UK 20–30 Mt/a by 2030 (conceded unachievable in
+Dec 2024), ">50 Mt/a by 2035", up to 170 Mt/a by 2050 as ambition against
+scenario figures nearer 30/40/60 Mt/a at 2035/2040/2050; 18.7 Mt/a past FID
+Europe-wide today.

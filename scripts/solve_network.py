@@ -584,6 +584,114 @@ def res_growth_allowance(config, planning_horizons):
     return allowance
 
 
+def corridor_tolerance(agg_p_nom_minmax_raw: pd.DataFrame) -> pd.Series:
+    """Per-(country, carrier) corridor width, read from the caps file itself.
+
+    The `tolerance` column of ``agg_p_nom_minmax*.csv`` holds a *relative* width,
+    e.g. ``0.005`` for half a percent; a blank cell means zero, i.e. leave the
+    corridor exactly as stated. It lives in the data because it is a statement
+    about the capacity figures on that row -- how precisely the source pins that
+    country's fleet -- and not a property of the solver or of the code.
+
+    Rows with no tolerance column at all (the upstream `data/agg_p_nom_minmax.csv`
+    predates it) get zero throughout, which reproduces the previous behaviour.
+    """
+    if ("tolerance", "rel") in agg_p_nom_minmax_raw.columns:
+        column = agg_p_nom_minmax_raw[("tolerance", "rel")]
+    elif "tolerance" in agg_p_nom_minmax_raw.columns:
+        column = agg_p_nom_minmax_raw["tolerance"]
+    else:
+        return pd.Series(0.0, index=agg_p_nom_minmax_raw.index)
+    return pd.to_numeric(column, errors="coerce").fillna(0.0)
+
+
+def widen_collapsed_corridors(
+    agg_p_nom_minmax: pd.DataFrame,
+    tolerance: pd.Series,
+    planning_horizons: str | None,
+) -> pd.DataFrame:
+    """Stop an aggregate capacity corridor from being an exact equality.
+
+    Where the CSV states ``min == max`` for a (country, carrier) group, the two
+    ``agg_p_nom`` constraints together pin a *sum* of extendable capacities to an
+    exact value. With ``include_existing`` both sides then subtract the same
+    standing fleet, so the residual right-hand side is a difference of two nearly
+    equal large numbers -- 0.20 MW for BE ``offwind-all`` in 2025, against
+    individual ``p_nom_max`` bounds summing to 16 000 MW. A barrier method has to
+    drive an aggregate of variables whose bounds span five orders of magnitude
+    onto that point from both sides, and on 2026-08-29 it stalled 3.4 % above its
+    own dual bound rather than converging.
+
+    Widening the ceiling to ``min * (1 + tolerance)`` costs at most `tolerance` of
+    the pinned fleet and leaves a corridor the barrier can sit inside. The width
+    comes from the caps file, per row -- see :func:`corridor_tolerance`.
+    """
+    both = agg_p_nom_minmax[["min", "max"]].dropna()
+    if both.empty:
+        return agg_p_nom_minmax
+    tol = tolerance.reindex(both.index).fillna(0.0)
+    collapsed = both.index[
+        ((both["max"] - both["min"]).abs() <= 1e-6 * both["min"].abs().clip(lower=1.0))
+        & (tol > 0)
+    ]
+    if collapsed.empty:
+        return agg_p_nom_minmax
+    agg_p_nom_minmax = agg_p_nom_minmax.copy()
+    agg_p_nom_minmax.loc[collapsed, "max"] = agg_p_nom_minmax.loc[
+        collapsed, "min"
+    ] * (1 + tolerance.reindex(collapsed).fillna(0.0))
+    logger.info(
+        "Widened %d collapsed capacity corridor(s) for %s: %s",
+        len(collapsed),
+        planning_horizons,
+        ", ".join(
+            f"{a} {b} by {100 * tolerance.get((a, b), 0.0):.2f} %"
+            for a, b in collapsed
+        ),
+    )
+    return agg_p_nom_minmax
+
+
+def _widen_against(
+    maximum: pd.Series,
+    minimum: pd.Series,
+    tolerance: pd.Series,
+    planning_horizons: str | None,
+    what: str,
+) -> pd.Series:
+    """Lift ``maximum`` off ``minimum`` wherever the two coincide.
+
+    The companion to :func:`widen_collapsed_corridors`, for corridors that are
+    open in the CSV but collapse while the right-hand sides are built. Widening
+    the ceiling rather than lowering the floor keeps every policy floor exactly
+    as stated. The width is the same per-row figure from the caps file, so a
+    group the file does not mention is left alone.
+    """
+    if maximum.empty or minimum.empty:
+        return maximum
+    lo = minimum.reindex(maximum.index)
+    tol = tolerance.reindex(maximum.index).fillna(0.0)
+    collapsed = [
+        k
+        for k in maximum.index
+        if pd.notna(lo.get(k))
+        and tol.get(k, 0.0) > 0
+        and abs(maximum[k] - lo[k]) <= 1e-6 * max(abs(lo[k]), 1.0)
+    ]
+    if not collapsed:
+        return maximum
+    maximum = maximum.copy()
+    maximum.loc[collapsed] = lo.loc[collapsed] * (1 + tol.reindex(collapsed))
+    logger.info(
+        "Widened %d collapsed %s corridor(s) for %s: %s",
+        len(collapsed),
+        what,
+        planning_horizons,
+        ", ".join(f"{a} {b} by {100 * tol.get((a, b), 0.0):.2f} %" for a, b in collapsed),
+    )
+    return maximum
+
+
 def add_CCL_constraints(
     n: pypsa.Network, config: dict, planning_horizons: str | None
 ) -> None:
@@ -618,12 +726,18 @@ def add_CCL_constraints(
     agg_p_nom_minmax = pd.read_csv(
         config["solving"]["agg_p_nom_limits"]["file"], index_col=[0, 1], header=[0, 1]
     )
-    
+    # Per-row corridor widths travel with the caps themselves, not with the code.
+    tolerance = corridor_tolerance(agg_p_nom_minmax)
+
     if planning_horizons in agg_p_nom_minmax.columns:
         agg_p_nom_minmax = agg_p_nom_minmax[planning_horizons]
     else:
         return
-    
+
+    agg_p_nom_minmax = widen_collapsed_corridors(
+        agg_p_nom_minmax, tolerance, planning_horizons
+    )
+
     buses_to_country = True
     # alias_buses = {}
     # alias_original = None
@@ -809,14 +923,16 @@ def add_CCL_constraints(
         rhs_links = rhs_links.clip(
             upper=remaining_max_links.reindex(rhs_links.index).fillna(np.inf)
         )
-        # ...and no more than the build-rate limit allows, or the floor would sit
-        # above the ceiling the max branch applies below. Where a national 2030
-        # target exceeds what the industry has ever built (German onshore wind,
-        # British offshore), the growth limit therefore *defines* 2030: the
-        # corridor collapses to a point at maximum achievable build.
-        growth_min = res_growth_allowance(config, planning_horizons)
-        if growth_min is not None:
-            rhs = rhs.clip(upper=growth_min.reindex(rhs.index).fillna(np.inf))
+        # The floor is left alone. This used to clip it down to the build-rate
+        # limit so it could not sit above the ceiling the max branch applies
+        # below -- but where a national target needs more than the industry has
+        # ever built (German onshore wind, British offshore) that made the
+        # corridor a single point, and across ~8 groups at once the feasible set
+        # became a needle the barrier could not find: 2030 failed twice with
+        # "Numerical trouble encountered" (269 iter / 3940 s and 201 / 2424 s,
+        # Gurobi reporting "may be infeasible or unbounded"), while the same
+        # model with the limit switched off solved to 3.69e11 in 169 iterations.
+        # The max branch drops the ceiling for those groups instead.
         minimum = xr.DataArray(rhs).rename(dim_0="group")
         minimum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:
@@ -895,6 +1011,31 @@ def add_CCL_constraints(
         # min(potential, growth) exactly as intended.
         growth = res_growth_allowance(config, planning_horizons)
         if growth is not None:
+            # A stated floor outranks the build-rate ceiling. Where a national
+            # target already needs at least everything the growth limit allows,
+            # imposing the limit as well pins the group to a point; dropping it
+            # leaves the floor exactly as stated and lets land use (`p_nom_max`)
+            # be the binding ceiling instead. Warn rather than silently reconcile
+            # the two -- "this target exceeds the build-rate limit" is a finding
+            # about the scenario, not a detail to bury.
+            floors = rhs.reindex(growth.index)
+            conflicting = growth.index[floors.notna() & (growth <= floors)]
+            if len(conflicting):
+                logger.warning(
+                    "Build-rate limit dropped for %d group(s) at %s: the stated "
+                    "capacity floor already meets or exceeds %s x the record "
+                    "annual addition. %s",
+                    len(conflicting),
+                    planning_horizons,
+                    config["solving"]["agg_p_nom_limits"].get("growth_multiplier"),
+                    "; ".join(
+                        f"{a} {b}: floor {floors[(a, b)]:.0f} MW vs limit "
+                        f"{growth[(a, b)]:.0f} MW"
+                        for a, b in conflicting
+                    ),
+                )
+                growth = growth.drop(conflicting)
+        if growth is not None and not growth.empty:
             union = rhs_gens.index.union(growth.index.intersection(lhs_groups))
             rhs_gens = rhs_gens.reindex(union)
             g = growth.reindex(union)
@@ -902,6 +1043,18 @@ def add_CCL_constraints(
             rhs_gens = rhs_gens.clip(
                 lower=lower_bounds_gens.reindex(rhs_gens.index).fillna(0)
             )
+        # The growth clip can collapse a corridor that the CSV left open: the min
+        # branch clips its floor *up* to the growth allowance and this branch
+        # clips its ceiling *down* to the same number, so a group whose national
+        # target exceeds the record build rate ends up with min == max. At 2030
+        # that is BEWAL onwind (2509 MW), DE onwind (48910) and GB offwind-all
+        # (26720), and the 2030 barrier hit "Numerical trouble encountered" with
+        # its dual infeasibility pinned at 4.2e-04 for 200 iterations. Same
+        # remedy as the base year, applied to whatever the collapse produced.
+        rhs_gens = _widen_against(rhs_gens, rhs, tolerance, planning_horizons, "generators")
+        rhs_links = _widen_against(
+            rhs_links, minimum_links.to_series(), tolerance, planning_horizons, "links"
+        )
         maximum = xr.DataArray(rhs_gens).rename(dim_0="group")
         maximum_links = xr.DataArray(rhs_links).rename(dim_0="group")
     else:
@@ -2200,11 +2353,18 @@ if __name__ == "__main__":
         n.model.print_infeasibilities()
         raise RuntimeError("Solving status 'infeasible'. Infeasibilities computed.")
 
-    if condition not in ["optimal", "suboptimal"]:
+    if condition not in ["optimal"]:
         # e.g. Gurobi's "numerical trouble" barrier abort arrives as
         # status='warning', condition='other'. Without this guard the solve
         # exports an unoptimized network, snakemake sees the rule as done, and
         # the myopic chain brownfields an all-zero fleet into later horizons.
+        #
+        # 'suboptimal' is refused too. Upstream tolerates it because it is what
+        # a TimeLimit hit looks like, and a time-limited point is still usable.
+        # No TimeLimit is configured in this workflow, so the only way to reach
+        # 'suboptimal' here is a barrier that stalled on numerics -- on
+        # 2026-08-29 the 2025 solve stopped 3.4 % above its own dual bound and
+        # the chain quietly carried that fleet into 2030.
         raise RuntimeError(
             f"Solving termination condition '{condition}' (status '{status}'); "
             "refusing to export a network without a certified solution."

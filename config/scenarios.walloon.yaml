@@ -46,7 +46,7 @@ scen_corrige:
 # 2040->2050 Tihange retrofit repeat, mirroring the vd.
 scen_demande_haute:
   sector:
-    times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
+    times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
   electricity:
     retrofit_nuclear_once: false
   solving:
@@ -121,7 +121,7 @@ scen_data:
 # Do not hand-edit either key. docs/ev-charging-softlink.md §4.6.
 scen_evflex:
   sector:
-    times_file: data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd
+    times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
     bev_dsm_availability:
       2020: 0.005
       2025: 0.03

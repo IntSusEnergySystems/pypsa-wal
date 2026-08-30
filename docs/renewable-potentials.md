@@ -128,18 +128,45 @@ already uses. Walloon onshore is 70.7 % of the Belgian fleet, giving 251 MW/yr.
 tendered or under construction, so leaving it to the optimiser produces a
 counterfactual rather than a forecast.
 
-**Decision.** For every node and technology:
+**Decision** (revised 30 Aug 2026 — see §4.1). For every node and technology:
 
 ```
-max(2030) = min( land potential , growth cap )
-min(2030) = min( land potential , growth cap , national target )
+min(2030) = min( land potential , national target )
+max(2030) = min( land potential , growth cap )   … unless that would put the
+                                                   ceiling at or below the floor,
+                                                   in which case the growth cap
+                                                   is dropped for that group
 ```
 
-The `min` takes the minimum of all three so it can never exceed the `max` — the
-infeasibility that cost the 2050 horizon on 26 Aug cannot recur by construction.
-Where a national target is reachable, the target *is* the floor; where it is not,
-the floor falls back to what is achievable, and the model is told to build as
-fast as the industry can.
+The floor is never clipped down to the growth cap. Where a national target is
+reachable the target is the floor and the growth cap is a real ceiling above it;
+where the target needs more than the industry has ever built, the target still
+stands and the growth cap is discarded with a warning naming the group and both
+numbers, leaving land use as the binding ceiling.
+
+### 4.1 Why the floor is no longer clipped to the growth cap
+
+The rule used to read `min(2030) = min(land, growth, target)`, so that the floor
+could never exceed the ceiling. That is feasible by construction, but where the
+target exceeds the growth cap it makes both bounds the *same number* and the
+corridor collapses to a point. At 2030 that happened to two groups at once:
+
+| group | stated floor | 2 × record × 5 yr | overshoot |
+|---|---:|---:|---:|
+| `GB offwind-all` | 34 008 MW | 26 720 MW | +27 % |
+| `DE onwind` | 57 169 MW | 48 910 MW | +17 % |
+
+The 2030 barrier then failed twice with `Numerical trouble encountered` and
+*"Model may be infeasible or unbounded"*, dual infeasibility pinned at
+`4.19e-04` for 200 iterations (269 iter / 3940 s, then 201 / 2424 s). With the
+growth limit switched off entirely the same model solved in 169 iterations
+(3.69148007e+11); with the precedence rule above it solved in 213 iterations at
+**3.69265168e+11**, within +0.03 % — so the discarded ceilings were doing no
+economic work, only creating a degenerate equality.
+
+The warning is the point. "This 2030 target needs more than twice the best year
+the industry has ever had" is a finding about the scenario; silently reconciling
+the two numbers hid it.
 
 ## 5. 2040 and 2050
 
@@ -159,7 +186,38 @@ rate does not.
 The base year is the one exception in the other direction: **2025 is pinned to
 the historical fleet** (`min = max`), so it is a calibration, not an
 optimisation. Without it the model built 4 796 MW of Walloon onshore wind in a
-single year.
+single year. That pin needs a width — see §5.1.
+
+### 5.1 A pinned corridor needs a stated width
+
+`min == max` on an aggregate is an equality on a *sum* of extendable capacities,
+and with `include_existing` both constraints subtract the same standing fleet.
+The residual right-hand side is then a difference of near-equal large numbers:
+for `BE offwind-all` at 2025 the cap is 2 262 MW against 2 261.8 MW standing, so
+the model is asked to drive a sum of variables whose own bounds add to 16 000 MW
+onto **0.20 MW**, from both sides. On 29 Aug the 2025 barrier stopped 3.4 % above
+its own dual bound and Gurobi reported `Sub-optimal termination`.
+
+Eighteen of the twenty two-sided groups in the 2025 column are pinned this way,
+so this is the normal case, not an edge case.
+
+**Decision.** The caps files carry a `tolerance` column giving a *relative*
+corridor width per (country, carrier) row; `solve_network.corridor_tolerance`
+reads it and the ceiling of a collapsed corridor is lifted to
+`min × (1 + tolerance)`. The width is data because it is a statement about how
+precisely a given source pins that row's fleet — not a property of the code or
+the solver. A blank cell, or a caps file without the column (upstream's
+`data/agg_p_nom_minmax.csv`), keeps the exact equality.
+
+Currently every collapsed row carries **0.005**, i.e. half a percent, which is
+well inside the accuracy of the capacity statistics the caps come from. At the
+stock solver settings this turned the 2025 solve from `Sub-optimal termination`
+(212 iter / 1985 s, 3.4 % gap) into `Optimal objective 3.51964349e+11`
+(235 iter / 1895 s) — no slower, and certified.
+
+The same width applies to corridors that collapse while the right-hand sides are
+being built rather than in the file: at 2040 `BE nuclear-all` collapses on both
+the generator and the link path and is widened by its own row's value.
 
 ## 6. What this produces
 
@@ -255,11 +313,12 @@ import prices and congestion rent all move with that.
 | File | Role |
 |---|---|
 | `config/input_parameters_for_models.csv` | the assumptions of record — 2025 base year and 2030 corridor floor, with `source` and `note` per row. 57 rows, down from 152 once the ceilings became calculated. |
-| `data/walloon/agg_p_nom_minmax_<scenario>.csv` | generated from the above by `scripts/build_common_parameters.py --write`. Three values per row: 2025 min, 2025 max, 2030 min. |
+| `data/walloon/agg_p_nom_minmax_<scenario>.csv` | generated from the above by `scripts/build_common_parameters.py --write`. Three values per row: 2025 min, 2025 max, 2030 min — plus a hand-maintained `tolerance` column, the per-row corridor width of §5.1. |
 | `data/walloon/custom_potentials.csv` | offshore per-node ceilings (§2) and the Walloon PNEC/EDORA potentials |
 | `data/walloon/res_build_rates.csv` | IRENA annual records, generated by `scripts/walloon_scripts/build_res_build_rates.py --network <2025 net>`. Committed rather than fetched at solve time: `add_CCL_constraints` runs on the cluster, where IRENASTAT has neither internet nor a cache. Refresh when IRENA publishes. |
 | `config/config.walloon.yaml` | `solving.agg_p_nom_limits.growth_multiplier` (2.0) and `build_rates_file` |
-| `scripts/solve_network.py` | `res_growth_allowance()` and its use in both branches of `add_CCL_constraints` |
+| `scripts/solve_network.py` | `res_growth_allowance()` and its use in both branches of `add_CCL_constraints`; the floor-over-ceiling precedence of §4.1; `corridor_tolerance()` / `widen_collapsed_corridors()` / `_widen_against()` for §5.1 |
+| `test/test_corridor_tolerance.py` | guards §4.1 and §5.1, including regressions pinned to the shipped caps file |
 | `scripts/walloon_scripts/check_res_envelope.py` | validates the stored overrides against this design; `test/test_res_envelope.py` runs it over every scenario |
 
 ### Reproducing the inputs
