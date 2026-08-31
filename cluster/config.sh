@@ -102,6 +102,10 @@ S3_BUCKET="${S3_BUCKET:-intervectoriel}"
 S3_ENV="${S3_ENV:-test}"                       # test → explorer.test… ; prod → explorer…
 AUTO_UPLOAD_S3="${AUTO_UPLOAD_S3:-1}"           # 1 = upload after nic5.sh postprocess/run
 SKIP_S3_UPLOAD="${SKIP_S3_UPLOAD:-0}"          # 1 = skip upload even when AUTO_UPLOAD_S3=1
+# HTML report → https://pypsa.squoilin.eu/intervec/<scenario>_<YYYYMMDD>/
+# (rules/publish_html.smk, passwordless SSH as negawatt with rsa_nopasswd).
+HTML_PUBLISH="${HTML_PUBLISH:-1}"               # 0 = do not ask postprocess for the publish sentinel
+PYPSA2HTML="${PYPSA2HTML:-1}"                   # 0 = do not ask postprocess for html/pypsa/index.html
 UPLOAD_SKIP_NETWORKS="${UPLOAD_SKIP_NETWORKS:-0}"  # 1 = omit large .nc files
 # Optional overrides (defaults: YYYYMMDD_<RUN_NAME> and <RUN_NAME>__YYYYMMDD):
 # UPLOAD_ID=20260717_scen_demande_haute
@@ -110,6 +114,8 @@ UPLOAD_SKIP_NETWORKS="${UPLOAD_SKIP_NETWORKS:-0}"  # 1 = omit large .nc files
 # Shared by upload_s3.sh and extract_explorer.sh so a single `publish` stamps one
 # date on the raw folder, the scenario folder and the extractor run_nickname.
 UPLOAD_DATE="${UPLOAD_DATE:-$(date +%Y%m%d)}"
+# Same stamp as S3 unless already set. Empty still means "today" inside the rule.
+HTML_PUBLISH_DATE="${HTML_PUBLISH_DATE:-$UPLOAD_DATE}"
 
 # --- Wallonie Explorer CSV extraction (ClimAct tool) --------------------------
 # Used by cluster/extract_explorer.sh (`nic5.sh extract`). The tool lives OUTSIDE

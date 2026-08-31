@@ -73,6 +73,8 @@ include: "rules/build_electricity.smk"
 include: "rules/build_sector.smk"
 include: "rules/solve_electricity.smk"
 include: "rules/postprocess.smk"
+include: "rules/pypsa2html.smk"
+include: "rules/publish_html.smk"
 include: "rules/development.smk"
 
 
@@ -225,6 +227,13 @@ rule all:
         # TIMES Sankey diagrams into results/<run>/html/ (empty list when
         # sector.times_sankey is off or times_pypsa is not installed).
         times_sankey_targets(),
+        # pypsa2html report into html/pypsa/ ([] if the library is not installed).
+        pypsa2html_targets(),
+        # Hub page at html/index.html linking pypsa/ and times/.
+        html_hub_targets(),
+        # rsync html/ to pypsa.squoilin.eu/intervec/<scenario>_<date>/ when
+        # html_publish.enable is set; no-op if SSH as negawatt is unavailable.
+        html_publish_targets(),
     default_target: True
 
 

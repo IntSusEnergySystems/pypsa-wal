@@ -847,11 +847,9 @@ rule plot_interactive_bus_balance:
 
 # --- TIMES Sankey diagrams (times_pypsa) --------------------------------------
 # The TIMES side of the report: one interactive Sankey per planning horizon and
-# per aggregation level, written into the scenario's own `html/` folder next to
-# the pypsa2html pages, so `./cluster/nic5.sh upload` publishes them with
-# everything else and the relative links keep working from S3.
-# See `docs/times-sankey.md`.
-#
+# per aggregation level, written into `html/times/` next to pypsa2html's
+# `html/pypsa/`. A pypsa-wal hub at `html/index.html` links both, so we never
+# patch the general-purpose library. See `docs/times-sankey.md`.
 # The gate below runs at PARSE time, deliberately: the rule's outputs are one
 # file per (horizon x level), so the list has to exist before the DAG is built.
 # `config` here is the merged config *before* scenario overlays, which is why
@@ -910,7 +908,7 @@ def times_sankey_targets():
     if not TIMES_SANKEY:
         return []
     return expand(
-        RESULTS + "html/{page}",
+        RESULTS + "html/times/{page}",
         page=TIMES_SANKEY["pages"] + ["times_sankey_index.html"],
         run=config["run"]["name"],
     )
@@ -942,9 +940,9 @@ if TIMES_SANKEY:
             # the way the old mapping saw it.
             times_mappings=times_mapping_files,
         output:
-            index=RESULTS + "html/times_sankey_index.html",
+            index=RESULTS + "html/times/times_sankey_index.html",
             pages=expand(
-                RESULTS + "html/{page}",
+                RESULTS + "html/times/{page}",
                 page=TIMES_SANKEY["pages"],
                 allow_missing=True,
             ),

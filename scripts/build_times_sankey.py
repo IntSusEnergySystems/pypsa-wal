@@ -3,11 +3,12 @@
 # SPDX-License-Identifier: MIT
 
 """
-Snakemake wrapper: TIMES Sankey diagrams into the scenario's ``html/`` folder.
+Snakemake wrapper: TIMES Sankey diagrams into ``html/times/``.
 
-One interactive page per planning horizon and aggregation level, written next to
-the pypsa2html report so ``./cluster/nic5.sh upload`` publishes them with
-everything else. The rendering lives in the sibling ``TIMES_PyPSA`` repository
+One interactive page per planning horizon and aggregation level. They live in
+a subfolder so pypsa2html can keep ``html/pypsa/`` (and its ``index.html``)
+untouched; ``html/index.html`` is a pypsa-wal hub that links both. The
+rendering lives in the sibling ``TIMES_PyPSA`` repository
 (``pip install -e ../TIMES_PyPSA``); this script only wires Snakemake I/O.
 
 These pages describe the **TIMES input**, not the PyPSA solve — the same ``.vd``
@@ -17,6 +18,7 @@ soft-link, so a demand that looks wrong downstream can be traced to the flow it
 came from. See `docs/times-sankey.md`.
 """
 
+import shutil
 from pathlib import Path
 
 from times_pypsa import default_mappings_dir, export_sankey_pages, sankey_page_names
@@ -73,3 +75,8 @@ if missing:
     raise RuntimeError(
         f"times_pypsa wrote {out_dir} but these declared pages are absent: {missing}"
     )
+
+# DirectoryIndex serves index.html for a bare ``times/`` URL. Copy the real
+# year table rather than a meta-refresh stub (some browsers never follow it).
+index = out_dir / "times_sankey_index.html"
+shutil.copyfile(index, out_dir / "index.html")

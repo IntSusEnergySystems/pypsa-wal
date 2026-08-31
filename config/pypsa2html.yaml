@@ -1,0 +1,81 @@
+# PyPSA-Wal HTML report config (consumed by rules/pypsa2html.smk and the
+# pypsa2html CLI). Paths are relative to this file's parent (the repo root)
+# via `root: ..`.
+#
+#     pypsa2html build --config config/pypsa2html.yaml
+root: ..
+
+project:
+  name: PyPSA-Wal
+  subtitle: Walloon energy system scenarios
+  decimals: 3
+
+model:
+  clusters: adm
+  opts: ""
+  sector_opts: ""
+  planning_horizons: null      # discovered from the solved networks
+
+nodes:
+  detect: true
+  focus: BEWAL
+  labels:
+    BEWAL: Wallonia
+    BEVLG: Flanders
+    BEBRU: Brussels
+    DE: Germany
+    FR: France
+    GB: Great Britain
+    LU: Luxembourg
+    NL: Netherlands
+  aggregate:
+    enabled: true
+    code: ALL
+    label: All regions
+  groups:
+    - {code: BE, label: Belgium, members: [BEVLG, BEWAL, BEBRU]}
+
+scenarios:
+  - name: scen_demande_haute
+    label: High demand
+    results_dir: results/walloon/scen_demande_haute
+    resources_dir: resources/walloon/scen_demande_haute
+  - name: scen_corrige
+    label: Corrected
+    results_dir: results/walloon/scen_corrige
+    resources_dir: resources/walloon/scen_corrige
+  - name: scen_base
+    label: Base
+    results_dir: results/walloon/scen_base
+    resources_dir: resources/walloon/scen_base
+  - name: scen_nuc11500
+    label: Nuclear 11500
+    results_dir: results/walloon/scen_nuc11500
+    resources_dir: resources/walloon/scen_nuc11500
+  - name: scen_nuc13500
+    label: Nuclear 13500
+    results_dir: results/walloon/scen_nuc13500
+    resources_dir: resources/walloon/scen_nuc13500
+  - name: scen_imppel
+    label: Imppel
+    results_dir: results/walloon/scen_imppel
+    resources_dir: resources/walloon/scen_imppel
+  - name: scen_data
+    label: Data
+    results_dir: results/walloon/scen_data
+    resources_dir: resources/walloon/scen_data
+  - name: scen_evflex
+    label: EV flexibility
+    results_dir: results/walloon/scen_evflex
+    resources_dir: resources/walloon/scen_evflex
+
+landing:
+  scenario: scen_demande_haute
+  node: BEWAL
+  page: overview
+
+output:
+  dir: results/walloon/{scenario}/html/pypsa
+  pages: [overview, emissions, sankeys, fec, demands, costs, capacities, dispatch, maps]
+  shared_maps: true
+  plotly: cdn

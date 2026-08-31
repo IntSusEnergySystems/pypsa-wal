@@ -18,6 +18,25 @@ run:
     file: config/scenarios.walloon.yaml
   shared_cutouts: true
 
+# pypsa2html report (rules/pypsa2html.smk). Skipped at parse time if the library
+# is not importable.
+pypsa2html:
+  config: config/pypsa2html.yaml
+
+# Publish results/<run>/html/ (pypsa2html + TIMES Sankey) to
+# https://pypsa.squoilin.eu/intervec/<scenario>_<YYYYMMDD>/ via rsync over SSH.
+# Requires passwordless login as negawatt with ~/.ssh/rsa_nopasswd (installed
+# by add-pypsa-alias.sh on the server). If the key cannot log in, the rule
+# writes a skip marker and the rest of the workflow is unaffected.
+# Override the stamp with html_publish.date or HTML_PUBLISH_DATE=YYYYMMDD.
+html_publish:
+  enable: true
+  ssh_host: negawatt.squoilin.eu
+  ssh_user: negawatt
+  identity_file: ~/.ssh/rsa_nopasswd
+  remote_dir: /home/negawatt/public_html/intervec
+  public_url: https://pypsa.squoilin.eu/intervec
+
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 
 # WEATHER YEAR — the only place to change it. Keep the three years in step:
@@ -287,9 +306,10 @@ sector:
   times_file: data/walloon/scen_base_coherence_3110.vd
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
-  # TIMES Sankey diagrams into results/<prefix>/<run>/html/, next to the
-  # pypsa2html report: one interactive page per planning horizon and aggregation
-  # level, from the same `times_file` the demands are extracted from.
+  # TIMES Sankey diagrams into results/<prefix>/<run>/html/times/, beside
+  # pypsa2html in html/pypsa/. html/index.html is a pypsa-wal hub that links
+  # both (pypsa2html is not patched). One page per planning horizon and
+  # aggregation level, from the same `times_file` the demands are extracted from.
   # `rules/postprocess.smk` reads this block at PARSE time (the outputs are one
   # file per horizon x level), so do NOT move it into a scenario overlay --
   # `times_file` may vary per scenario, this block may not.

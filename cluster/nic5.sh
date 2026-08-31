@@ -107,7 +107,19 @@ postprocess_targets() {
     # sector.times_sankey disabled -- the rule then does not exist and Snakemake
     # aborts with "no rule to produce target".
     if [ "${TIMES_SANKEY:-1}" = "1" ]; then
-        echo "results/${RUN_DIR_REL}/html/times_sankey_index.html"
+        echo "results/${RUN_DIR_REL}/html/times/times_sankey_index.html"
+    fi
+    # pypsa2html + hub + rsync of html/ to pypsa.squoilin.eu.
+    # Set HTML_PUBLISH=0 (or PYPSA2HTML=0) when the corresponding rule is not
+    # defined, otherwise Snakemake aborts with "no rule to produce target".
+    if [ "${PYPSA2HTML:-1}" = "1" ]; then
+        echo "results/${RUN_DIR_REL}/html/pypsa/index.html"
+    fi
+    if [ "${TIMES_SANKEY:-1}" = "1" ] || [ "${PYPSA2HTML:-1}" = "1" ]; then
+        echo "results/${RUN_DIR_REL}/html/index.html"
+    fi
+    if [ "${HTML_PUBLISH:-1}" = "1" ]; then
+        echo "results/${RUN_DIR_REL}/logs/html_published.url"
     fi
 }
 
@@ -367,6 +379,8 @@ cmd_postprocess() {
     local touch_targets targets log
     warn "postprocess runs LOCALLY after pull."
     warn "Step 1 uses Snakemake --touch on solved networks only (does NOT re-run Gurobi)."
+    # So rules/publish_html.smk stamps the remote folder with the same date as S3.
+    export HTML_PUBLISH_DATE="${HTML_PUBLISH_DATE:-}"
     local t
     for t in $(solved_targets); do
         [ -f "$REPO/$t" ] || die "missing $t — run './cluster/nic5.sh pull' (and solve) first"

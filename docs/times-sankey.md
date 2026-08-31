@@ -1,8 +1,8 @@
 # TIMES Sankey diagrams in the results report
 
 One interactive Sankey per planning horizon, at two aggregation levels, written
-into the scenario's own `html/` folder next to the
-[pypsa2html report](../instructions.md#html-report-pypsa2html).
+into `html/times/` beside the pypsa2html report in `html/pypsa/`. A hub at
+`html/index.html` links both; pypsa2html itself is not patched.
 
 **Status:** implemented. Enabled in
 [`config/config.walloon.yaml`](../config/config.walloon.yaml) under
@@ -14,8 +14,8 @@ into the scenario's own `html/` folder next to the
 
 ## 1. What it produces
 
-For the default Walloon horizons and levels, `results/walloon/<scenario>/html/`
-gains nine files:
+For the default Walloon horizons and levels, `results/walloon/<scenario>/html/times/`
+gains nine Sankey files plus a redirect `index.html`:
 
 ```
 times_sankey_index.html            ← year x level table, start here
@@ -81,7 +81,7 @@ Part of `rule all`, so a full workflow run produces it. On its own:
 
 ```bash
 snakemake --configfile config/config.walloon.yaml --cores 1 \
-  results/walloon/scen_demande_haute/html/times_sankey_index.html
+  results/walloon/scen_demande_haute/html/times/times_sankey_index.html
 ```
 
 It needs no solved network — only the `.vd` and the mapping CSVs — so it can be
@@ -94,7 +94,7 @@ Outside Snakemake, the same pages come from the CLI:
 ```bash
 times-pypsa sankey-pages \
   --vd data/walloon/scen_demande_haute_v01_260727_fix_nuc_2807.vd \
-  --out-dir results/walloon/scen_demande_haute/html \
+  --out-dir results/walloon/scen_demande_haute/html/times \
   --years 2025,2030,2040,2050 \
   --scenario-label scen_demande_haute
 ```
