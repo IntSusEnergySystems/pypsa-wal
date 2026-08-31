@@ -86,7 +86,8 @@ if HAVE_PYPSA2HTML:
                 format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
             )
 
-            pypsa_dir = Path(output.index).parent
+            pypsa_dir = Path(output.index).parent  # .../html/pypsa
+            # Scenario results dir is the parent of html/, not of pypsa/.
             results_tree = pypsa_dir.parent.parent
             scenario = params.scenario
             cfg = load_config(

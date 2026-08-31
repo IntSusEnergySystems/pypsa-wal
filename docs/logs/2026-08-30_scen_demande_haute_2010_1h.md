@@ -10,7 +10,7 @@
 | Run prefix (`run.prefix`) | `walloon` |
 | Config file(s) | `config/config.walloon.yaml` (weather year restored to **2010** after origin had switched it to 2013); on NIC5 also `cluster/config_cluster.yaml` (overlay last, **one** `--configfile` flag) |
 | Code version | pypsa-wal `fix/run-review-20260825` `dbca25df` + uncommitted: weather year 2010 (origin `dbca25df` had 2013), `cluster/config_cluster.yaml` `mem_mb: 100000` (was 1 TB), `config/scenarios.walloon.yaml` comment pointing at `times_20260828`. TIMES_PyPSA `main` `a48b774` |
-| Outcome | **success**: 4/4 horizons optimal; CSVs/plots. HTML / Explorer / S3 not run. Critical review **§11**. |
+| Outcome | **success**: 4/4 horizons optimal; CSVs/plots; pypsa2html; Explorer / S3; HTML published 31 Aug. Critical review **§11**. |
 
 ## 2. Goal of the run
 
@@ -44,7 +44,7 @@ node instead of waiting for a whole node.
 | Data retrieval / network build (prepare) | local | `LOCAL_CORES=4`; TMPDIR `/sylvain/mount/pypsa-wal-data/tmp` (`/dev/sdb1`). `resources/` and `results/walloon` are already symlinks onto that disk. |
 | LP solve | NIC5 `hmem` | 16 cpus/task, **100 GB** (not 1 TB), `SOLVE_RUNTIME=1440` min. 2025 job **11085822** started immediately on `nic5-w071` (shared with mhantro). |
 | Post-processing (CSVs, plots) | local | 8/8 at 20:40, `nic5.sh postprocess`, TMPDIR on `/dev/sdb1` |
-| HTML report (pypsa2html) | local | **83 pages**, 0 failed, 171 s. Config: `/sylvain/git/pypsa2html/config/pypsa-wal.yaml` |
+| HTML report (pypsa2html) | local | **83 pages** (30 Aug, 171 s), then rebuilt 31 Aug into `html/pypsa/` (**82 pages**, 0 failed, 129 s) and published. |
 | Explorer CSV extraction (ClimAct) | local | env `datapypsa`, extractor on `/sylvain/mount`, template `config_extraction_OET.yaml`. **49 / 3 / 1** staged. |
 
 Previous incomplete 29 Aug cluster 2025 (suboptimal) and leftover 26 Aug 2030–2050 networks will be removed on the cluster before this solve so Snakemake cannot skip 2025.
@@ -89,7 +89,7 @@ Local result folders:
 
 - Networks: `results/walloon/scen_demande_haute/networks/`
 - CSVs / plots: `results/walloon/scen_demande_haute/{csvs,graphs,graphics,maps}/`
-- HTML report: `results/walloon/scen_demande_haute/html/index.html`
+- HTML report: `results/walloon/scen_demande_haute/html/` (hub + `pypsa/` + `times/`)
 
 ## 8. Publication (Wallonie Explorer / S3)
 
@@ -101,6 +101,7 @@ Local result folders:
 | Explorer CSVs | 49 pypsa + 3 strategy |
 | TIMES vd staged | `scen_central_demande_haute_v1_260828_2808.vd` |
 | Verified in Explorer dropdown | open [explorer.test](https://explorer.test.wallonie.climact.com/) and pick `demande-haute-2010-1h` dated 30/08/2026 |
+| Public HTML | https://pypsa.squoilin.eu/intervec/scen_demande_haute_20260830/ |
 
 ## 9. Issues encountered and fixes
 
@@ -568,7 +569,8 @@ required at 1h on this model.
 6. ICEDD citation for 4.0 / 6.9 TWh biogas, or stop claiming TIMES
    consistency on that carrier.
 7. ~~HTML / ClimAct / S3 if this vintage is to be published.~~ **Done** —
-   Explorer folder `times-pypsa__demande-haute-2010-1h__20260830`.
+   Explorer folder `times-pypsa__demande-haute-2010-1h__20260830`; HTML at
+   https://pypsa.squoilin.eu/intervec/scen_demande_haute_20260830/.
 8. DE 2030 onwind 115 GW collapsed corridor — already documented in
    [`renewable-potentials.md`](../renewable-potentials.md) §7; decide
    whether the 2030 European price signal is acceptable.

@@ -110,7 +110,7 @@ if _publish_html_enabled() and _publish_html_inputs():
     rule publish_html:
         message:
             "Publishing HTML report for {params.scenario} to "
-            "{params.public_url}/<scenario>_<date>/"
+            "{params.public_url}/{params.scenario}_{params.date}/"
         params:
             scenario=_html_scenario_name,
             ssh_host=lambda w: _publish_html_cfg().get(
@@ -129,7 +129,7 @@ if _publish_html_enabled() and _publish_html_inputs():
             date=lambda w: (
                 _publish_html_cfg().get("date")
                 or __import__("os").environ.get("HTML_PUBLISH_DATE")
-                or ""
+                or __import__("datetime").date.today().strftime("%Y%m%d")
             ),
         input:
             _publish_html_inputs(),
@@ -139,7 +139,6 @@ if _publish_html_enabled() and _publish_html_inputs():
             RESULTS + "logs/publish_html.log",
         threads: 1
         run:
-            import datetime
             import logging
             import subprocess
             from pathlib import Path
@@ -154,7 +153,7 @@ if _publish_html_enabled() and _publish_html_inputs():
 
             html_dir = Path(input[0]).resolve().parent
             key = Path(params.identity_file).expanduser()
-            date = params.date or datetime.date.today().strftime("%Y%m%d")
+            date = params.date
             folder = f"{params.scenario}_{date}"
             remote_folder = f"{params.remote_dir.rstrip('/')}/{folder}"
             url = f"{params.public_url.rstrip('/')}/{folder}/"

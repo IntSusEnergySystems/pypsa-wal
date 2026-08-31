@@ -379,8 +379,10 @@ cmd_postprocess() {
     local touch_targets targets log
     warn "postprocess runs LOCALLY after pull."
     warn "Step 1 uses Snakemake --touch on solved networks only (does NOT re-run Gurobi)."
-    # So rules/publish_html.smk stamps the remote folder with the same date as S3.
-    export HTML_PUBLISH_DATE="${HTML_PUBLISH_DATE:-}"
+    # Stamp the remote HTML folder with the same date as S3 (config.sh sets
+    # HTML_PUBLISH_DATE from UPLOAD_DATE; keep that if postprocess is invoked
+    # after a caller already exported a stamp).
+    export HTML_PUBLISH_DATE="${HTML_PUBLISH_DATE:-$UPLOAD_DATE}"
     local t
     for t in $(solved_targets); do
         [ -f "$REPO/$t" ] || die "missing $t — run './cluster/nic5.sh pull' (and solve) first"
