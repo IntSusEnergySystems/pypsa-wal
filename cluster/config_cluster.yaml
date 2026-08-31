@@ -2,16 +2,19 @@
 # NIC5 cluster overrides (merged by `nic5.sh solve` via --configfile).
 # Local config/config.walloon.yaml is unchanged.
 #
-# Solve jobs run on the `hmem` partition (see cluster/config.sh). At fine
-# temporal resolution (e.g. clustering.temporal.resolution_sector: 6h) the
-# sector-coupled LP can require hundreds of GB to ~1 TB RAM during Gurobi model
-# build. Request the hmem node limit here (~1 000 000 MB on NIC5).
+# Solve jobs run on the `hmem` partition (see cluster/config.sh). Observed 1h
+# peak is ~32–37 GB; requesting the full ~1 TB node forces a long Resources
+# wait on a 3-node partition. 100 GB still leaves headroom and can share a
+# mixed hmem node.
 #
 # Keep solving.cpus / gurobi-default.threads in sync with each other and with
 # the Slurm cpus-per-task set in `nic5.sh solve`.
 solving:
-  mem_mb: 1000000
+  mem_mb: 100000
   cpus: &cluster_cpus 16
   solver_options:
     gurobi-default:
       threads: *cluster_cpus
+      # 2030 barrier abort 2026-08-30: "Numerical trouble encountered /
+      # Model may be infeasible or unbounded. Consider BarHomogeneous".
+      BarHomogeneous: 1

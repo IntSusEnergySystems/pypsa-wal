@@ -213,7 +213,9 @@ Currently every collapsed row carries **0.005**, i.e. half a percent, which is
 well inside the accuracy of the capacity statistics the caps come from. At the
 stock solver settings this turned the 2025 solve from `Sub-optimal termination`
 (212 iter / 1985 s, 3.4 % gap) into `Optimal objective 3.51964349e+11`
-(235 iter / 1895 s) — no slower, and certified.
+(235 iter / 1895 s) — no slower, and certified. `review_run.py` reads the same
+column when it checks aggregate maxima, so a fleet sitting inside
+`max × (1 + tolerance)` is a pass, not an overshoot.
 
 The same width applies to corridors that collapse while the right-hand sides are
 being built rather than in the file: at 2040 `BE nuclear-all` collapses on both

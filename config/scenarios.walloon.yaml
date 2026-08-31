@@ -34,8 +34,9 @@ scen_corrige:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_corrige.csv
 
-# Demande haute (Jul 2026 TIMES re-run, nuclear-aligned with Elia/cabinet central
-# path). Source: s3://intervectoriel/test/scenarios/times_20260727/
+# Demande haute (Aug 2026 TIMES re-run, nuclear-aligned with Elia/cabinet central
+# path). Source: s3://intervectoriel/test/scenarios/times_20260828/
+# (previous: times_20260727 / scen_demande_haute_v01_260727_fix_nuc_2807.vd).
 # Nuclear in TIMES: Tihange retrofit repeatable to keep 1 GW through 2050;
 # 2045 imposes 0.25 GW SMR + 0.5 GW large-scale; 2050 imposes 1 GW SMR + 1 GW
 # large-scale. PyPSA agg caps reproduce that trajectory exactly (MW_e, caps on

@@ -229,7 +229,7 @@ cmd_solve() {
     rssh "cd '$REMOTE_DIR' && $REMOTE_ENV && mkdir -p cluster/logs && \
         setsid bash -c \"snakemake --configfile $CONFIGFILE cluster/config_cluster.yaml \
             --executor slurm --jobs $MAX_SLURM_JOBS \
-            --rerun-triggers mtime --keep-going --printshellcmds \
+            --rerun-triggers mtime --rerun-incomplete --keep-going --printshellcmds \
             --envvars XDG_CACHE_HOME TMPDIR GRB_LICENSE_FILE \
             --default-resources slurm_partition=$SOLVE_PARTITION runtime=$SOLVE_RUNTIME mem_mb=$DEFAULT_MEM_MB slurm_account=ceci \
             --set-resources solve_sector_network_myopic:cpus_per_task=$solve_cpus \

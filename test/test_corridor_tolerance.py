@@ -221,3 +221,23 @@ def test_narrow_but_open_corridor_is_left_alone():
     kept, dropped = _precedence(growth, floors)
     assert not dropped
     assert kept[("BEWAL", "solar-all")] == 6585.0
+
+
+# --- review_run reads the same data column (not a hardcoded 0.5 %) ------------
+
+
+def test_review_honours_the_data_tolerance():
+    """2025 BEWAL onwind 2 371 vs file max 2 359 is inside the 0.5 % corridor."""
+    from scripts.walloon_scripts.review_run import (
+        AGG_SOLVER_NOISE,
+        allowed_agg_max,
+        _corridor_tolerance_series,
+    )
+
+    agg = pd.read_csv(CAPS, index_col=[0, 1], header=[0, 1])
+    tols = _corridor_tolerance_series(agg)
+    assert tols[("BEWAL", "onwind")] == pytest.approx(0.005)
+    allowed = allowed_agg_max(2359.0, tols[("BEWAL", "onwind")])
+    assert allowed == pytest.approx(2359.0 * 1.005)
+    assert 2371 <= allowed * (1.0 + AGG_SOLVER_NOISE)
+    assert allowed_agg_max(2359.0, 0.0) == 2359.0

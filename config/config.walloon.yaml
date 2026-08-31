@@ -28,13 +28,13 @@ run:
 # europe-<year>-sarah3-era5.nc.
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
 snapshots:
-  start: "2013-01-01"
-  end: "2014-01-01"
+  start: "2010-01-01"
+  end: "2011-01-01"
   inclusive: left
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
 atlite:
-  default_cutout: "europe-2013-sarah3-era5"
+  default_cutout: "europe-2010-sarah3-era5"
   nprocesses: 4
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight

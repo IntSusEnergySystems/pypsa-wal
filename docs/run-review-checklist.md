@@ -280,6 +280,14 @@ every horizon.
 - [ ] For every `(region, carrier)` row with a `max`, compare the limit against
       **total** `p_nom_opt` (extendable **+** non-extendable), not against the
       extendable tranche.
+- [ ] A row may carry a `tolerance` (relative, e.g. `0.005`). That is the
+      corridor width the solver was *allowed*, written in the caps file because
+      it is a statement about how precisely that source pins the fleet — not a
+      solver knob and not a hardcoded constant
+      ([`renewable-potentials.md`](renewable-potentials.md) §5.1). Compare
+      total against `max × (1 + tolerance)`. A blank cell, or a file without
+      the column, is exact equality. `review_run.py` reads the same column;
+      a 0.5 % overshoot on a pinned 2025 row is a pass, not a FAIL.
 - [ ] **Known defect** — in `scripts/solve_network.py::add_CCL_constraints`, the
       `include_existing` branch subtracts existing capacity from the RHS for
       *minima* (generators and links) and for *link maxima*, but **not for

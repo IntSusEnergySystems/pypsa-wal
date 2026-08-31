@@ -49,6 +49,31 @@ BE_NODES = ("BEWAL", "BEVLG", "BEBRU")
 # on lines that are saturated all year
 CONGESTION_TOL = 1e-2
 
+# Barrier noise on an interior solution (Crossover 0). Distinct from the per-row
+# corridor width in the caps file — that width is *data*, see
+# docs/renewable-potentials.md §5.1 and ``allowed_agg_max``.
+AGG_SOLVER_NOISE = 0.001
+
+
+def _corridor_tolerance_series(agg: pd.DataFrame) -> pd.Series:
+    """Per-row relative corridor width from the caps file.
+
+    Same contract as ``solve_network.corridor_tolerance``: the width lives in
+    the data. A missing column or a blank cell is zero — exact equality.
+    """
+    if ("tolerance", "rel") in agg.columns:
+        column = agg[("tolerance", "rel")]
+    elif "tolerance" in agg.columns:
+        column = agg["tolerance"]
+    else:
+        return pd.Series(0.0, index=agg.index)
+    return pd.to_numeric(column, errors="coerce").fillna(0.0)
+
+
+def allowed_agg_max(cap: float, tolerance: float) -> float:
+    """Ceiling the solver was allowed: file ``max``, widened by the row's tolerance."""
+    return float(cap) * (1.0 + max(0.0, float(tolerance)))
+
 # Level 5.4 plausibility windows. Deliberately wide: these are lie-detectors, not
 # calibration targets.
 CF_WINDOWS = {
@@ -622,7 +647,10 @@ def check_agg_limits(nets, agg_file: Path, rep: Report) -> None:
         rep.warn(sec, f"limits file not found ({agg_file}) — skipped")
         return
     agg = pd.read_csv(agg_file, index_col=[0, 1], header=[0, 1])
-    rep.info(sec, f"file: {agg_file}")
+    tols = _corridor_tolerance_series(agg)
+    n_wide = int((tols > 0).sum())
+    rep.info(sec, f"file: {agg_file}"
+             + (f" ({n_wide} rows with a corridor tolerance)" if n_wide else ""))
 
     # a 10x-out-of-line value in a row is almost always a typo
     for (region, car), row in agg.iterrows():
@@ -668,9 +696,12 @@ def check_agg_limits(nets, agg_file: Path, rep: Report) -> None:
                 tot = float(s.p_nom_opt.sum())
                 ext = float(s[s.p_nom_extendable].p_nom_opt.sum())
                 unit = "MW"
+            tol = float(tols.reindex([(region, car)]).fillna(0.0).iloc[0])
+            allowed = allowed_agg_max(cap, tol)
+            extra = (f", +{100 * tol:.2f}% corridor → {allowed:,.0f}" if tol > 0 else "")
             msg = (f"{y} {region}/{car}: total {tot:,.0f} {unit} vs max {cap:,.0f} "
-                   f"(extendable tranche {ext:,.0f})")
-            if tot <= cap * 1.001:
+                   f"(extendable tranche {ext:,.0f}{extra})")
+            if tot <= allowed * (1.0 + AGG_SOLVER_NOISE):
                 rep.ok(sec, msg)
             elif abs(ext - cap) < max(1.0, 0.001 * cap):
                 rep.fail(sec, "cap bound the EXTENDABLE tranche only — " + msg,
