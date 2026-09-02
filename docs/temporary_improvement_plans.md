@@ -1,7 +1,7 @@
 # Improvement plan — status 2026-09-01
 
 Live worklist for the Walloon model. Two meetings feed it: **27 Aug** (items
-1–10) and **1 Sept** (items 11–17, plus decisions on 6, 8 and 10).
+1–10) and **1 Sept** (items 11–17, plus decisions on 3, 6, 8 and 10).
 
 **What this file is.** The queue and its points of attention — not the evidence.
 Per-item dossiers live in the companion docs; the long 27 Aug evidence version
@@ -216,8 +216,9 @@ island exists (1 Oct 2031). **First PEZ-I power 2031–2032 at the earliest**, f
 
 ### Item 12 — Process emissions vs TIMES (new)
 
-Annick supplied an Excel with **2021 Walloon** process-emission values. Check
-they are recoverable in the vd, then align PyPSA's process emissions on them.
+Annick's table (below) is **Walloon process CO₂ emitted to the atmosphere**
+(ktonnes), not capture — that is item 9. Check the figures are recoverable in
+the vd, then align PyPSA's `process emissions` load on them.
 
 - **Attention.** PyPSA process emissions are pure PyPSA-Eur: a national
   industrial-production total spread by an industrial distribution key, never
@@ -227,13 +228,49 @@ they are recoverable in the vd, then align PyPSA's process emissions on them.
   (0.38 Mt by 2050 from black-liquor gasification). Only the fossil part belongs
   on the PyPSA `process emissions` load; adding the biogenic part would
   double-charge carbon the biomass chain already credits.
+- **Attention — process vs combustion.** Are these rows exclusively the
+  process itself, or do they also include fuel combustion? Only the process
+  part belongs on `process emissions`; combustion CO₂ is already on the fuel
+  chain (`gas for industry`, biomass, …). Mixing them double-counts.
+- **Attention — energy vs emissions.** Check the inventory against the
+  industrial energy PyPSA already imports, so transferred energy consumption
+  and transferred process emissions describe the same activity.
 - **Attention.** 2021 is not a model horizon — state the convention used to
-  bring it to 2025 (and the excel is **not yet in the repo**; commit it under
-  `data/walloon/` with its provenance).
+  bring it to 2025. The figures are now in this file; still commit the original
+  excel under `data/walloon/` with its provenance.
 - **Test.** `test_times_scenario_inputs.py`-style guard: BEWAL process emissions
   within a stated tolerance of the vd figure per horizon.
 - **Expect.** Directly moves the Walloon CO₂ balance and hence the 547 EUR/t
-  dual and `process emissions CC` (26 Aug: 238 MW, 1.98 Mt in 2050).
+  dual and `process emissions CC` (26 Aug: 238 MW, 1.98 Mt in 2050). Do this
+  *before* pinning capture (item 9), otherwise the pin sits on the wrong
+  inventory.
+
+**CO₂ process émis à l'atmosphère** (ktonnes). `VAR_Comnet` is the total;
+`VAR_FOut` is by TIMES process. Blank = no value in that year.
+
+| Process | 2021 | 2022 | 2025 | 2030 | 2035 | 2040 | 2045 | 2050 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `VAR_Comnet` (total) | 4417.22 | 4415.32 | 4411.62 | 3946.10 | 964.37 | 357.01 | 327.51 | 281.64 |
+| `IAMSTDPRO00` Standard Production.00 | 459.36 | 444.05 | 398.11 | | | | | |
+| `IAMSTDPRO01` Standard Production.01 | | 15.31 | 61.25 | | | | | |
+| `IBKSTDPRO00` bricks standard | 21.55 | 20.83 | 18.68 | 15.08 | 11.49 | 7.90 | 4.31 | 0.72 |
+| `IBKSTDPRO01` bricks standard.01 | | 0.72 | 2.87 | 6.46 | 10.06 | 13.65 | 17.24 | 20.83 |
+| `ICESTDPRO00` Ceramics standard | 23.73 | 22.94 | 20.57 | 16.61 | 12.66 | 8.70 | 4.75 | 0.79 |
+| `ICESTDPRO01` Ceramics standard.01 | | 0.79 | 3.16 | 7.12 | 11.08 | 15.03 | 18.99 | 22.94 |
+| `ICHDEMAND00` Other Chemicals.00 | 61.49 | 61.49 | 61.49 | 61.49 | 63.80 | 66.11 | 68.41 | 70.72 |
+| `ICMDRYPRD00` cement dry.00 | 2145.04 | 2073.54 | 1859.04 | 1501.53 | 579.18 | | | |
+| `ICMDRYPRD10` cement dry.01 | | 134.46 | 348.97 | 643.51 | | | | |
+| `ICMWETPRD00` cement wet.00 | 536.26 | 473.30 | 473.30 | 536.26 | | | | |
+| `IGFFLATGL00` Glass Flat.00 | 116.35 | 112.47 | 100.84 | 81.45 | 62.05 | 42.66 | 23.27 | 3.88 |
+| `IGFFLATGL01` glass production.01 | | 7.20 | 18.83 | 38.23 | 38.23 | 38.23 | 36.90 | 19.39 |
+| `IGHHOLLOW00` Glass Hollow.00 | 29.58 | 28.59 | 25.63 | 20.70 | 15.78 | 10.85 | 5.92 | 0.99 |
+| `IGHHOLLOW01` glass production.01 | | 0.99 | 3.94 | 8.87 | 8.87 | 8.87 | 8.87 | 8.69 |
+| `IGHRECYCL00` Glass Recycling.00 | 36.97 | 35.74 | 32.04 | 25.88 | 19.72 | 13.56 | 7.39 | 1.23 |
+| `IISFINPRO00` steel finishing.00 | 125.99 | 125.99 | 125.99 | | | | | |
+| `IISFINPRO01` steel finishing.01 | | 5.48 | 5.48 | | | | | |
+| `IISFINPRO02` | | | | 131.46 | 131.46 | 131.46 | 131.46 | 131.46 |
+| `ILMQLMPRO00` Quick Lime.00 | 860.89 | 851.42 | 851.42 | | | | | |
+| `ILMQLMPRO01` Quick Lime.11 | | | | 851.42 | | | | |
 
 ### Item 13 — Aviation back in the Walloon CO₂ accounting, as a yaml toggle (new)
 
@@ -273,31 +310,42 @@ remains deactivated for now to avoid infeasibilities.
 ### Item 9 — Industry CC / BECCS volumes (carried, blocked on 2)
 
 PyPSA already runs generic industry capture (26 Aug, 2050: 0.73 Mt biomass-CC
-+ 1.98 Mt process-CC + 0.79 gas); TIMES has **4.8 Mt** of named industrial capture
-(chemicals, lime, glass). Pin the PyPSA volumes to TIMES — **not** DAC, which
-TIMES does not build and which ate the Walloon DH bus when it was on. Blocked
-until item 2 gives Belgium a sink, otherwise the pin just exports CO₂.
++ 1.98 Mt process-CC + 0.79 gas); TIMES has **4.8 Mt** of named industrial
+capture (chemicals, lime, glass; `STORAGEMININD` in the vd). Pin the PyPSA
+*capture* volumes to TIMES — **not** DAC, which TIMES does not build and which
+ate the Walloon DH bus when it was on.
 
-### Item 3 — Boucle du Hainaut: floor in 2040? (decision only)
+This is a different LP object from item 12: 12 sets how much process CO₂ is
+**produced**; 9 sets how much of it (plus fuel-CC / BECCS) is **captured**.
+Do 12 first so the inventory is TIMES-aligned; confirm the 4.8 Mt is in the
+current vd. The LP pin itself stays blocked until item 2 gives Belgium a sink
+— otherwise the pin just exports CO₂.
+
+- **Test.** Guard that BEWAL industrial CC (biomass-CC + process-CC + gas-CC)
+  matches the vd `STORAGEMININD` volume per horizon, once the sink exists.
+- **Expect.** Capture becomes a transferred TIMES outcome rather than a PyPSA
+  residual. Moves the Walloon CO₂ dual and the industry-CC capacities item 15
+  will plot.
+
+### Item 3 — Boucle du Hainaut: NTC floor from 2035
 
 The 2040 NTC ceiling opens to 13.2 GW usable and the optimiser **does not
-build**: flows stay ~3 TWh/yr on a 3.566 GW usable path. Decide whether the line
-is *committed infrastructure* (an `s_nom_min` / NTC floor from 2040) or an
-*option*. Until decided, do not read the unused ceiling as "the model rejects
-Boucle du Hainaut". **Attention:** `lines.type` is non-empty in this network, so
-`set_transmission_limit` rebuilds `s_nom_min` from the conductor type and can
-silently override an NTC-derated `s_nom` — check the realised `s_nom` after any
-floor edit.
+build**: flows stay ~3 TWh/yr on a 3.566 GW usable path. The line is planned
+for 2033 and is now treated as *committed infrastructure* — an `s_nom_min` /
+NTC floor from **2035**. **Attention:** `lines.type` is non-empty in this
+network, so `set_transmission_limit` rebuilds `s_nom_min` from the conductor
+type and can silently override an NTC-derated `s_nom` — check the realised
+`s_nom` after any floor edit.
 
-### Item 8 — Rooftop PV: parked by the 1 Sept meeting
+### Item 8 — Rooftop PV
 
 Decision: transfer the TIMES rooftop share (TIMES 2050 is
 ~77 % rooftop; PyPSA builds ~0 MW because rooftop is 920 vs 526 EUR/kW
-overnight). Add this with a switch and a toggle.
-One small bug to solve: `BEWAL low voltage` maps to country `BE`,
-so any future rooftop build counts against the **Belgian** `solar-all` cap
-([renewable-potentials §7.3](renewable-potentials.md)). Harmless at 0 MW; repair
-before any rooftop floor.
+overnight). Add this with a config switch (and a chart toggle if the split
+should be visible). One small bug to solve first: `BEWAL low voltage` maps to
+country `BE`, so any future rooftop build counts against the **Belgian**
+`solar-all` cap ([renewable-potentials §7.3](renewable-potentials.md)). Repair
+that alias before any rooftop floor.
 
 ---
 
@@ -341,13 +389,6 @@ Primary energy gets **no new constraint**; the chart gets options.
   independence; the electricity indicator already counts nuclear kWh as domestic.
   Add a switch between "energy contained in the uranium" (current) and
   "electricity produced".
-- **50 % of Belgian offshore to Wallonia.** Offshore sits on Flemish coastal
-  nodes; offshore is a **federal** competence, assumed shared equally. Attribute
-  half of Belgian offshore production to Wallonia in the indicator only —
-  **attention:** it must be removed from Flanders in the same edit, or Belgium
-  double-counts, and the change must not leak into the LP or the energy balance.
-- **Attention.** Both switches change a *published headline* without changing the
-  model. Default, and the label, must say which convention a chart is on.
 
 ---
 
@@ -393,28 +434,28 @@ reporting only — no solve needed, do now
 data / caps — pytest guard each, no solve
   ├─ 11  BE offshore: pin 2030 at 2 262, move the PEZ to 2040/2050
   ├─ 10  BEVLG 3 000 + BE 6 000 nuclear (BE row first!)
-  ├─ 12  process emissions from the vd  ← needs Annick's excel in the repo
+  ├─ 12  process-emission load from the vd  ← Annick's table is in the item
+  ├─  3  Boucle du Hainaut: NTC floor from 2035
   └─ 16  water pits e_nom_max
 
 LP code — pytest guard + one cheap solve each
   ├─ 6a  BEWAL 10 TWh import cap   ← measure 30 Aug imports first
+  ├─  8  rooftop share (after the LV country-alias bug)
   ├─ 13  aviation toggle (default off)
   └─ 2   Belgian CO₂ sink (+ retry the geology ramp with BarHomogeneous)
               │
-              └─ 9  industry-CC pin, only once 2 is in
+              └─ 9  industry-CC pin, only once 2 is in (and 12 has run)
 
 final full run: 1h / 2010 / four horizons + §11 review
 
 no code, decide in a meeting
-  ├─  3  Boucle du Hainaut: 2040 grid or 2040 option?
-  ├─  8  rooftop parked (LV country-alias bug stays open)
   ├─ 17b DE 2030 onwind corridor: accept 115 GW or let growth win?
   └─ 17d biogas citation, owed by ICEDD
 ```
 
 Interactions to keep in mind when reading that final run: items **6a, 10, 11**
 all move 2050 independence, in opposite directions (nuclear helps, the offshore
-cut hurts, the cap forces); items **2, 12, 13** all move the Walloon CO₂ dual.
+cut hurts, the cap forces); items **2, 9, 12, 13** all move the Walloon CO₂ dual.
 If the sum is unreadable, the fallback is a 6h solve with 10 and 11 only.
 
 Still not comparable across vintages: total system cost (gas-store floors),
