@@ -60,22 +60,42 @@ the new vd; `CCGT CC` now **~0 MW_e in every horizon** (26 Aug built 463 in
 
 ## Open — LP and data
 
-### Item 2 — Give Belgium a CO₂ sink (then, only then, CCGT-CC in 2040)
+### Item 2 — Give Belgium *usable* CO₂ storage: domestic store or priced export
 
 `co2 sequestered` `e_nom_max = 0` at BEWAL/BEVLG/BEBRU is a `fillna(0.0)` on a
-missing CO₂StoP row, not a documented choice. TIMES stores **7.1 Mt in
-Wallonia**; PyPSA stores 0 in Belgium and fills NL to 100 %. Document an
-`e_nom_max` per Belgian node, or price an export to NL/NO.
+missing CO₂StoP row, not a documented choice (the overlay is offshore-only and
+no Belgian EEZ site clears `min_size`). TIMES stores **7.1 Mt in Wallonia**;
+PyPSA stores 0 in Belgium and fills NL to 100 %. Document an `e_nom_max` per
+Belgian node, **or** — closer to reality — an explicit priced export route.
 
-- **Attention.** The pooled EU cap that used to mask this is *back* after the
-  revert, and binds in all four horizons — a Belgian sink is only usable if that
-  cap has headroom. A second attempt at the geology ramp is now more promising
-  than in the write-up: the 2040 failure was the exact error message that
-  `BarHomogeneous: 1` fixes, and the cluster overlay has carried that flag since
-  30 Aug. Retry the ramp *with* the flag before concluding anything.
+- **Attention — the pipe is not the problem.** `sector.co2_network: true` already
+  gives extendable, **unbounded** `CO2 pipeline` links between neighbouring
+  `co2 stored` buses (BE→GB is 495–802 km of sea at 242–333 kEUR/MW, `p_nom_max
+  = inf`, no permitting), and the model uses them: the 26 Aug 2050 Walloon
+  CCGT-CC shipped its 0.41 Mt to a German/British sink. If anything, export is
+  modelled **too** generously. Norway is not in the model (BE/FR/GB/NL/DE/LU),
+  so a Northern-Lights-style route has to be an explicit priced link, not a
+  pipeline.
+- **Attention — the binding constraint has no geography.**
+  `sector.co2_sequestration_potential` is **one** pooled `GlobalConstraint` on
+  the `co2 sequestered` carrier for the whole network — no country dimension —
+  and it binds in all four horizons after the revert (431 / 73 / 125 / 342
+  EUR/t). A Belgian store or a new pipeline adds **zero** headroom to it. Fix
+  that layer first or nothing downstream is interpretable. The 2040 failure of
+  the geology ramp was the exact error `BarHomogeneous: 1` fixes, and the cluster
+  overlay has carried that flag since 30 Aug — retry the ramp *with* the flag
+  before concluding anything.
 - **Attention.** Do **not** hard-pin the TIMES 1 740 MW of CCGT-CC in 2040
-  before the sink exists — PyPSA `CCGT CC` is greenfield, not the
-  Flémalle/Seraing retrofit TIMES runs, and would dump CO₂ into a binding store.
+  before storage is usable. PyPSA `CCGT CC` is greenfield, not the
+  Flémalle/Seraing retrofit TIMES runs, and its capture split is fixed by
+  construction (`efficiency3 = co2 × capture_rate` onto `co2 stored`), so
+  dispatching it forces ~2.3–2.5 Mt/a — ~3 % of the entire 90 Mt/a 2040 pooled
+  cap — into a constraint that is already at 100 %. With `co2_vent: false` the
+  only outlets are sequestration, a pipeline to someone else's sink, or
+  synthetic-fuel feedstock (FT / Sabatier / methanolisation take `co2 stored`).
+  A **capacity** floor would therefore not fail outright — it would build the
+  plant and idle it, or reprice carbon system-wide through the pooled dual.
+  Either way the published number would be an artefact of the pin.
   If ICEDD wants the TIMES *outcome* in the charts anyway, it is a named overlay
   (`scen_ccgtcc_times`), not a change to the base.
 - **Test.** `test/` guard on the Belgian `e_nom_max` being a stated value, not a
@@ -271,11 +291,10 @@ floor edit.
 
 ### Item 8 — Rooftop PV: parked by the 1 Sept meeting
 
-Decision: transfer the TIMES rooftop share for now (TIMES 2050 is
+Decision: transfer the TIMES rooftop share (TIMES 2050 is
 ~77 % rooftop; PyPSA builds ~0 MW because rooftop is 920 vs 526 EUR/kW
-overnight). Keep reporting *total* PV (4.1 → 6.5 → 10.5 → 11.8 GW), never
-"rooftop = 0" as a finding.
-One small bug stays open regardless: `BEWAL low voltage` maps to country `BE`,
+overnight). Add this with a switch and a toggle.
+One small bug to solve: `BEWAL low voltage` maps to country `BE`,
 so any future rooftop build counts against the **Belgian** `solar-all` cap
 ([renewable-potentials §7.3](renewable-potentials.md)). Harmless at 0 MW; repair
 before any rooftop floor.
