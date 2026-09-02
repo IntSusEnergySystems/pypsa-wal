@@ -169,8 +169,8 @@ clustering:
   mode: custom_busmap_BE
   temporal:
     resolution_elec: False
-    # 1 h: this is the coupled study config. The consolidation commit
-    # (7225e6fb) set 168 h, which is a weekly test resolution -- restored.
+    # 1 h: this is the coupled study config. The 2026-09-02 item-2 cheap solves
+    # used 6h; switch back after those runs.
     resolution_sector: 1h
   exclude_carriers:
     - nuclear
@@ -407,33 +407,41 @@ sector:
   regional_coal_demand: true
   methanol:
     regional_methanol_demand: true
-  # CO2 storage. Reverted to the PyPSA-Eur formulation on 2026-08-30: a single
-  # pooled global cap, halved for this six-country subset (`* 0.5`), with the
-  # regional CO2StoP layer left at its upstream `max_size` default.
+  # CO2 storage -- geology limits the long run, deployment limits the short one.
+  # Full rationale: docs/co2-sequestration-20260829.md. Retried 2026-09-02 with
+  # BarHomogeneous (the 30 Aug revert was the exact error that flag fixes) and
+  # with a documented Belgian e_nom_max of 0 (item 2; export to DE/NL/GB).
   #
-  # `816be537` had replaced this with a deployment ramp plus a 1000 Mt/a backstop
-  # so that the per-node geology would be the binding limit. That commit was
-  # never re-solved, and it does not solve: 2040 failed with "Numerical trouble
-  # encountered" / "may be infeasible or unbounded". Nor is the cap value a
-  # structural threshold -- holding everything else fixed it is non-monotone
-  # (85 FAIL, 90 OPTIMAL, 100 FAIL, 1000 FAIL), so no choice of ramp fixes it.
-  # 90 Mt/a at 2040 is the one point proven to converge, and it is what this
-  # series already carried. Rationale, evidence and the open questions the
-  # revert leaves behind: docs/co2-sequestration-20260829.md.
-  #
-  # Known and still open (improvement-plan item 2): this series is an unsourced
-  # whole-Europe scalar that upstream changed twice without a release note, the
-  # `* 0.5` is justified only by a comment, and it binds at up to 360 EUR/t in
-  # every horizon. Belgium's per-node `e_nom_max` is a `fillna(0.0)` on a missing
-  # CO2StoP row rather than a documented choice (item 2.C).
+  # This is NOT a potential. The PyPSA-Eur default (0/0/40/100/180/250/250) is
+  # an unsourced whole-Europe scalar; halving it for a six-country model made
+  # it bind at 360 EUR/t in every horizon of the 26 Aug run. The geological
+  # limit now lives where it belongs -- the per-node CO2StoP store -- and this
+  # series only carries the build-out of injection capacity:
+  #   2020/2025  0     no CO2 storage in operation in BE, DE, FR, GB, LU or NL.
+  #   2030      60     EU Net-Zero Industry Act 50 Mt/a EU-wide by 2030, most of
+  #                    it in modelled North Sea projects (~35), plus the UK's
+  #                    20-30 Mt/a target (~25).
+  #   2035+   1000     non-binding backstop, ~5x the ~188 Mt/a the regional
+  #                    stores allow. It only bites if someone sets
+  #                    regional_co2_sequestration_potential.enable: false.
   co2_sequestration_potential:
     2020: 0
     2025: 0
-    2030: 20   # 40 * 0.5
-    2035: 50  # 100 * 0.5
-    2040: 90  # 180 * 0.5
-    2045: 125  # 250 * 0.5
-    2050: 125  # 250 * 0.5
+    2030: 60
+    2035: 1000
+    2040: 1000
+    2045: 1000
+    2050: 1000
+  regional_co2_sequestration_potential:
+    # Upstream clips each region at 25 Gt, which prepare_sector_network then
+    # annualises over years_of_storage into 25000/25 = 1000 Mt/a for GB alone --
+    # 20x the UK's own >50 Mt/a-by-2035 target. 2.5 Gt caps GB at 100 Mt/a.
+    # DE (1979 Mt) and NL (227 Mt) are below the clip and are unchanged.
+    # Belgian nodes are still absent from CO2StoP (offshore-only overlay);
+    # their e_nom_max is the documented custom_potentials.csv override
+    # (BEWAL/BEVLG/BEBRU 0 — no demonstrated Belgian storage; export to
+    # DE/NL/GB via co2_network).
+    max_size: 2.5
   agriculture_machinery_electric_share: 0.5
   agriculture_machinery_oil_share: 0.5
   shipping_methanol_share:
@@ -522,6 +530,9 @@ solving:
   solver_options:
     gurobi-default:
       threads: *local_cpus
+      # 2040 geology-ramp abort 2026-08-30: "Numerical trouble / consider
+      # BarHomogeneous". Required for item 2; also set in config_cluster.yaml.
+      BarHomogeneous: 1
 
   agg_p_nom_limits:
     agg_offwind: true

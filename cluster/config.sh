@@ -31,15 +31,16 @@ GUROBI_LIC="${GUROBI_LIC:-\$HOME/gurobi.lic}"
 GUROBI_MODULE_LIC="${GUROBI_MODULE_LIC:-/opt/cecisw/arch/easybuild/2023b/software/Gurobi/13.0.0-GCCcore-13.2.0/gurobi.lic}"
 
 # --- Slurm resources ----------------------------------------------------------
-# Sector-coupled PyPSA solves at fine temporal resolution (e.g. 6h) need large
+# Sector-coupled PyPSA solves at fine temporal resolution (e.g. 1h) need large
 # RAM for Gurobi model generation. Use the `hmem` partition on NIC5 (~1 TB per
 # node). Memory for solve jobs is set in cluster/config_cluster.yaml
 # (`solving.mem_mb`); keep it aligned with the hmem node limit (~1 000 000 MB).
 # Light rules (add_brownfield) share the same partition but use DEFAULT_MEM_MB.
 # CECI job-efficiency guidance: https://support.ceci-hpc.be/doc/SubmittingJobs/JobEfficiency/
+# The 2026-09-02 item-2 6h solves used `batch` (100 GB, 480 min); restore hmem
+# for 1h production runs.
 SOLVE_PARTITION="${SOLVE_PARTITION:-hmem}"
-# EDIT (2026-08-14): 1440 min for the 1h-resolution solve (360 was sized for
-# 6h; the LP is ~6x larger at 1h).
+# 1440 min for the 1h-resolution solve (360/480 was sized for 6h).
 SOLVE_RUNTIME="${SOLVE_RUNTIME:-1440}"     # minutes
 DEFAULT_PARTITION="${DEFAULT_PARTITION:-hmem}"
 DEFAULT_MEM_MB="${DEFAULT_MEM_MB:-16000}"      # light rules (add_brownfield)

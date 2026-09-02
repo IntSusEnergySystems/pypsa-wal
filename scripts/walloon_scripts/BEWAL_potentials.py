@@ -206,6 +206,79 @@ def apply_gas_store_cap(n, bus, attr, value):
     logger.info("Gas store at %s: %s = %s MWh_LHV.", bus, attr, value)
 
 
+def apply_co2_store_cap(n, bus, attr, value):
+    """Write `attr` on the `co2 sequestered` Store(s) at `bus`.
+
+    `prepare_sector_network` builds one extendable Store per CO₂ node from
+    the clustered CO2StoP CSV, then ``reindex(...).fillna(0.0)``. Belgian
+    nodes have no offshore site that clears `min_size`, so they land at 0
+    unless a documented value is written here. That silent zero is
+    improvement-plan item 2; this function is the documented override.
+
+    Value is in tonnes of CO₂ (the Store's native unit). `e_nom_max` is the
+    annualised injection ceiling after `years_of_storage`, not the geological
+    stock.
+
+    Myopic brownfield vintages the name (``BEWAL co2 sequestered-2025``), so
+    matching is by carrier and bus, not by the un-suffixed index. The ceiling
+    is a fleet cap: inherited vintages keep their ``e_nom``, and the residual
+    is written on the current extendable vintage.
+    """
+    bus_name = f"{bus} co2 sequestered"
+    sel = n.stores.index[
+        n.stores.carrier.astype(str).eq("co2 sequestered")
+        & n.stores.bus.astype(str).eq(bus_name)
+    ]
+    if sel.empty:
+        logger.warning(
+            "No co2 sequestered Store at bus %s; cannot apply %s=%s.",
+            bus,
+            attr,
+            value,
+        )
+        return
+
+    if attr != "e_nom_max":
+        n.stores.loc[sel, attr] = value
+        logger.info("CO2 sequestered store at %s: %s = %s t.", bus, attr, value)
+        return
+
+    cap = float(value)
+    # A documented zero is a fleet ban, including inherited brownfield vintages
+    # (TIMES 7.1 Mt/a must not survive as e_nom on a 2025 store).
+    if cap <= 0.0:
+        n.stores.loc[sel, "e_nom_max"] = 0.0
+        for floor in ["e_nom_min", "e_nom"]:
+            n.stores.loc[sel, floor] = n.stores.loc[sel, floor].clip(upper=0.0)
+        logger.info(
+            "CO2 sequestered store at %s: e_nom_max = 0 t (documented zero).",
+            bus,
+        )
+        return
+
+    extendable = sel[n.stores.loc[sel, "e_nom_extendable"].fillna(False).astype(bool)]
+    inherited = sel.difference(extendable)
+    existing = (
+        float(n.stores.loc[inherited, "e_nom"].sum()) if len(inherited) else 0.0
+    )
+    residual = max(cap - existing, 0.0)
+    targets = extendable if len(extendable) else sel
+    n.stores.loc[targets, "e_nom_max"] = residual
+    for floor in ["e_nom_min", "e_nom"]:
+        too_high = n.stores.loc[targets, floor] > residual
+        if too_high.any():
+            n.stores.loc[too_high.index[too_high], floor] = residual
+
+    logger.info(
+        "CO2 sequestered store at %s: e_nom_max = %s t "
+        "(fleet cap %s t, inherited %s t).",
+        bus,
+        residual,
+        cap,
+        existing,
+    )
+
+
 def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
     if walloon_potentials == None:
         return
@@ -373,6 +446,16 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             )
             logger.info(logger_msg_success)
             apply_gas_store_cap(n, bus, attr, potential)
+            continue
+        if carrier in ("co2 storage", "co2 sequestered"):
+            allowed = {"e_nom", "e_nom_min", "e_nom_max"}
+            assert attr in allowed, (
+                f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
+            )
+            logger.info(logger_msg_success)
+            if "Mt" in unit:
+                potential = potential * 1e6  # t
+            apply_co2_store_cap(n, bus, attr, potential)
             continue
         if carrier in ["CCGT", "CCGT CC"]:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}

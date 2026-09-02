@@ -49,7 +49,7 @@ Companion docs: [ccs_alignment](ccs_alignment.md) ·
 | 3 | No WAL grid expansion 2025→2030 | Answered, no code: Boucle du Hainaut slipped to **2032–33** (Conseil d'État Oct 2025, final environmental report Mar 2026), so the freeze is correct. Only the 2040 question remains → item 3 below | run §11.5: BEWAL–BEVLG usable **3 566 MW** all horizons |
 | — | RES envelope + 2025 pin | Not a numbered item but the precondition for item 6: 2025 = historical fleet, later horizons ≤ 2 × record build rate, then land. BEWAL onwind **2 371 / 4 870 / 6 500 / 6 500 MW**. Neighbour offshore fixed (DE 30 / NL 12 / GB 42.6 GW in 2030; 70 / 50 / 80 in 2050) | `96fd920e`, `bab60ed6` · run §11.5, R1 · [dossier](renewable-potentials.md) |
 | — | Collapsed-corridor tolerance | `min == max` on an aggregate is a difference of near-equal large numbers; a per-row `tolerance` column (0.5 %) makes 2025 certifiable. `review_run.py` reads the same column — the 18 "overshoots" were the script | `dbca25df` · run R7 |
-| (2) | CO₂ sequestration geology | **Applied then reverted** (`816be537` → `dbca25df`): the per-node CO₂StoP ramp made 2040 fail with *"Numerical trouble… consider the homogeneous algorithm"*, non-monotonically in the cap value. The EU scalar (0/20/90/125 Mt) is back and **binds every horizon** at 431/73/125/342 EUR/t | [§9 of the dossier](co2-sequestration-20260829.md) → item 2 reopened |
+| (2) | CO₂ sequestration geology + Belgian sink | Geology ramp + `BarHomogeneous`. Belgian `e_nom_max` **0** at BEWAL/BEVLG/BEBRU (no demonstrated CO2StoP site; TIMES 7.1 Mt was an injection figure, not geology). Capture exports via `co2_network` to DE/NL/GB. 6h re-solve 4/4 optimal; Belgian stores unused; seq. in DE/NL/GB | `docs/logs/2026-09-02_scen_demande_haute_2010_6h_co2sinks_be0.md` · [dossier](co2-sequestration-20260829.md) |
 
 Also from the run: 2050 effective Walloon CO₂ **1 272 → 547 EUR/t** with the
 *national* cap no longer binding; 2040 heat-profile gap 0.46 → **0.01 TWh** on
@@ -62,11 +62,14 @@ the new vd; `CCGT CC` now **~0 MW_e in every horizon** (26 Aug built 463 in
 
 ### Item 2 — Give Belgium *usable* CO₂ storage: domestic store or priced export
 
-`co2 sequestered` `e_nom_max = 0` at BEWAL/BEVLG/BEBRU is a `fillna(0.0)` on a
+**Done on the 6h re-solve** ([log](logs/2026-09-02_scen_demande_haute_2010_6h_co2sinks_be0.md)). Geology ramp + `BarHomogeneous: 1`. Belgian `e_nom_max` **0** at BEWAL/BEVLG/BEBRU (no demonstrated CO2StoP site; TIMES 7.1 withdrawn). Capture exports on existing `CO2 pipeline` links to DE/NL/GB. 4/4 optimal; Belgian stores unused; NL geology binds. No Northern-Lights link. Guard: `test/test_co2_store_potential.py`. Full 1h confirmation waits for the final run.
+
+`co2 sequestered` `e_nom_max = 0` at BEWAL/BEVLG/BEBRU *was* a `fillna(0.0)` on a
 missing CO₂StoP row, not a documented choice (the overlay is offshore-only and
 no Belgian EEZ site clears `min_size`). TIMES stores **7.1 Mt in Wallonia**;
-PyPSA stores 0 in Belgium and fills NL to 100 %. Document an `e_nom_max` per
-Belgian node, **or** — closer to reality — an explicit priced export route.
+PyPSA stored 0 in Belgium and filled NL to 100 %. Document an `e_nom_max` per
+Belgian node, **or** — closer to reality — an explicit priced export route. The
+export route is **not** taken in this pass.
 
 - **Attention — the pipe is not the problem.** `sector.co2_network: true` already
   gives extendable, **unbounded** `CO2 pipeline` links between neighbouring

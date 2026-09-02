@@ -5,7 +5,7 @@
 # Solve jobs run on the `hmem` partition (see cluster/config.sh). Observed 1h
 # peak is ~32–37 GB; requesting the full ~1 TB node forces a long Resources
 # wait on a 3-node partition. 100 GB still leaves headroom and can share a
-# mixed hmem node.
+# mixed hmem node. The 2026-09-02 6h item-2 solve ran on `batch` at ~8 GB.
 #
 # Keep solving.cpus / gurobi-default.threads in sync with each other and with
 # the Slurm cpus-per-task set in `nic5.sh solve`.

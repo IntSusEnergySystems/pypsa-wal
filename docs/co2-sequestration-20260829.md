@@ -7,17 +7,15 @@
 [ccs_alignment.md](ccs_alignment.md), which describes the CCS *technologies*;
 this file is about the *limit* on how much of their output can be buried.
 
-> ## Status: REVERTED on 30 Aug 2026
+> ## Status: RETRIED 2 Sep 2026 — 6h solve 4/4 optimal
 >
-> The change described below was implemented in `config/config.walloon.yaml` on
-> 29 Aug and **never solved**. When it was first run, on 30 Aug, the 2040 horizon
-> failed with `Numerical trouble encountered` / *"Model may be infeasible or
-> unbounded"*. The config is back to the pooled global cap; the analysis in this
-> file stands, and the underlying criticism of the number is still valid, but the
-> replacement does not work as written. See [§9](#9-why-it-was-reverted).
->
-> Every number describing model behaviour below is from the 26 Aug run, i.e.
-> *before* this change and before the revert.
+> Restored with `BarHomogeneous: 1`. Belgian `e_nom_max` is **0** at
+> BEWAL/BEVLG/BEBRU (no demonstrated CO2StoP site). TIMES 7.1 Mt/a was an
+> injection figure, not geology; captured CO₂ exports to DE/NL/GB on the
+> existing CO₂ network. 6h re-solve 4/4 optimal:
+> [2026-09-02 6h BE=0](logs/2026-09-02_scen_demande_haute_2010_6h_co2sinks_be0.md).
+> Earlier 6h with BEWAL 7.1:
+> [2026-09-02 6h](logs/2026-09-02_scen_demande_haute_2010_6h_co2sinks.md).
 
 **One-paragraph summary.** The binding constraint on carbon capture in every
 horizon of the 26 Aug run was `co2_sequestration_limit`, a single pooled
@@ -37,8 +35,9 @@ Wallonia a sink.
 
 | Change | File | Status |
 |---|---|---|
-| Global cap → deployment ramp (0/0/60) then non-binding (1000) | `config/config.walloon.yaml` | **reverted 30 Aug** |
-| `regional_co2_sequestration_potential.max_size` 25 → 2.5 Gt | `config/config.walloon.yaml` | **reverted 30 Aug** |
+| Global cap → deployment ramp (0/0/60) then non-binding (1000) | `config/config.walloon.yaml` | **retried 2 Sep** with `BarHomogeneous` |
+| `regional_co2_sequestration_potential.max_size` 25 → 2.5 Gt | `config/config.walloon.yaml` | **retried 2 Sep** |
+| Belgian `e_nom_max` (all BE nodes 0; export to DE/NL/GB) | `data/walloon/custom_potentials.csv` | **2 Sep**, TIMES 7.1 withdrawn |
 | This write-up | `docs/co2-sequestration-20260829.md` | kept, with §9 added |
 
 ---
