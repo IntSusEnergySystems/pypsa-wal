@@ -18,14 +18,23 @@ from scripts.build_common_parameters import (
     _parse_agg_header,
 )
 
-# Trajectory authored in docs/nuclear-alignment-20260816.md (MW_e, total).
+# Trajectory authored in docs/nuclear-alignment-20260816.md (MW_e, total),
+# with item 10 Flanders siting on top (BEVLG 2050 = 3000, BE 2050 = 6000).
+# 2045 keeps Doel 4 (1 GW) so a 2045 solve can still retrofit it in 2050.
 EXPECTED = {
     ("BEWAL", "nuclear-all", "min"): {2035: 1000, 2040: 1000, 2045: 1750, 2050: 3000},
     ("BEWAL", "nuclear-all", "max"): {2035: 1030, 2040: 1030, 2045: 1750, 2050: 3000},
-    ("BE", "nuclear-all", "min"): {2035: 2000, 2040: 2000, 2045: 1750, 2050: 3000},
-    ("BE", "nuclear-all", "max"): {2035: 2030, 2040: 2030, 2045: 1750, 2050: 3000},
+    ("BEVLG", "nuclear-all", "min"): {2035: 1000, 2040: 1000, 2045: 1000, 2050: 3000},
+    ("BEVLG", "nuclear-all", "max"): {2035: 1000, 2040: 1000, 2045: 1000, 2050: 3000},
+    ("BE", "nuclear-all", "min"): {2035: 2000, 2040: 2000, 2045: 2750, 2050: 6000},
+    ("BE", "nuclear-all", "max"): {2035: 2030, 2040: 2030, 2045: 2750, 2050: 6000},
 }
 
+# Item 11: Belgian PEZ retiming (MW). 2030 is a pin; 2040/2050 are floors.
+EXPECTED_OFFSHORE = {
+    ("BE", "offwind-all", "min"): {2025: 2262, 2030: 2262, 2040: 4362, 2050: 5800},
+    ("BE", "offwind-all", "max"): {2025: 2262, 2030: 2262},
+}
 # Walloon dispatchable-gas floor, technology-neutral over CCGT + CCGT CC. Unlike
 # nuclear this one does anchor 2025/2030: the legacy gas fleet is well below it.
 EXPECTED_GAS = {
@@ -54,13 +63,26 @@ def test_master_csv_anchors_match_alignment():
     targets = collect_targets(load_master(), "agg", planning_horizons(), nparts=3)
     # the RES envelope (docs/renewable-potentials-analysis.md) contributes many
     # more agg: targets; these are the TIMES-driven ones this file owns
-    assert set(EXPECTED) | set(EXPECTED_GAS) <= set(targets)
+    assert set(EXPECTED) | set(EXPECTED_GAS) | set(EXPECTED_OFFSHORE) <= set(targets)
     for key, anchors in EXPECTED.items():
         got = {int(y): v for y, v in targets[key].anchors.items()}
         assert got == anchors, key
         # hold-forward must not invent a 2025/2030 cap (legacy fleet, no CCL)
         assert 2025 not in targets[key].anchors
         assert 2030 not in targets[key].anchors
+    for key, anchors in EXPECTED_OFFSHORE.items():
+        got = {int(y): v for y, v in targets[key].anchors.items()}
+        assert got == anchors, key
+
+
+def test_be_nuclear_covers_regional_rows():
+    """CCL subtracts each region row from the parent; BE must cover both."""
+    for bound in ("min", "max"):
+        be = EXPECTED[("BE", "nuclear-all", bound)]
+        bewal = EXPECTED[("BEWAL", "nuclear-all", bound)]
+        bevlg = EXPECTED[("BEVLG", "nuclear-all", bound)]
+        for year in be:
+            assert be[year] >= bewal[year] + bevlg[year], (bound, year)
 
 
 def test_walloon_gas_floor_is_technology_neutral():
@@ -84,7 +106,7 @@ def test_demande_haute_file_already_in_sync():
     patch = patch_agg_p_nom(load_master(), planning_horizons(), dry_run=True)
     assert patch.ok, patch.errors
     assert patch.changes == []
-    assert patch.managed >= len(EXPECTED) + len(EXPECTED_GAS)
+    assert patch.managed >= len(EXPECTED) + len(EXPECTED_GAS) + len(EXPECTED_OFFSHORE)
 
 
 def test_write_restores_scrambled_caps(tmp_path: Path):
@@ -111,9 +133,13 @@ def test_write_restores_scrambled_caps(tmp_path: Path):
     assert any("BEWAL nuclear-all 2050 max" in c and "3000" in c for c in patch.changes)
 
     bewal = _cells(dest, "BEWAL", "nuclear-all")
+    bevlg = _cells(dest, "BEVLG", "nuclear-all")
     be = _cells(dest, "BE", "nuclear-all")
     for year, bound in ((2035, "min"), (2040, "max"), (2045, "min"), (2050, "max")):
         assert float(bewal[(year, bound)]) == EXPECTED[("BEWAL", "nuclear-all", bound)][
+            year
+        ]
+        assert float(bevlg[(year, bound)]) == EXPECTED[("BEVLG", "nuclear-all", bound)][
             year
         ]
         assert float(be[(year, bound)]) == EXPECTED[("BE", "nuclear-all", bound)][year]
@@ -121,5 +147,7 @@ def test_write_restores_scrambled_caps(tmp_path: Path):
     for year in (2025, 2030):
         assert bewal[(year, "min")] == ""
         assert bewal[(year, "max")] == ""
+        assert bevlg[(year, "min")] == ""
+        assert bevlg[(year, "max")] == ""
         assert be[(year, "min")] == ""
         assert be[(year, "max")] == ""

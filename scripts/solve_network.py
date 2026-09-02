@@ -1740,6 +1740,21 @@ NATIONAL_CO2_COUNTRIES = ["BEBRU", "BEVLG", "BEWAL", "DE", "FR", "NL", "GB", "LU
 AVIATION_SECTORS = ["domestic aviation", "international aviation"]
 AVIATION_CARRIER = "kerosene for aviation"
 
+
+def national_include_aviation(n) -> bool:
+    """Item 13: aviation on the national cap, both sides, default off."""
+    cfg = getattr(n, "config", None)
+    if not isinstance(cfg, dict):
+        return False
+    return bool(cfg.get("co2_budget_national_include_aviation", False))
+
+
+def national_co2_sectors(sectors, include_aviation: bool) -> list[str]:
+    """RHS of the national cap. Must match the LHS filter in ``national_co2_expression``."""
+    if include_aviation:
+        return list(sectors)
+    return [s for s in sectors if s not in AVIATION_SECTORS]
+
 # emissions of these are accounted for at the European level, not nationally
 NATIONAL_CO2_EXCLUDE = ["EU oil refining", "EU methanol import", "EU oil import"]
 
@@ -1779,22 +1794,30 @@ def national_co2_country(n):
     return country[country != "EU"]
 
 
-def national_co2_expression(n):
+def national_co2_expression(n, include_aviation: bool | None = None):
     """Linopy expression for annual CO2 per country, in t.
 
     Shared by the national cap and the national CO2 price so the two can never
     disagree on scope. Sums every link port that touches the ``co2`` carrier —
     i.e. ``co2 atmosphere`` — weighted by that port's efficiency.
+
+    Aviation is excluded unless ``co2_budget_national_include_aviation`` is
+    true (item 13). The flag must move the RHS in ``add_co2limit_country``
+    at the same time.
     """
     p = n.model["Link-p"]  # dimension: (time, component)
     country = national_co2_country(n)
+    if include_aviation is None:
+        include_aviation = national_include_aviation(n)
 
-    exclude = np.append(
-        NATIONAL_CO2_EXCLUDE,
-        n.links.index[
-            n.links.carrier.astype(str).str.contains(AVIATION_CARRIER, na=False)
-        ].values,
-    )
+    exclude = np.array(NATIONAL_CO2_EXCLUDE, dtype=object)
+    if not include_aviation:
+        exclude = np.append(
+            exclude,
+            n.links.index[
+                n.links.carrier.astype(str).str.contains(AVIATION_CARRIER, na=False)
+            ].values,
+        )
 
     lhs = []
     for port in [col[3:] for col in n.links if col.startswith("bus")]:
@@ -1843,7 +1866,7 @@ def add_co2limit_country(n, limit_countries, nyears=1.0):
 
     # TODO: import function from prepare_sector_network? Move to common place?
     sectors = determine_emission_sectors(options)
-    national_sectors = [s for s in sectors if s not in AVIATION_SECTORS]
+    national_sectors = national_co2_sectors(sectors, national_include_aviation(n))
 
     # convert Mt to tCO2
     co2_totals = 1e6 * pd.read_csv(snakemake.input.co2_totals_name, index_col=0)

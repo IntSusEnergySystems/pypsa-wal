@@ -279,6 +279,43 @@ def apply_co2_store_cap(n, bus, attr, value):
     )
 
 
+def apply_process_emission_load(n, bus, kt_per_year):
+    """Set the process-emissions Load at `bus` to an annual TIMES volume.
+
+    Item 12: the Load is gross process CO₂ (t/h, negative p_set injects onto
+    the process-emissions bus). ``kt_per_year`` is fossil ``INDCO2`` only
+    (Annick / ``VAR_Comnet``); biogenic ``INDCO2b`` stays off this bus.
+    Capture is a different object (item 9).
+    """
+    name = f"{bus} process emissions"
+    if name not in n.loads.index:
+        logger.warning(
+            "No process-emissions Load at %s; cannot apply %s kt/a.",
+            bus,
+            kt_per_year,
+        )
+        return
+    weights = n.snapshot_weightings
+    if "objective" in weights.columns:
+        nhours = float(weights["objective"].sum())
+    else:
+        nhours = float(weights.iloc[:, 0].sum())
+    if nhours <= 0:
+        logger.warning("snapshot weightings sum to 0; cannot apply process emissions.")
+        return
+    t_year = float(kt_per_year) * 1e3
+    p_set = -t_year / nhours
+    n.loads.loc[name, "p_set"] = p_set
+    if name in n.loads_t.p_set.columns:
+        n.loads_t.p_set[name] = p_set
+    logger.info(
+        "Process-emissions load at %s: %.2f kt/a (p_set = %.4f t/h).",
+        bus,
+        kt_per_year,
+        p_set,
+    )
+
+
 def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
     if walloon_potentials == None:
         return
@@ -456,6 +493,18 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             if "Mt" in unit:
                 potential = potential * 1e6  # t
             apply_co2_store_cap(n, bus, attr, potential)
+            continue
+        if carrier == "process emissions":
+            allowed = {"p_set"}
+            assert attr in allowed, (
+                f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
+            )
+            logger.info(logger_msg_success)
+            kt = potential
+            unit_l = unit.lower()
+            if "mt" in unit_l:
+                kt = potential * 1e3
+            apply_process_emission_load(n, bus, kt)
             continue
         if carrier in ["CCGT", "CCGT CC"]:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}

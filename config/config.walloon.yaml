@@ -462,6 +462,11 @@ sector:
     2050: 0.20
   district_heating:
     potential: 0.3
+    # Item 16: bound urban-central water pits at 4 weeks of that node's DH
+    # demand (~100–200 GWh_th in Wallonia). capital_cost is 0; without a
+    # ceiling the TES E/P equality invents tens of GW of charger.
+    ptes:
+      e_nom_max_weeks: 4
   electrobiofuels: false
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#co2-budget
@@ -471,6 +476,9 @@ co2_budget:
   2040: 0.250
   2050: 0.050
 co2_budget_national: true
+# Item 13: put aviation on the national cap (LHS *and* RHS). Default off —
+# kerosene is drawn from the EU oil bus and 2050 is likely infeasible.
+co2_budget_national_include_aviation: false
 co2_price_national: false
 budget_national:
   2025:

@@ -79,3 +79,10 @@ output:
   pages: [overview, emissions, sankeys, fec, demands, costs, capacities, dispatch, maps]
   shared_maps: true
   plotly: cdn
+
+features:
+  # Primary-energy independence: count nuclear as imported uranium (fuel is
+  # not mined here, default) or as the electricity the reactors produce.
+  # Accounting switch only — no 50 % Belgian-offshore attribution to Wallonia.
+  nuclear_primary: uranium
+

@@ -49,6 +49,7 @@ from scripts.walloon_scripts.nuclear_helper_overnight import add_BEWAL_nuclear
 from scripts.walloon_scripts.nuclear_helper import apply_nuclear_inflexibility
 from scripts.walloon_scripts.BEWAL_potentials_overnight import update_BEWAL_potentials
 from scripts.walloon_scripts.set_NTCs import apply_ntc_limits
+from scripts.walloon_scripts.ptes_bounds import ptes_store_e_nom_max
 
 spatial = SimpleNamespace()
 logger = logging.getLogger(__name__)
@@ -3698,6 +3699,11 @@ def add_heat(
                 else:
                     e_max_pu = 1
 
+                weeks = options.get("district_heating", {}).get("ptes", {}).get(
+                    "e_nom_max_weeks"
+                )
+                pit_e_nom_max = ptes_store_e_nom_max(n, nodes, weeks, str(heat_system))
+
                 n.add(
                     "Store",
                     nodes,
@@ -3705,6 +3711,7 @@ def add_heat(
                     bus=nodes + f" {heat_system} water pits",
                     e_cyclic=True,
                     e_nom_extendable=True,
+                    e_nom_max=pit_e_nom_max,
                     e_max_pu=e_max_pu,
                     carrier=f"{heat_system} water pits",
                     standing_loss=costs.at[

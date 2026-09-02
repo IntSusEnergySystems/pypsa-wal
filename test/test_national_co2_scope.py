@@ -29,6 +29,8 @@ from scripts.solve_network import (
     AVIATION_SECTORS,
     national_co2_country,
     national_co2_expression,
+    national_co2_sectors,
+    national_include_aviation,
 )
 
 CO2_INTENSITY_KEROSENE = 0.2571
@@ -89,11 +91,31 @@ def _link_labels(n: pypsa.Network, name: str) -> np.ndarray:
 
 def test_aviation_is_dropped_from_the_national_expression():
     n = _toy_network()
+    n.config = {}
     expr = national_co2_expression(n)
     used = np.asarray(expr.vars).ravel()
 
     assert not np.isin(_link_labels(n, "BEWAL kerosene for aviation"), used).any()
     assert np.isin(_link_labels(n, "BEWAL rural gas boiler"), used).all()
+
+
+def test_aviation_toggle_puts_kerosene_on_the_national_lhs():
+    """Item 13: both sides move together; this test is the LHS."""
+    n = _toy_network()
+    n.config = {"co2_budget_national_include_aviation": True}
+    assert national_include_aviation(n) is True
+    expr = national_co2_expression(n)
+    used = np.asarray(expr.vars).ravel()
+    assert np.isin(_link_labels(n, "BEWAL kerosene for aviation"), used).any()
+    assert np.isin(_link_labels(n, "BEWAL rural gas boiler"), used).all()
+
+
+def test_aviation_toggle_default_is_off():
+    n = _toy_network()
+    n.config = {}
+    assert national_include_aviation(n) is False
+    n.config = {"co2_budget_national_include_aviation": False}
+    assert national_include_aviation(n) is False
 
 
 def test_attribution_still_reaches_bewal_through_bus1():
@@ -121,3 +143,5 @@ def test_aviation_stays_in_the_global_sector_list():
     assert "domestic aviation" not in national
     # nothing else may be lost
     assert set(sectors) - set(national) == set(AVIATION_SECTORS)
+    assert national_co2_sectors(sectors, False) == national
+    assert set(national_co2_sectors(sectors, True)) == set(sectors)

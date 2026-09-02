@@ -15,12 +15,12 @@ of this file (full option tables per item) is preserved at
 TIMES vd `scen_central_demande_haute_v1_260828_2808.vd`. Every "today" number
 below is from that run's §11.
 
-**Test strategy (agreed 1 Sept).** There is no time for a production solve
-between individual improvements. So:
+**Test strategy (agreed 1 Sept; tightened 2 Sept).** There is no time for a
+production solve between individual improvements. So:
 
 1. every item ships a **pytest guard** in `test/` (`python -m pytest test/ -q`);
-2. items that change the LP also get a **cheap solve** — one horizon, or all
-   four at `resolution_sector: 6h` — only to prove feasibility and direction;
+2. **no cheap 6h / one-horizon solves between items** — only those fast tests
+   until the queue is empty (decided 2 Sept while implementing);
 3. **one final full 1h / 2010 four-horizon run** at the end, with a §11 review.
 
 Accept the consequence up front: after ~10 simultaneous changes, attribution in
@@ -432,7 +432,7 @@ step 0 — measure, no change
 reporting only — no solve needed, do now
   ├─ 14  power-to-gas split (Electrolysis / FT / methanation)
   ├─ 15  BECCS/CCS in installed capacities
-  └─ 6b  independence toggles (nuclear accounting, 50 % offshore)
+  └─ 6b  independence toggle (nuclear accounting only)
 
 data / caps — pytest guard each, no solve
   ├─ 11  BE offshore: pin 2030 at 2 262, move the PEZ to 2040/2050
@@ -441,11 +441,11 @@ data / caps — pytest guard each, no solve
   ├─  3  Boucle du Hainaut: NTC floor from 2035
   └─ 16  water pits e_nom_max
 
-LP code — pytest guard + one cheap solve each
-  ├─ 6a  BEWAL 10 TWh import cap   ← measure 30 Aug imports first
-  ├─  8  rooftop share (after the LV country-alias bug)
+LP code — pytest guard (no cheap solve until the final run)
+  ├─ 6a  BEWAL 10 TWh import cap   ← step 0 measured
+  ├─ 8  rooftop share (after the LV country-alias bug)
   ├─ 13  aviation toggle (default off)
-  └─ 2   Belgian CO₂ sink (+ retry the geology ramp with BarHomogeneous)
+  └─ 2   Belgian CO₂ sink  ← done 2 Sept
               │
               └─ 9  industry-CC pin, only once 2 is in (and 12 has run)
 
@@ -455,6 +455,77 @@ no code, decide in a meeting
   ├─ 17b DE 2030 onwind corridor: accept 115 GW or let growth win?
   └─ 17d biogas citation, owed by ICEDD
 ```
+
+**Implementation log (2 Sept).** Decisions and pytest results as items land.
+Dropped items from the 1 Sept plan are left dropped (e.g. 6b does **not**
+attribute 50 % of Belgian offshore to Wallonia).
+
+- **Tests between items.** Pytest only; the final 1h run is the production
+  check. Cheap 6h / one-horizon solves are skipped until then.
+- **Step 0 — imports.** The 30 Aug 1h networks were overwritten by the 2 Sept
+  6h item-2 solves, so the measurement is on those 6h files (AC lines + DC
+  links; positive = net import). BEWAL includes Flanders/Brussels.
+
+  | TWh | 2025 | 2030 | 2040 | 2050 |
+  |---|---:|---:|---:|---:|
+  | BEWAL | −12.5 | −2.4 | **7.0** | **2.7** |
+  | BEVLG | 30.4 | 12.8 | 7.5 | 20.3 |
+  | BEBRU | 3.7 | 5.5 | 7.1 | 9.5 |
+  | BE vs abroad | 21.6 | 15.9 | 21.6 | 32.5 |
+
+  TIMES `Transfo_Imp` is 2.94 / 6.47 / 10 TWh (2030/40/50). On this 6h proxy
+  the 2050 10 TWh cap would be **slack**; the 2040 6.47 TWh cap would **bind**.
+  26 Aug was 18 TWh BEWAL in 2050 — the RES envelope and neighbour-offshore
+  pin already did most of the work. 1h may differ; 6a still goes in as decided.
+- **14 — power-to-gas split** (pypsa2html). `tech_groups.csv` now maps
+  Electrolysis / methanation / Fischer-Tropsch as separate groups in costs,
+  capacities, dispatch and the faceted capacity panels. H2 liquefaction is its
+  own leftover group (not in the meeting's three series). Tests:
+  `tests/test_tech_map.py` (45 passed with 15).
+- **15 — CCS capacities.** New `CCS capacities (fuel input)` panel (GW of
+  *fuel input*, stated in the title). Group is industry CC + process-emissions
+  CC + SMR CC. **Decision:** `CCGT CC` stays a sibling of CCGT on the power
+  panel; CHP CC stays in CHP because `normalize_carrier` folds any "CHP"
+  label — mixing those MW onto the industry CCS stack would be the items 5/7
+  mixed-unit bug.
+- **11 — BE offshore retimed.** 2030 is now a pin at the standing fleet
+  (`min = max = 2 262`), 2040 floor 4 362 (PEZ I+II), 2050 floor 5 800 (full
+  zone). Maxima after 2030 stay with the envelope. Tag
+  `NECP-BE-2030 (retimed 2026-09, press review)`. The envelope checker
+  (`check_res_envelope.py`) allows a 2030 pin and later floors **only** for
+  `BE/offwind-all`; every other RES group still forbids stored max after 2025
+  and stored min after 2030. Tests:   `test/test_res_envelope.py` +
+  `test/test_common_parameters_agg.py` (19 passed).
+- **10 — Flanders nuclear 2050.** BEVLG `nuclear-all` is now an explicit
+  row (2035/2040/2045 = 1 000 MW Doel 4, 2050 = 3 000). BE raised first:
+  2045 2 750, 2050 6 000. **Decision:** keep Doel 4 through 2045 so a 2045
+  solve can still retrofit it; the myopic chain (2025–2030–2040–2050) already
+  carries 2040 brownfield into 2050. A 2050-only BEVLG row would alias the
+  bus out of the BE remainder and leave 2035/2040 unconstrained — so every
+  horizon that has a BE nuclear cap is filled. Label: **siting policy, not
+  TIMES alignment** (vd has Flanders at 0 by 2045). Guard: BE ≥ BEWAL+BEVLG
+  every horizon. Tests: `test/test_common_parameters_agg.py` (40 passed with
+  envelope + corridor).
+- **6b — nuclear accounting toggle only.** `features.nuclear_primary`:
+  `uranium` (default, fuel imported) or `electricity` (reactor kWh domestic).
+  Chart panel title states the convention. **Not restored:** 50 % of Belgian
+  offshore attributed to Wallonia. Tests: `tests/test_indicators.py` +
+  `tests/test_config_and_pages.py` (66 passed, 2 skipped).
+- **12 — process-emission load.** BEWAL `process emissions` Load is now the
+  TIMES `VAR_Comnet` fossil totals (kt): 4 411.62 / 3 946.10 / 357.01 /
+  281.64 for 2025/30/40/50. 2025 uses the 2025 column, not a 2021
+  carry-forward. Biogenic `INDCO2b` is not on this bus. The original Excel
+  is not in the repo; values are transcribed from Annick's table in this
+  file into `custom_potentials.csv`. Capture remains item 9. Tests:
+  `test/test_process_emissions_load.py`.
+- **13 — aviation toggle.** `co2_budget_national_include_aviation: false`
+  (default). When true, both the national LHS (`AVIATION_CARRIER`) and RHS
+  (`AVIATION_SECTORS`) move together. Left off for the final run. Tests:
+  `test/test_national_co2_scope.py`.
+- **16 — water pits `e_nom_max`.** `sector.district_heating.ptes.e_nom_max_weeks:
+  4` (weeks of that node's urban-central heat demand). Decision: 4 weeks is
+  the upper end of the 2–4 week proxy in the 26 Aug review (~100–200 GWh_th
+  BEWAL), against 689 GWh unbounded. Tests: `test/test_ptes_e_nom_max.py`.
 
 Interactions to keep in mind when reading that final run: items **6a, 10, 11**
 all move 2050 independence, in opposite directions (nuclear helps, the offshore

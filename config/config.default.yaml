@@ -673,6 +673,9 @@ sector:
         booster_heat_pump: false
       max_top_temperature: 90
       min_bottom_temperature: 35
+      # null = unbounded (upstream default). A positive number is weeks of
+      # that node's urban-central heat demand used as Store e_nom_max.
+      e_nom_max_weeks: null
     ates:
       enable: false
       suitable_aquifer_types:

@@ -24,6 +24,10 @@ from ``growth_multiplier x`` the IRENA annual record ``x`` the period length.
 So a stored maximum after 2025, or a stored minimum after 2030, is a stale
 override that would silently override a calculation — which is what this checks.
 
+Exception (item 11): ``BE/offwind-all`` may pin 2030 (``min == max`` = standing
+fleet) and carry committed-infrastructure floors after 2030. Other groups keep
+the original design.
+
 Usage
 -----
     python scripts/walloon_scripts/check_res_envelope.py \\
@@ -46,6 +50,10 @@ MODELLED = ("BE", "BEWAL", "DE", "FR", "GB", "NL", "LU")
 # offshore only exists where there is a coast
 NO_OFFSHORE = ("BEWAL", "LU")
 BASE_YEAR, CORRIDOR_YEAR = 2025, 2030
+# Item 11: Belgian PEZ is committed infrastructure on a slipped calendar, not
+# a 2030 NECP floor. This group may pin 2030 (min=max=standing fleet) and
+# carry floors after 2030. Every other RES group keeps the original design.
+PEZ_RETIME = {("BE", "offwind-all")}
 
 
 def load_envelope(path: Path) -> pd.DataFrame:
@@ -88,16 +96,24 @@ def check(env: pd.DataFrame, rates: pd.DataFrame | None = None) -> list[str]:
             errors.append(f"{key}: min {row.min:,.0f} > max {getattr(row, 'max'):,.0f} — empty LP")
 
         if row.year > BASE_YEAR and has_max:
-            errors.append(
-                f"{key}: stored max {getattr(row, 'max'):,.0f} — after {BASE_YEAR} the "
-                "ceiling is computed as min(land potential, growth allowance); a stored "
-                "value silently overrides it"
-            )
+            pez_pin = (row.country, row.carrier) in PEZ_RETIME and row.year == CORRIDOR_YEAR
+            if not pez_pin:
+                errors.append(
+                    f"{key}: stored max {getattr(row, 'max'):,.0f} — after {BASE_YEAR} the "
+                    "ceiling is computed as min(land potential, growth allowance); a stored "
+                    "value silently overrides it"
+                )
+            elif abs(row.min - getattr(row, "max")) > 1e-6:
+                errors.append(
+                    f"{key}: PEZ 2030 pin requires min == max (standing fleet), "
+                    f"got min {row.min:,.0f} max {getattr(row, 'max'):,.0f}"
+                )
         if row.year > CORRIDOR_YEAR and has_min:
-            errors.append(
-                f"{key}: stored min {row.min:,.0f} — past {CORRIDOR_YEAR} the scenario is a "
-                "techno-economic optimum with no policy floor"
-            )
+            if (row.country, row.carrier) not in PEZ_RETIME:
+                errors.append(
+                    f"{key}: stored min {row.min:,.0f} — past {CORRIDOR_YEAR} the scenario is a "
+                    "techno-economic optimum with no policy floor"
+                )
 
     present = set(zip(ours.country, ours.carrier))
     for country, carrier in sorted(expected_groups() - present):

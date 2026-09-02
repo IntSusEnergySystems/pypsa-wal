@@ -12,6 +12,7 @@ from scripts.walloon_scripts.BEWAL_potentials import (
     apply_battery_p_nom_min,
     apply_co2_store_cap,
     apply_gas_store_cap,
+    apply_process_emission_load,
 )
 
 logger = logging.getLogger(__name__)
@@ -194,6 +195,18 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             if "Mt" in unit:
                 potential = potential * 1e6  # t
             apply_co2_store_cap(n, bus, attr, potential)
+            continue
+        if carrier == "process emissions":
+            allowed = {"p_set"}
+            assert attr in allowed, (
+                f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
+            )
+            logger.info(logger_msg_success)
+            kt = potential
+            unit_l = unit.lower()
+            if "mt" in unit_l:
+                kt = potential * 1e3
+            apply_process_emission_load(n, bus, kt)
             continue
         if carrier in ['CCGT']:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}

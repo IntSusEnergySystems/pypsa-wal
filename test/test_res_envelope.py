@@ -105,6 +105,30 @@ def test_rejects_a_stored_ceiling_after_the_base_year(tmp_path):
     assert any("ceiling is computed" in e for e in check(load_envelope(bad)))
 
 
+def test_pez_retime_allows_a_2030_pin_and_later_floors(tmp_path):
+    """Item 11: BE offwind-all is the one group allowed to pin 2030 and floor 2040+."""
+    good = _csv(
+        tmp_path,
+        "pez.csv",
+        "BE,offwind-all,2262,2262,2262,2262,5800,\n"
+        "DE,onwind,100,100,115000,,,\n",
+    )
+    # Need a 2025 pin + 2030 min for DE; the extra 2050 min on BE is the PEZ floor.
+    # The helper CSV only has 2025/2030/2050 columns — 2050 min=5800 is the later floor.
+    errors = check(load_envelope(good))
+    assert not any("BE/offwind-all" in e for e in errors)
+
+
+def test_pez_2030_pin_must_be_min_eq_max(tmp_path):
+    """A 2030 stored max on BE offwind-all is only legal as a pin."""
+    bad = _csv(
+        tmp_path,
+        "pez_unequal.csv",
+        "BE,offwind-all,2262,2262,2262,5800,,\n",
+    )
+    assert any("PEZ 2030 pin" in e for e in check(load_envelope(bad)))
+
+
 def test_rejects_a_policy_floor_past_the_corridor(tmp_path):
     bad = _csv(tmp_path, "floor.csv", "DE,onwind,100,100,115000,,150000,\n")
     assert any("techno-economic optimum" in e for e in check(load_envelope(bad)))
@@ -114,6 +138,18 @@ def test_rejects_a_group_missing_from_the_rate_table(tmp_path):
     bad = _csv(tmp_path, "norate.csv", "DE,onwind,100,100,115000,,,\n")
     rates = pd.DataFrame({"node": ["FR"], "carrier": ["onwind"], "record_annual_MW": [1.0]})
     assert any("build-rate table" in e for e in check(load_envelope(bad), rates))
+
+
+def test_be_offwind_2030_is_the_standing_fleet():
+    """Item 11: first future horizon must not floor PEZ above the standing fleet."""
+    path = ROOT / "data" / "walloon" / "agg_p_nom_minmax_demande_haute.csv"
+    env = load_envelope(path)
+    row = env[
+        (env.country == "BE") & (env.carrier == "offwind-all") & (env.year == 2030)
+    ]
+    assert len(row) == 1
+    assert float(row.iloc[0]["min"]) == 2262
+    assert float(row.iloc[0]["max"]) == 2262
 
 
 def test_base_and_corridor_years_are_what_the_doc_says():
