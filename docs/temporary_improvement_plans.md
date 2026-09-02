@@ -1,856 +1,414 @@
-# Temporary improvement plans — meeting 2026-08-27
+# Improvement plan — status 2026-09-01
 
-Roadmap from the results review of
-[`scen_demande_haute` @ 2010, 1h](logs/2026-08-26_scen_demande_haute_2010_1h.md)
-(solved 26–27 Aug, published as Explorer `demande-haute-2010-1h (times-pypsa) - 27/08/2026`).
-Each item is the meeting note, then evidence from that run (and the 25 Aug archive
-where the meeting compared “previous”), then options and a recommended next step.
+Live worklist for the Walloon model. Two meetings feed it: **27 Aug** (items
+1–10) and **1 Sept** (items 11–17, plus decisions on 6, 8 and 10).
 
-**How to use this file.** The *Recommended* row is the proposed default for the
-next production solve. *Do not* treat every option as queued work — several are
-mutually exclusive, and two (Flanders nuclear, electricity import cap) change
-the meaning of the TIMES soft-link. Decide those two before touching the rest.
+**What this file is.** The queue and its points of attention — not the evidence.
+Per-item dossiers live in the companion docs; the long 27 Aug evidence version
+of this file (full option tables per item) is preserved at
+`git show ae753bb3:docs/temporary_improvement_plans.md`.
 
-**Evidence vintage.** Networks
-`results/walloon/scen_demande_haute/networks/base_s_adm___*.nc`.
-Comparison archive `/sylvain/mount/pypsa-wal-data/archive/walloon-20260825`.
-Companion notes: [ccs_alignment.md](ccs_alignment.md),
-[nuclear-alignment-20260816.md](nuclear-alignment-20260816.md),
-[network-representation-analysis.md](network-representation-analysis.md),
-[heat-softlink.md](heat-softlink.md),
-[renewable-potentials.md](renewable-potentials.md),
-[discount-rates.md](discount-rates.md),
-[gas-storage-20260829.md](gas-storage-20260829.md),
-[co2-sequestration-20260829.md](co2-sequestration-20260829.md).
+**Reference run.** [`2026-08-30 scen_demande_haute @ 2010, 1h`](logs/2026-08-30_scen_demande_haute_2010_1h.md)
+— 4/4 optimal, critically reviewed (§11), published as Explorer
+`demande-haute-2010-1h` (30/08) and
+[HTML](https://pypsa.squoilin.eu/intervec/scen_demande_haute_20260830/). New
+TIMES vd `scen_central_demande_haute_v1_260828_2808.vd`. Every "today" number
+below is from that run's §11.
 
-| # | Item | Kind | Severity | Recommended default |
-|---|---|---|---|---|
-| 1 | Gas storage in Wallonia | data | medium | **Done** → [gas-storage-20260829.md](gas-storage-20260829.md) |
-| 2 | CCGT-CC only in 2050 | physics / TIMES | high | Do **not** hard-pin 2040; first give BE a CO₂ sink. **Half done 29 Aug** — the pooled EU cap that masked the sink question is gone ([co2-sequestration-20260829.md](co2-sequestration-20260829.md)); BE's own `e_nom_max = 0` is still open |
-| 3 | No WAL grid expansion 2025→2030 | already correct | low | Keep the freeze; decide if Boucle du Hainaut is a *floor* in 2040 |
-| 4 | Biogas 6.9 / 4 TWh | data | medium | **Done 29 Aug** — 4.0 (2040) / 6.9 (2050) applied; **source still owed by ICEDD** |
-| 5 | Flanders P2H falling | expected + **plot bug** | low | **Done 29 Aug** — trend real; P2H panel mixed MW_th/MW_e, fixed |
-| 6 | Energy independence dropped | physics | **high** | Diagnose after neighbour-offshore fix; import cap is a scenario choice |
-| 7 | Flanders heat demand rising | **plot bug** | medium | **Done 29 Aug** — chart dropped urban-decentral heat and inverted the sign |
-| 8 | No rooftop PV | physics | high | Impose TIMES rooftop *energy* share at BEWAL |
-| 9 | BECCS → DAC / industry CC | physics / TIMES | high | Pin industry-CC volumes; do **not** turn DAC back on |
-| 10 | 3 GW nuclear min in Flanders 2050 | scenario | **high** | New overlay, not the TIMES-aligned base — decide 3 vs 6 GW Belgium |
+**Test strategy (agreed 1 Sept).** There is no time for a production solve
+between individual improvements. So:
 
----
+1. every item ships a **pytest guard** in `test/` (`python -m pytest test/ -q`);
+2. items that change the LP also get a **cheap solve** — one horizon, or all
+   four at `resolution_sector: 6h` — only to prove feasibility and direction;
+3. **one final full 1h / 2010 four-horizon run** at the end, with a §11 review.
 
-## 1. Gas storage in Wallonia — is there any? What potential?
+Accept the consequence up front: after ~10 simultaneous changes, attribution in
+that final run is weak. Each item below therefore states **what it should move**,
+so the final review can check the sum rather than guess.
 
-**Done, and moved out of this file.** The full write-up — Walloon geology, the
-BEWAL pin, the cushion-vs-working-gas correction, the quantile-clip bug, the
-P2G seasonal-storage argument, and an H₂-storage-by-node appendix — is archived
-in **[gas-storage-20260829.md](gas-storage-20260829.md)**.
-
-One-line answer to the meeting question: Wallonia has **no** gas storage
-(Anderlues and Péronnes-lez-Binche closed 1 Nov 2012, no salt-cavern geology),
-so `BEWAL gas Store` is pinned to `e_nom_max = 0`; Belgium's only real store is
-Loenhout in Flanders, which was carried at 545 GWh and is now corrected to
-**8.2 TWh** as a legacy floor the model may use or not.
-
-Carry into the next solve: **total system cost is not comparable with earlier
-runs** (−7.3 BEUR/a Europe-wide, from forced-floor capex — see the archive).
+Companion docs: [ccs_alignment](ccs_alignment.md) ·
+[co2-sequestration](co2-sequestration-20260829.md) ·
+[gas-storage](gas-storage-20260829.md) ·
+[nuclear-alignment](nuclear-alignment-20260816.md) ·
+[renewable-potentials](renewable-potentials.md) ·
+[network-representation](network-representation-analysis.md) ·
+[heat-softlink](heat-softlink.md) · [discount-rates](discount-rates.md) ·
+[run-review-checklist](run-review-checklist.md)
 
 ---
 
-## 2. CCGT-CC appears only in 2050 — impose the TIMES capacity in 2040?
+## Done since 27 Aug
 
-### What the meeting asked
+| # | Item | What was done | Confirmed by |
+|---|---|---|---|
+| 1 | Gas storage in Wallonia | Wallonia has none (Anderlues/Péronnes closed 2012, no salt caverns) → `BEWAL gas Store` `e_nom_max = 0`; Loenhout corrected 545 GWh → **8.2 TWh** *working* gas as a legacy floor | `2aea1b01`, `46c2f485` · run §11.1b, R3: **0 GWh** BEWAL, 8.18 TWh BEVLG · [dossier](gas-storage-20260829.md) |
+| 4 | Biogas 4.0 / 6.9 TWh | Caps applied as instructed (2040 **4.0**, 2050 **6.9**; 2025/30 keep Valbiom 8.3). Master-CSV row split per year; `--check` passes | `907433a6` · run: used 0 / 0 / **0.22** / **6.90** — 2050 binds, 2040 slack. **Source still owed by ICEDD** (see 17d) |
+| 5 | Flanders P2H "falling" | Plot bug: the panel added MW_th (heat pumps are reversed links) to MW_e (resistive). Restated on the heat side, retitled "Power-to-heat (thermal)". Trend itself is real (renovation + decentral→DH shift) | pypsa2html `0d1b904`, `c4220d71` |
+| 7 | Flanders heat demand "rising" | Plot bug, sign-inverting: `_DEMAND_CODES` whitelist was missing `demandheatc`, dropping **71 %** of Flemish heat (urban-decentral). Truth: Flanders −18 %, Wallonia −17 % 2025→2050. Fixed + tripwire for unclaimed demand codes | pypsa2html `0d1b904`, `c4220d71`; report rebuilt (82 pages) and published |
+| 3 | No WAL grid expansion 2025→2030 | Answered, no code: Boucle du Hainaut slipped to **2032–33** (Conseil d'État Oct 2025, final environmental report Mar 2026), so the freeze is correct. Only the 2040 question remains → item 3 below | run §11.5: BEWAL–BEVLG usable **3 566 MW** all horizons |
+| — | RES envelope + 2025 pin | Not a numbered item but the precondition for item 6: 2025 = historical fleet, later horizons ≤ 2 × record build rate, then land. BEWAL onwind **2 371 / 4 870 / 6 500 / 6 500 MW**. Neighbour offshore fixed (DE 30 / NL 12 / GB 42.6 GW in 2030; 70 / 50 / 80 in 2050) | `96fd920e`, `bab60ed6` · run §11.5, R1 · [dossier](renewable-potentials.md) |
+| — | Collapsed-corridor tolerance | `min == max` on an aggregate is a difference of near-equal large numbers; a per-row `tolerance` column (0.5 %) makes 2025 certifiable. `review_run.py` reads the same column — the 18 "overshoots" were the script | `dbca25df` · run R7 |
+| (2) | CO₂ sequestration geology | **Applied then reverted** (`816be537` → `dbca25df`): the per-node CO₂StoP ramp made 2040 fail with *"Numerical trouble… consider the homogeneous algorithm"*, non-monotonically in the cap value. The EU scalar (0/20/90/125 Mt) is back and **binds every horizon** at 431/73/125/342 EUR/t | [§9 of the dossier](co2-sequestration-20260829.md) → item 2 reopened |
 
-TIMES has CCGT with capture from the 2030s. PyPSA only builds it in 2050.
-Should we force the TIMES capacity in 2040?
-
-### Evidence
-
-TIMES-WAL ([ccs_alignment.md](ccs_alignment.md) §0): Flémalle (E12) + Seraing
-New (E13) = **1 740 MW_e**, unabated in 2025/2030, **fully on CCS from 2035**
-(retrofit, ~86 % capture). New-build post-combustion CCGT-CCS is in the
-dictionary and **not built**. 2040 and 2050 both carry the 1.74 GW retrofit.
-
-PyPSA 26 Aug (MW_e = `p_nom_opt × η`):
-
-| | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| BEWAL CCGT (unabated) | 1 740 | 1 741 | 1 785 | 1 277 |
-| BEWAL **CCGT CC** | 0.0 | 0.2 | **0.2** | **463** |
-| BEVLG CCGT CC | 0.0 | 0.2 | 0.2 | 0.2 |
-
-Confirmed: material CCGT-CC **only in 2050**, only in Wallonia, and only
-**463 MW_e** inside the 1 740 `CCGT-all` floor — not a TIMES retrofit of
-Flémalle + Seraing. The floor is technology-neutral since 26 Aug
-([ccs_alignment.md](ccs_alignment.md) §13.1); the model *may* meet it with
-capture and mostly does not until 2050.
-
-Why 2040 does not build capture, despite a 243 EUR/t effective CO₂ price
-(break-even vs unabated CCGT ≈ 103 EUR/t at 4 000 FLH):
-
-1. **Myopic brownfield.** 2040 inherits 1 740 MW of *unabated* CCGT that
-   already satisfies the floor. Building capture means paying a second power
-   island; TIMES pays only the absorber.
-2. **No retrofit link.** PyPSA `CCGT CC` is greenfield
-   ([ccs_alignment.md](ccs_alignment.md) §6.2).
-3. **Nowhere to put the CO₂.** All three Belgian nodes have
-   `co2 sequestered` `e_nom_max = 0`; NL’s store is **100 % full in 2040 and
-   2050** (solve log §11.14 C). 2050 still finds a German/British sink for
-   0.41 Mt from Walloon CCGT-CC; 2040’s European sequestration cap is tighter
-   (90 vs 125 Mt).
-
-   **Update 29 Aug.** That last clause was an artefact, not a fact about 2040:
-   the 90 Mt was an unsourced whole-Europe scalar applied to a six-country
-   model, binding in all four horizons at up to 360 EUR/t. It has been demoted
-   to a deployment ramp and the per-node CO₂StoP store now limits
-   ([co2-sequestration-20260829.md](co2-sequestration-20260829.md)). The other
-   half of this reason — Belgium's own zero — **stands unchanged**, which is
-   the point: option C below is now the only thing between Wallonia and a
-   sink, and the next solve will say cleanly whether it is the binding one.
-4. **Pinned heat already eats the Walloon cap.** Option B′ claims 86 % of the
-   2050 BEWAL budget before power CCS is asked to help.
-
-Forcing 1.74 GW of CCGT-CC in 2040 without a CO₂ sink is likely infeasible or
-will dump captured CO₂ into an already-binding European store at a huge dual.
-
-### Options
-
-| | What | Effect |
-|---|---|---|
-| **A. Hard-pin TIMES capacity in 2040** | `agg:BEWAL:CCGT CC:min = 1740` from 2040 (and keep the `CCGT-all` floor, or replace it) | Reproduces TIMES *MW*. Ignores retrofit economics. Needs a CO₂ export/storage assumption or the LP will struggle. Still not a retrofit of the existing TGVs. |
-| **B. Retrofit link** (correct TIMES analogue) | Second Link per existing CCGT, `p_nom` tied to standing capacity, cheaper than greenfield (power island reused) | Matches TIMES physically. Non-trivial code (new carrier, brownfield carry-forward, tests). Best long-term, not a next-run patch. |
-| **C. Give Belgium a CO₂ sink first** (recommended sequencing) | Documented `e_nom_max` on BEWAL/BEVLG/BEBRU, or a priced export to NL/NO (solve log §11.14 C2) | Makes capture *eligible* in 2040. Then look at whether the model builds it. If it still does not, the gap is the missing retrofit, not the sink. **Prerequisite done 29 Aug** — the pooled EU cap no longer binds, so a Belgian sink would now actually be usable. C itself is untouched. |
-| **D. Leave 2040 free, footnote the gap** | status quo | Honest: PyPSA new-build CCS ≠ TIMES retrofit from 2035. Do not plot 2040 CCGT-CC as 0 for policy. |
-
-### Recommended
-
-**C then D**, not A. Imposing TIMES MW in 2040 without storage papers over the
-cause. If the next ICEDD meeting wants the TIMES *outcome* in the published
-charts regardless, A is a scenario overlay (`scen_ccgtcc_times`) on top of C,
-not a silent change to the base. B is a later physics ticket.
-
-Do not publish 2050’s 463 MW_e as “the TIMES retrofit of Flémalle + Seraing”
-(solve log §11.10 item 8).
+Also from the run: 2050 effective Walloon CO₂ **1 272 → 547 EUR/t** with the
+*national* cap no longer binding; 2040 heat-profile gap 0.46 → **0.01 TWh** on
+the new vd; `CCGT CC` now **~0 MW_e in every horizon** (26 Aug built 463 in
+2050).
 
 ---
 
-## 3. No transmission expansion in Wallonia 2030 vs 2025 — any current plans?
+## Open — LP and data
 
-### What the meeting asked
+### Item 2 — Give Belgium a CO₂ sink (then, only then, CCGT-CC in 2040)
 
-The internal grid does not grow between 2025 and 2030. Is that because there
-are no plans, or because the model is frozen?
+`co2 sequestered` `e_nom_max = 0` at BEWAL/BEVLG/BEBRU is a `fillna(0.0)` on a
+missing CO₂StoP row, not a documented choice. TIMES stores **7.1 Mt in
+Wallonia**; PyPSA stores 0 in Belgium and fills NL to 100 %. Document an
+`e_nom_max` per Belgian node, or price an export to NL/NO.
 
-### Evidence
+- **Attention.** The pooled EU cap that used to mask this is *back* after the
+  revert, and binds in all four horizons — a Belgian sink is only usable if that
+  cap has headroom. A second attempt at the geology ramp is now more promising
+  than in the write-up: the 2040 failure was the exact error message that
+  `BarHomogeneous: 1` fixes, and the cluster overlay has carried that flag since
+  30 Aug. Retry the ramp *with* the flag before concluding anything.
+- **Attention.** Do **not** hard-pin the TIMES 1 740 MW of CCGT-CC in 2040
+  before the sink exists — PyPSA `CCGT CC` is greenfield, not the
+  Flémalle/Seraing retrofit TIMES runs, and would dump CO₂ into a binding store.
+  If ICEDD wants the TIMES *outcome* in the charts anyway, it is a named overlay
+  (`scen_ccgtcc_times`), not a change to the base.
+- **Test.** `test/` guard on the Belgian `e_nom_max` being a stated value, not a
+  fillna. Then a 2040-only solve.
+- **Expect.** Capture becomes *eligible* in 2040. If it still is not built, the
+  gap is the missing retrofit link, not the sink.
 
-Live network, AC line `2` (BEVLG ↔ BEWAL), `s_max_pu = 0.7`:
+### Item 6a — Electricity independence: the TIMES 10 TWh import cap
 
-| Horizon | `s_nom` (MW) | `s_nom_max` (MW) | **usable** (MW) | Net flow (TWh, + = VLG→WAL) |
-|---|---:|---:|---:|---:|
-| 2025 | 5 094 | 5 143 | **3 566** | −9.9 (WAL exports) |
-| 2030 | 5 094 | 5 143 | **3 566** | −5.6 |
-| 2040 | 5 094 | 18 857 | **3 566** | +2.7 |
-| 2050 | 5 094 | 20 571 | **3 600** | +3.1 |
+TIMES caps Walloon electricity imports at **10 TWh in 2050** (`Transfo_Imp`,
+36 PJ; 6.47 in 2040, 2.94 in 2030). PyPSA has only NTC *power* ceilings. Decided
+1 Sept: **align on TIMES.**
 
-**No expansion 2025→2030**, by design.
-[network-representation-analysis.md](network-representation-analysis.md) §3.1.1:
-Wallonia–Flanders stays at the clustered base through 2030 because **Boucle du
-Hainaut** (Avelgem–Courcelles, 6 GW, 380 kV) slipped from the original 2029–30
-FDP date to **2032–2033**. The step is in the 2040 NTC file (3 600 → 13 200 MW
-usable ceiling).
+- **Reuse, don't rebuild.** `add_selfsufficiency_constraints` already exists in
+  `scripts/solve_network.py` (gated by `self_sufficiency.self_sufficiency_constraint:
+  false`) with an `Import_p` variable per bus and `import_positive_*` linking it
+  to line/link net flows. It needs two changes: an **absolute TWh** right-hand
+  side instead of `(1 - level) × local_energy`, and scoping to **BEWAL** instead
+  of every region.
+- **Attention.** Grouped by location, BEWAL "imports" include flows **from
+  Flanders and Brussels**. That is arguably the right TIMES analogue (RW imports
+  from everything outside RW), but it must be written on the chart — it is not
+  "imports from abroad".
+- **Attention.** Measure before imposing. The 30 Aug §11 has **no net-import
+  table**, so the post-envelope, post-neighbour-offshore import level is
+  unknown; 26 Aug was 30.8 TWh Belgium / 18.0 TWh BEWAL in 2050 on an
+  under-built European offshore fleet that has since been fixed. Run the import
+  measurement on the 30 Aug networks first — the cap may bind far less than
+  feared.
+- **Attention.** Do **not** put a 10 TWh cap on *Belgium* — TIMES's figure is
+  Wallonia-only; Belgium-wide it is an autarky scenario.
+- **Test.** `test/test_import_limit.py` on a toy network (cap respected, cap
+  slack, correct sign for exports). Then a 2050-only solve.
+- **Expect.** Forces local generation, storage or load shifting in 2050;
+  interacts strongly with 10 (Flanders nuclear) and 11 (offshore 2030).
 
-Online check (Elia project page; Conseil d’État Oct 2025; final environmental
-report filed March 2026): commissioning still **2032–2033**. Ventilus is the
-Flanders twin (Princess Elisabeth Zone infeed), not a Walloon internal line.
-There is **no** other 380 kV WAL–VLG project with a 2030 date.
+### Item 10 — Nuclear in Flanders 2050: 1 GW retrofit + 2 GW new (decided)
 
-The 2040 *ceiling* opens; the optimiser **does not build**. Flows in 2040/2050
-are ~3 TWh/year across a 3.6 GW usable path (load factor ~10 %). Boucle du
-Hainaut is available and unused — a committed-project vs optional-expansion
-question, not a 2030 one.
+Symmetric with Wallonia (whose 3 000 MW is retrofit #2 ≈1 030 + new ≈1 970).
+So **BEVLG 2050 = 3 000** and **BE 2050 = 6 000** MW_e.
 
-Usable stays ~3.6 GW in 2040 even with `s_nom_max` at 18.9 GW because the NTC
-is the *flow* ceiling under `vopt` (solve log §11.5, R7). Report usable
-capacity, not `s_nom_opt`. Cross-border NTC (ALEGrO, Nemo, BE–FR, BE–NL) *does*
-grow on the published-project schedule.
+- **Attention — order of edits.** `add_CCL_constraints` subtracts the region row
+  from the parent country row. Setting BEVLG `min = 3000` while `BE` is still
+  `min = max = 3000` is **infeasible**. Raise the BE row first, in the same edit.
+- **Attention — the retrofit leg.** A Flemish *retrofit* in 2050 requires the
+  2040 Doel 4 unit (1 000 MW) to carry forward and be retrofittable a second
+  time; `retrofit_nuclear_once: false` already permits the repeat, but brownfield
+  must be rebuilt from 2040. The 0.01 MW placeholder plants must stay above any
+  authored zero cap (already guarded).
+- **Attention — labelling.** The vd puts *all* new Belgian nuclear in Wallonia
+  and Flanders at 0 by 2045. This doubles the vd's new build to 6 GW Belgium. It
+  was instructed, so it goes in the base run — but it is a **siting policy, not
+  TIMES alignment**, and must be labelled that way wherever it is published.
+- **Route.** Master CSV `agg:BEVLG:nuclear-all:min/max` + `agg:BE:nuclear-all:*`,
+  `--write`, keep the `tolerance` cell.
+- **Test.** Extend the nuclear/CCL guards: BE ≥ Σ regions in every horizon.
+- **Expect.** ~20–23 TWh of extra must-run in Flanders (BE band
+  `p_min_pu = 0.783`) → 2050 imports down, Belgian prices down, cost up. Largest
+  independence lever after the onwind cap.
 
-### Options
+### Item 11 — Offshore 2030 is forced too high (new)
 
-| | What | Effect |
-|---|---|---|
-| **A. Keep 2025–2030 freeze** (recommended) | already implemented (`ntc_2030.csv` BEWAL–BEVLG = 3 600) | Matches Elia. Nothing to do for 2030. |
-| **B. Force Boucle du Hainaut in 2040** | `s_nom_min` (or NTC as floor) on BEWAL–BEVLG from 2040 = 3 600 + 6 000 | Treats the line as committed infrastructure. Changes 2040/2050 congestion rent and WAL↔VLG prices. Justified if the publication should show the line *in* the grid, not merely *allowed*. |
-| **C. Let 2030 expand** | raise 2030 NTC | Contradicts the delayed permit. Do not. |
+`data/walloon/agg_p_nom_minmax_*.csv` carries `BE offwind-all` **2030 min =
+5 800 MW** — a *floor*, tagged `NECP-BE-2030` (2.26 GW standing + 3.5 GW Princess
+Elisabeth Zone). It is also the **only** offshore floor in the file: 2035–2050 are
+blank. So the model is obliged to commission the entire PEZ by 2030 and free
+thereafter — the opposite of the real schedule.
 
-### Recommended
+**Press review (FR / NL / EN, 1 Sept 2026) — nothing new can be online by 2030.**
 
-**A** is already right. Add **B** as an explicit decision for the next
-parameter round: “is Boucle du Hainaut in the 2040 *grid* or only in the 2040
-*option set*?” Until then, do not read the unused 2040 ceiling as “the model
-rejects Boucle du Hainaut” — it rejects paying for thermal capacity it cannot
-use above the NTC.
-
----
-
-## 4. Decrease biogas to 6.9 TWh in 2050 (4 TWh in 2040)
-
-### What the meeting asked
-
-Cut the Walloon biogas potential from the current 8.3 TWh (flat) to **6.9 TWh
-in 2050** and **4 TWh in 2040**.
-
-### Evidence
-
-PyPSA today: `potential:BEWAL:biogas:p_nom = 8300` GWh/an, **every** horizon
-(Valbiom; `custom_potentials.csv` / master CSV). Dispatch on this run:
-
-| Horizon | Cap | Dispatch |
-|---|---:|---:|
-| 2025 | 8.30 TWh | 0 (off) + 1.45 unsustainable |
-| 2030 | 8.30 | ~0 + 0.93 unsustainable |
-| 2040 | 8.30 | **1.45** |
-| 2050 | 8.30 | **8.30 (binds)** |
-
-The 8.3 TWh block is all-or-nothing at 78.8 EUR/MWh (~654 MEUR/a) and is one
-of the four exhausted 2050 CO₂ escape valves (solve log §11.14 C). Cutting it
-**raises** the 2050 Walloon carbon dual unless something else gives.
-
-TIMES vd `scen_demande_haute` (upgrading `BWSUPGZH100`, region RW):
-
-| Year | Upgraded biogas |
+| Date | Fact |
 |---|---|
-| 2030 | **0.90 TWh** |
-| 2040 | **7.67 TWh** |
-| 2050 | **8.07 TWh** |
+| Jul 2025 | PEZ-1 tender **withdrawn** (legal, calendar and financial framework judged unworkable) |
+| Feb 2025 | Elia **postpones the island's HVDC contracts** (price escalation; island budget 3.6 → 7–8 bn EUR) — reported as a ~3-year slip for that phase, which carries **PEZ III (1.4 GW)** and Nautilus (GB, "from 2032") |
+| Feb / May 2026 | Relaunch misses the promised deadline; ~2 years lost; delay costed at **~400 MEUR by 2030** (EnergyVille, via Agoria) |
+| 18 Jul 2026 | New framework approved: two-sided CfD, no strike-price cap, construction window **48 → 60 months**, bid prep ≥ 6 months + fixed 5-month evaluation. Still needs Council of State + EC state-aid clearance; relaunch planned **late Sept / early Oct 2026** |
+| — | Island phase 1 (**MOG II**) must be operational by **1 Oct 2031**; HVAC phase (contracted, caissons all placed by Mar 2026) serves PEZ I + II only |
+| — | Government's own framing is now security of supply "**from 2035**"; PATHS2050 asks for the zone operational **by 2035**; commentators state the park "will no longer contribute in time" to the 2030 EU 42.5 % target, with supply-security concerns **2030–2032** |
 
-TIMES *uses* ~8 TWh from 2040, not 4. The 6.9 / 4 figures are **not** in the
-vd, `aggregation.md`, or `common_parameters.md`. They appear only in this
-meeting list.
+Arithmetic from the framework's own parameters: relaunch late 2026 → bids mid
+2027 → award ~late 2027 → up to 60 months construction, and no export before the
+island exists (1 Oct 2031). **First PEZ-I power 2031–2032 at the earliest**, full
+700 MW ~2032–33; PEZ II later; PEZ III behind the postponed HVDC.
 
-Where 8.3 comes from: Green Gas Platform / Valbiom realistic injectable
-potential, Belgium 15.6 TWh_PCS, **53 % Wallonia → 8.3 TWh**. ICEDD
-alternatives in the tree already use **7.7 TWh** (`custom_potentials_alternatif.csv`)
-and **7.8 TWh** (`custom_potentials_imppel.csv`), still flat. CWaPE/ICEDD
-*Avenir du gaz* discusses an **8 TWh** TIMES sub-scenario.
+- **Action.** Move the floor and pin 2030 to the standing fleet:
 
-Possible readings of “6.9”:
+  | `BE offwind-all` | 2030 | 2040 | 2050 |
+  |---|---:|---:|---:|
+  | now | min **5 800** | — | — |
+  | proposed | min = max **2 262** | min **4 362** (2 262 + PEZ I + II, the contracted HVAC) | min **5 800** (full zone) |
 
-- HHV→LHV on 8.3 (~0.9 × 8.3 ≈ 7.5, not 6.9).
-- A more conservative *deployment* than the Valbiom *potential*.
-- A different cadastre vintage.
+  Maxima beyond 2030 stay with the envelope (land 8 000 MW). Retag the row
+  `NECP-BE-2030 (retimed 2026-09, press review)`.
+- **Attention.** Cutting the **max** does nothing — 5 800 is the *min*. Pinning
+  `min = max` in 2030 is what actually implements "no new installations before
+  2030"; the 0.5 % `tolerance` column keeps that corridor solvable.
+- **Attention.** Do **not** put the full 5 800 in 2040 as a floor: PEZ III
+  (1.4 GW) depends on an HVDC decision that has slipped ~3 years and is not
+  contracted. 4 362 MW is the committed-infrastructure reading.
+- **Attention.** Same "policy target used as a floor" pattern to re-check on the
+  neighbours (NL 12 GW, FR 3.6, GB 50 → clipped to 42.6 by the growth cap).
+- **Test.** `test/test_res_envelope.py` case: no offshore floor above the
+  standing fleet in the first future horizon.
+- **Expect.** ~3.5 GW of cheap Belgian offshore removed from 2030 → higher 2030
+  Belgian prices, more imports, worse 2030 independence, and a 2030 CO₂ dual that
+  can only rise. This is the item most likely to make 2030 look *worse* than the
+  published run — say so before publishing, and note it also pushes 2030 gas
+  generation up.
+- **Sources.** [tender withdrawn (Jul 2025)](https://www.offshorewind.biz/2025/07/01/belgium-delays-tender-for-offshore-wind-farm-in-princess-elisabeth-zone-until-2026/) ·
+  [new framework, 1 Oct 2031 (Jul 2026)](https://www.offshorewind.biz/2026/07/24/belgium-approves-new-tender-framework-for-first-princess-elisabeth-zone-offshore-wind-site/) ·
+  [construction 48→60 months, bid/evaluation windows](https://www.loyensloeff.com/insights/news--events/news/belgium-offshore-wind-tender-amendment-and-ventilus-permit-push/) ·
+  [Elia postpones HVDC, ~3-year slip](https://www.elia.be/nl/pers/2025/02/20250204_elia-temporarily-postpones-signing-hvdc-contracts-for-princess-elisabeth-island) ·
+  [RTBF: retard, PEZ 1 = 700 MW / PEZ 2 = 1 400 MW](https://www.rtbf.be/article/eolien-offshore-l-extension-de-la-capacite-belge-a-pris-du-retard-11727009) ·
+  [La Libre: ~400 MEUR pour les ménages](https://www.lalibre.be/dernieres-depeches/2026/05/12/le-retard-dans-leolien-offshore-coutera-des-centaines-de-millions-aux-menages-TAHEAHNJEJEB3LZPNF2CKPFQ5E/) ·
+  [misses the 2030 EU target, supply concerns 2030–32](https://gasoutlook.com/analysis/surging-costs-cloud-outlook-for-belgian-princess-elisabeth-wind-island/) ·
+  [relaunch late Sept/early Oct 2026](https://www.indegazette.be/nieuwe-regels-brengen-eerste-windpark-in-prinses-elisabethzone-dichterbij/) ·
+  [government: supply "from 2035"](https://www.seatalk.be/techniek-innovatie/2026/04/20/belgie-zet-offshorewind-in-prinses-elisabeth-zone-opnieuw-in-beweging/)
 
-4 TWh in 2040 is a **deployment trajectory**, not a potential: TIMES already
-runs 7.7 TWh in 2040. Imposing 4 TWh would *diverge* from TIMES, not align.
+### Item 12 — Process emissions vs TIMES (new)
 
-### Options
+Annick supplied an Excel with **2021 Walloon** process-emission values. Check
+they are recoverable in the vd, then align PyPSA's process emissions on them.
 
-| | What | Effect |
-|---|---|---|
-| **A. Wait for ICEDD to source 6.9 / 4** (recommended) | do not change the CSV until the number has a citation | Avoids a silent TIMES break. |
-| **B. Potential = 6.9 TWh all years** | one cell in the master CSV, `--write` | 2050 still binds; 2040 dispatch (1.45) is unaffected. Small 2050 CO₂ impact. |
-| **C. Trajectory 4 (2040) / 6.9 (2050)** | year-varying `potential:BEWAL:biogas:p_nom` | 2040 cap becomes 4 TWh (currently 1.45 used — still slack). 2050 loses 1.4 TWh of a binding CO₂ valve → dual up. TIMES 2040 is 7.7, so this is a **PyPSA-only** conservative path. |
-| **D. Align the *shape* with TIMES, keep ~8 TWh in 2050** | 0.9 / 7.7 / 8.1 TWh caps | Makes 2040 use biogas when TIMES does. Opposite of the meeting’s 4 TWh. |
+- **Attention.** PyPSA process emissions are pure PyPSA-Eur: a national
+  industrial-production total spread by an industrial distribution key, never
+  soft-linked. So a mismatch is expected, and fixing it means adding a transfer
+  (a `process emissions` load override at BEWAL), not tuning a coefficient.
+- **Attention.** TIMES separates fossil `INDCO2` from **biogenic `INDCO2b`**
+  (0.38 Mt by 2050 from black-liquor gasification). Only the fossil part belongs
+  on the PyPSA `process emissions` load; adding the biogenic part would
+  double-charge carbon the biomass chain already credits.
+- **Attention.** 2021 is not a model horizon — state the convention used to
+  bring it to 2025 (and the excel is **not yet in the repo**; commit it under
+  `data/walloon/` with its provenance).
+- **Test.** `test_times_scenario_inputs.py`-style guard: BEWAL process emissions
+  within a stated tolerance of the vd figure per horizon.
+- **Expect.** Directly moves the Walloon CO₂ balance and hence the 547 EUR/t
+  dual and `process emissions CC` (26 Aug: 238 MW, 1.98 Mt in 2050).
 
-`--write` currently forbids a `planning_horizon: all` row from holding a
-year-varying value (`instructions.md`). C or D needs split rows in the master
-CSV (the failsafe will say so).
+### Item 13 — Aviation back in the Walloon CO₂ accounting, as a yaml toggle (new)
 
-### Recommended
+The meeting reads the 30 Aug CO₂ constraint as "less tight" and asks to
+re-integrate aviation, removed in `644cefd9`, behind a config switch. The switch 
+remains deactivated for now to avoid infeasibilities.
 
-**A.** Ask ICEDD whether 6.9/4 is (i) a new Valbiom/LHV figure, (ii) a
-deployment ceiling below potential, or (iii) a mix-up with another scenario.
-If (ii), implement **C** as a named sensitivity, not the demande-haute
-default, and expect a higher 2050 BEWAL CO₂ dual. If the goal is TIMES
-alignment, **D** is the move, not a cut.
+- **Attention — why it was removed.** Not a preference: kerosene is drawn from
+  the single `EU oil` bus, whose Fischer-Tropsch / biomass-to-liquid negative CO₂
+  sits at location `EU` and is **dropped** by national attribution, while the
+  withdrawing aviation link sits in Wallonia and pays full fossil intensity.
+  Wallonia paid for carbon the synthetic pathway had already removed. The
+  aviation term alone was **2.23 Mt against a 1.717 Mt cap** — unsatisfiable
+  from a sector the model cannot abate locally.
+- **Attention — the right-hand side.** The agreed trajectory in
+  `config/input_parameters_for_models.csv` is defined *"hors aviation
+  internationale & UTCATF"*. Putting aviation back on the LHS without switching
+  the RHS to a with-aviation baseline makes the cap contradict its own target.
+  A toggle must move **both sides**, as `644cefd9` did in reverse.
+- **Attention — why the dual fell.** The 1 272 → 547 EUR/t drop is *not* the
+  aviation exclusion (already present on 26 Aug). It is the new TIMES heat mix +
+  RES envelope + biogas 6.9. The system `CO2Limit` still binds, so aviation is
+  **not** free today — it is priced globally instead of nationally.
+- **Do.** Ship the toggle next to the other national-CO₂ keys
+  (`co2_budget_national_include_aviation`, default **false**). It is a small
+  change: both sides already key off the same two constants in
+  `solve_network.py` (`AVIATION_CARRIER` on the LHS, `AVIATION_SECTORS` in the
+  baseline), so one flag can move them together. Keep the default off until oil
+  is nodal (per-node synthetic-fuel balances). Extend
+  `test/test_national_co2_scope.py` to both settings.
+- **Expect.** Likely infeasible in 2050 even with both sides moved: the RHS is
+  5 % of a 1990 baseline, so aviation adds a few tens of kt to the cap and
+  ~2.2 Mt to the left-hand side — a 95 % target applied to the one sector that
+  has not decarbonised. That outcome *is* the answer to the meeting's question;
+  get it from a 2050-only solve, not from the final run.
 
-### Implemented — 29 Aug 2026: **C**, on instruction, source still open
+### Item 9 — Industry CC / BECCS volumes (carried, blocked on 2)
 
-Applied as directed at the 27 Aug meeting: the new caps are in, and the
-provenance gap is recorded in the data rather than left implicit.
+PyPSA already runs generic industry capture (26 Aug, 2050: 0.73 Mt biomass-CC
++ 1.98 Mt process-CC + 0.79 gas); TIMES has **4.8 Mt** of named industrial capture
+(chemicals, lime, glass). Pin the PyPSA volumes to TIMES — **not** DAC, which
+TIMES does not build and which ate the Walloon DH bus when it was on. Blocked
+until item 2 gives Belgium a sink, otherwise the pin just exports CO₂.
 
-| Horizon | Cap before | Cap now | Source cell |
-|---|---:|---:|---|
-| 2025 | 8 300 GWh | **8 300** (unchanged) | Valbiom |
-| 2030 | 8 300 | **8 300** (unchanged) | Valbiom |
-| 2040 | 8 300 | **4 000** | `ICEDD meeting 2026-08-27 - SOURCE TO BE PROVIDED` |
-| 2050 | 8 300 | **6 900** | `ICEDD meeting 2026-08-27 - SOURCE TO BE PROVIDED` |
+### Item 3 — Boucle du Hainaut: floor in 2040? (decision only)
 
-**Route.** The edit is in the *shared* master table,
-[`config/input_parameters_for_models.csv`](../config/input_parameters_for_models.csv),
-not in the derived file. The single yearless `potential_wal` row
-(`year` empty, one value for every horizon) had to be **split into four
-per-year `potential` rows**, because `--write` refuses to let a
-`planning_horizon: all` row hold a year-varying value — exactly the failsafe
-this file predicted. `data/walloon/custom_potentials.csv` was then regenerated
-with `python scripts/build_common_parameters.py --write`; only the two value
-cells moved. `--check` passes.
+The 2040 NTC ceiling opens to 13.2 GW usable and the optimiser **does not
+build**: flows stay ~3 TWh/yr on a 3.566 GW usable path. Decide whether the line
+is *committed infrastructure* (an `s_nom_min` / NTC floor from 2040) or an
+*option*. Until decided, do not read the unused ceiling as "the model rejects
+Boucle du Hainaut". **Attention:** `lines.type` is non-empty in this network, so
+`set_transmission_limit` rebuilds `s_nom_min` from the conductor type and can
+silently override an NTC-derated `s_nom` — check the realised `s_nom` after any
+floor edit.
 
-Because `--write` patches *values* only, the `source` and
-`further_description` cells of the two changed rows were edited by hand so the
-derived file also carries the warning. **Only `custom_potentials.csv` was
-touched** — the `_alternatif` (7 700), `_alternatif_biolow` (7 700) and
-`_imppel` (7 800) variants carry their own ICEDD biogas assumptions and belong
-to other scenarios.
+### Item 8 — Rooftop PV: parked by the 1 Sept meeting
 
-**Two caveats recorded in the CSV notes and repeated here:**
-
-1. **The source is still missing.** 6.9 / 4 TWh appear only in the meeting
-   list — not in the TIMES vd, `aggregation.md` or `common_parameters.md`. The
-   vd runs **7.67 TWh in 2040 and 8.07 in 2050**, so this is a deliberate
-   *divergence* from TIMES, not an alignment. Do not publish it as
-   TIMES-consistent until ICEDD supplies the citation.
-2. **The cap is now non-monotonic** (8.3 / 8.3 / 4.0 / 6.9). The meeting gave
-   figures for 2040 and 2050 only; 2025/2030 keep Valbiom's 8.3. If 6.9/4 is a
-   *deployment* trajectory rather than a *potential*, the early horizons should
-   probably come down too — ask in the same round.
-
-### Expected effect — correcting the dispatch table above
-
-Re-measured on the 26 Aug 1-hour networks
-(`results/_diagnostics/20260826/base_s_adm___{2040,2050}.nc`):
-
-| Horizon | Cap before | Dispatch before | New cap | Effect |
-|---|---:|---:|---:|---|
-| 2040 | 8.30 TWh | **1.45 TWh** | 4.00 | **none** — still slack by 2.55 TWh |
-| 2050 | 8.30 | **8.30 (binds)** | 6.90 | **−1.40 TWh** of a binding CO₂ valve |
-
-So 2040 is untouched and 2050 loses 1.4 TWh of the cheapest remaining
-decarbonisation headroom. Expect the **2050 BEWAL CO₂ dual to rise** and total
-system cost with it; the 2050 gas balance must find that 1.4 TWh elsewhere.
-
-⚠️ **Do not read biogas dispatch from
-`results/times-pypsa/scen_demande_haute/networks/`** — those files are dated
-**14 August** and 6-hourly, and they show 2040 biogas *binding* at 8.30 TWh,
-which is not what the 26 Aug run does. The vintage trap is documented in
-[gas-storage-20260829.md](gas-storage-20260829.md).
-
----
-
-## 5. Power-to-heat decreases in Flanders — why?
-
-### What the meeting asked
-
-P2H in Flanders falls across horizons. Is that a bug?
-
-### Evidence
-
-Flanders is **not** heat-soft-linked. Only `times_heat.node: BEWAL` is
-overwritten; BEVLG follows PyPSA-Eur (JRC/Eurostat × population, EU-2012
-stock). Option B′ pins Wallonia and leaves Flanders free.
-
-| BEVLG | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| HP fleet (MW_th) | 7 132 | 7 113 | 7 003 | 7 317 |
-| Resistive (MW_e) | 3 054 | 2 680 | 1 789 | 1 509 |
-| **P2H electricity (TWh_e)** | **18.0** | **17.3** | **15.7** | **15.5** |
-| P2H heat (TWh_th) | 41.6 | 39.8 | 36.9 | 37.3 |
-| of which urban-central HP heat | 4.6 | 4.3 | 3.9 | **8.9** |
-
-| BEWAL (for contrast) | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| **P2H electricity (TWh_e)** | **3.2** | **3.2** | **3.7** | **7.4** |
-| HP fleet (MW_th) | 1 366 | 1 452 | 2 525 | 3 238 |
-
-Flanders P2H electricity **falls 18 → 15.5 TWh_e**. Wallonia **rises**
-3.2 → 7.4 (TIMES electrification under B′).
-
-Drivers in Flanders, not a solver bug:
-
-1. **Renovation.** Total Flemish building heat load 56.7 → 47.1 TWh_th
-   (−17 %). Less heat to serve.
-2. **Fuel substitution, not a P2H collapse.** Urban-decentral air HP heat
-   31.5 → 23.5 TWh_th; urban-decentral resistive 1 943 → 350 MW. Meanwhile
-   **urban-central air HP** jumps 641 → 1 575 MW_th in 2050 (heat 3.8 →
-   7.4 TWh). P2H *moves into DH*, which Explorer may plot as a different
-   carrier.
-3. **Asymmetric coupling.** Wallonia cannot re-optimise the mix; Flanders
-   can, and PyPSA-Eur’s default is “build DH + central HP”, not “keep
-   decentral HP”.
-
-### Options
-
-| | What | Effect |
-|---|---|---|
-| **A. Document and leave** (recommended) | footnote on every Flanders heat chart | Correct. The drop is renovation + DH shift. |
-| **B. Apply a TIMES-like mix to Flanders** | needs a Flemish TIMES (does not exist) or a copied Walloon mix | Would make Flanders look like Wallonia. Not evidence-based. |
-| **C. Freeze Flanders DH share** | cap `urban central heat` load growth | Stops the 2.5 → 15 TWh DH explosion (item 7) and the P2H relocation. A scenario choice about *Flemish* policy, not a Walloon soft-link. |
-
-### Recommended
-
-**A**, and look at **C** together with item 7. Do not “fix” Flanders P2H to
-rise in lockstep with Wallonia — that would be manufacturing TIMES-like
-electrification in a region TIMES does not model.
-
-### Implemented — 29 Aug 2026: the *number* was wrong, the *trend* is real
-
-Checked the hypothesis that pypsa2html was mis-aggregating. It was — but not in
-the way that would change the answer.
-
-**Grouping is complete.** `tech_groups.csv` matches `heat pump` and
-`resistive heater` as substrings, so rural, urban-decentral **and**
-urban-central carriers all land in the `power-to-heat` group. Nothing central
-or decentral is missing from that panel. Likewise the heat *balance* page
-selects buses with `carrier.str.contains("heat")`, so it sees all three.
-
-**But the panel added MW_th to MW_e.** In PyPSA-Eur a heat pump is a
-**reversed** link — `bus0` is the heat bus, `bus1` electricity, `efficiency`
-is 1/COP — so its `p_nom` is **thermal**. A resistive heater is a normal link,
-so its `p_nom` is **electric**. Verified on the 26 Aug 2050 network:
-
-| carrier | bus0 → bus1 | efficiency | `p_nom` is |
-|---|---|---:|---|
-| urban central air heat pump | urban central heat → low voltage | 0.30 | **MW_th** |
-| urban decentral air heat pump | urban decentral heat → low voltage | 0.39 | **MW_th** |
-| rural ground heat pump | rural heat → low voltage | 0.29 | **MW_th** |
-| urban central resistive heater | low voltage → urban central heat | 0.99 | **MW_e** |
-| urban decentral resistive heater | low voltage → urban decentral heat | 0.90 | **MW_e** |
-
-Summing them overstates heat pumps by the COP relative to resistive heaters.
-`extract/flows.py` already knew the orientation for the Sankey; the capacity
-path did not. **Fixed** in pypsa2html (`0d1b904`): `heat_output_scaling()`
-restates power-to-heat capacity on the **heat** side — the side needing no
-assumption, since heat-pump `p_nom` is already thermal while its *electrical*
-rating has no fixed value (`efficiency` is a time series). The panel is
-retitled **“Power-to-heat (thermal)”** so a GW_th axis is not read as GW_e.
-
-**This does not change the conclusion.** On the 26 Aug numbers the Flemish
-decline survives every accounting: mixed −13 %, consistent MW_th −13 %,
-consistent MW_e −27 %. The fall is renovation plus the decentral→DH shift
-described above, exactly as **A** says. What changed is that the plotted
-quantity is now a quantity.
+Decision: transfer the TIMES rooftop share for now (TIMES 2050 is
+~77 % rooftop; PyPSA builds ~0 MW because rooftop is 920 vs 526 EUR/kW
+overnight). Keep reporting *total* PV (4.1 → 6.5 → 10.5 → 11.8 GW), never
+"rooftop = 0" as a finding.
+One small bug stays open regardless: `BEWAL low voltage` maps to country `BE`,
+so any future rooftop build counts against the **Belgian** `solar-all` cap
+([renewable-potentials §7.3](renewable-potentials.md)). Harmless at 0 MW; repair
+before any rooftop floor.
 
 ---
 
-## 6. Energy independence has dropped — model issue? TIMES 10 TWh import cap?
+## Open — reporting (pypsa2html)
 
-### What the meeting asked
+### Item 14 — Split the power-to-gas bucket (new)
 
-Independence is worse than the previous published run. Is the model broken?
-Should PyPSA impose TIMES’s **max 10 TWh electricity imports in 2050**?
+"Power-to-gas is zero while there is some Fischer-Tropsch." Show
+**Electrolysis / Fischer-Tropsch / Methanation** as separate series instead of
+one bucket. Today `tech_groups.csv` maps `H2 Electrolysis` + `methanation` +
+`helmeth` + `H2 liquefaction` → `power-to-gas`, and `Fischer-Tropsch` →
+`power-to-liquid`, in three different sections (`costs`, `capacities`,
+`dispatch`) that must be edited consistently.
 
-### Evidence
+- **Attention — the physics behind the odd chart.** Walloon **electrolysis is
+  ~0 MW** while the H2 pipeline carries **3.9 → 5.3 GW** of transit. Any
+  Fischer-Tropsch therefore runs on **imported** H₂. Splitting the series will
+  make that visible, which is the point — but it also means the FT bar is not
+  Walloon power-to-liquid. Label it, and check the H₂ import is intended.
+- **Test.** pypsa2html unit test that each of the three carriers reaches its own
+  series and that the group total is unchanged.
 
-TIMES (vd, region **RW only**): `Transfo_Imp` activity **36.000 PJ = 10.000 TWh**
-in 2050 (6.47 TWh in 2040, 2.94 TWh in 2030). Encoded as the solved import
-adaptor `ELCIMP` → `ELCHIG` (`IMPELCHIG` + `IMPELCOFFWINBE`). There is no
-equivalent annual-energy constraint in PyPSA — only NTC *power* ceilings.
+### Item 15 — BECCS in installed capacities (new)
 
-Net electricity import, this run vs 25 Aug archive (positive = importer):
+The `capacities` section of `tech_groups.csv` has **no CC/CCS rows at all** —
+`solid biomass for industry CC`, `gas for industry CC`, `process emissions CC`,
+`CCGT CC`, gas CHP CC and `SMR CC` appear only in `dispatch`. Add a `CCS` (or
+`BECCS`) capacity group.
 
-| | BE 26 Aug | BE 25 Aug | BEWAL 26 Aug | BEWAL 25 Aug |
-|---|---:|---:|---:|---:|
-| 2025 | +21.4 | +13.7 | **−11.0** (exporter) | −11.0 |
-| 2030 | +6.1 | +2.8 | −5.8 | −10.1 |
-| 2040 | +19.9 | +7.1 | +8.2 | +0.6 |
-| **2050** | **+30.8** | **+5.8** | **+18.0** | **+6.9** |
+- **Attention.** Those links are rated on the **fuel input** (MW of biomass or
+  gas), not MW_e and not MtCO₂. State the unit in the panel title, exactly as the
+  power-to-heat fix did — a mixed-unit stack is the bug items 5/7 already cost
+  us once.
 
-2050 Belgium **31 TWh** vs TIMES **10 TWh** (and vs 25 Aug **6 TWh**, which
-happened to sit under the TIMES cap). Wallonia flips from exporter to
-**+18 TWh** importer. ClimAct `strategy_metrics` “Exports” for Wallonia:
-11 / 6 / **0** / **0** TWh.
+### Item 6b — Independence chart: two accounting switches (new)
 
-This is **not** a failed constraint — there is none. It is a changed
-optimum. Same TIMES vd, weather year, resolution, option B′. What moved
-between 25 Aug and 26 Aug (solve log §11.1b):
+Primary energy gets **no new constraint**; the chart gets options.
 
-| Change | Direction on independence |
-|---|---|
-| Walloon onwind **12.4 → 6.5 GW** (CCL max fix) | **−11 TWh** local wind at CF ~25 %. Largest single hit. |
-| `vopt` + grown NTC | More *ability* to import (BE–FR 7.3 GW, BE–NL 8.6, Nemo 3.8). |
-| Neighbour offshore **an order of magnitude too small** (NL 4.5 GW, DE 5.1 vs 50/70 GW targets) while neighbour onshore is huge | Distorts import prices. §11.14 D; a fix is already in `renewable-potentials.md` but **not in this solve**. |
-| Aviation out of national CO₂; `CCGT-all` floor | Second-order on the power balance. |
-| All new nuclear in Wallonia, Flanders **0 GW** in 2050 | Flanders is the big load; it has no 2050 nuclear. Item 10. |
-
-So: independence dropped because the model **stopped overbuilding Walloon
-wind** and **was allowed to use the interconnectors**, on a European system
-whose offshore fleet is still wrong. The 25 Aug “independent” 2050 was the
-one that illegally sat at 12.4 GW of Walloon onshore.
-
-PyPSA 2050 BE import 31 TWh is **Wallonia+Flanders+Brussels from five
-neighbours**. TIMES 10 TWh is **Wallonia from a stylised rest-of-world**.
-They are not the same quantity. A 10 TWh cap copied onto Belgian *or*
-Walloon annual net import is a new policy, not a soft-link.
-
-### Options
-
-| | What | Effect |
-|---|---|---|
-| **A. Re-solve after neighbour-offshore + onwind trajectory** (recommended first) | already specified in [renewable-potentials.md](renewable-potentials.md); needs a full `resources/` wipe | Neighbours get real offshore; Walloon onwind follows 2.4→6.5 GW instead of jumping. Independence will move. Measure *then*. |
-| **B. Walloon annual import cap = 10 TWh** | extra functionality, `sum(BEWAL AC net import) ≤ 10 TWh` in 2050 | Closest TIMES analogue (RW). Will force local generation or cut load-meeting via Flanders. Interacts with item 10 (Flanders nuclear) and the onwind cap. |
-| **C. Belgian annual import cap = 10 TWh** | same, on BE | Much tighter than TIMES (TIMES is Wallonia-only). 10 TWh for all of Belgium is a political autarky scenario. Name it as such. |
-| **D. Keep free trade, report the number** | status quo after A | Honest European-market result. TIMES 10 TWh stays a TIMES figure, plotted next to PyPSA, not imposed. |
-
-### Recommended
-
-**A, then D**, with B as a **named sensitivity** (`scen_autarky_wal` or similar)
-if the Explorer needs a TIMES-comparable independence chart. Do not put C on
-the demande-haute default — it would say “Belgium as a whole may not import
-more than Wallonia-TIMES imports”, which is a different country.
-
-Until A is solved, do not publish 2050 Belgian imports as a policy result
-(solve log §11.14 D.5: every 2050 European quantity is conditional on the
-under-built offshore fleet).
+- **Nuclear toggle.** Today `indicators.py` treats uranium as an import (fuel is
+  not mined here) and books reactor thermal losses, so nuclear *reduces* primary
+  independence; the electricity indicator already counts nuclear kWh as domestic.
+  Add a switch between "energy contained in the uranium" (current) and
+  "electricity produced".
+- **50 % of Belgian offshore to Wallonia.** Offshore sits on Flemish coastal
+  nodes; offshore is a **federal** competence, assumed shared equally. Attribute
+  half of Belgian offshore production to Wallonia in the indicator only —
+  **attention:** it must be removed from Flanders in the same edit, or Belgium
+  double-counts, and the change must not leak into the LP or the energy balance.
+- **Attention.** Both switches change a *published headline* without changing the
+  model. Default, and the label, must say which convention a chart is on.
 
 ---
 
-## 7. Heat demand increases a lot in Flanders, stable in Wallonia — why?
+## Carried from the 30 Aug run review
 
-### What the meeting asked
+### Item 16 — Water pits `e_nom_max` is `inf` (publication blocker)
 
-Flemish heat demand shoots up; Walloon heat is flat. Bug?
+2050 urban-central water pits: charger/discharger **29 773 MW**, store
+689 GWh_th, `capital_cost = 0`. Open since 26 Aug (§11.14 B). Bound
+`e_nom_max`. Until then the number must not be plotted (run §11.10 item 3); the
+2050 `tes_se` Sankey FAIL (−0.193 TWh) sits on the same bus.
 
-### Evidence
+### Item 17 — Smaller carry-overs
 
-Annual **building** heat *load* (rural + urban decentral + urban central):
-
-| TWh_th | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| **BEWAL total** | 28.1 | 27.8 | 25.9 | **23.3** |
-| BEWAL urban central (DH) | 0.46 | 1.22 | 1.90 | 2.69 |
-| **BEVLG total** | 56.7 | 57.0 | 53.7 | **47.1** |
-| BEVLG urban central (DH) | **2.5** | **5.2** | **9.9** | **15.0** |
-
-**The sum falls in both regions** (renovation). What *explodes* is **Flemish
-district heating** (×6). Walloon DH only ×6 as well in relative terms but
-from a TIMES-sized base (0.46 TWh — TIMES has almost no DH).
-
-Why the two regions are not comparable ([heat-softlink.md](heat-softlink.md),
-[times_data_extraction.md](../times_data_extraction.md)):
-
-- **BEWAL** useful-heat totals *and* the appliance mix come from TIMES
-  (`write_wallon_heat_demands`, option B′). DH stays out of the mix transfer
-  on purpose ([heat-softlink.md](heat-softlink.md) §6).
-- **BEVLG** is stock-standard PyPSA-Eur: population-weighted JRC/Eurostat
-  energy totals, EU-2012 heating distribution, endogenous DH expansion.
-  Nothing in TIMES-WAL describes Flanders.
-
-If the meeting looked at an Explorer DH chart, or at urban-central heat, the
-Flanders “increase” is real in the model and **not** a TIMES transfer error.
-If they looked at *total* heat, the chart is misread — both fall.
-
-A leftover confusion from 18 Aug: with DAC on, Walloon urban-central heat was
-sized for DAC (6 TWh_th to the capture plant). DAC is now off; that artefact
-is gone. Flanders never had that mechanism.
-
-### Options
-
-| | What | Effect |
-|---|---|---|
-| **A. Label the charts** (recommended, immediate) | “Flanders heat is PyPSA-Eur default; Wallonia is TIMES.” Split total vs DH. | Stops the misreading. |
-| **B. Cap Flemish DH** | exogenous DH share or `urban central heat` load trajectory | Policy choice. Use if the publication should not show 15 TWh of Flemish DH in 2050 with no Flemish TIMES behind it. |
-| **C. Soft-link a Flemish heat mix** | needs data that does not exist in this vd | Out of scope until a Belgian TIMES or a Flemish study is coupled. |
-
-### Recommended
-
-**A** now. **B** if Explorer users keep reading Flemish DH as a forecast.
-Do not try to make Flemish *total* heat “rise” — it does not.
-
-### Implemented — 29 Aug 2026: it *was* a pypsa2html bug, and it inverted the sign
-
-The meeting's reading was not a misread chart. The chart was wrong.
-
-`carrier_flows_energy.csv` emits one code per residential/tertiary heat bus:
-
-| bus | code |
-|---|---|
-| `rural heat` | `demandheat` |
-| `urban decentral heat` | **`demandheatc`** |
-| `urban central heat` | `presvapcfdhs` (plotted as “DH demand”) |
-
-`_DEMAND_CODES` in `extract/tables.py` listed `demandheat`, `demandheata`,
-`demandheatb`, `demandheats` — **not `demandheatc`**. The `a`/`b`/`s` variants
-are emitted by nothing. The chart is a *whitelist*, so `urban decentral heat`
-disappeared with no error and no warning.
-
-It is the **largest** block — 42.0 of 59.2 TWh of Flemish heat in 2040 (71 %).
-And because the dropped block shrinks while district heating grows, the chart
-**inverted the trend it was meant to show**:
-
-| Sectoral demands, res+tertiary heat | chart before | truth |
-|---|---|---|
-| **Flanders** 2025 → 2050 | 10.9 → 20.6 TWh **(+89 %)** | 59.8 → 49.2 TWh **(−18 %)** |
-| **Wallonia** 2025 → 2050 | 13.3 → 12.2 TWh (−9 %) | 28.3 → 23.4 TWh (−17 %) |
-
-That is the meeting note verbatim — “heat demand increases a lot in Flanders,
-stable in Wallonia”. Both halves were artefacts of the same missing line.
-
-**Fixed** in pypsa2html (`0d1b904`): `demandheatc` added, plus a tripwire that
-warns whenever `carrier_flows_energy.csv` emits a code whose label says
-“demand” and no `_DEMAND_CODES` entry claims it. Secondary link ports (entry
-names ending `_2`, “X *to demand*”) are excluded — they restate energy already
-counted on the primary row, so plotting them would double-count; six exist and
-none is a real gap.
-
-**Not changed:** the FEC pages. `processes_energy.csv` has no `vap_fe` node for
-decentral heat because FEC counts it at the *fuel* boundary (gas, biomass,
-electricity into the appliance), which is the standard convention. Adding it
-there would double-count.
-
-Verified end to end by rebuilding the report and decoding the plotted series,
-not by reading the code. Note the rebuild used the **14 Aug** vintage (the only
-one with all four horizons and a `csvs/` tree); the 26 Aug figures in the
-Evidence table above tell the same story.
-
-**Option A is still worth doing** — the Flanders-is-PyPSA-Eur / Wallonia-is-TIMES
-label is a separate point from this bug, and both regions' *totals* fall.
+- **a. Coal for industry** soft-link gap +10 / +14 / **+37** / +23 % (worse on
+  the new vd, 2040) — accounting, not a solve failure.
+- **b. DE 2030 onwind 115 GW** is a collapsed corridor (target above the growth
+  cap) and still sets the 2030 European price signal. Decide: accept, or let the
+  growth cap win.
+- **c. `enc_pe` / `pac_fe` / `vap_se` Sankey WARNs** — known mapping holes.
+- **d. Biogas 4.0 / 6.9 TWh citation** still owed by ICEDD. The vd runs 7.67 /
+  8.07 TWh, so this is a deliberate **divergence** from TIMES: do not publish it
+  as TIMES-consistent until the source arrives, and ask at the same time whether
+  2025/2030 should come down from 8.3 (the cap is currently non-monotonic).
 
 ---
 
-## 8. No rooftop PV in PyPSA — align with TIMES?
+## Sequencing
 
-Meeting sub-notes: *coûts de transport*; *imposer la part en toiture venant de TIMES*.
-
-### What the meeting asked
-
-TIMES is mostly rooftop; PyPSA builds none. Should we cost the grid properly,
-and/or force the TIMES rooftop share?
-
-### Evidence
-
-TIMES 2050 (RW, `VAR_Act`):
-
-| Process | TWh |
-|---|---:|
-| `ERNW_PV-GreenField_SOL_N` (utility) | 4.30 |
-| `ERNW_PV-Buildings_SOL_N` (rooftop commercial) | 10.57 |
-| `ERNW_PV-RES_Homes_SOL_N` (rooftop residential) | 4.70 |
-| **Rooftop share** | **~15.3 / 19.8 TWh ≈ 77 %** |
-
-PyPSA 26 Aug, BEWAL `p_nom_opt`:
-
-| | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| `solar rooftop` | **0.05** | 0.52 | 0.61 | **0.63 MW** |
-| `solar` | 4 088 | 4 088 | 2 786 | 5 038 |
-| `solar-hsat` | 0 | 3 970 | 6 915 | 6 916 |
-| **total PV** | 4.1 GW | 8.1 | 9.7 | **12.0 GW** |
-
-Rooftop potential is **46 GW** (Énergie Commune). Not a cap problem.
-[renewable-potentials.md](renewable-potentials.md) §7: rooftop is 0 MW
-“for cost reasons (19 % dearer per MW than ground-mounted)”. Annualised
-`capital_cost` 2025: rooftop **84 628** > hsat 79 188 > utility **71 898**
-EUR/MW/year. Overnight: rooftop **920** vs utility **526** vs hsat
-**560 €/kW_e** (`custom_costs.csv`). Hurdle rates are the same 7.5 %
-(`ALL-PV`, [discount-rates.md](discount-rates.md) D5) — not the driver.
-
-Generation is **not** soft-linked ([ccs_alignment.md](ccs_alignment.md) §12).
-TIMES rooftop share is never transferred.
-
-**Transport / distribution costs.** Rooftop sits on `BEWAL low voltage`;
-utility/hsat on the transmission bus. The distribution link is extendable at
-**~529 €/kW** ([network-representation-analysis.md](network-representation-analysis.md)
-§5, §9). In principle rooftop avoids that link for energy consumed behind the
-meter. In practice:
-
-- HP / EV already force distribution expansion (9.5 GW of zero-capital-cost
-  distribution in 2050 — solve log §11.6), so the “saved” grid is often
-  already paid for.
-- The CAPEX gap (920 − 526 = **394 €/kW**) is similar to the distribution
-  overnight cost. Even crediting rooftop with a *full* avoided grid still
-  does not clearly beat utility, and surplus rooftop *uses* the link the
-  other way (export).
-- The distribution link is a single copper plate per node, not a hosting-capacity
-  map, so there is no “export-limited suburb where rooftop is worthless” nor
-  “self-consumption zone where it is gold”. Item 9 of the network note is the
-  proper long-term fix; it will not, by itself, produce 77 % rooftop.
-
-A second, smaller bug: `BEWAL low voltage` maps to country `BE`, so a future
-rooftop build would count against the **Belgian** `solar-all` cap, not the
-Walloon one ([renewable-potentials.md](renewable-potentials.md) §7.3). Harmless
-while rooftop is 0; repair before imposing a floor.
-
-### Options
-
-| | What | Effect |
-|---|---|---|
-| **A. Impose TIMES rooftop *energy* share at BEWAL** (recommended) | annual constraint: rooftop generation ≥ 77 % of BEWAL PV (or ≥ TIMES TWh) | Gets the published mix right. Lets the model still choose total MW. Needs the LV-country alias fix first. |
-| **B. Impose TIMES rooftop *capacity*** | `p_nom_min` on `solar rooftop` from vd `VAR_Cap` | Heavier. Capacity ≠ energy (rooftop CF is lower). |
-| **C. Only fix costs / grid** | cut rooftop CAPEX, or credit avoided distribution, or DSO hosting map | Will not reach 77 % with a 75 % overnight gap. Worth doing as realism, not as the alignment tool. |
-| **D. Leave at 0, report total PV** | current review practice | Honest about the cost table; misleading vs TIMES and vs real Walloon PV (overwhelmingly rooftop today). |
-
-### Recommended
-
-**A** as the alignment mechanism (config switch under `sector.times_pv` or a
-one-off extra-functionality constraint, BEWAL only). **C** in parallel so the
-constraint is not fighting a 400 €/kW lie — at least document that TIMES and
-PyPSA do not share a rooftop overnight cost (920 vs whatever TIMES uses).
-Repair the LV country alias before A, otherwise the Belgian `solar-all` cap
-will clip Walloon roofs.
-
-Do not apply A to Flanders: TIMES has no Flemish rooftop share.
-
----
-
-## 9. BECCS is on in TIMES — activate DAC, or a new industrial capture process?
-
-### What the meeting asked
-
-TIMES runs biomass-for-industry with carbon capture. PyPSA does not show an
-equivalent. Turn DAC on at a similar volume? Or add an industrial process?
-
-### Evidence
-
-TIMES 2050 industrial capture (`INDCO2c`), several processes, **~4.8 Mt**:
-chemicals `ICMPRC20/21` (1.71 + 1.64 Mt), lime `ILMQLMPRCC02` (0.78), glass
-oxyfuel, etc. Food-process CC is in the dictionary but captures ~0.
-**DAC (`CO2DAC-01`) is not built** (duals only). Storage
-`STORAGEMINELC + STORAGEMININD` ≈ **7.1 Mt** in Wallonia
-([ccs_alignment.md](ccs_alignment.md) §0, §11).
-
-PyPSA 26 Aug, BEWAL, `sector.dac: false`:
-
-| Process | 2050 | CO₂ stored |
-|---|---|---:|
-| `solid biomass for industry CC` | **240 MW**, 2.10 TWh biomass in, 1.89 TWh to industry | **0.73 Mt** |
-| `gas for industry CC` | 481 MW, 4.21 TWh | 0.79 Mt |
-| `process emissions CC` | 238 MW | **1.98 Mt** |
-| urban central gas CHP CC | 1 048 MW | 0.44 Mt |
-| CCGT CC | 463 MW_e | 0.41 Mt |
-| **DAC** | **0 links** | 0 |
-
-Industry CC **is already in the LP** and **does run in 2050**. It is a
-generic biomass-industry link, not TIMES’s chemicals/lime/glass set, and the
-volume (0.73 Mt biomass-CC) is below TIMES’s 4.8 Mt industrial total. Earlier
-solves with DAC **on** built a 1.1 GW_e plant, 23.5 TWh_e, **4.39 Mt**
-captured at BEWAL — 2.6× the Walloon cap — by pulling more district heat than
-buildings used ([ccs_alignment.md](ccs_alignment.md) §8, 18 Aug R10). That is
-why DAC was turned off on 25 Aug: to match TIMES’s technology *set*, after it
-had eaten the DH bus.
-
-Belgian `co2 sequestered` `e_nom_max = 0` still applies. TIMES stores 7.1 Mt
-*in Wallonia*; PyPSA stores 0 in Belgium and fills NL. Volume alignment
-without a Belgian sink just moves the CO₂ across the border.
-
-### Options
-
-| | What | Effect |
-|---|---|---|
-| **A. Turn DAC back on, cap it at TIMES-not-built (= 0)** | pointless | TIMES does not build DAC. |
-| **B. Turn DAC on at ~4 Mt** (meeting’s “equivalent level”) | restores the 18 Aug artefact unless DAC is **forbidden** from the DH bus (electricity-only or waste-heat-only) | Closes the *tonnage* gap with a technology TIMES rejected. Do not, unless the study is a DAC sensitivity. |
-| **C. Pin industrial CC energy/CO₂ to TIMES** (recommended) | extra-functionality floors on `solid biomass for industry CC` + `process emissions CC` (or a new chemicals-CC link) to ~4.8 Mt in 2050 | Aligns the *industrial* BECCS TIMES actually runs. Needs the Belgian (or priced-export) sink from item 2.C. |
-| **D. New labelled industrial processes** | chemicals / lime / glass CC as separate Links | Better TIMES mapping, more engineering. Only if C’s generic pin is too coarse for Explorer. |
-| **E. Enable `sector.bioH2`** | biomass → H₂ + CCS | Matches TIMES process `SBIOH2GCC01`, which this vd **does not use**. TIMES’s actual bio-H₂ is black liquor (`BBLQH2G110`), deliberately not exported. Skip. |
-
-### Recommended
-
-**C**, after item 2.C (Belgian CO₂ sink). **Not DAC.** If Explorer needs a
-named “industry CCS” series, D is a follow-up. Keep `sector.dac: false` on
-demande-haute; a `scen_dac` overlay exists as a one-line scenario switch
-([ccs_alignment.md](ccs_alignment.md) §8) for a dedicated study.
-
-Until C, the honest sentence is: “PyPSA has generic industry CC and used it
-for 0.73 Mt biomass-CC + 1.98 Mt process-CC in 2050; TIMES has 4.8 Mt of
-named industrial capture and 7.1 Mt of Walloon storage PyPSA does not have.”
-
----
-
-## 10. Add a 3 GW nuclear minimum in Flanders in 2050 (symmetric with Wallonia)
-
-### What the meeting asked
-
-Flanders should have a **3 GW floor in 2050**, symmetric with Wallonia.
-
-### Evidence
-
-Current agg file (`agg_p_nom_minmax_demande_haute.csv`), from
-[nuclear-alignment-20260816.md](nuclear-alignment-20260816.md) §3.2 / §4.1:
-
-| 2050 | min | max |
-|---|---:|---:|
-| BEWAL `nuclear-all` | **3 000** | **3 000** |
-| BE `nuclear-all` | **3 000** | **3 000** |
-| rest-of-BE after subtraction (BEVLG+BEBRU) | **0** | **0** |
-
-Solved 2050: BEWAL **3 000 MW_e**, BEVLG **0.05 MW_e**. This is doing exactly
-what the 16 Aug note decided: *all new nuclear in Wallonia, Flanders to zero
-by 2045*, because that is what the Walloon TIMES vd contains. The same note
-records the email caveat: *“in reality one large unit might be sited in
-Flanders”* — left aside because a BE-wide siting assumption is not in the vd.
-
-Adding a 3 GW Flanders *minimum* is therefore **not a bugfix**. It is a
-new Belgian siting policy. Two readings:
-
-| Reading | 2050 Belgium | Meaning |
-|---|---|---|
-| **Symmetric floors on top of TIMES** | Wallonia 3 + Flanders 3 = **6 GW** | Doubles the vd’s new-build. Needs `BE nuclear-all` max raised to ≥ 6 000. |
-| **Split the TIMES 3 GW** | Wallonia ~1.5 + Flanders ~1.5, or 1+2, still **3 GW** Belgium | Matches the email (“one large unit in Flanders”) without doubling. Breaks “follow the vd exactly”. |
-
-Must-run ([nuclear-alignment-20260816.md](nuclear-alignment-20260816.md) §6)
-would apply to the new Flemish units: BE band [0.783, 0.883] → ~20–23 TWh
-from an extra 3 GW, which **helps item 6** (independence) and Flanders’s
-missing 2050 firm capacity.
-
-`add_CCL_constraints` subtracts the region row from the parent country row.
-A BEVLG (or rest-of-BE) min of 3 000 with a BE max of 3 000 is **infeasible**.
-The BE row must move first.
-
-### Options
-
-| | What | Effect |
-|---|---|---|
-| **A. New scenario overlay, 3+3 GW** | `scen_nuc_be_6gw`: BEWAL min=max=3000, BEVLG (or BE−BEWAL) min=max=3000, BE min=max=6000 | Clean. Demande-haute stays TIMES-aligned. Explorer can switch. Cost, grid, independence all move. |
-| **B. New overlay, split 3 GW** | e.g. BEWAL 2000 + BEVLG 1000, BE = 3000 | Matches the email, not the meeting’s “3 GW in Flanders”. Confirm siting with Elia/ICEDD. |
-| **C. Change demande-haute itself** | edit the agg file in place | Silently abandons the 16 Aug TIMES alignment. Do not, unless the vd is re-issued. |
-| **D. Free siting, BE total = 3 GW** | drop the regional max, keep BE = 3000 | The 14 Aug bug that put new build in Flanders. The LP will likely put it there again (load, grid). Only if “PyPSA chooses the site” is the new rule. |
-
-### Recommended
-
-**Do not silently edit demande-haute.** Pick A or B in the next ICEDD slot,
-as a **named overlay**, and say which Belgium (3 vs 6 GW) is the published
-central case.
-
-If the meeting’s wording is taken literally (“3 GW minimum in Flanders,
-symmetric with Wallonia”), that is **A = 6 GW Belgium**. That is a different
-scenario from the vd and should be labelled as such. It would also be the
-single largest independence lever after the onwind cap (item 6).
-
-Implementation path (once decided): master CSV `agg:BEVLG:nuclear-all:min/max`
-and `agg:BE:nuclear-all:*`, `--write`, plus a scenario block in
-`config/scenarios.walloon.yaml`. The 0.1 MW placeholder plants must stay
-above any authored *zero* cap (already guarded in `add_CCL_constraints`).
-Rebuild brownfield from 2040 (2030 still has Doel 4).
-
----
-
-## Sequencing for the next solves
-
-Item 3 needs no code. Items 5 and 7 were pypsa2html bugs and are fixed
-(`0d1b904` in that repo) — **the report must be rebuilt** before the heat
-charts are read again. The rest stack:
+Cheap and independent first, so the expensive final run carries as few unknowns
+as possible.
 
 ```
-already in tree, not in this solve
-  └─ renewable-potentials.md (neighbour offshore, Walloon onwind trajectory)
-        │
-        ▼
-next production solve  ←  measure independence again (item 6.A)
-        │
-        ├─ item 1  ✔ done — see gas-storage-20260829.md
-        ├─ item 8  LV country alias + TIMES rooftop energy share at BEWAL
-        ├─ item 2.C / 9.C  Belgian CO₂ sink, then industry-CC pin
-        │     (not DAC; not 2040 CCGT-CC floor until the sink exists)
-        │     EU-wide cap ✔ fixed 29 Aug — co2-sequestration-20260829.md;
-        │     BE e_nom_max = 0 still open, and now unmasked
-        └─ item 4  ✔ caps applied 29 Aug (source still owed by ICEDD)
-        │
-        ▼
-scenario overlays, not the base
-        ├─ item 10  Flanders nuclear (3+3 vs split-3) 
-        ├─ item 6.B  Walloon 10 TWh import cap
-        ├─ item 2.A  TIMES CCGT-CC MW in 2040 (after sink)
-        └─ item 7.B / 5.C  Flemish DH cap (policy choice, separate from the plot fix)
+step 0 — measure, no change
+  └─ net electricity imports per region on the 30 Aug networks (§11 never
+     reported them; needed before 6a's cap value can be judged)
+
+reporting only — no solve needed, do now
+  ├─ 14  power-to-gas split (Electrolysis / FT / methanation)
+  ├─ 15  BECCS/CCS in installed capacities
+  └─ 6b  independence toggles (nuclear accounting, 50 % offshore)
+
+data / caps — pytest guard each, no solve
+  ├─ 11  BE offshore: pin 2030 at 2 262, move the PEZ to 2040/2050
+  ├─ 10  BEVLG 3 000 + BE 6 000 nuclear (BE row first!)
+  ├─ 12  process emissions from the vd  ← needs Annick's excel in the repo
+  └─ 16  water pits e_nom_max
+
+LP code — pytest guard + one cheap solve each
+  ├─ 6a  BEWAL 10 TWh import cap   ← measure 30 Aug imports first
+  ├─ 13  aviation toggle (default off)
+  └─ 2   Belgian CO₂ sink (+ retry the geology ramp with BarHomogeneous)
+              │
+              └─ 9  industry-CC pin, only once 2 is in
+
+final full run: 1h / 2010 / four horizons + §11 review
+
+no code, decide in a meeting
+  ├─  3  Boucle du Hainaut: 2040 grid or 2040 option?
+  ├─  8  rooftop parked (LV country-alias bug stays open)
+  ├─ 17b DE 2030 onwind corridor: accept 115 GW or let growth win?
+  └─ 17d biogas citation, owed by ICEDD
 ```
 
-**Do not combine the Flanders-nuclear overlay, the 10 TWh import cap, and the
-biogas cut in the first re-solve.** Each one moves 2050 independence and the
-CO₂ dual; together they will be unreadable. The neighbour-offshore rebuild is
-the one change that is already decided and that this run’s 31 TWh import
-figure is not comparable without.
+Interactions to keep in mind when reading that final run: items **6a, 10, 11**
+all move 2050 independence, in opposite directions (nuclear helps, the offshore
+cut hurts, the cap forces); items **2, 12, 13** all move the Walloon CO₂ dual.
+If the sum is unreadable, the fallback is a 6h solve with 10 and 11 only.
+
+Still not comparable across vintages: total system cost (gas-store floors),
+2025 capacities (now a historical pin), onwind (2 371/4 870/6 500 vs the old
+flat 6 500 or 12.4 GW).
 
 ---
 
-## Original meeting notes
+## Meeting notes, verbatim
 
 Kept for traceability.
+
+### 27 August
 
 - vérifier qu'il y a bien du stockage de gaz en wallonie? potentiel?
 - CCGT-CC apparait seulement en 2050 => impose the TIMES capacity in 2040?
@@ -868,3 +426,24 @@ Kept for traceability.
     => activer DAC à un niveau équivalent?
     => nouveau process industriel qui capture le CO2?
 - il faut ajouter 3 GW de minimum de nucléaire en flande en 2050 (symétrique avec wallonie)
+
+### 1 September
+
+- power-to-gas is zero while there is a bit of fischer tropsch
+   => to be updated, in that broad category, differentiate into Electrolysis, Fischer Tropsh, Methanation
+- Vérifier process émissions par rapport à times
+   Annick a fourni un excel qui détaille le valeurs de 2021 en wallonie
+   Vérifier si on retrouve bien ces valeurs de CO2 dans le fichier VD et intégrer cela aux process emissions de pypsa
+- contrainte indépendance énergétique
+    Electricité: On s'aligne sur TIMES => max 10 TWh?
+    Pour l'énergie primaire, on ne fait rien, mais on ajoute un toggle au graphique pour changer la comptabilité nucléaire (Energie electrique produite vs Eenrgie contenue dans l'uranium)
+    Inclure 50% de l'offshore belge dans la comptabilité (il s'agit d'une compétence fédérale qu'on suppose répercutée équitablement entre la wallonie et la flandre)
+- diminuer l'offshore 2030
+    Pas de nouvelles installations prévues entre maintenant et 2030 => contrainte!
+    faire une revue des articcles de presse => ou en est la construction en 2025? Que'est-ce qui est dans le pipeline? Quelle est la date de mise en service pour les nouvelles enchètes prévues en 2027?
+- Ajouter nucléaire en flandre en 2050 (même chose qu'en wallonie: 1GW de retrofit, 2GW de new nuclear)
+- Pour le moment, il n'y pas de rooftop => reprendre le rooftop de times
+- ajouter beccs dans les capacités installées dans pypsa2html
+- Aviation:
+   The co2 contraint seems less tight in the last run
+   => try to re-integrate aviation in the CO2 accounting of wallonia (was removed in a previous commit). It should be a simple option in the yaml file to include it or not

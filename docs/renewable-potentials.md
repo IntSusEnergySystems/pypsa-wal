@@ -59,7 +59,7 @@ no more meaningful than 2 MW/km² was.
 
 | node | offshore potential | source |
 |---|---:|---|
-| BEVLG | 8 000 | Belgian NECP 5.8 GW + PEZ repowering headroom |
+| BEVLG | 8 000 | Belgian NECP 5.8 GW + PEZ repowering headroom (a *potential*; on the delivery date of that 5.8 GW see §4.2) |
 | DE | 70 000 | WindSeeG (30 GW 2030 / 40 GW 2035 / 70 GW 2045) |
 | NL | 50 000 | North Sea Wind Energy Infrastructure Plan, Jul 2025 |
 | GB | 80 000 | Clean Power 2030 trajectory extended |
@@ -168,6 +168,80 @@ The warning is the point. "This 2030 target needs more than twice the best year
 the industry has ever had" is a finding about the scenario; silently reconciling
 the two numbers hid it.
 
+### 4.2 The Belgian 2030 offshore floor is not deliverable
+
+**Reviewed 2026-09-01** (FR / NL / EN press review, at the request of the 1 Sept
+meeting). `BE offwind-all` carries **2030 min = 5 800 MW**, tagged
+`NECP-BE-2030` — 2 262 MW standing plus the 3.5 GW Princess Elisabeth Zone
+(PEZ I 700 + PEZ II 1 400 + PEZ III 1 400 MW). It is also the **only** offshore
+floor in the caps file: 2035–2050 are blank. The model is therefore obliged to
+commission the whole zone by 2030 and free to add nothing afterwards — the
+inverse of the actual schedule.
+
+What the sources say:
+
+- **Feb 2025** — Elia postpones signing the island's **HVDC** contracts (island
+  budget 3.6 → 7–8 bn EUR); reported as a ~3-year slip for that phase, which is
+  the one carrying **PEZ III** and Nautilus ("from 2032"). The contracted HVAC
+  phase serves PEZ I + II only.
+- **Jul 2025** — the PEZ-1 tender is **withdrawn**: legal, calendar and financial
+  framework judged unworkable.
+- **Feb / May 2026** — relaunch misses the promised deadline; ~2 years lost;
+  the delay is costed at ~400 MEUR by 2030 (EnergyVille, via Agoria).
+- **18 Jul 2026** — new framework approved (two-sided CfD, no strike-price cap,
+  construction window **48 → 60 months**, bid preparation ≥ 6 months plus a fixed
+  5-month evaluation). Still awaiting Council of State review and EC state-aid
+  clearance; relaunch planned late Sept / early Oct 2026.
+- Island phase 1 (**MOG II**) must be operational by **1 Oct 2031** — no wind
+  farm can export before its grid connection exists.
+- The government now frames security of supply as "from 2035"; PATHS2050 asks for
+  the zone operational by 2035; commentary states the park "will no longer
+  contribute in time" to the 2030 EU 42.5 % target, with supply-security concerns
+  in 2030–2032.
+
+Arithmetic on the framework's own parameters — relaunch late 2026 → bids mid
+2027 → award ~late 2027 → up to 60 months of construction, gated by the island in
+Oct 2031 — puts **first PEZ-I power in 2031–2032 at the earliest**, the full
+700 MW around 2032–33, PEZ II after that and PEZ III behind the postponed HVDC.
+**No new Belgian offshore capacity can be online in 2030.**
+
+Proposed retiming (not yet implemented; improvement-plan item 11):
+
+| `BE offwind-all` | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|
+| now | min **5 800** | — | — |
+| proposed | min = max **2 262** (standing fleet) | min **4 362** (+ PEZ I + II, the contracted HVAC) | min **5 800** (full zone) |
+
+Points of attention:
+
+- 5 800 is a **min**, not a max — lowering a ceiling changes nothing. Pinning
+  `min = max` at 2030 is what implements "no new installations before 2030", and
+  the 0.5 % `tolerance` of §5.1 keeps that collapsed corridor solvable.
+- Do **not** put the full 5 800 into 2040 as a floor: PEZ III depends on an HVDC
+  decision that has slipped ~3 years and is not contracted. 4 362 MW is the
+  committed-infrastructure reading.
+- The §2 ceiling (BEVLG `p_nom_max` = 8 000 MW) is unaffected — it is a *sea
+  potential*; this finding is about *timing*. And the same "policy target used as
+  a floor" pattern is worth re-checking on the neighbours (NL 12 000, FR 3 600,
+  GB 50 000 → clipped to 42 636 by growth).
+- Removing ~3.5 GW of cheap offshore will make **2030 look worse**: higher
+  Belgian prices, more imports, more gas, a higher 2030 CO₂ dual.
+
+Sources:
+[tender withdrawn (Jul 2025)](https://www.offshorewind.biz/2025/07/01/belgium-delays-tender-for-offshore-wind-farm-in-princess-elisabeth-zone-until-2026/) ·
+[new framework and 1 Oct 2031 (Jul 2026)](https://www.offshorewind.biz/2026/07/24/belgium-approves-new-tender-framework-for-first-princess-elisabeth-zone-offshore-wind-site/) ·
+[construction 48 → 60 months, bid and evaluation windows](https://www.loyensloeff.com/insights/news--events/news/belgium-offshore-wind-tender-amendment-and-ventilus-permit-push/) ·
+[amended plan, PEZ 1 = 700 MW](https://www.rivieramm.com/news-content-hub/belgium-amends-plan-for-princess-elisabeth-zone-offshore-wind-tender-89460) ·
+[Elia postpones the HVDC contracts](https://www.elia.be/nl/pers/2025/02/20250204_elia-temporarily-postpones-signing-hvdc-contracts-for-princess-elisabeth-island) ·
+[RTBF: le retard, PEZ 1 / PEZ 2 capacities](https://www.rtbf.be/article/eolien-offshore-l-extension-de-la-capacite-belge-a-pris-du-retard-11727009) ·
+[La Libre: ~400 MEUR pour les ménages](https://www.lalibre.be/dernieres-depeches/2026/05/12/le-retard-dans-leolien-offshore-coutera-des-centaines-de-millions-aux-menages-TAHEAHNJEJEB3LZPNF2CKPFQ5E/) ·
+[La Libre: pas lancé ce trimestre (Feb 2026)](https://www.lalibre.be/belgique/politique-belge/2026/02/26/lappel-doffres-pour-la-zone-princesse-elisabeth-ne-sera-pas-lance-ce-trimestre-UGY7F3SOSZGF7DS2H66O2EDCKI/) ·
+[Vandenbulcke: tender misses the deadline](https://www.flows.be/offshore/2026/02/vandenbulcke-tender-prinses-elisabeth-eiland-mist-beloofde-deadline/) ·
+[island cost, missed 2030 EU target, 2030–32 supply concerns](https://gasoutlook.com/analysis/surging-costs-cloud-outlook-for-belgian-princess-elisabeth-wind-island/) ·
+[relaunch late Sept / early Oct 2026](https://www.indegazette.be/nieuwe-regels-brengen-eerste-windpark-in-prinses-elisabethzone-dichterbij/) ·
+[government: supply "from 2035"](https://www.seatalk.be/techniek-innovatie/2026/04/20/belgie-zet-offshorewind-in-prinses-elisabeth-zone-opnieuw-in-beweging/) ·
+[industry doubts the realisation](https://www.lavenir.net/actu/2026/01/26/par-eolien-offshore-princesse-elisabeth-les-cooperatives-citoyennes-craignent-lexclusion-lindustrie-doute-de-sa-realisation-7FOLBRB5RBFSHJSZU6JU7PV3XA/)
+
 ## 5. 2040 and 2050
 
 **Decision.** No policy limits at all. Both bounds are calculated:
@@ -256,6 +330,11 @@ The growth cap binds nearly everywhere in 2030 — land binds only for Belgian
 offshore. That is the expected shape five years out: the constraint is how fast
 you can build, not whether there is room.
 
+The `BE offwind-all` **min of 5 800** in that table is now known to be
+undeliverable — nothing new can be commissioned in Belgian waters by 2030
+(§4.2). The row is unchanged in the shipped caps file; the retiming is
+improvement-plan item 11.
+
 ### 2050 — the envelope
 
 | node | carrier | growth cap | land | **max** | binds |
@@ -303,6 +382,9 @@ import prices and congestion rent all move with that.
    repairing before any Walloon rooftop question is asked of the model — and note
    that rooftop currently comes out at 0 MW for cost reasons (19 % dearer per MW
    than ground-mounted), not because of any cap.
+4. **The Belgian 2030 offshore floor (5 800 MW) is not deliverable** — see
+   §4.2. Pin 2030 to the standing 2 262 MW and move the Princess Elisabeth Zone
+   to the 2040 / 2050 floors. **Not implemented** (improvement-plan item 11).
 5. **The envelope is duplicated across three `agg_p_nom_minmax_*` files** that now
    differ in only 2 of 54 rows (the nuclear caps). Nothing checks them against
    each other, and `build_common_parameters.py` manages only the demande-haute
