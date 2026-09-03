@@ -2,11 +2,18 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""BEWAL process-emissions load follows the TIMES VAR_Comnet fossil totals.
+"""BEWAL process-emissions load carries the TIMES **gross** fossil process CO2.
 
-Item 12 of ``docs/temporary_improvement_plans.md``: override the PyPSA
-``process emissions`` Load (gross production on that bus), not a coefficient
-and not capture (item 9). Values are fossil ``INDCO2`` only.
+Item 12 of ``docs/temporary_improvement_plans.md``, corrected by B4. The PyPSA
+Load is the injection onto the process-emissions bus, *upstream* of
+``process emissions CC``. TIMES splits the same quantity in two: ``INDCO2P``
+(``VAR_Comnet``) is what reaches the atmosphere and ``INDCO2c`` (``VAR_FOut``
+of the CC process variants, consumed by ``STORAGEMININD``) is what is captured.
+Loading only ``INDCO2P`` books TIMES's capture twice — once by leaving it out of
+the inventory and again through item 9's capture floor — and left 2040 with
+357 kt of process CO2 against a 5 077 kt capture floor, which no combination of
+Walloon industrial gas and biomass can meet. Values here are
+``INDCO2P + INDCO2c``; biogenic ``INDCO2b`` stays off this bus.
 """
 
 from __future__ import annotations
@@ -25,8 +32,14 @@ from scripts.walloon_scripts.BEWAL_potentials import (
 ROOT = Path(__file__).resolve().parents[1]
 CSV = ROOT / "data" / "walloon" / "custom_potentials.csv"
 HORIZONS = (2025, 2030, 2040, 2050)
-# Annick / VAR_Comnet fossil totals (kt). 2025 is the 2025 column, not 2021.
-EXPECTED_KT = {2025: 4411.62, 2030: 3946.10, 2040: 357.01, 2050: 281.64}
+# Gross = INDCO2P + INDCO2c (kt). 2025 is the 2025 column, not 2021; no CC
+# process runs before 2035, so gross equals emitted in 2025 and 2030.
+EXPECTED_KT = {2025: 4411.62, 2030: 3946.10, 2040: 5433.90, 2050: 5108.04}
+#: what TIMES leaves in the atmosphere — must NOT be what the Load carries
+EMITTED_ONLY_KT = {2025: 4411.62, 2030: 3946.10, 2040: 357.01, 2050: 281.64}
+#: STORAGEMININD (item 9). The cross-check that the Load can feed the floor
+#: lives in test_industry_cc_floor.py, which reads both CSVs.
+CAPTURED_KT = {2040: 5076.88, 2050: 4826.40}
 
 
 def _network() -> pypsa.Network:
@@ -64,7 +77,23 @@ def test_csv_has_fossil_totals_for_every_horizon():
     for year, kt in EXPECTED_KT.items():
         val = float(bewal.loc[bewal["year"].astype(int) == year, "value"].iloc[0])
         assert val == pytest.approx(kt)
-    assert EXPECTED_KT[2025] != pytest.approx(4417.22)
+    assert EXPECTED_KT[2025] != pytest.approx(4417.22)  # not the 2021 row
+
+
+def test_load_is_gross_not_the_atmosphere_residual():
+    """B4: the 2040/2050 rows must not be TIMES's post-capture emissions."""
+    rows = _csv_rows()
+    bewal = rows[rows["bus"] == "BEWAL"]
+    for year in (2040, 2050):
+        val = float(bewal.loc[bewal["year"].astype(int) == year, "value"].iloc[0])
+        assert val != pytest.approx(EMITTED_ONLY_KT[year]), (
+            f"{year} load is TIMES's atmosphere residual, not the gross "
+            "inventory the PyPSA bus needs (B4)"
+        )
+        assert val == pytest.approx(
+            EMITTED_ONLY_KT[year] + CAPTURED_KT[year], abs=0.02
+        )
+
 
 
 def test_apply_sets_annual_volume_to_the_times_figure():
@@ -79,7 +108,7 @@ def test_update_bewal_potentials_writes_the_load(tmp_path):
     csv = tmp_path / "custom_potentials.csv"
     csv.write_text(
         "bus,technology,parameter,value,unit,year,source,further_description,year_currency\n"
-        "BEWAL,process emissions,p_set,281.64,kt/year,2050,Annick,item 12,\n"
+        "BEWAL,process emissions,p_set,5108.04,kt/year,2050,TIMES,item 12,\n"
     )
     n = _network()
     update_BEWAL_potentials(n, 2050, walloon_potentials=str(csv))

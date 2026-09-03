@@ -4147,7 +4147,7 @@
             },
             "ptes": {
               "additionalProperties": true,
-              "description": "Pit thermal energy storage settings.",
+              "description": "Pit thermal energy storage settings. `e_nom_max_weeks`: null leaves the Store unbounded (upstream default); a positive number is weeks of that node's urban-central heat demand, used as the Store `e_nom_max` (improvement-plan item 16).",
               "type": "object"
             },
             "ates": {
@@ -6285,7 +6285,7 @@
         },
         "ptes": {
           "additionalProperties": true,
-          "description": "Pit thermal energy storage settings.",
+          "description": "Pit thermal energy storage settings. `e_nom_max_weeks`: null leaves the Store unbounded (upstream default); a positive number is weeks of that node's urban-central heat demand, used as the Store `e_nom_max` (improvement-plan item 16).",
           "type": "object"
         },
         "ates": {
@@ -10536,7 +10536,7 @@
             },
             "ptes": {
               "additionalProperties": true,
-              "description": "Pit thermal energy storage settings.",
+              "description": "Pit thermal energy storage settings. `e_nom_max_weeks`: null leaves the Store unbounded (upstream default); a positive number is weeks of that node's urban-central heat demand, used as the Store `e_nom_max` (improvement-plan item 16).",
               "type": "object"
             },
             "ates": {

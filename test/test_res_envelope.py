@@ -141,12 +141,12 @@ def test_rejects_a_group_missing_from_the_rate_table(tmp_path):
 
 
 def test_be_offwind_2030_is_the_standing_fleet():
-    """Item 11: first future horizon must not floor PEZ above the standing fleet.
+    """Item 11: no new Belgian offshore before 2030, so 2030 pins the fleet.
 
-    2026-09-03 1h: 2025 BEVLG AC country is ``BEVLG``, so the BE offwind-all
-    pin never bound and the horizon built the 8 GW potential. 2030 brownfield
-    has country ``BE`` and 8 GW standing; a 2262 pin is then an empty LP.
-    The 2030 pin follows that built fleet for this myopic chain.
+    The press review is unambiguous — PEZ-1 tender withdrawn Jul 2025, island
+    operational 1 Oct 2031 — so 2030 is `min = max = 2262`, the 2024 standing
+    fleet. The 8 GW pin this replaces was a work-around for the carrier-blind
+    CCL rewrite (B1/B2), which let 2025 build the whole technical potential.
     """
     path = ROOT / "data" / "walloon" / "agg_p_nom_minmax_demande_haute.csv"
     env = load_envelope(path)
@@ -154,37 +154,27 @@ def test_be_offwind_2030_is_the_standing_fleet():
         (env.country == "BE") & (env.carrier == "offwind-all") & (env.year == 2030)
     ]
     assert len(row) == 1
-    assert float(row.iloc[0]["min"]) == 8000
-    assert float(row.iloc[0]["max"]) == 8000
+    assert float(row.iloc[0]["min"]) == 2262
+    assert float(row.iloc[0]["max"]) == 2262
 
 
-def test_bevlg_carries_the_belgian_res_remainder():
-    """CCL rewrites BEVLG/BEWAL country to the bus name, so a BE-only 2030
-    floor is applied to BEBRU alone. 2026-09-03 1h: that asked Brussels for
-    4.3 GW of new utility solar on leftover land after 2025 hsat → empty LP.
-    The Elia remainder (BE − BEWAL) must sit on BEVLG, where the 2025 fleet
-    already covers it.
+def test_no_hand_split_bevlg_res_rows():
+    """The Elia targets are Belgian; the CCL splits them, not the caps file.
+
+    `BEVLG,solar-all` 10 000 and `BEVLG,onwind` 2 000 were arithmetic done by
+    hand (BE minus BEWAL) to stop the remainder landing on Brussels. With
+    `add_CCL_constraints` grouping per (region, carrier) the `BE` row covers
+    BEVLG and BEBRU together again, so those rows have to go — otherwise the
+    national target is silently re-split every time Elia updates it.
     """
     path = ROOT / "data" / "walloon" / "agg_p_nom_minmax_demande_haute.csv"
     env = load_envelope(path)
-
-    def _val(country, carrier, year, col):
-        row = env[
-            (env.country == country) & (env.carrier == carrier) & (env.year == year)
-        ]
-        assert len(row) == 1, f"missing {country}/{carrier} {year}"
-        return float(row.iloc[0][col])
-
-    assert _val("BEVLG", "solar-all", 2030, "min") == 10000
-    assert _val("BEWAL", "solar-all", 2030, "min") + _val(
-        "BEVLG", "solar-all", 2030, "min"
-    ) == _val("BE", "solar-all", 2030, "min")
-    assert _val("BEVLG", "onwind", 2030, "min") == 2000
-    assert _val("BEWAL", "onwind", 2030, "min") + _val(
-        "BEVLG", "onwind", 2030, "min"
-    ) == _val("BE", "onwind", 2030, "min")
-    assert _val("BEVLG", "offwind-all", 2030, "min") == 8000
-    assert _val("BEVLG", "offwind-all", 2030, "max") == 8000
+    for carrier in ("solar-all", "onwind", "offwind-all"):
+        rows = env[(env.country == "BEVLG") & (env.carrier == carrier)]
+        assert rows.empty, (
+            f"BEVLG/{carrier} is a hand-computed split of the BE row; the CCL "
+            "does that arithmetic itself now (B1/B2)"
+        )
 
 
 def test_base_and_corridor_years_are_what_the_doc_says():

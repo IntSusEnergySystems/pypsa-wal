@@ -49,12 +49,16 @@ scen_demande_haute:
   sector:
     times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
     rooftop_share:
-      # Item 8 withdrawn for this 1h run (2026-09-03). 2025 at 25.8 % was
-      # optimal after rooftop left solar-all. 2030 at 71.4 % is still
-      # inf-or-unbounded in 0 barrier iterations with item 6a off (job
-      # 11110016). TIMES mix is 5.2 GW rooftop / 2.1 GW utility; Elia
-      # solar-all floor is 6.5 GW utility. Code and CSV stay; overlay off.
-      # See docs/logs/2026-09-02_scen_demande_haute_2010_1h.md §9.
+      # Item 8 is OFF, and the reason is not the one recorded on 2026-09-03:
+      # the 2030 empty LP was the CCL region rewrite (B1), not this pin. The
+      # real obstacle is the base year — PyPSA labels the entire historical
+      # Walloon fleet `solar`, so a TIMES share of *total* capacity cannot be
+      # imposed on a year pinned to that fleet (2025 needs ~1.4 GW of rooftop
+      # inside a 20 MW corridor). Taking rooftop out of `solar-all` solved it
+      # but unpinned total PV, so that was reverted (B5). Re-enabling needs a
+      # rooftop/utility split of the base-year fleet, or a share of new build
+      # only. Code, CSV and tests stay. See B5 of
+      # docs/temporary_improvement_plans.md.
       enable: false
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
@@ -68,13 +72,16 @@ scen_demande_haute:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_demande_haute.csv
   self_sufficiency:
-    # Item 6a withdrawn for this 1h run (2026-09-03). TIMES Transfo_Imp
-    # 2.94 / 6.47 / 10 TWh is not feasible as a GROSS hourly cap on BEWAL
-    # (incl. Flanders): 2025 1h already has 13.1 TWh gross inflow (8.2 TWh
-    # from abroad alone) while annual NET is an export (−1.5 TWh). 2030
-    # job 11108009 was inf-or-unbounded in 0 barrier iterations. Code and
-    # tests stay; only this overlay is off. See
-    # docs/logs/2026-09-02_scen_demande_haute_2010_1h.md §9.
+    # Item 6a is OFF pending a decision on the number, not on the code.
+    # The 2030 empty LP blamed on it (job 11108009) was the CCL region
+    # rewrite (B1). What remains true is the magnitude: the constraint caps
+    # the hourly positive part of net cross-border inflow — the right analogue
+    # of TIMES `Transfo_Imp`, which is also a one-way annual flow — and the
+    # 2025 1h network already carries ~13 TWh of it (8.2 from abroad) against
+    # a 2.94 TWh cap for 2030. The expression itself was wrong until B6 (AC
+    # and DC capped separately, DC imports dropped with the `reversed` leg,
+    # AC inflated by 1/s_max_pu), so re-measure on a solved 1h network before
+    # choosing values. See B6 of docs/temporary_improvement_plans.md.
     self_sufficiency_constraint: false
     mode: absolute
     nodes:
@@ -154,7 +161,7 @@ scen_evflex:
   sector:
     times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
     rooftop_share:
-      # Same item-8 withdrawal as scen_demande_haute (2030 71.4 % inf).
+      # Same item-8 withdrawal as scen_demande_haute (base-year fleet split, B5).
       enable: false
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
@@ -230,8 +237,8 @@ scen_evflex:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_demande_haute.csv
   self_sufficiency:
-    # Same 6a withdrawal as scen_demande_haute: 1h GROSS BEWAL cap is inf.
-    # See docs/logs/2026-09-02_scen_demande_haute_2010_1h.md §9.
+    # Same 6a withdrawal as scen_demande_haute; see B6 of
+    # docs/temporary_improvement_plans.md.
     self_sufficiency_constraint: false
     mode: absolute
     nodes:

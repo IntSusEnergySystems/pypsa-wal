@@ -1217,11 +1217,34 @@ def patch_costs_scalars(
 # --------------------------------------------------------------------------- #
 # validation
 # --------------------------------------------------------------------------- #
+def untargeted_monetary_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Monetary rows that cannot reach a PyPSA input file.
+
+    `pypsa_wal_target` is what makes a row an input to this tool; rows without
+    one are reference documentation (TIMES-side sources, literature). They keep
+    the currency year of their own source, so the EUR_REF tag is not required
+    of them — see `check_currency`.
+    """
+    return df.loc[monetary_mask(df) & df["pypsa_wal_target"].isna()]
+
+
 def check_currency(df: pd.DataFrame, meta: dict) -> list[str]:
+    """Every monetary value this tool *writes* must be tagged EUR_REF.
+
+    Scoped to rows carrying a `pypsa_wal_target`. The 20 untargeted rows added
+    with the JRC/ETRI reference costs (central gas CHP, central solid biomass
+    CHP, SMR, H2 (l) storage tank, `4459a96c`) record their source currency
+    (EUR2010/2012/2013) and no PyPSA file reads them; failing on those blocked
+    `--write` entirely, which is why the PV/onwind lifetime change of `788cc75a`
+    never reached `data/walloon/custom_costs.csv`. `--check` still lists them,
+    as a note rather than an error. See B7 of
+    docs/temporary_improvement_plans.md.
+    """
     eur_ref = int(meta["EUR_REF"])
     prefix = f"EUR{eur_ref}"
     fails: list[str] = []
-    for r in df.loc[monetary_mask(df)].itertuples():
+    targeted = df.loc[monetary_mask(df) & df["pypsa_wal_target"].notna()]
+    for r in targeted.itertuples():
         if not str(r.units).startswith(prefix):
             fails.append(
                 f"units: {r.technology_name_pypsa}/{r.parameter}/{r.year} -> {r.units}"
@@ -1344,6 +1367,20 @@ def cmd_check(df: pd.DataFrame, meta: dict, verbose: bool = False) -> int:
         print("master CSV:")
         for f in fails:
             print(f"  ✗ {f}")
+
+    untargeted = untargeted_monetary_rows(df)
+    off_tag = untargeted.loc[
+        ~untargeted["units"].astype(str).str.startswith(f"EUR{int(meta['EUR_REF'])}")
+    ]
+    if len(off_tag):
+        print(
+            f"note: {len(off_tag)} monetary row(s) keep a non-EUR{meta['EUR_REF']} "
+            "source currency and have no pypsa_wal_target (reference only, "
+            "nothing reads them):"
+        )
+        for tech, grp in off_tag.groupby("technology_name_pypsa"):
+            years = sorted({str(y) for y in grp["year_currency"].dropna()})
+            print(f"  · {tech} ({len(grp)} rows, EUR{'/'.join(years)})")
 
     horizons = planning_horizons()
     patches = [

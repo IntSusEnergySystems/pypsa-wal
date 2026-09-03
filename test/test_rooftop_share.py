@@ -2,14 +2,21 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Rooftop PV on the LV bus counts as BEWAL, and TIMES sets its share of solar.
+"""Rooftop PV counts as BEWAL solar, and TIMES sets its share of the fleet.
 
-Item 8: alias ``BEWAL low voltage`` country after the region rewrite, then pin
-rooftop ≥ TIMES share × (rooftop + utility + hsat).
+Item 8. Rooftop sits on the ``BEWAL low voltage`` bus, whose *country* is the
+national code — grouping it correctly used to need a country alias. Since B1
+the CCL groups by ``(bus location, carrier)``, so the LV bus is BEWAL by
+construction and the alias is gone.
+
+The share pin itself stays **off** (B5): PyPSA labels the whole historical
+Walloon fleet ``solar``, so a share of total capacity cannot be imposed on a
+base year that is pinned to that fleet.
 """
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 import pandas as pd
@@ -18,7 +25,6 @@ import pytest
 
 from scripts.walloon_scripts.named_pins import (
     add_rooftop_share_constraint,
-    alias_low_voltage_countries,
     year_map,
 )
 
@@ -65,29 +71,23 @@ def _network() -> pypsa.Network:
     return n
 
 
-def test_lv_country_follows_the_rewritten_region_bus():
+def test_rooftop_groups_with_bewal_by_location():
+    """No alias needed: the LV bus already carries the region as its location."""
     n = _network()
     assert n.buses.at["BEWAL low voltage", "country"] == "BE"
-    n.buses.at["BEWAL", "country"] = "BEWAL"
-    alias_low_voltage_countries(n)
-    assert n.buses.at["BEWAL low voltage", "country"] == "BEWAL"
+    location = n.generators.bus.map(n.buses.location)
+    assert location["BEWAL solar rooftop"] == "BEWAL"
+    assert location["BEWAL solar"] == "BEWAL"
 
 
-def test_rooftop_groups_with_bewal_solar_all_after_alias():
-    n = _network()
-    n.buses.at["BEWAL", "country"] = "BEWAL"
-    alias_low_voltage_countries(n)
-    country = n.generators.bus.map(n.buses.country)
-    assert country["BEWAL solar rooftop"] == "BEWAL"
-    assert country["BEWAL solar"] == "BEWAL"
+def test_share_pin_is_infeasible_inside_a_collapsed_base_year_envelope():
+    """Why item 8 is off (B5), stated as an LP fact rather than a note.
 
-
-def test_share_and_collapsed_utility_envelope_need_rooftop_outside_solar_all():
-    """2025 BEWAL solar-all is min=max=utility. Share × that stock does not fit.
-
-    Utility 100 MW pinned, TIMES-like 25.8 % share wants ~35 MW rooftop. If
-    rooftop is inside the same solar-all group the LP is infeasible; if it is
-    not, the share pin is just extra rooftop and solves.
+    2025 BEWAL solar-all is `min = max` at the historical fleet, all of which
+    PyPSA labels utility. A 25.8 % rooftop share then needs ~35 MW of extra
+    capacity inside a corridor that has none — infeasible. Taking rooftop out
+    of `solar-all` makes it solvable but unpins total PV, which is the trade
+    B5 refuses. Re-enabling item 8 means splitting the base-year fleet first.
     """
     share = 0.25806451612903225
     utility = 100.0
@@ -143,3 +143,20 @@ def test_committed_share_csv_has_2050_above_three_quarters():
     # share column is rooftop / (rooftop + utility), not a hand-typed guess
     recomputed = df["rooftop_gw"] / (df["rooftop_gw"] + df["utility_gw"])
     assert (recomputed - df["share"]).abs().max() < 1e-4
+
+
+def test_rooftop_is_inside_the_solar_all_group():
+    """B5: the caps file holds Elia's *total* PV, so the group must be total PV.
+
+    With `solar rooftop` outside `rename_solar`, the 2025 pin bounded utility
+    alone and the solve came out at 5 510 MW of Walloon PV against a 4 088 MW
+    historical pin. `res_build_rates.csv` derives the regional split from the
+    same total, so the two only agree when rooftop is in the group.
+    """
+    import scripts.solve_network as sn
+
+    src = inspect.getsource(sn.add_CCL_constraints)
+    assert '"solar rooftop": "solar-all"' in src, (
+        "rooftop is outside solar-all: the base-year pin no longer bounds "
+        "total PV (B5)"
+    )

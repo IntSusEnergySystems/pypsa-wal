@@ -48,7 +48,6 @@ from scripts.prepare_sector_network import determine_emission_sectors
 from scripts.walloon_scripts.named_pins import (
     add_industry_cc_floor,
     add_rooftop_share_constraint,
-    alias_low_voltage_countries,
     lookup_year_value,
     planning_year,
 )
@@ -699,6 +698,24 @@ def _widen_against(
     return maximum
 
 
+def _parent_country(n: pypsa.Network, region: str) -> str | None:
+    """ISO code a region node belongs to (`BEWAL` -> `BE`).
+
+    Read from the buses at that location rather than from the node's own AC
+    bus, so an already-solved network whose `country` column was rewritten by
+    an older version of this function still resolves correctly.
+    """
+    at_loc = n.buses[n.buses.location.astype(str) == str(region)]
+    codes = [
+        str(c)
+        for c in at_loc.country.astype(str)
+        if str(c) not in ("", "nan", str(region))
+    ]
+    if not codes:
+        return None
+    return pd.Series(codes).mode().iloc[0]
+
+
 def add_CCL_constraints(
     n: pypsa.Network, config: dict, planning_horizons: str | None
 ) -> None:
@@ -745,39 +762,54 @@ def add_CCL_constraints(
         agg_p_nom_minmax, tolerance, planning_horizons
     )
 
-    buses_to_country = True
-    # alias_buses = {}
-    # alias_original = None
-    if buses_to_country:
-        # temporarily set bus countries to region names for CCL constraint application
-        regions = set(agg_p_nom_minmax.index.get_level_values(0))
-        region_buses = list(regions.intersection(n.buses.index))
-        original_country = None
-        if region_buses:
-            original_country = n.buses.loc[region_buses, "country"].copy()
-            n.buses.loc[region_buses, "country"] = region_buses
-            # when a bus has its own constraint entry, subtract it from its parent country
-            for region in region_buses:
-                parent = original_country.loc[region]
-                if parent == region:
-                    continue
-                for carrier in agg_p_nom_minmax.index.get_level_values(1).unique():
-                    region_idx = (region, carrier)
-                    parent_idx = (parent, carrier)
-                    if region_idx not in agg_p_nom_minmax.index:
-                        continue
-                    if parent_idx not in agg_p_nom_minmax.index:
-                        continue
-                    for col in agg_p_nom_minmax.columns:
-                        region_val = agg_p_nom_minmax.loc[region_idx, col]
-                        parent_val = agg_p_nom_minmax.loc[parent_idx, col]
-                        if pd.isna(region_val) or pd.isna(parent_val):
-                            continue
-                        agg_p_nom_minmax.loc[parent_idx, col] = max(
-                            parent_val - region_val, 0
-                        )
+    # A region row detaches that region from its parent country *for the carrier
+    # it names, and only that carrier*. The previous implementation rewrote
+    # `n.buses.country` per bus, which is carrier-blind: the first BEVLG row
+    # (`BEVLG,nuclear-all`, 87552368) silently removed Flanders from every `BE`
+    # row, so the 2025 offshore pin grouped nothing (2025 built the full 8 GW
+    # potential) and 2030 applied Elia's whole 10 GW solar remainder to
+    # Brussels, which has no land left -- an empty LP in 0 barrier iterations.
+    # See B1 in docs/temporary_improvement_plans.md. The bus table is no longer
+    # mutated, so there is nothing to restore afterwards either.
+    rows = set(agg_p_nom_minmax.index)
+    carriers_in_file = agg_p_nom_minmax.index.get_level_values(1).unique()
+    locations = set(n.buses.location.dropna().astype(str))
+    regions = sorted(set(agg_p_nom_minmax.index.get_level_values(0)) & locations)
 
-        alias_low_voltage_countries(n)
+    for region in regions:
+        parent = _parent_country(n, region)
+        if parent is None:
+            continue
+        # when a region has its own entry, subtract it from its parent country
+        for carrier in carriers_in_file:
+            region_idx = (region, carrier)
+            parent_idx = (parent, carrier)
+            if region_idx not in agg_p_nom_minmax.index:
+                continue
+            if parent_idx not in agg_p_nom_minmax.index:
+                continue
+            for col in agg_p_nom_minmax.columns:
+                region_val = agg_p_nom_minmax.loc[region_idx, col]
+                parent_val = agg_p_nom_minmax.loc[parent_idx, col]
+                if pd.isna(region_val) or pd.isna(parent_val):
+                    continue
+                agg_p_nom_minmax.loc[parent_idx, col] = max(parent_val - region_val, 0)
+
+    def ccl_country(comp: pd.DataFrame, bus_col: str) -> pd.Series:
+        """Group key: the region when the caps file names (region, carrier).
+
+        Otherwise the bus keeps its own country, so a `BE` row still covers
+        every Belgian node for the carriers no region row claims.
+        """
+        buses = comp[bus_col]
+        loc = buses.map(n.buses.location).astype(object)
+        ctry = buses.map(n.buses.country).astype(object)
+        claimed = pd.Series(
+            [(a, b) in rows for a, b in zip(loc, comp.carrier.astype(object))],
+            index=comp.index,
+        )
+        return loc.where(claimed, ctry).rename(bus_col)
+
     logger.info("Adding generation capacity constraints per carrier and country")
     p_nom = n.model["Generator-p_nom"]
     p_nom_link = n.model["Link-p_nom"]
@@ -802,12 +834,19 @@ def add_CCL_constraints(
             "solar": "solar-all",
             "solar-utility": "solar-all",
             "solar-hsat": "solar-all",
-            # Not rooftop. 2025 BEWAL solar-all min=max=4088 MW is the
-            # utility fleet (vintages + 2025 vintage). Putting rooftop in
-            # that group plus the TIMES share pin needs ~1.4 GW extra in a
-            # 20 MW corridor → Gurobi inf-or-unbounded in 0 barrier
-            # iterations (2026-09-02 1h). Item 8 keeps the share pin and
-            # the LV country alias; solar-all stays utility + hsat.
+            # Rooftop belongs in the group. The numbers in the caps file are
+            # Elia's *total* PV fleet (BE 9 751 MW in 2025, BEWAL 4 088), and
+            # res_build_rates.csv derives the regional split from that same
+            # total. With rooftop outside, the base-year pin bounded utility
+            # alone and the 2025 solve came out at 5 510 MW of Walloon PV
+            # against a 4 088 MW pin. It was taken out on 2026-09-02 because
+            # item 8's share pin then needs ~1.4 GW of rooftop inside a 20 MW
+            # corridor; that is a fault in the share pin, not in the group —
+            # PyPSA labels the whole historical fleet `solar` while TIMES has
+            # 0.5 GW rooftop + 1.4 GW utility in 2025. Item 8 stays off until
+            # that base year is reconciled. See B5 of
+            # docs/temporary_improvement_plans.md.
+            "solar rooftop": "solar-all",
         }
         gens = gens.replace(rename_solar)
     if config["solving"]["agg_p_nom_limits"]["agg_nuclear"]:
@@ -825,8 +864,8 @@ def add_CCL_constraints(
             links = links.replace(rename_nuclear)
     if config["solving"]["agg_p_nom_limits"]["agg_ccgt"]:
         links = links.replace({"CCGT": "CCGT-all", "CCGT CC": "CCGT-all"})
-    grouper = pd.concat([gens.bus.map(n.buses.country), gens.carrier], axis=1)
-    grouper_links = pd.concat([links.bus1.map(n.buses.country), links.carrier], axis=1)
+    grouper = pd.concat([ccl_country(gens, "bus"), gens.carrier], axis=1)
+    grouper_links = pd.concat([ccl_country(links, "bus1"), links.carrier], axis=1)
     lhs = p_nom.groupby(grouper).sum().rename(bus="country")
     lhs_groups = lhs.indexes["group"] if "group" in lhs.indexes else pd.Index([])
 
@@ -865,7 +904,7 @@ def add_CCL_constraints(
             links_cst = links_cst.replace({"CCGT": "CCGT-all", "CCGT CC": "CCGT-all"})
         rhs_cst = (
             pd.concat(
-                [gens_cst.bus.map(n.buses.country), gens_cst[["carrier", "p_nom"]]],
+                [ccl_country(gens_cst, "bus"), gens_cst[["carrier", "p_nom"]]],
                 axis=1,
             )
             .groupby(["bus", "carrier"])
@@ -875,7 +914,7 @@ def add_CCL_constraints(
         rhs_cst_links = (
             pd.concat(
                 [
-                    links_cst.bus1.map(n.buses.country),
+                    ccl_country(links_cst, "bus1"),
                     links_cst[["carrier", "p_nom_e"]],
                 ],
                 axis=1,
@@ -997,6 +1036,22 @@ def add_CCL_constraints(
         # bound only the extendable tranche, so a myopic cap reset at every
         # horizon and the fleet grew past the aggregate limit.
         rhs_gens = (rhs_max - rhs_cst.reindex(idx_max).fillna(0).p_nom).dropna()
+        # A standing fleet above its own cap is the one failure Gurobi reports
+        # as "infeasible or unbounded in 0 barrier iterations", with no IIS and
+        # no clue which group did it: 2030 was misdiagnosed three times that way
+        # (items 6a, 8 and 11 in turn) before the cause was found. Say it out
+        # loud instead. B1/B8 of docs/temporary_improvement_plans.md.
+        over = rhs_gens[rhs_gens < -1e-6]
+        for (country, carrier), gap in over.items():
+            logger.warning(
+                "%s %s at %s: the standing fleet already exceeds the aggregate "
+                "cap by %.0f MW. Nothing new can be built and the corridor may "
+                "be empty — check the previous horizon's solved network.",
+                country,
+                carrier,
+                planning_horizons,
+                -gap,
+            )
         lower_bounds_gens = (
             pd.concat([grouper, gens.p_nom_min.rename("p_nom")], axis=1)
             .groupby(["bus", "carrier"])
@@ -1081,11 +1136,9 @@ def add_CCL_constraints(
             name="agg_p_nom_max_links",
         )
 
-    # reset original country assignments
-    # if alias_buses and alias_original is not None:
-    #     n.buses.loc[list(alias_buses.keys()), "country"] = alias_original
-    # if buses_to_country and region_buses:
-    #     n.buses.loc[region_buses, "country"] = original_country
+    # Nothing to reset: `n.buses.country` is never mutated, so the solved
+    # network keeps the real ISO codes and downstream consumers (national CO2
+    # attribution, review_run, pypsa2html) group by `location` as they expect.
 
 
 def add_EQ_constraints(n, o, scaling=1e-1):
@@ -1617,8 +1670,17 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
     variable per location, lower-bounded by net inflows on AC lines and DC
     links, and caps the annual sum at ``(1 - level) * local_energy``. Item 6a
     keeps that machinery and adds an **absolute TWh** right-hand side scoped
-    to a list of nodes (BEWAL). Exports cannot count as negative imports:
-    ``Import_p >= 0``.
+    to a list of nodes (BEWAL).
+
+    What the variable measures: the **hourly positive part of net cross-border
+    inflow**, summed over the year. Exports never net imports off
+    (``Import_p >= 0``), which is the right analogue of the TIMES
+    ``Transfo_Imp`` process — also a one-way annual flow — and is *not* the
+    annual net balance. B6 fixed three defects in the expression: AC and DC
+    were capped separately (so the bound was the larger, not the sum), the
+    ``-reversed`` leg of every DC pair was filtered out (so DC imports were
+    invisible), and both flows were inflated (``/ s_max_pu`` on lines,
+    ``/ efficiency`` on links) instead of using the physical flow.
     """
     if isinstance(settings, (int, float)):
         settings = {"mode": "fraction", "level": float(settings)}
@@ -1672,15 +1734,19 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
             (group(n.links, b="bus0") != group(n.links, b="bus1")).to_numpy()
         ]
         if not cross_region_links.empty:
-            reversed_mask = (
-                cross_region_links.index.astype(str).str.contains("reversed")
-            )
+            # Keep BOTH legs of a lossy bidirectional pair. Dropping the
+            # `-reversed` leg dropped the *import* direction: BEWAL's only DC
+            # border is ALEGrO, whose reversed link (DE -> BEWAL) carries every
+            # imported MWh, so the cap saw exports only. B6.
             cross_region_links = cross_region_links.loc[
-                cross_region_links.carrier.isin(["DC"]) & ~reversed_mask
+                cross_region_links.carrier.isin(["DC"])
             ]
 
     import_buses = list(n.model["Import_p"].indexes["bus"])
 
+    # One expression over AC and DC together. Adding a constraint per component
+    # made `Import_p` the *larger* of the two nets rather than their sum. B6.
+    net_total = None
     for component_name, df in (
         ("Line", cross_region_lines),
         ("Link", cross_region_links),
@@ -1689,14 +1755,16 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
             continue
 
         if component_name == "Line":
-            avail = df["s_max_pu"]
-            flow = n.model["Line-s"].loc[:, df.index] / avail
+            # physical flow: `s` is what crosses the border. Dividing by
+            # `s_max_pu` (0.7 here) inflated every AC import by 43 %. B6.
+            flow = n.model["Line-s"].loc[:, df.index]
             inflow = flow.groupby(group(df, "bus1")).sum()
             outflow = flow.groupby(group(df, "bus0")).sum()
         else:
+            # `p` is withdrawn at bus0; `p * efficiency` arrives at bus1.
             eff = df["efficiency"]
-            flow = n.model["Link-p"].loc[:, df.index] / eff
-            inflow = flow.groupby(group(df, "bus1")).sum()
+            flow = n.model["Link-p"].loc[:, df.index]
+            inflow = (flow * eff).groupby(group(df, "bus1")).sum()
             outflow = flow.groupby(group(df, "bus0")).sum()
 
         bus_dim = "bus"
@@ -1707,13 +1775,13 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
             continue
         inflow = inflow.reindex({bus_dim: union}, fill_value=0)
         outflow = outflow.reindex({bus_dim: union}, fill_value=0)
-        net = inflow - outflow
-        common = [b for b in import_buses if b in net.indexes["bus"]]
-        if not common:
-            continue
+        net = (inflow - outflow).reindex({bus_dim: import_buses}, fill_value=0)
+        net_total = net if net_total is None else net_total + net
+
+    if net_total is not None:
         n.model.add_constraints(
-            n.model["Import_p"].sel(bus=common) >= net.sel(bus=common),
-            name=f"import_positive_{component_name}",
+            n.model["Import_p"] >= net_total,
+            name="import_positive",
         )
 
     imported_elec = (

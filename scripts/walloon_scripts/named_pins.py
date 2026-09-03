@@ -58,24 +58,6 @@ def lookup_year_value(cfg: dict, year: int | None, inline_key: str, file_col: st
     return None
 
 
-def alias_low_voltage_countries(n) -> None:
-    """Copy each AC bus's country onto its `` low voltage`` child.
-
-    Rooftop PV sits on the LV bus. ``sanitize_locations`` fills an empty LV
-    ``country`` from the parent's ISO code, so rooftop is counted against the
-    Belgian ``solar-all`` cap instead of BEWAL. After region buses have been
-    rewritten to their own names, copy that country down.
-    """
-    suffix = " low voltage"
-    for bus in n.buses.index:
-        name = str(bus)
-        if not name.endswith(suffix):
-            continue
-        parent = name[: -len(suffix)]
-        if parent in n.buses.index:
-            n.buses.at[bus, "country"] = n.buses.at[parent, "country"]
-
-
 def add_rooftop_share_constraint(n, node: str, share: float) -> None:
     """``solar rooftop`` ≥ ``share`` × all solar at ``node`` (by location)."""
     if share <= 0:

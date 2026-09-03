@@ -26,7 +26,8 @@ override that would silently override a calculation — which is what this check
 
 Exception (item 11): ``BE/offwind-all`` may pin 2030 (``min == max`` = standing
 fleet) and carry committed-infrastructure floors after 2030. Other groups keep
-the original design.
+the original design. Region rows (``BEVLG``, ``BEBRU``) are policed by the same
+rules even though they are not required to exist.
 
 Usage
 -----
@@ -47,6 +48,12 @@ RES_CARRIERS = ("onwind", "offwind-all", "solar-all")
 # nodes the walloon config solves; the file also carries inert rows for countries
 # outside `countries:` (BG, DK, IE, …) which are not ours to police
 MODELLED = ("BE", "BEWAL", "DE", "FR", "GB", "NL", "LU")
+# Region rows are not in MODELLED (they need no row of their own — the parent
+# country row covers them), but when one *is* written it has to obey the same
+# design. Leaving them unpoliced is how `BEVLG,offwind-all 2030 min=max=8000`
+# and two hand-split Elia remainders passed a green checker. See B1/B2 of
+# docs/temporary_improvement_plans.md.
+POLICED = MODELLED + ("BEVLG", "BEBRU")
 # offshore only exists where there is a coast
 NO_OFFSHORE = ("BEWAL", "LU")
 BASE_YEAR, CORRIDOR_YEAR = 2025, 2030
@@ -86,7 +93,7 @@ def expected_groups() -> set[tuple[str, str]]:
 
 def check(env: pd.DataFrame, rates: pd.DataFrame | None = None) -> list[str]:
     errors: list[str] = []
-    ours = env[env.country.isin(MODELLED) & env.carrier.isin(RES_CARRIERS)]
+    ours = env[env.country.isin(POLICED) & env.carrier.isin(RES_CARRIERS)]
 
     for row in ours.itertuples():
         key = f"{row.country}/{row.carrier} {row.year}"
@@ -115,6 +122,8 @@ def check(env: pd.DataFrame, rates: pd.DataFrame | None = None) -> list[str]:
                     "techno-economic optimum with no policy floor"
                 )
 
+    # completeness is a MODELLED-only question: region nodes inherit their
+    # parent country's row and must not be required to carry one
     present = set(zip(ours.country, ours.carrier))
     for country, carrier in sorted(expected_groups() - present):
         errors.append(f"{country}/{carrier}: no row at all — the group would be unbounded")

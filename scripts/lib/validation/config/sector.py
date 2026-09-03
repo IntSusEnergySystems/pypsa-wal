@@ -65,8 +65,14 @@ class _DistrictHeatingConfig(ConfigModel):
             "supplemental_heating": {"enable": False, "booster_heat_pump": False},
             "max_top_temperature": 90,
             "min_bottom_temperature": 35,
+            "e_nom_max_weeks": None,
         },
-        description="Pit thermal energy storage settings.",
+        description=(
+            "Pit thermal energy storage settings. `e_nom_max_weeks`: null "
+            "leaves the Store unbounded (upstream default); a positive number "
+            "is weeks of that node's urban-central heat demand, used as the "
+            "Store `e_nom_max` (improvement-plan item 16)."
+        ),
     )
     ates: dict[str, Any] = Field(
         default_factory=lambda: {

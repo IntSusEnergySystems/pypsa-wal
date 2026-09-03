@@ -30,6 +30,7 @@ from scripts.walloon_scripts.nuclear_helper import (
     retrofit_retired_nuclear,
 )
 from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
+from scripts.walloon_scripts.ptes_bounds import apply_ptes_fleet_cap
 from scripts.walloon_scripts.set_NTCs import apply_ntc_floors
 
 logger = logging.getLogger(__name__)
@@ -459,6 +460,17 @@ if __name__ == "__main__":
         planning_horizons=int(snakemake.wildcards.planning_horizons),
         walloon_potentials=snakemake.input.get("walloon_potentials"),
     )
+
+    # Item 16 is a ceiling on the standing fleet, not on each vintage: the
+    # ceiling prepare_sector_network wrote applies to this horizon's Store,
+    # and brownfield has just added the earlier ones (B9).
+    _ptes_cfg = (
+        ((snakemake.config.get("sector") or {}).get("district_heating") or {}).get(
+            "ptes"
+        )
+        or {}
+    )
+    apply_ptes_fleet_cap(n, _ptes_cfg.get("e_nom_max_weeks"))
 
     kind = snakemake.params.transmission_limit[planning_horizon][0]
     factor = snakemake.params.transmission_limit[planning_horizon][1:]
