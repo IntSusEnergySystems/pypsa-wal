@@ -30,6 +30,7 @@ from scripts.walloon_scripts.nuclear_helper import (
     retrofit_retired_nuclear,
 )
 from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
+from scripts.walloon_scripts.set_NTCs import apply_ntc_floors
 
 logger = logging.getLogger(__name__)
 idx = pd.IndexSlice
@@ -467,6 +468,13 @@ if __name__ == "__main__":
     # undoing the carry-forward add_brownfield established above. Re-apply it,
     # or every horizon would be free to tear down what the last one built.
     carry_forward_built_grid(n, n_p)
+
+    # Committed NTC floor (Boucle du Hainaut). Must follow the clip above:
+    # carry_forward caps s_nom_min at s_nom_max, then the floor raises both
+    # if the 2035 ceiling was still 3.6 GW.
+    floors = getattr(snakemake.input, "ntc_floors", None)
+    if floors:
+        apply_ntc_floors(n, floors, planning_horizon)
 
     if factor != "opt" and float(factor) == 1.0:
         disable_grid_expansion_if_limit_hit(n)

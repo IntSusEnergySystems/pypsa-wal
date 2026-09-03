@@ -48,11 +48,41 @@ scen_corrige:
 scen_demande_haute:
   sector:
     times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
+    rooftop_share:
+      # Item 8 withdrawn for this 1h run (2026-09-03). 2025 at 25.8 % was
+      # optimal after rooftop left solar-all. 2030 at 71.4 % is still
+      # inf-or-unbounded in 0 barrier iterations with item 6a off (job
+      # 11110016). TIMES mix is 5.2 GW rooftop / 2.1 GW utility; Elia
+      # solar-all floor is 6.5 GW utility. Code and CSV stay; overlay off.
+      # See docs/logs/2026-09-02_scen_demande_haute_2010_1h.md §9.
+      enable: false
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture.csv
   electricity:
     retrofit_nuclear_once: false
   solving:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_demande_haute.csv
+  self_sufficiency:
+    # Item 6a withdrawn for this 1h run (2026-09-03). TIMES Transfo_Imp
+    # 2.94 / 6.47 / 10 TWh is not feasible as a GROSS hourly cap on BEWAL
+    # (incl. Flanders): 2025 1h already has 13.1 TWh gross inflow (8.2 TWh
+    # from abroad alone) while annual NET is an export (−1.5 TWh). 2030
+    # job 11108009 was inf-or-unbounded in 0 barrier iterations. Code and
+    # tests stay; only this overlay is off. See
+    # docs/logs/2026-09-02_scen_demande_haute_2010_1h.md §9.
+    self_sufficiency_constraint: false
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
 
 # Nuclear CAPEX sensitivities. `costs: overwrites: {<parameter>: {<technology>: value}}`
 # is applied in scripts/process_cost_data.py on top of the custom-costs file, before
@@ -123,6 +153,15 @@ scen_data:
 scen_evflex:
   sector:
     times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
+    rooftop_share:
+      # Same item-8 withdrawal as scen_demande_haute (2030 71.4 % inf).
+      enable: false
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture.csv
     bev_dsm_availability:
       2020: 0.005
       2025: 0.03
@@ -190,3 +229,14 @@ scen_evflex:
   solving:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_demande_haute.csv
+  self_sufficiency:
+    # Same 6a withdrawal as scen_demande_haute: 1h GROSS BEWAL cap is inf.
+    # See docs/logs/2026-09-02_scen_demande_haute_2010_1h.md §9.
+    self_sufficiency_constraint: false
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0

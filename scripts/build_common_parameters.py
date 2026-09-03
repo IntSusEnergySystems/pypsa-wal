@@ -447,7 +447,10 @@ def patch_ntc(df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool) -> lis
 
     patches: list[Patch] = []
     for path in sorted((ROOT / "data" / "walloon").glob(NTC_GLOB)):
-        year = int(re.search(r"(\d{4})", path.name).group(1))
+        year_m = re.search(r"ntc_(\d{4})\.csv$", path.name)
+        if not year_m:
+            continue  # ntc_floors.csv and any other non-horizon table
+        year = int(year_m.group(1))
         patch = Patch(path=path)
         frame = _read_str(path)
         before = frame.copy()

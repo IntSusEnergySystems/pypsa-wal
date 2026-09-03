@@ -1865,6 +1865,7 @@ rule prepare_sector_network:
             else []
         ),
         ntc_csv="data/walloon/ntc_{planning_horizons}.csv",
+        ntc_floors="data/walloon/ntc_floors.csv",
         clever_transport=resources("clever_Transport_{clusters}_{planning_horizons}.csv"),
     output:
         resources(

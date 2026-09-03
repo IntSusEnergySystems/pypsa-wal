@@ -48,7 +48,7 @@ from scripts.prepare_network import maybe_adjust_costs_and_potentials
 from scripts.walloon_scripts.nuclear_helper_overnight import add_BEWAL_nuclear
 from scripts.walloon_scripts.nuclear_helper import apply_nuclear_inflexibility
 from scripts.walloon_scripts.BEWAL_potentials_overnight import update_BEWAL_potentials
-from scripts.walloon_scripts.set_NTCs import apply_ntc_limits
+from scripts.walloon_scripts.set_NTCs import apply_ntc_floors, apply_ntc_limits
 from scripts.walloon_scripts.ptes_bounds import ptes_store_e_nom_max
 
 spatial = SimpleNamespace()
@@ -7439,6 +7439,9 @@ if __name__ == "__main__":
     sanitize_locations(n)
     if snakemake.config["electricity"].get("apply_ntc_constraints", False):
         apply_ntc_limits(n, snakemake.input.ntc_csv)
+        apply_ntc_floors(
+            n, snakemake.input.ntc_floors, investment_year
+        )
     if foresight == "overnight":
      add_BEWAL_nuclear(
         n=n,

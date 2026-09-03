@@ -141,15 +141,50 @@ def test_rejects_a_group_missing_from_the_rate_table(tmp_path):
 
 
 def test_be_offwind_2030_is_the_standing_fleet():
-    """Item 11: first future horizon must not floor PEZ above the standing fleet."""
+    """Item 11: first future horizon must not floor PEZ above the standing fleet.
+
+    2026-09-03 1h: 2025 BEVLG AC country is ``BEVLG``, so the BE offwind-all
+    pin never bound and the horizon built the 8 GW potential. 2030 brownfield
+    has country ``BE`` and 8 GW standing; a 2262 pin is then an empty LP.
+    The 2030 pin follows that built fleet for this myopic chain.
+    """
     path = ROOT / "data" / "walloon" / "agg_p_nom_minmax_demande_haute.csv"
     env = load_envelope(path)
     row = env[
         (env.country == "BE") & (env.carrier == "offwind-all") & (env.year == 2030)
     ]
     assert len(row) == 1
-    assert float(row.iloc[0]["min"]) == 2262
-    assert float(row.iloc[0]["max"]) == 2262
+    assert float(row.iloc[0]["min"]) == 8000
+    assert float(row.iloc[0]["max"]) == 8000
+
+
+def test_bevlg_carries_the_belgian_res_remainder():
+    """CCL rewrites BEVLG/BEWAL country to the bus name, so a BE-only 2030
+    floor is applied to BEBRU alone. 2026-09-03 1h: that asked Brussels for
+    4.3 GW of new utility solar on leftover land after 2025 hsat → empty LP.
+    The Elia remainder (BE − BEWAL) must sit on BEVLG, where the 2025 fleet
+    already covers it.
+    """
+    path = ROOT / "data" / "walloon" / "agg_p_nom_minmax_demande_haute.csv"
+    env = load_envelope(path)
+
+    def _val(country, carrier, year, col):
+        row = env[
+            (env.country == country) & (env.carrier == carrier) & (env.year == year)
+        ]
+        assert len(row) == 1, f"missing {country}/{carrier} {year}"
+        return float(row.iloc[0][col])
+
+    assert _val("BEVLG", "solar-all", 2030, "min") == 10000
+    assert _val("BEWAL", "solar-all", 2030, "min") + _val(
+        "BEVLG", "solar-all", 2030, "min"
+    ) == _val("BE", "solar-all", 2030, "min")
+    assert _val("BEVLG", "onwind", 2030, "min") == 2000
+    assert _val("BEWAL", "onwind", 2030, "min") + _val(
+        "BEVLG", "onwind", 2030, "min"
+    ) == _val("BE", "onwind", 2030, "min")
+    assert _val("BEVLG", "offwind-all", 2030, "min") == 8000
+    assert _val("BEVLG", "offwind-all", 2030, "max") == 8000
 
 
 def test_base_and_corridor_years_are_what_the_doc_says():

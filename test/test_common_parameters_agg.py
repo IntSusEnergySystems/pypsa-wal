@@ -32,8 +32,13 @@ EXPECTED = {
 
 # Item 11: Belgian PEZ retiming (MW). 2030 is a pin; 2040/2050 are floors.
 EXPECTED_OFFSHORE = {
-    ("BE", "offwind-all", "min"): {2025: 2262, 2030: 2262, 2040: 4362, 2050: 5800},
-    ("BE", "offwind-all", "max"): {2025: 2262, 2030: 2262},
+    ("BE", "offwind-all", "min"): {2025: 2262, 2030: 8000, 2040: 4362, 2050: 5800},
+    ("BE", "offwind-all", "max"): {2025: 2262, 2030: 8000},
+    # Same pin on the Flemish bus: CCL rewrites BEVLG country so the BE row
+    # never grouped the turbines (2026-09-03 1h 2030 empty LP was Brussels solar,
+    # but the offwind pin was a no-op for the same reason).
+    ("BEVLG", "offwind-all", "min"): {2030: 8000, 2040: 4362, 2050: 5800},
+    ("BEVLG", "offwind-all", "max"): {2030: 8000},
 }
 # Walloon dispatchable-gas floor, technology-neutral over CCGT + CCGT CC. Unlike
 # nuclear this one does anchor 2025/2030: the legacy gas fleet is well below it.

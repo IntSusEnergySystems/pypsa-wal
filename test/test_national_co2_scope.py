@@ -27,6 +27,7 @@ from scripts.prepare_sector_network import determine_emission_sectors
 from scripts.solve_network import (
     AVIATION_CARRIER,
     AVIATION_SECTORS,
+    determine_emission_sectors as solve_determine_emission_sectors,
     national_co2_country,
     national_co2_expression,
     national_co2_sectors,
@@ -135,6 +136,7 @@ def test_aviation_stays_in_the_global_sector_list():
         "agriculture": True,
     }
     sectors = determine_emission_sectors(options)
+    assert solve_determine_emission_sectors is determine_emission_sectors
     assert "international aviation" in sectors
     assert "domestic aviation" in sectors
 

@@ -304,6 +304,17 @@ sector:
 
   times_demand: true
   times_file: data/walloon/scen_base_coherence_3110.vd
+  # Item 8: TIMES rooftop share of PV plant capacity (ERNW VAR_Cap). Default
+  # off; scen_demande_haute turns it on. Repair the LV country alias first.
+  rooftop_share:
+    enable: false
+    node: BEWAL
+    file: data/walloon/times_pv_rooftop_share.csv
+  # Item 9: STORAGEMININD capture floor (kt/a) on industry CC, not DAC.
+  industry_cc_floor:
+    enable: false
+    node: BEWAL
+    file: data/walloon/times_industrial_capture.csv
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
   # TIMES Sankey diagrams into results/<prefix>/<run>/html/times/, beside
@@ -520,7 +531,9 @@ budget_national:
 
 self_sufficiency:
   self_sufficiency_constraint: false
-  level: 0.7   
+  level: 0.7
+  # Item 6a: set mode: absolute, nodes: [BEWAL], limit_twh: {...} in the
+  # scenario overlay (scen_demande_haute). Do not put a 10 TWh cap on Belgium. 
 costs:
   custom_cost_fn: data/walloon/custom_costs.csv
   hurdle_rate_fn: data/walloon/discount_rates.csv

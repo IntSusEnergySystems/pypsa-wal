@@ -13,6 +13,7 @@ import pytest
 from scripts.walloon_scripts.set_NTCs import (
     BE_REGION_BUSES,
     _bus_selector,
+    apply_ntc_floors,
     apply_ntc_limits,
     read_ntc_pairs,
 )
@@ -204,3 +205,87 @@ def test_a_dc_only_border_keeps_its_zero_base(tmp_path):
 
     assert n.links.at["DC2", "p_nom"] == 0.0
     assert n.links.at["DC2", "p_nom_max"] == pytest.approx(1400.0)
+
+
+ROOT = Path(__file__).resolve().parents[1]
+FLOORS = ROOT / "data" / "walloon" / "ntc_floors.csv"
+BOUCLE_USABLE_MW = 9600.0
+
+
+def _floors_file(tmp_path: Path, year: int, mw: float) -> Path:
+    f = tmp_path / f"floors_{year}.csv"
+    f.write_text(
+        "year,source_country_code,target_country_code,NTC_MIN_MW\n"
+        f"{year},BEWAL,BEVLG,{mw}\n{year},BEVLG,BEWAL,{mw}\n"
+    )
+    return f
+
+
+def test_2035_ceiling_covers_the_boucle_floor():
+    """A 3.6 GW 2035 ceiling would invert min>max once the floor is 9.6 GW."""
+    ntc = ROOT / "data" / "walloon" / "ntc_2035.csv"
+    pairs = read_ntc_pairs(ntc)
+    usable = pairs[tuple(sorted(["BEWAL", "BEVLG"]))]
+    assert usable >= BOUCLE_USABLE_MW
+
+
+def test_floors_file_starts_in_2035_at_9600():
+    floors = pd.read_csv(FLOORS, comment="#")
+    by_year = floors.groupby("year")["NTC_MIN_MW"].mean()
+    assert 2025 not in by_year.index
+    assert 2030 not in by_year.index
+    for year in (2035, 2040, 2045, 2050):
+        assert by_year.loc[year] == pytest.approx(BOUCLE_USABLE_MW)
+
+
+def test_apply_ntc_floors_sets_usable_s_nom_min(tmp_path: Path):
+    n = _be_network()
+    apply_ntc_limits(n, _ntc_file(tmp_path, "BEWAL", "BEVLG", 13200))
+    apply_ntc_floors(n, _floors_file(tmp_path, 2040, 9600), 2040)
+
+    usable_min = n.lines.at["WAL-VLG", "s_nom_min"] * 0.7
+    usable_max = n.lines.at["WAL-VLG", "s_nom_max"] * 0.7
+    assert usable_min == pytest.approx(BOUCLE_USABLE_MW)
+    assert usable_max == pytest.approx(13200.0)
+    assert usable_min <= usable_max
+
+
+def test_floor_raises_a_too_low_ceiling(tmp_path: Path):
+    n = _be_network()
+    apply_ntc_limits(n, _ntc_file(tmp_path, "BEWAL", "BEVLG", 3600))
+    apply_ntc_floors(n, _floors_file(tmp_path, 2035, 9600), 2035)
+
+    usable_min = n.lines.at["WAL-VLG", "s_nom_min"] * 0.7
+    usable_max = n.lines.at["WAL-VLG", "s_nom_max"] * 0.7
+    assert usable_min == pytest.approx(BOUCLE_USABLE_MW)
+    assert usable_max == pytest.approx(BOUCLE_USABLE_MW)
+
+
+def test_floor_is_a_noop_before_2035(tmp_path: Path):
+    n = _be_network()
+    apply_ntc_limits(n, _ntc_file(tmp_path, "BEWAL", "BEVLG", 3600))
+    before = n.lines.at["WAL-VLG", "s_nom_min"]
+    apply_ntc_floors(n, _floors_file(tmp_path, 2035, 9600), 2030)
+    assert n.lines.at["WAL-VLG", "s_nom_min"] == before
+
+
+def test_floor_survives_transmission_limit_rebuild(tmp_path: Path):
+    """carry_forward of the 2030 grid leaves the floor too low; reapply it."""
+    from scripts.add_brownfield import carry_forward_built_grid
+
+    n = _be_network()
+    apply_ntc_limits(n, _ntc_file(tmp_path, "BEWAL", "BEVLG", 13200))
+    apply_ntc_floors(n, _floors_file(tmp_path, 2040, 9600), 2040)
+
+    n_p = n.copy()
+    n_p.lines["s_nom_opt"] = 5000.0  # 2030 standing, below the Boucle floor
+
+    n.lines["s_nom_min"] = 0.0  # wiped as set_transmission_limit can do
+    carry_forward_built_grid(n, n_p)
+    apply_ntc_floors(n, _floors_file(tmp_path, 2040, 9600), 2040)
+
+    usable_min = n.lines.at["WAL-VLG", "s_nom_min"] * 0.7
+    usable_max = n.lines.at["WAL-VLG", "s_nom_max"] * 0.7
+    assert usable_min == pytest.approx(BOUCLE_USABLE_MW)
+    assert usable_min <= usable_max
+

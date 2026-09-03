@@ -1,4 +1,4 @@
-# Improvement plan — status 2026-09-01
+# Improvement plan — status 2026-09-02
 
 Live worklist for the Walloon model. Two meetings feed it: **27 Aug** (items
 1–10) and **1 Sept** (items 11–17, plus decisions on 3, 6, 8 and 10).
@@ -110,7 +110,8 @@ export route is **not** taken in this pass.
 
 TIMES caps Walloon electricity imports at **10 TWh in 2050** (`Transfo_Imp`,
 36 PJ; 6.47 in 2040, 2.94 in 2030). PyPSA has only NTC *power* ceilings. Decided
-1 Sept: **align on TIMES.**
+1 Sept: **align on TIMES.** **Implemented 2 Sept** (`mode: absolute` on BEWAL;
+pytest only, confirmation waits for the final run).
 
 - **Reuse, don't rebuild.** `add_selfsufficiency_constraints` already exists in
   `scripts/solve_network.py` (gated by `self_sufficiency.self_sufficiency_constraint:
@@ -316,7 +317,8 @@ PyPSA already runs generic industry capture (26 Aug, 2050: 0.73 Mt biomass-CC
 + 1.98 Mt process-CC + 0.79 gas); TIMES has **4.8 Mt** of named industrial
 capture (chemicals, lime, glass; `STORAGEMININD` in the vd). Pin the PyPSA
 *capture* volumes to TIMES — **not** DAC, which TIMES does not build and which
-ate the Walloon DH bus when it was on.
+ate the Walloon DH bus when it was on. **Implemented 2 Sept** (current vd:
+4.83 Mt in 2050; pytest only).
 
 This is a different LP object from item 12: 12 sets how much process CO₂ is
 **produced**; 9 sets how much of it (plus fuel-CC / BECCS) is **captured**.
@@ -335,7 +337,8 @@ current vd. The LP pin itself stays blocked until item 2 gives Belgium a sink
 The 2040 NTC ceiling opens to 13.2 GW usable and the optimiser **does not
 build**: flows stay ~3 TWh/yr on a 3.566 GW usable path. The line is planned
 for 2033 and is now treated as *committed infrastructure* — an `s_nom_min` /
-NTC floor from **2035**. **Attention:** `lines.type` is non-empty in this
+NTC floor from **2035**. **Implemented 2 Sept** (9 600 MW usable floor;
+pytest only). **Attention:** `lines.type` is non-empty in this
 network, so `set_transmission_limit` rebuilds `s_nom_min` from the conductor
 type and can silently override an NTC-derated `s_nom` — check the realised
 `s_nom` after any floor edit.
@@ -343,9 +346,11 @@ type and can silently override an NTC-derated `s_nom` — check the realised
 ### Item 8 — Rooftop PV
 
 Decision: transfer the TIMES rooftop share (TIMES 2050 is
-~77 % rooftop; PyPSA builds ~0 MW because rooftop is 920 vs 526 EUR/kW
+~77 % rooftop on the toy/corrige vd, **85.8 %** on the current demande_haute
+vd; PyPSA builds ~0 MW because rooftop is 920 vs 526 EUR/kW
 overnight). Add this with a config switch (and a chart toggle if the split
-should be visible). One small bug to solve first: `BEWAL low voltage` maps to
+should be visible). **Implemented 2 Sept** (LV alias + share pin; pytest only).
+One small bug to solve first: `BEWAL low voltage` maps to
 country `BE`, so any future rooftop build counts against the **Belgian**
 `solar-all` cap ([renewable-potentials §7.3](renewable-potentials.md)). Repair
 that alias before any rooftop floor.
@@ -476,7 +481,15 @@ attribute 50 % of Belgian offshore to Wallonia).
   TIMES `Transfo_Imp` is 2.94 / 6.47 / 10 TWh (2030/40/50). On this 6h proxy
   the 2050 10 TWh cap would be **slack**; the 2040 6.47 TWh cap would **bind**.
   26 Aug was 18 TWh BEWAL in 2050 — the RES envelope and neighbour-offshore
-  pin already did most of the work. 1h may differ; 6a still goes in as decided.
+  pin already did most of the work.
+
+  **1h finding (3 Sept).** The 6h table is **annual NET**. Item 6a caps
+  **gross hourly** `Import_p ≥ 0`. On the 2025 1h network, BEWAL is a net
+  *exporter* (−1.53 TWh) but has **13.14 TWh** gross inflow (4.98 from
+  Flanders/Brussels, 8.17 from abroad). TIMES 2030 2.94 TWh is ~4.5× tighter
+  than that gross, and even foreign-only 8.17 > 2.94. 2030 job 11108009 was
+  inf-or-unbounded in 0 barrier iterations. Overlay flag is **off** for this
+  production 1h (`scen_demande_haute` and `scen_evflex`); code and tests stay.
 - **14 — power-to-gas split** (pypsa2html). `tech_groups.csv` now maps
   Electrolysis / methanation / Fischer-Tropsch as separate groups in costs,
   capacities, dispatch and the faceted capacity panels. H2 liquefaction is its
@@ -488,14 +501,20 @@ attribute 50 % of Belgian offshore to Wallonia).
   panel; CHP CC stays in CHP because `normalize_carrier` folds any "CHP"
   label — mixing those MW onto the industry CCS stack would be the items 5/7
   mixed-unit bug.
-- **11 — BE offshore retimed.** 2030 is now a pin at the standing fleet
-  (`min = max = 2 262`), 2040 floor 4 362 (PEZ I+II), 2050 floor 5 800 (full
-  zone). Maxima after 2030 stay with the envelope. Tag
-  `NECP-BE-2030 (retimed 2026-09, press review)`. The envelope checker
-  (`check_res_envelope.py`) allows a 2030 pin and later floors **only** for
-  `BE/offwind-all`; every other RES group still forbids stored max after 2025
-  and stored min after 2030. Tests:   `test/test_res_envelope.py` +
-  `test/test_common_parameters_agg.py` (19 passed).
+- **11 — BE offshore retimed.** 2030 was a pin at the 2024 standing fleet
+  (`min = max = 2 262`), 2040 floor 4 362 (PEZ I+II), 2050 floor 5 800.
+  **2026-09-03 1h:** 2025 BEVLG AC `country` is `BEVLG`, so the `BE` CCL row
+  never bound and 2025 built **8 000 MW**. 2030 brownfield resets `country`
+  to `BE` with that 8 GW standing; `max = 2262` is inf-or-unbounded in 0
+  iterations (jobs 11108009 / 11110016 / 11110118 — not 6a, not rooftop).
+  2030 pin is now `min = max = 8000` so the myopic chain can continue.
+  2040/2050 floors stay; they are below standing so slack.
+  **2026-09-03 evening:** the `BE` offwind pin was still a no-op (CCL rewrites
+  BEVLG country). The 2030 empty LP was the same rewrite on **solar**: Elia
+  16.5 GW − BEWAL 6.5 GW = 10 GW remainder applied to **BEBRU only**, which
+  had ~0.8 GW leftover land after 2025 hsat. Fix: BEVLG rows for the Elia
+  remainder (`solar-all` 10 GW, `onwind` 2 GW) and the 8 GW offwind pin.
+  Tests: `test/test_res_envelope.py` + `test/test_common_parameters_agg.py`.
 - **10 — Flanders nuclear 2050.** BEVLG `nuclear-all` is now an explicit
   row (2035/2040/2045 = 1 000 MW Doel 4, 2050 = 3 000). BE raised first:
   2045 2 750, 2050 6 000. **Decision:** keep Doel 4 through 2045 so a 2045
@@ -526,6 +545,45 @@ attribute 50 % of Belgian offshore to Wallonia).
   4` (weeks of that node's urban-central heat demand). Decision: 4 weeks is
   the upper end of the 2–4 week proxy in the 26 Aug review (~100–200 GWh_th
   BEWAL), against 689 GWh unbounded. Tests: `test/test_ptes_e_nom_max.py`.
+- **3 — Boucle du Hainaut NTC floor.** From 2035 the BEWAL–BEVLG corridor has
+  `s_nom_min` so *usable* capacity is at least **9 600 MW** (standing 3.6 GW +
+  Boucle 6 GW). 2040/2050 ceilings stay 13.2 / 14.4 GW. 2035 ceiling raised
+  from 3 600 → 9 600 so min ≰ max. Applied after NTC ceilings **and** after
+  `set_transmission_limit` / `carry_forward_built_grid` (which rebuild
+  `s_nom_min` from the conductor type). Tests: `test/test_ntc_limits.py`.
+- **6a — BEWAL 10 TWh import cap.** `add_selfsufficiency_constraints` now takes
+  `mode: absolute` with a per-year TWh table, scoped to BEWAL. TIMES
+  `Transfo_Imp`: 2.94 / 6.47 / 10 (2030/40/50). 2025 unconstrained. **Label:**
+  BEWAL "imports" include Flanders/Brussels. Tests: `test/test_import_limit.py`.
+  **2026-09-03 1h:** flag **off** on `scen_demande_haute` / `scen_evflex`.
+  The constraint is GROSS hourly inflow, not TIMES annual `Transfo_Imp` /
+  not 6h NET. 2025 1h already has 13.14 TWh gross (8.17 abroad) vs 2.94 TWh
+  2030 cap; 2030 was inf-or-unbounded in 0 iterations (job 11108009). Code
+  stays; overlay only. See
+  `docs/logs/2026-09-02_scen_demande_haute_2010_1h.md` §9.
+- **8 — rooftop PV share.** LV country alias restored: after region buses are
+  rewritten, each ` low voltage` bus copies its parent's country, so rooftop
+  counts against BEWAL `solar-all`. TIMES share is `VAR_Cap` of
+  `ERNW_PV-Buildings_SOL_N` + `ERNW_PV-RES_Homes_SOL_N` over those plus
+  greenfield (**not** `VAR_Ncap`, not `ELCSOL00`, not demand-side
+  RSDPVELC/COMPVELC/INDPVELC). Demand_haute 2050 share is **85.8 %** (the
+  ~77 % figure was the older toy/corrige vd). Config switch, default off;
+  on for `scen_demande_haute`. Tests: `test/test_rooftop_share.py` +
+  TIMES_PyPSA `tests/test_named_transfers.py`. **2026-09-02 1h:** putting
+  rooftop in `solar-all` made 2025 inf-or-unbounded (share × 4 088 MW utility
+  needs 1.4 GW rooftop in a 20 MW corridor). `solar-all` is utility+hsat
+  again; rooftop stays out of that pin (46 GW own potential). **2026-09-03:**
+  2025 at 25.8 % then solved; 2030 at 71.4 % is still inf-or-unbounded in 0
+  iterations with 6a off (job 11110016). Overlay **off** for this 1h;
+  Elia 6.5 GW utility floor vs TIMES 2.1 GW is the clash to revisit.
+- **9 — industry CC floor.** `STORAGEMININD` `VAR_FOut` of `CO2STOCK` from the
+  current vd: 4 365 / 5 077 / 5 120 / 4 826 kt (2035/40/45/50). Floor on
+  BEWAL process-CC + biomass-CC + gas-CC capture (not DAC). No row before
+  2035 → no pin. Extractors live in TIMES_PyPSA `named_transfers.py`.
+  Tests: `test/test_industry_cc_floor.py` + the same library tests.
+
+The queue of LP/data items is empty. Next: the final 1h / 2010 four-horizon
+run + §11 review. No cheap 6h / one-horizon solves before that.
 
 Interactions to keep in mind when reading that final run: items **6a, 10, 11**
 all move 2050 independence, in opposite directions (nuclear helps, the offshore

@@ -45,6 +45,13 @@ from linopy.remote.oetc import OetcCredentials, OetcHandler, OetcSettings
 from pypsa.descriptors import get_activity_mask
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 from scripts.prepare_sector_network import determine_emission_sectors
+from scripts.walloon_scripts.named_pins import (
+    add_industry_cc_floor,
+    add_rooftop_share_constraint,
+    alias_low_voltage_countries,
+    lookup_year_value,
+    planning_year,
+)
 from scripts._benchmark import memory_logger
 from scripts._helpers import (
     PYPSA_V1,
@@ -770,15 +777,7 @@ def add_CCL_constraints(
                             parent_val - region_val, 0
                         )
 
-        # Map " low voltage" buses to their base region if present
-        # alias_buses = {
-        #     bus: bus.replace(" low voltage", "").strip()
-        #     for bus in n.buses.index
-        #     if " low voltage" in bus and bus.replace(" low voltage", "").strip() in regions
-        # }
-        # if alias_buses:
-        #     alias_original = n.buses.loc[list(alias_buses.keys()), "country"].copy()
-        #     n.buses.loc[list(alias_buses.keys()), "country"] = list(alias_buses.values())
+        alias_low_voltage_countries(n)
     logger.info("Adding generation capacity constraints per carrier and country")
     p_nom = n.model["Generator-p_nom"]
     p_nom_link = n.model["Link-p_nom"]
@@ -803,7 +802,12 @@ def add_CCL_constraints(
             "solar": "solar-all",
             "solar-utility": "solar-all",
             "solar-hsat": "solar-all",
-            "solar rooftop": "solar-all",
+            # Not rooftop. 2025 BEWAL solar-all min=max=4088 MW is the
+            # utility fleet (vintages + 2025 vintage). Putting rooftop in
+            # that group plus the TIMES share pin needs ~1.4 GW extra in a
+            # 20 MW corridor → Gurobi inf-or-unbounded in 0 barrier
+            # iterations (2026-09-02 1h). Item 8 keeps the share pin and
+            # the LV country alias; solar-all stays utility + hsat.
         }
         gens = gens.replace(rename_solar)
     if config["solving"]["agg_p_nom_limits"]["agg_nuclear"]:
@@ -1606,53 +1610,164 @@ def add_co2_atmosphere_constraint(n, snapshots):
 
             n.model.add_constraints(lhs <= rhs, name=f"GlobalConstraint-{name}")
 
-def add_selfsufficiency_constraints(n, level):
+def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
+    """Cap annual electricity imports, as a fraction of local supply or in TWh.
+
+    The original formulation (Koen van Greevenbroek) uses an ``Import_p``
+    variable per location, lower-bounded by net inflows on AC lines and DC
+    links, and caps the annual sum at ``(1 - level) * local_energy``. Item 6a
+    keeps that machinery and adds an **absolute TWh** right-hand side scoped
+    to a list of nodes (BEWAL). Exports cannot count as negative imports:
+    ``Import_p >= 0``.
     """
-     Add self-sufficiency constraint using a import variable.
-     Addapted from the work of Koen van Greevenbroek
-    """
-    logger.info(f"Adding self sufficiency constraint")
+    if isinstance(settings, (int, float)):
+        settings = {"mode": "fraction", "level": float(settings)}
+
+    mode = settings.get("mode", "fraction")
+    requested = settings.get("nodes")
+    if requested is not None:
+        requested = [str(x) for x in requested]
+
+    logger.info("Adding self sufficiency constraint (mode=%s)", mode)
+
+    rhs_twh = None
+    if mode == "absolute":
+        year = planning_year(planning_horizons)
+        limit_twh = settings.get("limit_twh")
+        if isinstance(limit_twh, dict) and year is not None:
+            rhs_twh = limit_twh.get(year, limit_twh.get(str(year)))
+        elif isinstance(limit_twh, (int, float)):
+            rhs_twh = limit_twh
+        if rhs_twh is None:
+            logger.info(
+                "Self-sufficiency absolute cap: no TWh for year %s, skip", year
+            )
+            return
 
     def group(df, b="bus"):
-        """
-        Group given dataframe by bus location or country.
-        """
-        # Ensure 'location' exists in n.buses
-        return df[b].map(n.buses.location).to_xarray()
+        mapped = df[b].map(n.buses.location)
+        mapped.name = "bus"
+        return mapped.to_xarray()
 
-    #Calculate Total Local Production
-    local_gen_carriers = list(
-        set(
-            config["pypsa_eur"]["Generator"]
-            + ["solar rooftop"]
+    locations = n.buses.location.dropna().drop_duplicates()
+    if requested:
+        locations = locations[locations.isin(requested)]
+    if locations.empty:
+        logger.warning("Self-sufficiency: no matching locations, skip")
+        return
+
+    n.model.add_variables(
+        coords={"bus": locations.rename("bus"), "snapshot": n.snapshots},
+        dims=("bus", "snapshot"),
+        name="Import_p",
+        lower=0,
+    )
+
+    cross_region_lines = n.lines.loc[
+        (group(n.lines, b="bus0") != group(n.lines, b="bus1")).to_numpy()
+    ]
+    cross_region_links = n.links.iloc[0:0]
+    if not n.links.empty:
+        cross_region_links = n.links.loc[
+            (group(n.links, b="bus0") != group(n.links, b="bus1")).to_numpy()
+        ]
+        if not cross_region_links.empty:
+            reversed_mask = (
+                cross_region_links.index.astype(str).str.contains("reversed")
+            )
+            cross_region_links = cross_region_links.loc[
+                cross_region_links.carrier.isin(["DC"]) & ~reversed_mask
+            ]
+
+    import_buses = list(n.model["Import_p"].indexes["bus"])
+
+    for component_name, df in (
+        ("Line", cross_region_lines),
+        ("Link", cross_region_links),
+    ):
+        if df.empty:
+            continue
+
+        if component_name == "Line":
+            avail = df["s_max_pu"]
+            flow = n.model["Line-s"].loc[:, df.index] / avail
+            inflow = flow.groupby(group(df, "bus1")).sum()
+            outflow = flow.groupby(group(df, "bus0")).sum()
+        else:
+            eff = df["efficiency"]
+            flow = n.model["Link-p"].loc[:, df.index] / eff
+            inflow = flow.groupby(group(df, "bus1")).sum()
+            outflow = flow.groupby(group(df, "bus0")).sum()
+
+        bus_dim = "bus"
+        in_buses = list(inflow.indexes[bus_dim])
+        out_buses = list(outflow.indexes[bus_dim])
+        union = list(dict.fromkeys(in_buses + out_buses))
+        if not union:
+            continue
+        inflow = inflow.reindex({bus_dim: union}, fill_value=0)
+        outflow = outflow.reindex({bus_dim: union}, fill_value=0)
+        net = inflow - outflow
+        common = [b for b in import_buses if b in net.indexes["bus"]]
+        if not common:
+            continue
+        n.model.add_constraints(
+            n.model["Import_p"].sel(bus=common) >= net.sel(bus=common),
+            name=f"import_positive_{component_name}",
         )
+
+    imported_elec = (
+        n.model["Import_p"] * n.snapshot_weightings.generators
+    ).sum("snapshot")
+
+    if mode == "absolute":
+        rhs_mwh = float(rhs_twh) * 1e6
+        n.model.add_constraints(
+            imported_elec <= rhs_mwh, name="import_energy_limit"
+        )
+        logger.info(
+            "Capped electricity imports at %s to %.2f TWh/a.",
+            import_buses,
+            float(rhs_twh),
+        )
+        return
+
+    # Fraction of local production (original formulation).
+    cfg = getattr(n, "config", None) or {}
+    local_gen_carriers = list(
+        set(cfg.get("pypsa_eur", {}).get("Generator", []) + ["solar rooftop"])
     )
     local_gen_i = n.generators.loc[
         n.generators.carrier.isin(local_gen_carriers)
         & (n.generators.bus.map(n.buses.location) != "EU")
     ].index
-    local_gen_p = (
-        n.model["Generator-p"]
-        .loc[:, local_gen_i]
-        .groupby(group(n.generators.loc[local_gen_i]))
-        .sum()
-    )
-    local_gen = (local_gen_p * n.snapshot_weightings.generators).sum("snapshot")
+    local_energy = None
+    if len(local_gen_i) > 0:
+        local_gen_p = (
+            n.model["Generator-p"]
+            .loc[:, local_gen_i]
+            .groupby(group(n.generators.loc[local_gen_i]))
+            .sum()
+        )
+        local_energy = (local_gen_p * n.snapshot_weightings.generators).sum(
+            "snapshot"
+        )
 
-    #Hydro
     local_hydro_i = n.storage_units.loc[n.storage_units.carrier == "hydro"].index
-    local_hydro_p = (
-        n.model["StorageUnit-p_dispatch"]
-        .loc[:, local_hydro_i]
-        .groupby(group(n.storage_units.loc[local_hydro_i]))
-        .sum()
-    )
-    local_hydro = (local_hydro_p * n.snapshot_weightings.stores).sum("snapshot")
+    if len(local_hydro_i) > 0:
+        local_hydro_p = (
+            n.model["StorageUnit-p_dispatch"]
+            .loc[:, local_hydro_i]
+            .groupby(group(n.storage_units.loc[local_hydro_i]))
+            .sum()
+        )
+        local_hydro = (local_hydro_p * n.snapshot_weightings.stores).sum("snapshot")
+        local_energy = (
+            local_hydro if local_energy is None else local_energy + local_hydro
+        )
 
-    # Conventional technologies modeled as links in pypsa
-    conv_carriers = config["electricity"].get("conventional_carriers", {})
+    conv_carriers = cfg.get("electricity", {}).get("conventional_carriers", [])
     local_conv_gen_i = n.links.loc[n.links.carrier.isin(conv_carriers)].index
-    local_conv_gen = None
     if len(local_conv_gen_i) > 0:
         local_conv_gen_p = n.model["Link-p"].loc[:, local_conv_gen_i]
         efficiencies = n.links.loc[local_conv_gen_i, "efficiency"]
@@ -1662,65 +1777,21 @@ def add_selfsufficiency_constraints(n, level):
             .sum()
             .rename({"bus1": "bus"})
         )
-        local_conv_gen = (local_conv_gen_p * n.snapshot_weightings.generators).sum("snapshot")
-
-    # Total locally produced energy
-    local_energy = sum(e for e in [local_gen, local_hydro, local_conv_gen] if e is not None)
-
-    #Use a new import variable
-    buses = n.buses.location.rename("bus").drop_duplicates()
-    coords = {"bus": buses, "snapshot": n.snapshots}
-    dims = ("bus", "snapshot")
-    n.model.add_variables(
-      coords=coords,
-      dims=dims,
-      name="Import_p",
-      lower=0,
-    )
-    
-    #Define transmission lines and DC links
-    cross_region_lines = n.lines.loc[(group(n.lines, b="bus0") != group(n.lines, b="bus1")).to_numpy()]
-    cross_region_links = n.links.loc[(group(n.links, b="bus0") != group(n.links, b="bus1")).to_numpy()]
-    #Removing reversed transmission lines as efficiency is already considered
-    cross_region_links = cross_region_links.loc[ cross_region_links.carrier.isin(["DC"])
-    & ~cross_region_links.index.str.contains("reversed") ]
-
-    cross_region_components = {
-        'Line': cross_region_lines,
-        'Link': cross_region_links,
-    }
-
-    for component_name, df in cross_region_components.items():
-        if df.empty:
-            continue
-
-        if component_name == "Line":
-          avail = df["s_max_pu"]
-          flow = n.model["Line-s"].loc[:, df.index] / avail
-          inflow  = flow.groupby(group(df, "bus1")).sum()
-          outflow = flow.groupby(group(df, "bus0")).sum()
-        else:
-          eff = df["efficiency"]
-          flow = n.model["Link-p"].loc[:, df.index] / eff
-          inflow  = flow.groupby(group(df, "bus1")).sum()
-          outflow = flow.groupby(group(df, "bus0")).sum()
-        
-        #Total cross border flows
-        net = inflow - outflow
-        #Impose a positive netflow constraint to consider as imports
-        n.model.add_constraints(
-          n.model["Import_p"] >= net,
-          name=f"import_positive_{component_name}"
+        local_conv = (local_conv_gen_p * n.snapshot_weightings.generators).sum(
+            "snapshot"
         )
-        
-    #Total imported electricity
-    imported_elec = (
-      n.model["Import_p"] * n.snapshot_weightings.generators).sum("snapshot")
-    #Self-sufficiency constraint, level is set in configfile
+        local_energy = local_conv if local_energy is None else local_energy + local_conv
+
+    if local_energy is None:
+        logger.warning("Self-sufficiency fraction mode: no local generation, skip")
+        return
+
+    level = float(settings.get("level", 0.7))
     n.model.add_constraints(
-      imported_elec <= (1 - level) * local_energy,
-      name="import_energy_limit")
-      
+        imported_elec <= (1 - level) * local_energy,
+        name="import_energy_limit",
+    )
+
 NATIONAL_CO2_COUNTRIES = ["BEBRU", "BEVLG", "BEWAL", "DE", "FR", "NL", "GB", "LU"]
 
 # Aviation is out of scope for the *national* CO2 targets, on both sides of the
@@ -2009,9 +2080,25 @@ def extra_functionality(
 
     if config["sector"]["imports"]["enable"]:
         add_import_limit_constraint(n, snapshots)
-    if config["self_sufficiency"]["self_sufficiency_constraint"]:
-        level = config["self_sufficiency"]["level"]
-        add_selfsufficiency_constraints(n, level)
+    ss = config.get("self_sufficiency") or {}
+    if ss.get("self_sufficiency_constraint"):
+        add_selfsufficiency_constraints(n, ss, planning_horizons)
+
+    sector_cfg = config.get("sector") or {}
+    rooftop_cfg = sector_cfg.get("rooftop_share") or {}
+    if rooftop_cfg.get("enable"):
+        year = planning_year(planning_horizons)
+        share = lookup_year_value(rooftop_cfg, year, "shares", "share")
+        node = rooftop_cfg.get("node", "BEWAL")
+        if share is not None:
+            add_rooftop_share_constraint(n, node, float(share))
+    cc_cfg = sector_cfg.get("industry_cc_floor") or {}
+    if cc_cfg.get("enable"):
+        year = planning_year(planning_horizons)
+        kt = lookup_year_value(cc_cfg, year, "kt", "kt")
+        node = cc_cfg.get("node", "BEWAL")
+        if kt is not None:
+            add_industry_cc_floor(n, node, float(kt))
     if n.config["co2_budget_national"]:
         # prepare co2 constraint
         nhours = n.snapshot_weightings.generators.sum()
@@ -2367,10 +2454,18 @@ if __name__ == "__main__":
             )
         check_objective_value(n, snakemake.params.solving)
 
+    if condition == "infeasible_or_unbounded":
+        # Substring "infeasible" used to send a 31 M-row 1h model into IIS
+        # for hours (2026-09-02 job 11107735). Raise; do not diagnose here.
+        raise RuntimeError(
+            "Solving termination condition 'infeasible_or_unbounded' "
+            f"(status '{status}'); refusing IIS on a full-year model."
+        )
+
     if "warning" in condition:
         raise RuntimeError("Solving status 'warning'. Discarding solution.")
 
-    if "infeasible" in condition:
+    if condition == "infeasible":
         labels = n.model.compute_infeasibilities()
         logger.info(f"Labels:\n{labels}")
         n.model.print_infeasibilities()
