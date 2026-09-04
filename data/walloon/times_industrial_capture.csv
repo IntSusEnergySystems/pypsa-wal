@@ -1,8 +1,8 @@
 # TIMES STORAGEMININD VAR_FOut of CO2STOCK, kt/a.
-# Extracted 2026-09-02 from scen_central_demande_haute_v1_260828_2808.vd.
+# Extracted 2026-09-04 from scen_central_demande_haute_v2_260903_0309.vd.
 # No row before 2035: the pin is a no-op those years. Item 9.
 year,kt
 2035,4364.60197031038
 2040,5076.88289217246
-2045,5119.96918315794
-2050,4826.40081849059
+2045,5140.27324196075
+2050,4842.48777630522

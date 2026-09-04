@@ -74,7 +74,7 @@ def test_csv_is_the_vd_storageminind_volume():
     assert 2025 not in kt
     assert 2030 not in kt
     assert kt[2040] == pytest.approx(5076.88289217246)
-    assert kt[2050] == pytest.approx(4826.40081849059)
+    assert kt[2050] == pytest.approx(4842.48777630522)
 
 
 def test_floor_is_annual_tonnes():

@@ -137,8 +137,8 @@ def test_share_constraint_forces_the_times_ratio():
 
 def test_committed_share_csv_has_2050_above_three_quarters():
     shares = year_map(SHARE_CSV, "share")
-    assert shares[2050] == pytest.approx(0.858125, rel=1e-4)
-    assert shares[2040] == pytest.approx(0.760539, rel=1e-3)
+    assert shares[2050] == pytest.approx(0.800963, rel=1e-4)
+    assert shares[2040] == pytest.approx(0.775701, rel=1e-3)
     df = pd.read_csv(SHARE_CSV, comment="#")
     # share column is rooftop / (rooftop + utility), not a hand-typed guess
     recomputed = df["rooftop_gw"] / (df["rooftop_gw"] + df["utility_gw"])

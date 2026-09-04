@@ -47,7 +47,7 @@ scen_corrige:
 # 2040->2050 Tihange retrofit repeat, mirroring the vd.
 scen_demande_haute:
   sector:
-    times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
+    times_file: data/walloon/scen_central_demande_haute_v2_260903_0309.vd
     rooftop_share:
       # Item 8 ON again (2026-09-04). The obstacle was the base year: PyPSA
       # labelled the whole 2025 fleet `solar`, so a share of total capacity
@@ -164,7 +164,7 @@ scen_data:
 # Do not hand-edit either key. docs/ev-charging-softlink.md §4.6.
 scen_evflex:
   sector:
-    times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
+    times_file: data/walloon/scen_central_demande_haute_v2_260903_0309.vd
     rooftop_share:
       # Item 8 on with the base-year fleet split; same as scen_demande_haute.
       enable: true
