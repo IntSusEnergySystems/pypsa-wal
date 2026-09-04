@@ -24,18 +24,21 @@ pypsa2html:
   config: config/pypsa2html.yaml
 
 # Publish results/<run>/html/ (pypsa2html + TIMES Sankey) to
-# https://pypsa.squoilin.eu/intervec/<scenario>_<YYYYMMDD>/ via rsync over SSH.
-# Requires passwordless login as negawatt with ~/.ssh/rsa_nopasswd (installed
-# by add-pypsa-alias.sh on the server). If the key cannot log in, the rule
-# writes a skip marker and the rest of the workflow is unaffected.
+# https://pypsa.squoilin.eu/<scenario>_<YYYYMMDD>/ via rsync over SSH.
+# Since 2026-09-01 the site is a dedicated vhost (add-pypsa-vhost.sh) with
+# DocumentRoot /home/pypsa/public_html; the old /intervec/ path on the
+# negawatt vhost 301-redirects to the root URLs, so publishing there
+# produces 404s (seen 2026-09-03). Requires passwordless login as pypsa
+# with ~/.ssh/rsa_nopasswd. If the key cannot log in, the rule writes a
+# skip marker and the rest of the workflow is unaffected.
 # Override the stamp with html_publish.date or HTML_PUBLISH_DATE=YYYYMMDD.
 html_publish:
   enable: true
   ssh_host: negawatt.squoilin.eu
-  ssh_user: negawatt
+  ssh_user: pypsa
   identity_file: ~/.ssh/rsa_nopasswd
-  remote_dir: /home/negawatt/public_html/intervec
-  public_url: https://pypsa.squoilin.eu/intervec
+  remote_dir: /home/pypsa/public_html
+  public_url: https://pypsa.squoilin.eu
 
 # coupling_dir: /path/to/coupling_run   # optional; enables pre-exported TIMES inputs
 

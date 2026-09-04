@@ -581,9 +581,25 @@ attribute 50 % of Belgian offshore to Wallonia).
   BEWAL process-CC + biomass-CC + gas-CC capture (not DAC). No row before
   2035 → no pin. Extractors live in TIMES_PyPSA `named_transfers.py`.
   Tests: `test/test_industry_cc_floor.py` + the same library tests.
+  **2026-09-03 1h:** flag **off** on `scen_demande_haute` / `scen_evflex`.
+  The 2040 floor (5 077 kt) exceeds the maximum BEWAL can capture from the
+  transferred industrial fuel mix — 357 kt process ×0.95 + 7.62 TWh biomass
+  ×0.3484 + 5.56 TWh gas ×0.1881 = **3 361 kt**; 2050 = **3 424 kt** vs
+  4 826 — the CC links' fuel-side outputs land on buses with *fixed*
+  TIMES-transferred demands, so the LP cannot burn extra fuel just to
+  capture. Barrier proved it (79 iterations, "Infeasible model", job
+  11114388). Items 9+12 are inconsistent as a pair: STORAGEMININD must be fed
+  by capture sources PyPSA does not carry (feedstock, SMR CC, CCGT-CC or a
+  larger industry). Code/tests/CSV stay; overlay off. See
+  `docs/logs/2026-09-02_scen_demande_haute_2010_1h.md` §9.
 
-The queue of LP/data items is empty. Next: the final 1h / 2010 four-horizon
-run + §11 review. No cheap 6h / one-horizon solves before that.
+The queue of LP/data items is empty. **Final 1h run done 2026-09-03** (4/4
+optimal, §11-reviewed, published as `demande-haute-2010-1h` @ 20260903 +
+[HTML](https://pypsa.squoilin.eu/scen_demande_haute_20260903/)):
+items 6a, 8 and 9 solved-but-withdrawn (see the solve log §9); review findings
+F1 (80.2 GW phantom FR rooftop from the item-8 solar-all exclusion — fix and
+re-run needed) and F2 (2025 Flanders unconstrained, CCL country rewrite) are
+the next queue entries.
 
 Interactions to keep in mind when reading that final run: items **6a, 10, 11**
 all move 2050 independence, in opposite directions (nuclear helps, the offshore

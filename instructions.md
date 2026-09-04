@@ -1098,28 +1098,18 @@ snakemake --configfile config/config.walloon.yaml --cores 1 \
 ### Publishing HTML to pypsa.squoilin.eu
 
 `rule publish_html` rsyncs the whole `html/` folder (pypsa2html pages + TIMES
-Sankey diagrams) to the labothap/negawatt host, as user `negawatt`, using
+Sankey diagrams) to the labothap/negawatt host, as user `pypsa`, using
 `~/.ssh/rsa_nopasswd`. The public URL is:
 
 ```
-https://pypsa.squoilin.eu/intervec/<scenario>_<YYYYMMDD>/
+https://pypsa.squoilin.eu/<scenario>_<YYYYMMDD>/
 ```
 
-`pypsa.squoilin.eu` is a ServerAlias of `negawatt.squoilin.eu` (same
-DocumentRoot `/home/negawatt/public_html`). Directory listing is on for
-`/intervec/`, so the parent URL lists every published run. Each run folder
-opens the pypsa-wal hub (`index.html`) with links to `pypsa/` and `times/`.
+Since 1 Sept 2026 `pypsa.squoilin.eu` is a **dedicated vhost**
+(`add-pypsa-vhost.sh`) with DocumentRoot `/home/pypsa/public_html`; the root
+URL lists every published run. Each run folder opens the pypsa-wal hub
+(`index.html`) with links to `pypsa/` and `times/`. 
 
-One-time server setup (as root on labothap):
-
-```bash
-sudo bash /home/sylvain/scripts/add-pypsa-alias.sh
-```
-
-That script merges the new hostname into the existing negawatt vhost, expands
-the shared Let's Encrypt certificate, creates `/home/negawatt/public_html/intervec`,
-and installs the `rsa_nopasswd` public key for user `negawatt` (the account had
-no `~/.ssh` before this).
 
 If the key cannot log in, the Snakemake rule writes
 `results/<run>/logs/html_published.url` with a `skipped:` line and does **not**
