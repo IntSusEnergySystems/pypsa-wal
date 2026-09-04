@@ -22,6 +22,7 @@ from scripts.walloon_scripts.nuclear_helper import (
     apply_nuclear_inflexibility,
 )
 from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
+from scripts.walloon_scripts.baseyear_pv_split import apply_baseyear_pv_split
 
 from scripts._helpers import (
     configure_logging,
@@ -939,5 +940,12 @@ if __name__ == "__main__":
         n=n,
         planning_horizons=int(snakemake.wildcards.planning_horizons),
         walloon_potentials=snakemake.input.get("walloon_potentials"),
+    )
+
+    apply_baseyear_pv_split(
+        n=n,
+        cfg=snakemake.config.get("electricity", {}).get("baseyear_pv_split")
+        or {},
+        baseyear=int(baseyear),
     )
     n.export_to_netcdf(snakemake.output[0])

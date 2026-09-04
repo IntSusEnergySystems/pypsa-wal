@@ -1,0 +1,13 @@
+# 2025 Walloon PV fleet split between rooftop and ground-mounted/utility.
+# Total (rooftop + utility) must equal the BEWAL solar-all 2025 pin in
+# agg_p_nom_minmax_demande_haute.csv (2668 MW, Energy Balance for Wallonia
+# 2025 preliminary, AC installed power). The split itself is the Elia/ICEDD
+# assumption agreed 2026-09-04: 1.77 GW rooftop + ~0.9 GW ground-mounted and
+# larger installations. Consumed by scripts/walloon_scripts/baseyear_pv_split.py
+# via electricity.baseyear_pv_split in config/config.walloon.yaml.
+# The split is applied to the standing vintages newest-first; the relabelled
+# capacity is non-extendable, so rooftop >= rooftop_mw and
+# utility <= total - rooftop_mw hold in the base year without a share pin
+# (item 8's TIMES share applies from 2030 on, data/walloon/times_pv_rooftop_share.csv).
+node,year,rooftop_mw,utility_mw,source
+BEWAL,2025,1770,898,"Energy Balance for Wallonia 2025 (preliminary) total 2668 MW AC; rooftop/ground split assumed 1.77/0.9 GW (Elia/ICEDD, 2026-09-04)"

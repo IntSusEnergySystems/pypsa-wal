@@ -91,6 +91,15 @@ electricity:
   walloon_potentials: data/walloon/custom_potentials.csv
   retrofit_nuclear_once: true
 
+  # 2025 Walloon PV fleet: relabel rooftop_mw of the standing `solar`
+  # vintages as non-extendable `solar rooftop` on the LV bus (item 8 / plan
+  # B5). Together with the solar-all 2025 pin (total PV) this differentiates
+  # the base-year fleet rooftop vs ground-mounted; the TIMES share applies
+  # from 2030 on (sector.rooftop_share).
+  baseyear_pv_split:
+    enable: true
+    file: data/walloon/baseyear_pv_split.csv
+
   extendable_carriers:
     extendable_nuclear_links:
       2025: [FR, GB, NL, LU]

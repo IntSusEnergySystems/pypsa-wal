@@ -49,29 +49,26 @@ scen_demande_haute:
   sector:
     times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
     rooftop_share:
-      # Item 8 is OFF, and the reason is not the one recorded on 2026-09-03:
-      # the 2030 empty LP was the CCL region rewrite (B1), not this pin. The
-      # real obstacle is the base year — PyPSA labels the entire historical
-      # Walloon fleet `solar`, so a TIMES share of *total* capacity cannot be
-      # imposed on a year pinned to that fleet (2025 needs ~1.4 GW of rooftop
-      # inside a 20 MW corridor). Taking rooftop out of `solar-all` solved it
-      # but unpinned total PV, so that was reverted (B5). Re-enabling needs a
-      # rooftop/utility split of the base-year fleet, or a share of new build
-      # only. Code, CSV and tests stay. See B5 of
+      # Item 8 ON again (2026-09-04). The obstacle was the base year: PyPSA
+      # labelled the whole 2025 fleet `solar`, so a share of total capacity
+      # needed GW of new rooftop inside a 20 MW corridor. electricity.
+      # baseyear_pv_split now relabels 1 770 MW of the standing fleet as
+      # `solar rooftop` (1 770 + 898 = the 2 668 MW solar-all 2025 pin), so
+      # 2025 is differentiated by capacity, not by share, and the TIMES
+      # share binds from 2030 on (71.4 % in 2030, 85.8 % in 2050). See B5 of
       # docs/temporary_improvement_plans.md.
-      enable: false
+      enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
     industry_cc_floor:
-      # Item 9 withdrawn for this 1h run (2026-09-03 evening). 2040 floor
-      # 5 077 kt (2050: 4 826) exceeds the maximum BEWAL can capture from the
-      # transferred industrial fuel mix: 2040 = 357 kt process x0.95
-      # + 7.62 TWh biomass x0.348 + 5.56 TWh gas x0.188 = 3 361 kt (2050:
-      # 3 424 kt) with every CC link at full demand. Barrier proved
-      # infeasible (79 it, job 11114388). STORAGEMININD implies capture
-      # sources (feedstock, SMR/CCGT-CC) PyPSA does not carry. Code and CSV
-      # stay; overlay off. See docs/logs/2026-09-02_scen_demande_haute_2010_1h.md §9.
-      enable: false
+      # Item 9 ON (2026-09-04). The 2026-09-03 withdrawal was based on the net
+      # process-emissions inventory (357 kt in 2040): with the net load the
+      # floor of 5 077 kt exceeded every capturable source. B4 made the load
+      # gross (emitted + captured, 5 434 kt in 2040), so process capture alone
+      # reaches 5 162 kt >= the floor and biomass/gas CC add headroom — which
+      # is how TIMES builds it. See B3/B4 of
+      # docs/temporary_improvement_plans.md.
+      enable: true
       node: BEWAL
       file: data/walloon/times_industrial_capture.csv
   electricity:
@@ -169,14 +166,12 @@ scen_evflex:
   sector:
     times_file: data/walloon/scen_central_demande_haute_v1_260828_2808.vd
     rooftop_share:
-      # Same item-8 withdrawal as scen_demande_haute (base-year fleet split, B5).
-      enable: false
+      # Item 8 on with the base-year fleet split; same as scen_demande_haute.
+      enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
     industry_cc_floor:
-      # Same item-9 withdrawal as scen_demande_haute (2040/2050 floors exceed
-      # the capturable maximum from the transferred fuel mix).
-      enable: false
+      enable: true
       node: BEWAL
       file: data/walloon/times_industrial_capture.csv
     bev_dsm_availability:

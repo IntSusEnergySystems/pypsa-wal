@@ -53,7 +53,7 @@ Companion docs: [ccs_alignment](ccs_alignment.md) ·
 | 5 · 7 | Flanders P2H / heat demand plot bugs | **done** | pypsa2html `0d1b904` |
 | 6a | BEWAL 10 TWh import cap | expression **fixed**, flag still off — TWh values owed | **B6** |
 | 6b | Nuclear primary-energy toggle | **done** — `uranium` / `electricity`, validated; both panel titles state the convention | pypsa2html `9454be9` |
-| 8 | TIMES rooftop share | still off; the PV pin it broke is **repaired** — base-year split owed | **B5** |
+| 8 | TIMES rooftop share | **done 4 Sept** — base-year fleet split 1.77 GW rooftop / 0.9 GW ground (Elia/ICEDD); share on from 2030 | **B5** (fixed) |
 | 9 | Industry-CC floor (STORAGEMININD) | **done** — reachable once the inventory is gross | **B3** (fixed) |
 | 10 | Flanders nuclear (BEVLG 3 GW, BE 6 GW in 2050) | **done as specified**, but it triggered **B1** | `87552368` |
 | 11 | Belgian offshore retimed | **done** — 2025/2030 pinned at 2 262, floors 4 362 / 5 800 | **B2** (fixed) |
@@ -223,13 +223,17 @@ carbon — the split needs ICEDD.
 
 ### B5 — item 8 took rooftop out of `solar-all`, which unpins 2025 PV
 
-> **FIXED 3 Sept (option i).** `solar rooftop` is back in `rename_solar`, so
-> `solar-all` means what Elia's numbers mean: total PV. Item 8 stays **off**,
-> and the reason is now stated correctly in the overlay — the obstacle is the
-> base year, not the 2030 LP. The LV country alias is deleted: since B1 the
-> CCL groups by `(bus location, carrier)`, and the LV bus is BEWAL by
-> construction. Guards: `test_rooftop_share.py` (5 cases, including
-> `test_rooftop_is_inside_the_solar_all_group`).
+> **FIXED 4 Sept (fleet split).** `solar rooftop` is back in `rename_solar`
+> (option i, 3 Sept) and the base-year fleet is now split:
+> `electricity.baseyear_pv_split` relabels **1 770 MW** of the standing
+> vintages (newest first) as non-extendable `solar rooftop` on
+> `BEWAL low voltage` (`data/walloon/baseyear_pv_split.csv`), next to the
+> 2 668 MW `solar-all` 2025 pin (Energy Balance for Wallonia 2025) that
+> `--write` now carries. 2025 is therefore differentiated by *capacity*
+> (rooftop >= 1 770 hard, ground <= 898 via the total pin), and item 8's
+> TIMES share is enabled from 2030 on (71.4 % 2030, 85.8 % 2050). Guards:
+> `test_baseyear_pv_split.py` (5 cases, including CSV/pin consistency);
+> `test_rooftop_share.py` still covers the share.
 
 To make 2025 solvable, `rename_solar` no longer maps `solar rooftop` into
 `solar-all`. The Elia numbers in the caps file (BE 9 751, BEWAL 4 088 MW in
@@ -395,9 +399,6 @@ next  B8  re-solve 2025 → 2030 → 2040 → 2050 from scratch, then a §11 rev
 
 **Still owed, and each needs a decision rather than an edit:**
 
-- **B5 / item 8.** A rooftop-vs-utility split of the 2025 Walloon fleet (PyPSA
-  labels all 4 088 MW `solar`; TIMES has 0.5 + 1.4 GW), or item 8 restated as a
-  share of new build. Until then the share pin stays off.
 - **B6 / item 6a.** Re-measure `Import_p` on a solved 1h network with the
   corrected expression, then pick the TWh values. TIMES's 2.94 / 6.47 / 10 may
   not be transferable to an hourly model that trades with Flanders.
