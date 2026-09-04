@@ -63,7 +63,15 @@ scen_demande_haute:
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
     industry_cc_floor:
-      enable: true
+      # Item 9 withdrawn for this 1h run (2026-09-03 evening). 2040 floor
+      # 5 077 kt (2050: 4 826) exceeds the maximum BEWAL can capture from the
+      # transferred industrial fuel mix: 2040 = 357 kt process x0.95
+      # + 7.62 TWh biomass x0.348 + 5.56 TWh gas x0.188 = 3 361 kt (2050:
+      # 3 424 kt) with every CC link at full demand. Barrier proved
+      # infeasible (79 it, job 11114388). STORAGEMININD implies capture
+      # sources (feedstock, SMR/CCGT-CC) PyPSA does not carry. Code and CSV
+      # stay; overlay off. See docs/logs/2026-09-02_scen_demande_haute_2010_1h.md §9.
+      enable: false
       node: BEWAL
       file: data/walloon/times_industrial_capture.csv
   electricity:
@@ -166,7 +174,9 @@ scen_evflex:
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
     industry_cc_floor:
-      enable: true
+      # Same item-9 withdrawal as scen_demande_haute (2040/2050 floors exceed
+      # the capturable maximum from the transferred fuel mix).
+      enable: false
       node: BEWAL
       file: data/walloon/times_industrial_capture.csv
     bev_dsm_availability:
