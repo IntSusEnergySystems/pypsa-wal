@@ -15,12 +15,19 @@ rule add_existing_baseyear:
         heat_pump_sources=config_provider("sector", "heat_pump_sources"),
         energy_totals_year=config_provider("energy", "energy_totals_year"),
         conventional=config_provider("conventional"),
+        # Read straight from snakemake.config until 2026-09-05, so editing the
+        # flag or the pins left the brownfield network stale (F7). Both are
+        # declared now: the flag as a param, the caps file as an input.
+        baseyear_reconcile=config_provider(
+            "electricity", "baseyear_reconcile_forced_build"
+        ),
     input:
         network=resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
         ),
         powerplants=resources("powerplants_s_{clusters}.csv"),
         walloon_potentials=config_provider("electricity", "walloon_potentials"),
+        agg_p_nom_limits=config_provider("solving", "agg_p_nom_limits", "file"),
         nuclear_p_max_pu=config_provider("conventional", "nuclear", "p_max_pu"),
         costs=lambda w: resources(
             f"costs_{config_provider('scenario', 'planning_horizons',0)(w)}_processed.csv"

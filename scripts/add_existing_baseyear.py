@@ -170,6 +170,7 @@ def add_power_capacities_installed_before_baseyear(
     renewable_carriers: list[str],
     agg_limits_file: str | None = None,
     reconcile_baseyear_forced_build: bool = False,
+    reconcile_standing_fleet: bool = False,
 ) -> None:
     """
     Add power generation capacities installed before base year.
@@ -257,7 +258,13 @@ def add_power_capacities_installed_before_baseyear(
             reconcile_baseyear_forced_build as _reconcile,
         )
 
-        _reconcile(df_agg, agg_limits_file, int(baseyear), grouping_years)
+        _reconcile(
+            df_agg,
+            agg_limits_file,
+            int(baseyear),
+            grouping_years,
+            scale_standing=reconcile_standing_fleet,
+        )
     # drop assets which are already phased out / decommissioned
     phased_out = df_agg[df_agg["DateOut"] < baseyear].index
     df_agg.drop(phased_out, inplace=True)
@@ -880,6 +887,15 @@ if __name__ == "__main__":
 
     grouping_years_power = snakemake.params.existing_capacities["grouping_years_power"]
     grouping_years_heat = snakemake.params.existing_capacities["grouping_years_heat"]
+    # Declared on the rule since 2026-09-05; the config fallback keeps the
+    # script runnable outside snakemake.
+    reconcile_opts = dict(
+        getattr(snakemake.params, "baseyear_reconcile", None)
+        or snakemake.config.get("electricity", {}).get(
+            "baseyear_reconcile_forced_build", {}
+        )
+    )
+
     add_power_capacities_installed_before_baseyear(
         n=n,
         costs=costs,
@@ -890,15 +906,16 @@ if __name__ == "__main__":
         capacity_threshold=snakemake.params.existing_capacities["threshold_capacity"],
         lifetime_values=snakemake.params.costs["fill_values"],
         renewable_carriers=renewable_carriers,
-        agg_limits_file=(
+        agg_limits_file=getattr(
+            snakemake.input,
+            "agg_p_nom_limits",
             snakemake.config.get("solving", {})
             .get("agg_p_nom_limits", {})
-            .get("file")
+            .get("file"),
         ),
-        reconcile_baseyear_forced_build=bool(
-            snakemake.config.get("electricity", {}).get(
-                "baseyear_reconcile_forced_build", {}
-            ).get("enable", False)
+        reconcile_baseyear_forced_build=bool(reconcile_opts.get("enable", False)),
+        reconcile_standing_fleet=bool(
+            reconcile_opts.get("scale_standing_fleet", False)
         ),
     )
 

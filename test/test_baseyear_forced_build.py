@@ -103,6 +103,70 @@ def test_open_corridor_no_touch(tmp_path):
     assert df["Capacity"].sum() == pytest.approx(before)
 
 
+def test_standing_untouched_without_the_flag(tmp_path):
+    """F7 default: the standing overshoot is warned about, not rewritten."""
+    agg = _agg(tmp_path, {("BEWAL", "onwind"): (1560.0, 1560.0)})
+    df = _dfagg(
+        [
+            ("BEWAL", "onwind", 2010, 2035, 1000.0),
+            ("BEWAL", "onwind", 2015, 2040, 694.3),
+            ("BEWAL", "onwind", 2023, 2048, 655.0),
+        ]
+    )
+    reconcile_baseyear_forced_build(df, agg, 2025, GROUPS)
+    assert df["Capacity"].sum() == pytest.approx(1694.3)
+
+
+def test_standing_scaled_to_the_pin(tmp_path):
+    """F7: the IRENASTAT land-potential split loses to the measured pin."""
+    agg = _agg(tmp_path, {("BEWAL", "onwind"): (1560.0, 1560.0)})
+    df = _dfagg(
+        [
+            ("BEWAL", "onwind", 2005, 2030, 108.1),
+            ("BEWAL", "onwind", 2010, 2035, 381.6),
+            ("BEWAL", "onwind", 2015, 2040, 538.9),
+            ("BEWAL", "onwind", 2020, 2045, 665.7),
+            ("BEWAL", "onwind", 2023, 2048, 655.0),
+        ]
+    )
+    reconcile_baseyear_forced_build(df, agg, 2025, GROUPS, scale_standing=True)
+    # forced tranche gone, standing scaled to land exactly on the pin
+    assert (df["DateIn"] >= 2021).sum() == 0
+    assert df["Capacity"].sum() == pytest.approx(1560.0)
+    # scaled pro rata, so the vintage mix is preserved
+    assert df.loc[df["DateIn"] == 2005, "Capacity"].iloc[0] == pytest.approx(
+        108.1 * 1560.0 / 1694.3, rel=1e-6
+    )
+
+
+def test_standing_under_the_pin_untouched_with_the_flag(tmp_path):
+    """The flag only bites on an overshoot; headroom is left for the pin."""
+    agg = _agg(tmp_path, {("BEWAL", "solar-all"): (2668.0, 2668.0)})
+    df = _dfagg(
+        [
+            ("BEWAL", "solar", 2015, 2040, 516.1),
+            ("BEWAL", "solar", 2020, 2045, 1770.0),
+            ("BEWAL", "solar", 2023, 2048, 1802.2),
+        ]
+    )
+    reconcile_baseyear_forced_build(df, agg, 2025, GROUPS, scale_standing=True)
+    assert df.loc[df["DateIn"] < 2021, "Capacity"].sum() == pytest.approx(2286.1)
+    assert df["Capacity"].sum() == pytest.approx(2668.0)
+
+
+def test_standing_scaled_when_there_is_no_forced_tranche(tmp_path):
+    """An overshoot with nothing to clip still reaches the pin."""
+    agg = _agg(tmp_path, {("BEWAL", "onwind"): (1560.0, 1560.0)})
+    df = _dfagg(
+        [
+            ("BEWAL", "onwind", 2010, 2035, 1000.0),
+            ("BEWAL", "onwind", 2015, 2040, 694.3),
+        ]
+    )
+    reconcile_baseyear_forced_build(df, agg, 2025, GROUPS, scale_standing=True)
+    assert df["Capacity"].sum() == pytest.approx(1560.0)
+
+
 def test_real_files_agree():
     pins = baseyear_pins(
         str(REPO / "data/walloon/agg_p_nom_minmax_demande_haute.csv"), 2025

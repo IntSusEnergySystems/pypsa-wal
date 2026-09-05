@@ -68,6 +68,7 @@ def reconcile_baseyear_forced_build(
     agg_file: str,
     baseyear: int,
     grouping_years: list[int],
+    scale_standing: bool = False,
 ) -> pd.DataFrame:
     """Scale base-year-grouped renewable rows down to the pin headroom.
 
@@ -75,6 +76,16 @@ def reconcile_baseyear_forced_build(
     same binning ``add_power_capacities_installed_before_baseyear`` applies
     (``np.digitize(DateIn, grouping_years, right=True)``): rows landing in
     the base-year bin are the forced new build this reconciles.
+
+    With ``scale_standing`` the reconciliation also scales the *pre*-base-year
+    vintages when they alone exceed the pin (F7). ``add_existing_renewables``
+    splits one IRENASTAT **country** total across that country's nodes in
+    proportion to remaining land potential (``p_nom_max``), not by where the
+    plants stand, so a region with lots of free land is handed more of the
+    national fleet than it owns. Where the caps file carries a measured
+    regional pin, that pin is the better number and the split is what is
+    wrong. Off by default: this rewrites historical capacity, so it is only
+    correct where the pin genuinely supersedes the disaggregation.
     """
     pins = baseyear_pins(agg_file, baseyear)
     if not pins:
@@ -90,52 +101,68 @@ def reconcile_baseyear_forced_build(
             pin = pins.get((str(bus), FUELTYPE_TO_GROUP.get(str(fuel), "")))
             if pin is None:
                 continue
-            forced = group.index[group["_grouping_year"] == int(baseyear)]
-            if forced.empty:
-                continue
             # Same aliveness rule as the phased_out drop below: rows without
             # a DateOut (the IRENA rows just added) survive.
             alive = group["DateOut"].isna() | (
                 group["DateOut"] >= int(baseyear)
             )
-            standing = float(
-                group.loc[(group["_grouping_year"] < int(baseyear)) & alive][
-                    "Capacity"
-                ].sum()
-            )
+            standing_idx = group.index[
+                (group["_grouping_year"] < int(baseyear)) & alive
+            ]
+            standing = float(group.loc[standing_idx, "Capacity"].sum())
+            forced = group.index[group["_grouping_year"] == int(baseyear)]
             forced_sum = float(group.loc[forced, "Capacity"].sum())
-            if forced_sum <= 0:
-                continue
             headroom = pin - standing
-            if headroom >= forced_sum:
-                continue
-            if headroom <= 0:
+
+            if forced_sum > 0 and headroom < forced_sum:
+                if headroom <= 0:
+                    logger.warning(
+                        "Base-year reconciliation: standing %s %s (%.0f MW) already "
+                        "covers the %.0f MW pin — dropping %.0f MW of forced "
+                        "%s additions. Check the pin against the fleet source.",
+                        bus,
+                        fuel,
+                        standing,
+                        pin,
+                        forced_sum,
+                        baseyear,
+                    )
+                    df_agg.drop(forced, inplace=True)
+                else:
+                    factor = headroom / forced_sum
+                    logger.info(
+                        "Base-year reconciliation: scaling %s %s %s additions by "
+                        "%.3f (%.0f MW of %.0f MW headroom under the pin).",
+                        bus,
+                        fuel,
+                        baseyear,
+                        factor,
+                        headroom,
+                        pin,
+                    )
+                    df_agg.loc[forced, "Capacity"] = (
+                        df_agg.loc[forced, "Capacity"] * factor
+                    )
+
+            # F7: dropping the forced tranche is all the headroom there is; if
+            # the standing vintages alone still overshoot, only the
+            # disaggregation can give.
+            if scale_standing and headroom < 0 and standing > 0:
+                factor = pin / standing
                 logger.warning(
-                    "Base-year reconciliation: standing %s %s (%.0f MW) already "
-                    "covers the %.0f MW pin — dropping %.0f MW of forced "
-                    "%s additions. Check the pin against the fleet source.",
+                    "Base-year reconciliation: scaling the standing %s %s fleet "
+                    "by %.4f (%.0f MW -> %.0f MW) to meet the measured pin. The "
+                    "%.0f MW excess is the IRENASTAT country total split by land "
+                    "potential, not a regional observation.",
                     bus,
                     fuel,
+                    factor,
                     standing,
                     pin,
-                    forced_sum,
-                    baseyear,
+                    standing - pin,
                 )
-                df_agg.drop(forced, inplace=True)
-            else:
-                factor = headroom / forced_sum
-                logger.info(
-                    "Base-year reconciliation: scaling %s %s %s additions by "
-                    "%.3f (%.0f MW of %.0f MW headroom under the pin).",
-                    bus,
-                    fuel,
-                    baseyear,
-                    factor,
-                    headroom,
-                    pin,
-                )
-                df_agg.loc[forced, "Capacity"] = (
-                    df_agg.loc[forced, "Capacity"] * factor
+                df_agg.loc[standing_idx, "Capacity"] = (
+                    df_agg.loc[standing_idx, "Capacity"] * factor
                 )
     finally:
         df_agg.drop(columns=["_grouping_year"], inplace=True, errors="ignore")

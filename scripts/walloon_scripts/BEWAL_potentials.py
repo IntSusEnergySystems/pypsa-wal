@@ -403,17 +403,37 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             allowed = "p_nom"
             assert attr == allowed, f"Unsupported attr: {attr!r}; expected {allowed!r}"
             pypsa_eur_potential = n.generators.loc[f"BEWAL {carrier}", attr]
+            # F8 (2026-09-05). `potential` is the *total* Valbiom domestic
+            # resource; PyPSA-Eur splits it into a sustainable and an
+            # unsustainable generator. The two must therefore sum to
+            # `potential`, not each carry it. Until this date the remainder
+            # went onto the unsustainable generator *and* the sustainable one
+            # was then overwritten with the full `potential`, so BEWAL entered
+            # the solve with `2 * potential - pypsa_eur_potential`: 12.0 TWh in
+            # 2025 (0 + 6.0 upstream -> 6.0 + 6.0) and 9.18 TWh in 2030
+            # (2.82 upstream -> 6.0 + 3.18) against a 6.0 TWh potential.
+            # The sustainable generator now keeps its upstream value whenever
+            # the remainder is booked as unsustainable.
+            sustainable_potential = potential
             if pypsa_eur_potential <= potential and carrier == "solid biomass":
                 if "unsustainable biomass limit" in n.global_constraints.index:
-                    n.generators.loc[unsustainable_idx, [attr, "e_sum_max"]] = (
-                        potential - pypsa_eur_potential
+                    previous_unsustainable = float(
+                        n.generators.loc[unsustainable_idx, attr]
                     )
+                    remainder = potential - pypsa_eur_potential
+                    n.generators.loc[unsustainable_idx, [attr, "e_sum_max"]] = (
+                        remainder
+                    )
+                    sustainable_potential = pypsa_eur_potential
                     limit = n.global_constraints.loc[
                         "unsustainable biomass limit", "constant"
                     ]
+                    # Swap BEWAL's old contribution for the new one; adding the
+                    # remainder without removing `previous_unsustainable` left
+                    # the Europe-wide limit inflated by the Walloon share.
                     n.global_constraints.loc[
                         "unsustainable biomass limit", "constant"
-                    ] = limit - pypsa_eur_potential + potential
+                    ] = limit - previous_unsustainable + remainder
             elif carrier == "solid biomass":
                 if "unsustainable biomass limit" in n.global_constraints.index:
                     limit = n.global_constraints.loc[
@@ -424,9 +444,12 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
                     ] = limit - n.generators.loc[unsustainable_idx, attr]
                 if unsustainable_idx in n.generators.index:
                     n.generators.loc[unsustainable_idx, [attr, "e_sum_max"]] = 0
-            n.generators.loc[f"BEWAL {carrier}", [attr, "e_sum_max"]] = potential
-            # what about ["BEWAL solid biomass transported", "BEWAL unsustainable solid biomass transported"] ?
-            # what about ["BEWAL solid biomass transported", "BEWAL unsustainable solid biomass transported"] ?
+            n.generators.loc[f"BEWAL {carrier}", [attr, "e_sum_max"]] = (
+                sustainable_potential
+            )
+            # Imported pellets are *not* part of this potential: they arrive on
+            # `BEWAL solid biomass transported`, capped by its own row of
+            # custom_potentials.csv (2.0 / 2.0 / 2.25 / 3.0 TWh, Valbiom).
         elif carrier == "solid biomass import":
             # remove all solid biomass imports except the one for BEWAL
             # and set the import potential to the one given for BEWAL

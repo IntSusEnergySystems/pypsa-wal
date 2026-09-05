@@ -522,6 +522,45 @@ by-product of a European cap that is roughly a decade ahead of the agreed
 trajectory, not a result of the Walloon target. Either sync `co2_budget` to the
 same anchors, or state plainly that the binding constraint is European.
 
+> **Decision (2026-09-05) — fixed, the national caps now follow the system cap.**
+> Of the two options above the third was taken: `budget_national` is set equal
+> to `co2_budget`, not the reverse. The national caps therefore adopt the
+> *tighter* series (2025 0.648 · 2030 0.450 · 2040 0.250) rather than the
+> literature anchors, so that a country cap binds exactly when the system cap
+> does and the "per-country caps sum to the global cap" check holds in every
+> horizon instead of two out of four.
+>
+> **2050 is deliberately the exception.** `budget_national` stays at the agreed
+> 5 % of 1990 while `co2_budget` goes to **0.000 — net zero for the modelled
+> system**. Each country may still emit 5 % gross; the system as a whole may
+> not. With `sector.dac: false` the only sinks are BECCS and biogas upgrading
+> with capture, so 2050 is the horizon that can fail.
+>
+> The `config:budget_national` anchors in
+> `config/input_parameters_for_models.csv` were moved with it — 64.8 @**2025**,
+> 45.0 @**2030**, 25.0 @**2040**, 5.0 @2050 — so
+> `build_common_parameters.py --check` stays green and `--write` reproduces the
+> block instead of reverting the decision. The 2026-07-26 literature reading
+> (64.8 @2030 / 45.0 @2040 / 5.0 @2050 — the same shape one decade later) is
+> preserved verbatim in that row's `note_complementaire`. Leaving the CSV alone
+> was tried first and rejected: `test_discount_rates.py::test_check_mode_passes`
+> asserts the sync check exits 0, so the divergence would have shipped as a red
+> test rather than as a documented exception.
+>
+> **Verified 2026-09-05, and 2050 net zero does *not* hold.** In
+> [`2026-09-05_scen_test_2013_6h_local`](2026-09-05_scen_test_2013_6h_local.md)
+> §12, 2025/2030/2040 solved optimal and 2050 returned a clean primal
+> infeasibility certificate. A control solve on the identical 2040 inheritance
+> at 0.050 was feasible, so the cap was the sole cause. The reason is
+> structural: with `sector.dac: false` every sink is biogenic and capped at
+> ~127 Mt, while a tonne of biogenic carbon can be sequestered *or* displace a
+> tonne of fossil fuel, never both — so net zero needs fossil combustion below
+> ~127 Mt against ~230 Mt realised, with aviation kerosene alone at 106 Mt.
+> `co2_budget` 2050 is therefore back at **0.050**; `budget_national` keeps the
+> synced series. Net zero is reachable only with DAC enabled or the
+> aviation/HVC demand revisited, and that is now the open question, not this
+> one.
+
 ### F6 — 2025 is a 433 EUR/t counterfactual, not a base year
 
 Every Belgian, French and Dutch national cap binds *exactly* in 2025:
@@ -551,6 +590,43 @@ run. Note the coupling to F1: the 1 802 MW of forced 2025 ground PV — about
 1 420 MW of which should not exist — is precisely the vintage that retires in
 2050 and produces the PV cliff.
 
+> **Decision (2026-09-05) — closed. The measured pin beats the disaggregation.**
+> `0def1c0a` took the four FAILs down to two, both 2025 onshore wind: BEWAL
+> 1 694 MW against the 1 560 MW pin, BE 3 480 against 3 337. The two are **one**
+> finding, not two. `add_CCL_constraints` subtracts a region row from its parent,
+> so the BE row covers only BEBRU + BEVLG at 3 337 − 1 560 = 1 777 MW, and those
+> two land on 1 785.9 — inside the 0.5 % corridor. The whole BE overshoot is the
+> BEWAL residue seen from the parent row.
+>
+> That residue was never a Walloon measurement. `add_existing_renewables`
+> distributes **one IRENASTAT country total** across a country's nodes with
+> `fraction = p_nom_max / p_nom_max.sum()` — in proportion to *remaining land
+> potential*, not to where the turbines stand. Wallonia has the most free land
+> in Belgium, so it is handed the largest share of the Belgian onshore fleet.
+> The 1 560 MW pin, by contrast, is a direct reading of the Walloon Energy
+> Balance. Where the two disagree the pin wins, and every other country's 2025
+> onwind pin is *already* the model's own fleet ("Model base year:
+> powerplantmatching + custom_powerplants") — BEWAL was the only row sourced
+> differently, which is exactly why it was the only row that broke.
+>
+> **Fix:** `electricity.baseyear_reconcile_forced_build.scale_standing_fleet`
+> (new, default **false** — it rewrites historical capacity, so it must be
+> opted into). When the forced tranche has already been clipped to zero and the
+> standing vintages still overshoot, they are scaled pro rata onto the pin:
+> ×0.9207 on BEWAL's 2005/2010/2015/2020 bins, preserving the vintage mix and
+> therefore the retirement schedule. Three new cases in
+> `test_baseyear_forced_build.py` (7 → 9), including one proving the default is
+> still a warning and not a rewrite.
+>
+> **Second defect, same finding.** Neither the flag nor the caps file was
+> declared on `rule add_existing_baseyear` — the script read both straight from
+> `snakemake.config`, so editing a pin or flipping the switch left the
+> brownfield network stale and the change silently inert. The flag is now a
+> `param` and the caps file an `input`. Same family as the
+> `generate_html_report` race in
+> [`2026-09-05_scen_test_2013_6h_local`](2026-09-05_scen_test_2013_6h_local.md)
+> §9: an undeclared dependency that only misleads on a *re-run*.
+
 ### F8 — Walloon solid biomass exceeds the documented potential, twice over
 
 The BEWAL `solid biomass` generator carries `e_sum_max` = **8.00 / 8.00 / 8.25 /
@@ -576,6 +652,50 @@ billions and it carries the BECCS credit that puts BEWAL 2050 under its cap
 Related: the Walloon biogas block is all-or-nothing as the checklist warns —
 0 TWh in 2025/2030/2040, then **6.90 TWh in 2050, exactly on the ICEDD cap**.
 Read the 2050 Walloon CO₂ balance knowing it flips on this single block.
+
+> **Decision (2026-09-05) — closed, and it was worse than reported: two
+> defects, not one.**
+>
+> **(a) The domestic potential was counted twice — a code bug.** Measured on
+> the 6h networks, not inferred: BEWAL 2025 carried `solid biomass` 6.00 TWh
+> **and** `unsustainable solid biomass` 6.00 TWh, and 2030 carried 6.00 + 3.18.
+> `update_BEWAL_potentials` wrote the remainder `potential − upstream` onto the
+> unsustainable generator — correct — and then overwrote the sustainable one
+> with the **full** `potential`, so BEWAL entered every solve with
+> `2 × potential − upstream` against a 6.0 TWh Valbiom row. The sustainable
+> generator now keeps its upstream value whenever the remainder is booked as
+> unsustainable, so the two legs sum to the Valbiom total exactly. The same
+> block also grew the Europe-wide `unsustainable biomass limit` by the new
+> remainder *without* removing BEWAL's previous contribution; it now swaps
+> them. Six cases in the new `test_bewal_biomass_potential.py`, four of which
+> fail on the old code.
+>
+> Note what this means for 2025: the Valbiom split becomes 0.0 sustainable +
+> 6.0 unsustainable, which is the right answer — the Europe-wide 2025
+> `biomass limit` is `<= 0`, so sustainable solid biomass is banned that year
+> (checklist §4.4) and all Walloon biomass *must* be unsustainable.
+>
+> **(b) The pellet imports were specified twice — a data decision.**
+> `solid biomass import` (store + link, e_nom 4.0/4.0/4.5/6.0 TWh, "Bioenergy
+> Europe 2025 stat report … projections avec centrale COGEN aux pellets") and
+> `solid biomass transported` (e_sum_max 2.0/2.0/2.25/3.0 TWh, Valbiom,
+> "potentiel annuel de pellets importés destinés à la Wallonie") are two
+> estimates of the same physical flow, and 2040 used **both** — 4.50 + 2.25 =
+> 6.75 TWh of pellets. `sector.solid_biomass_import.enable` is now **false**.
+> `BEWAL_potentials` strips every non-BEWAL import link, so that feature served
+> Wallonia alone and switching it off costs nothing elsewhere. The Valbiom row
+> is kept because it is written as a *Walloon potential* rather than one
+> plant's projection, and because it is the conservative of the two.
+>
+> **This is the half that is a judgement call, and the data owner should
+> confirm it.** Keeping the other channel instead would give BEWAL
+> 10.0/10.0/10.5/12.0 TWh rather than 8.0/8.0/8.25/9.0. Whichever is chosen,
+> only one may be active — the config comment says so.
+>
+> Post-fix Walloon totals: **8.0 / 8.0 / 8.25 / 9.0 TWh** available
+> (6.0 domestic + the Valbiom pellet allowance), against 7.74 / 10.07 / 12.75 /
+> 6.47 consumed before. 2030 and 2040 lose the most, and the 2050 `biomass
+> limit` dual (−1 041.6 EUR/MWh) says that is where it will be felt.
 
 ### F9 — capital costs: **resolved 2026-09-05, not a defect**
 

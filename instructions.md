@@ -478,8 +478,12 @@ succeeded, and transferred the wrong thing.
 The mechanical checks are scripted:
 
 ```bash
-python scripts/walloon_scripts/review_run.py results/walloon/<scenario>
+PYTHONPATH=. python scripts/walloon_scripts/review_run.py results/walloon/<scenario>
 ```
+
+`PYTHONPATH=.` is load-bearing: the script imports `scripts.walloon_scripts.…`
+absolutely, so without the repository root on the path it dies on
+`ModuleNotFoundError: No module named 'scripts'` before checking anything.
 
 and the profile-fidelity check, which needs the exported right-hand sides, stays
 separate:
