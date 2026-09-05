@@ -161,10 +161,12 @@ F1 (the item-8 pin as a ceiling) and all of F2 are **left as is and re-checked
 on the next run**. F9 was not a defect and is closed. The reporting half of F1 is
 fixed: pypsa2html `83a59b0` now splits the PV capacity charts three ways and
 stops counting solar-thermal collectors as PV. The remaining blockers to
-publication are F4 (the inverted Explorer table), F5 (CO₂ trajectory), F7
-(2025 pins) and F8 (solid biomass). **F3 is now fixed in tree**: item 6a is on
-with the TIMES values, after three implementation fixes and a feasibility
-analysis — see the decision box under F3.
+publication are F5 (CO₂ trajectory), F7 (2025 pins) and F8 (solid biomass).
+**F3 is now fixed in tree**: item 6a is on with the TIMES values, after three
+implementation fixes and a feasibility analysis — see the decision box under
+F3. **F4 is documented and will not be fixed** — it is ClimAct's extraction
+library and no result of ours depends on it; it is a hand-off, not a defect in
+this model.
 
 ### 11.1 Provenance (level 0) — **pass**
 
@@ -476,8 +478,16 @@ self-sufficiency message is inverted.
 Source: `graph_extraction_transform.py` (ClimAct extraction repo), around the
 `imports`/`exports` `groupby` pair — `exports` groups `["node","node_1",…]`,
 `imports` groups `["node_1","node",…]` and then renames the levels back, so the
-`nodes` column means a different thing in each block. **Resolve with ClimAct
-before promoting this scenario out of the test environment.**
+`nodes` column means a different thing in each block.
+
+> **Decision (2026-09-05) — documented, not fixed.** The extraction library is
+> ClimAct's, not ours, and the orientation is a labelling convention inside it:
+> the underlying flows are correct and **none of our own results depend on this
+> file** — the solve, the CSVs, `review_run.py` and the pypsa2html report all
+> read the networks directly. We will not resolve it. What we owe is the
+> hand-off: tell ClimAct which block means what, so the Explorer does not show
+> Wallonia exporting 17.6 TWh in 2050 when the model has it importing 20.4 TWh
+> net. Recomputed from the networks, the numbers to check against are in F3.
 
 ### F5 — the global and national CO₂ trajectories disagree, and the national caps are inert after 2025
 

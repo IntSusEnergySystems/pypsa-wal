@@ -62,6 +62,22 @@ if HAVE_PYPSA2HTML:
                 **config["scenario"],
                 allow_missing=True,
             ),
+            # pypsa2html reads csvs/ as well as the networks, and caches each
+            # file on first use. Without these inputs Snakemake is free to run
+            # the report alongside `make_global_summary`, and the report is
+            # then built from the PREVIOUS run's summary tables while its file
+            # timestamps look fresh. Seen 2026-09-05 on the 6h test: the
+            # capacity pages carried the 3 Sept run's PV fleet (BEWAL 4 088 MW
+            # of ground PV, zero rooftop) although csvs/nodal_capacities.csv on
+            # disk was correct. Declare what is actually read.
+            nodal_capacities=RESULTS + "csvs/nodal_capacities.csv",
+            nodal_costs=RESULTS + "csvs/nodal_costs.csv",
+            nodal_energy_balance=RESULTS + "csvs/nodal_energy_balance.csv",
+            nodal_capacity_factors=RESULTS + "csvs/nodal_capacity_factors.csv",
+            costs=RESULTS + "csvs/costs.csv",
+            capacities=RESULTS + "csvs/capacities.csv",
+            energy_balance=RESULTS + "csvs/energy_balance.csv",
+            metrics=RESULTS + "csvs/metrics.csv",
             config_file=PYPSA2HTML_CONFIG,
         output:
             index=RESULTS + "html/pypsa/index.html",

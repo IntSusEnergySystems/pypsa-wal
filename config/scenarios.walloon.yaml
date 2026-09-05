@@ -119,6 +119,53 @@ scen_demande_haute:
       2040: 6.47
       2050: 10.0
 
+# Local smoke test: the production scenario at the weather year that is cached
+# locally (2013) and 6h sector resolution, under its own run name so it can
+# never overwrite `scen_demande_haute`'s resources/ or results/ tree. Every
+# other setting mirrors the production overlay above, so a divergence is
+# attributable to the weather-year/resolution swap alone. Roughly 45 min
+# end-to-end on a 16-core box (2026-09-03 smoke test: 42m47s).
+#
+# `html_publish.enable` cannot be switched off from here — `publish_html.smk`
+# gates on the static parse-time config — so pair this with
+# `config/config.test6h.yaml`:
+#   snakemake --configfile config/config.walloon.yaml config/config.test6h.yaml \
+#             --cores 16 -call
+scen_test_2013_6h:
+  snapshots:
+    start: '2013-01-01'
+    end: '2014-01-01'
+  atlite:
+    default_cutout: europe-2013-sarah3-era5
+  clustering:
+    temporal:
+      resolution_sector: 6h
+  sector:
+    times_file: data/walloon/scen_central_demande_haute_v2_260903_0309.vd
+    rooftop_share:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture.csv
+  electricity:
+    retrofit_nuclear_once: false
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_demande_haute.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
+
 # Nuclear CAPEX sensitivities. `costs: overwrites: {<parameter>: {<technology>: value}}`
 # is applied in scripts/process_cost_data.py on top of the custom-costs file, before
 # the annuity is computed, so capital_cost follows. Units are EUR/MW_e (the cost table

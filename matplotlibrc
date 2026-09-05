@@ -1,6 +1,12 @@
 # SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 #
 # SPDX-License-Identifier: CC0-1.0
+# Batch workflow: every figure is written to a file, none is shown. Without an
+# explicit backend matplotlib picks an interactive one whenever DISPLAY is set,
+# and a shell that has DISPLAY but no reachable Qt platform plugin -- cron, CI,
+# an agent shell, ssh without X forwarding -- aborts with SIGABRT in every
+# plot_* rule (2026-09-05 6h test run: 12 plot rules dead in one minute).
+backend: Agg
 font.family: sans-serif
 image.cmap: viridis
 figure.autolayout : True

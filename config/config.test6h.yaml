@@ -1,0 +1,16 @@
+# Layer for the local 6h smoke test. Use *after* config.walloon.yaml so it wins:
+#
+#   snakemake --configfile config/config.walloon.yaml config/config.test6h.yaml \
+#             --cores 16 -call
+#
+# Only two keys, and both have to live here rather than in the scenario overlay:
+#   * `run.name` selects which overlay in scenarios.walloon.yaml is active;
+#   * `html_publish.enable` is read from the static parse-time config by
+#     rules/publish_html.smk, so a scenario override cannot reach it — that is
+#     how the 2026-09-03 smoke test published itself to the public site by
+#     accident.
+run:
+  name:
+  - scen_test_2013_6h
+html_publish:
+  enable: false
