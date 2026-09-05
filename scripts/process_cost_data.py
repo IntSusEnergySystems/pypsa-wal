@@ -76,6 +76,13 @@ def overwrite_costs(costs: pd.DataFrame, custom_costs: pd.DataFrame) -> pd.DataF
     return costs
 
 
+#: Cost-table technologies renamed after the annuity is computed. Kept in step
+#: with ``scripts/build_common_parameters.py::COST_TABLE_RENAMES``, which uses
+#: it to name the generated ``discount_rates.csv`` rows
+#: (``test_cost_table_renames_agree`` pins the two together).
+COST_TABLE_RENAMES = {"solar-utility single-axis tracking": "solar-hsat"}
+
+
 def prepare_costs(
     costs: pd.DataFrame,
     config: dict,
@@ -187,6 +194,12 @@ def prepare_costs(
             hurdle_rate_fn, dtype={"planning_horizon": "str"}
         ).query("planning_horizon in [@planning_horizon, 'all']")
         rates = hurdle.set_index("technology")["value"]
+        # The hurdle file is generated with the technology names the cost table
+        # carries *after* COST_TABLE_RENAMES, but the rename happens below,
+        # after the annuity. Map back, or the renamed technology silently keeps
+        # the fill_values fallback: `solar-hsat` did, at 7 % instead of the
+        # 7.5 % TIMES hurdle its row asks for, i.e. ~3 % too cheap.
+        rates = rates.rename(index={new: old for old, new in COST_TABLE_RENAMES.items()})
         unknown = rates.index.difference(costs.index)
         if len(unknown):
             logger.warning(
@@ -227,8 +240,11 @@ def prepare_costs(
     costs.at["OCGT", "CO2 intensity"] = costs.at["gas", "CO2 intensity"]
     costs.at["CCGT", "CO2 intensity"] = costs.at["gas", "CO2 intensity"]
 
+    # `solar` is the electricity-network ground-mount carrier; it takes the
+    # utility cost, so its own `investment` row is decorative and was removed
+    # from custom_costs.csv on 2026-09-05.
     costs.at["solar", "capital_cost"] = costs.at["solar-utility", "capital_cost"]
-    costs = costs.rename({"solar-utility single-axis tracking": "solar-hsat"})
+    costs = costs.rename(COST_TABLE_RENAMES)
 
     costs = costs.rename(columns={"standing losses": "standing_losses"})
 

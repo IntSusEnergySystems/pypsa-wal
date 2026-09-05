@@ -197,6 +197,65 @@ CSV values win; notes record superseded Walloon custom_costs figures.
 * Haber-Bosch units — CLOSED by §4.3.
 * Placeholders / NTC BE-offshore / H₂ turbines — documented `pending`/`none`.
 
+### 3.11 Learning curves on the Walloon cost overrides — CLOSED (2026-09-05)
+
+Every Walloon `investment` override sat on one `all`-horizon row, so its CAPEX
+was **flat from 2025 to 2050** while technology-data's FOM *percentage* kept
+climbing — that percentage is calibrated against the catalogue's own falling
+CAPEX, so on a flat CAPEX it makes the annuity **grow**. Annualised cost was
+rising for every PV carrier (+2.3 % ground, +2.2 % tracking, +3.4 % rooftop,
+2025→2050) and barely moving for onshore wind (−0.6 %). Found by §11/F1 of
+[`docs/logs/2026-09-04_scen_demande_haute_2010_1h_v2.md`](docs/logs/2026-09-04_scen_demande_haute_2010_1h_v2.md):
+utility PV came out at 81 EUR/MWh in 2050 against a 101.5 EUR/MWh Walloon
+price, which is why the 2050 solve retired PV instead of rebuilding it.
+
+**Rule now applied.** The Walloon literature figure is the **2025 anchor**;
+2030/2040/2050 scale it by technology-data v0.14.0's own relative trajectory
+for that technology. The level stays Walloon, the shape follows the catalogue —
+which is also what makes the FOM percentage coherent again.
+
+| target | 2025 (anchor) | 2030 | 2040 | 2050 | rate source |
+|---|---:|---:|---:|---:|---|
+| `cost:solar-utility:investment` | 525.825 | 426.482 | 356.567 | 325.173 | `solar-utility` |
+| `cost:solar-rooftop:investment` | 920.194 | 735.011 | 606.285 | 548.815 | `solar-rooftop` |
+| `cost:solar-utility single-axis tracking:investment` | 570.739 | 469.549 | 397.062 | 364.208 | same name |
+| `cost:onwind:investment` | 1450 | 1393.992 | 1315.922 | 1296.405 | `onwind` |
+| `cost:biogas:investment` | 1547.779 | 1346.568 | 1300.134 | 1222.745 | `biogas` |
+| `cost:biogas upgrading:investment` | 306.790 | 254.467 | 203.953 | 187.142 | `biogas upgrading` |
+
+`nuclear` (9 500 EUR/kW_e) stays flat — technology-data's nuclear is flat too.
+`nuclear retrofit` (1 800) stays flat: it has no catalogue entry to follow.
+Everything else was already learning, because PyPSA-origin targets *are* the
+catalogue values: offshore −13.9 %, battery storage −59.9 %, battery inverter
+−72.1 %, electrolysis −44.4 %, CCGT −6.4 % on investment 2025→2050.
+
+`year_rule` on these six moved `hold` → `interp`, so a horizon added later
+(2035, 2045) lands on the curve instead of holding the previous anchor.
+
+Two mechanical defects were fixed with it:
+
+* **`custom_costs.csv` is now 100 % master-managed** (63/63 rows). The one
+  unmanaged row, `all,solar,investment = 500`, was deleted: `process_cost_data.py`
+  copies `solar`'s `capital_cost` from `solar-utility`, so that 500 EUR/kW was
+  never read — it only invited someone to edit the wrong number.
+* **The `solar-hsat` hurdle rate was not reaching it.** `discount_rates.csv` is
+  generated with the name the cost table carries *after*
+  `COST_TABLE_RENAMES`, but `prepare_costs` applies hurdle rates *before* the
+  rename, so tracking PV silently kept the `fill_values` 7 % instead of its
+  7.5 % TIMES hurdle — about 3 % too cheap. `prepare_costs` now maps the
+  hurdle index back through the inverse rename.
+
+Guards: [`test/test_cost_learning.py`](test/test_cost_learning.py) — 13 cases,
+7 of which fail on the pre-2026-09-05 data.
+
+**One thing to write down that is not in this table.** `add_electricity.py`
+adds `electricity grid connection` (187.012 EUR/kW, 40 y, 7.5 %, FOM 2 % →
+**18 589 EUR/MW/a**) to every carrier built from an atlite profile — `solar`,
+`solar-hsat`, `onwind`, and the offshore family — and **not** to
+`solar rooftop`, which `prepare_sector_network.py` adds behind the distribution
+grid. It is 33 % of ground PV's annualised cost in 2050 and 0 % of rooftop's,
+so it is a large part of the ground-versus-rooftop ranking.
+
 ---
 
 ## 4. Currency-year strategy (decided + executed)
@@ -457,10 +516,6 @@ Script that applied targets/notes/additions: `scripts/apply_common_parameters_de
   `HVAC/HVDC overhead` and `HVDC inverter pair` FOM (2 vs 1.5); water-tank/pit
   storage lifetimes. Either retag them as Walloon overrides (add a row to
   `custom_costs.csv`) or correct the table to the archive.
-* **`solar` `investment`** is in `custom_costs.csv` with no master-CSV target, so it
-  is drifting away from `solar-utility` (500 vs 525.825). Largely harmless —
-  `process_cost_data.py` overwrites `solar`'s `capital_cost` from `solar-utility` —
-  but listed by `--check -v` as unmanaged.
 * **`custom_potentials_imppel.csv`** is still a full copy (now genuinely in effect
   after the scenario-override fix in §5.5). Giving it the cost-file treatment would
   need a per-potential config override, which pypsa-eur does not have.

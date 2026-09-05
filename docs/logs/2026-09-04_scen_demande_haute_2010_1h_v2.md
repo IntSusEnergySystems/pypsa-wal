@@ -152,11 +152,13 @@ double count, Explorer import/export orientation). Findings new to this review:
 orientation), **F5** (CO₂ trajectory), **F8** (solid biomass), **F11** (process
 emissions), **F12** (per-node CO₂ caps) and **F13** (2025 carbon capture).
 
-**Status after the 2026-09-05 walkthrough.** F1 and F2 are **understood and
-accepted for now**: the mechanisms are sound, PV is simply uneconomic at this
-carbon price with this much cheap import available, and the fix belongs to the
-*next* run (import cap on, CO₂ trajectory reconciled) rather than to this one.
-F9 turned out not to be a defect and is closed. The reporting half of F1 is
+**Status after the 2026-09-05 walkthrough.** The cost half of F1 turned out to
+be a real defect and is **fixed in tree**: no Walloon `investment` override had
+a learning curve, so every PV annualised cost was *rising* to 2050. Rooftop PV
+2050 moves 100.1 → 59.7 EUR/MWh against a 101.5 EUR/MWh Walloon price, which
+should be enough on its own to change the F1 outcome. The *structural* half of
+F1 (the item-8 pin as a ceiling) and all of F2 are **left as is and re-checked
+on the next run**. F9 was not a defect and is closed. The reporting half of F1 is
 fixed: pypsa2html `83a59b0` now splits the PV capacity charts three ways and
 stops counting solar-thermal collectors as PV. The remaining blockers to
 publication are unchanged — F3/F4 (self-sufficiency and its inverted Explorer
@@ -275,43 +277,70 @@ and a rooftop level row to `agg_p_nom_minmax_demande_haute.csv` for 2035–2050)
 not the ratio. Add a `BEWAL, solar-hsat` `p_nom_max` row, or fold hsat into the
 `solar` 13 GW ceiling. Until then the Walloon PV trajectory must not be published.
 
-**Cost trajectory: PV gets *more* expensive, not less.** Checked 2026-09-05 on
-the run's own cost table (`costs_<year>_processed.csv`; the solved
-`capital_cost` values match it to the euro). There is **no learning curve**:
+**Cost trajectory: PV was getting *more* expensive, not less — FIXED
+2026-09-05.** Checked on the run's own cost table (`costs_<year>_processed.csv`;
+the solved `capital_cost` values match it to the euro). There was **no learning
+curve** on any Walloon override:
 
-| EUR/MW/a, as delivered to the generator | 2025 | 2030 | 2040 | 2050 | 2025→2050 |
-|---|---:|---:|---:|---:|---:|
-| `solar` (ground) | 77 320 | 78 779 | 79 037 | 79 060 | **+2.3 %** |
-| `solar-hsat` (tracking) | 79 188 | 80 625 | 80 724 | 80 933 | **+2.2 %** |
-| `solar rooftop` | 94 115 | 95 649 | 96 862 | 97 329 | **+3.4 %** |
-| `onwind` | 166 573 | 166 312 | 165 864 | 165 743 | −0.5 % |
+| EUR/MW/a, as delivered to the generator | 2025 | 2050 (this run) | 2050 (fixed) |
+|---|---:|---:|---:|
+| `solar` (ground) | 77 320 | 79 060 **(+2.3 %)** | **55 985 (−28 %)** |
+| `solar-hsat` (tracking) | 79 188 → 81 414 | 80 933 **(+2.2 %)** | **60 561 (−26 %)** |
+| `solar rooftop` | 94 115 | 97 329 **(+3.4 %)** | **58 048 (−38 %)** |
+| `onwind` | 166 573 | 165 743 (−0.5 %) | **150 156 (−10 %)** |
 
-Two causes compose:
+Two causes composed:
 
-- **`custom_costs.csv` sets one `all`-horizon investment** — solar-utility
-  525.825 EUR/kW, solar-rooftop 920.194, onwind 1 450 — so CAPEX is flat from
-  2025 to 2050. Only `solar-utility single-axis tracking` has per-year values,
-  and only −1.9 % over 25 years. For reference, technology-data v0.14 has
-  utility PV falling roughly −28 % over the same window.
-- **The FOM *percentage* still rises** (solar-utility 2.198 → 2.529 %/a,
-  rooftop 1.257 → 1.606, hsat 2.037 → 2.553), because technology-data
-  calibrates FOM% against its own *declining* CAPEX so that absolute O&M stays
-  flat. Applied to a flat Walloon CAPEX it makes the annuity grow. `onwind`
-  escapes because its FOM% was overridden and falls (1.235 → 1.178 %/a).
+- **`custom_costs.csv` carried one `all`-horizon investment** — solar-utility
+  525.825 EUR/kW, solar-rooftop 920.194, onwind 1 450, biogas 1 547.779 — so
+  CAPEX was flat 2025→2050. Only `solar-utility single-axis tracking` varied,
+  and only by −1.9 % over 25 years.
+- **The FOM *percentage* still rose** (solar-utility 2.198 → 2.529 %/a, rooftop
+  1.257 → 1.606, hsat 2.037 → 2.553), because technology-data calibrates FOM%
+  against its own *falling* CAPEX so absolute O&M stays flat. On a flat Walloon
+  CAPEX it made the annuity grow. `onwind` escaped only because its FOM% was
+  overridden and falls.
 
-At the modelled Walloon capacity factors that is **81 / 72 / 100 EUR/MWh** for
-ground / tracking / rooftop in 2050, against a BEWAL mean price of
-101.5 EUR/MWh. PV is at the money and getting worse, which is exactly why the
-model retires it rather than rebuilding.
+Everything **not** overridden was already learning, so this was confined to the
+`Revue de littérature` rows: offshore −13.9 %, battery storage −59.9 %, battery
+inverter −72.1 %, electrolysis −44.4 %, CCGT −6.4 % on investment 2025→2050.
 
-> **Decision (2026-09-05).** Nothing here is *wrong* — the constraint is sound,
-> the retirements follow an agreed 25-year lifetime, and the flat CAPEX is a
-> deliberate Walloon override. PV is simply too expensive to enter at this
-> carbon price with this much cheap import available. **Left as is for now.**
-> The test is whether PV comes back when the system is squeezed: re-check F1
-> after a run with the BEWAL import cap on (F3) and/or a tighter CO₂
-> trajectory (F5). If PV still does not enter, the flat CAPEX is the next
-> thing to revisit — not the rooftop-share constraint.
+**Fix.** The literature figure is now the **2025 anchor** and 2030/2040/2050
+scale it by technology-data v0.14.0's own rate for that technology — the level
+stays Walloon, the shape follows the catalogue, and the FOM percentage becomes
+coherent again. `nuclear` stays flat (so is the catalogue's); `nuclear retrofit`
+stays flat (no catalogue entry). Two mechanical defects went with it:
+`custom_costs.csv` is now 100 % master-CSV managed (the dead
+`all,solar,investment = 500` row is gone), and the `solar-hsat` hurdle rate now
+actually reaches it — it had been silently using the 7 % `fill_values` fallback
+instead of its 7.5 % TIMES hurdle, ~3 % too cheap, because
+`discount_rates.csv` is generated with the *post*-rename name while
+`prepare_costs` applies hurdle rates *before* the rename. See
+[`common_parameters.md`](../../common_parameters.md) §3.11 and
+[`test/test_cost_learning.py`](../../test/test_cost_learning.py) (13 cases, 7 of
+which fail on this run's data).
+
+**What it does to the economics.** At the capacity factors this run produced,
+2050 PV LCOE moves:
+
+| | this run | fixed | BEWAL 2050 mean price |
+|---|---:|---:|---:|
+| ground PV | 81.3 | **57.6** | 101.5 |
+| tracking PV | 71.6 | **53.6** | 101.5 |
+| rooftop PV | 100.1 | **59.7** | 101.5 |
+| onshore wind | 77.5 | **70.3** | 101.5 |
+
+Rooftop PV goes from *at* the Walloon price to 41 % below it. Since the
+rooftop-share constraint works by making the model buy 4.03 MW of rooftop with
+every MW of ground PV, and rooftop was the leg that priced that bundle out of
+the money, this is the single change most likely to bring Walloon PV back.
+
+> **Decision (2026-09-05).** The *cost* half of F1 was a real defect and is
+> fixed in tree (not in this run). The *structural* half — the item-8 pin being
+> a floor on rooftop and therefore a ceiling on everything else — is left as is
+> and re-checked on the next run: with rooftop at 59.7 EUR/MWh the constraint
+> may simply stop binding, in which case nothing more is needed. If PV still
+> does not enter, the pin has to become a capacity pin rather than a ratio.
 >
 > Reporting is fixed in the meantime: pypsa2html `83a59b0` splits the capacity
 > charts into ground / rooftop / tracking (and stops counting solar-thermal
@@ -767,9 +796,9 @@ deeply-decarbonised counterfactual, not a base year. Either calibrate 2025
    count; add a test that BEWAL solid-biomass consumption ≤ domestic + one
    import allowance.
 8. **F9** — publish `costs_<year>_processed.csv` with every run (the
-   reconciliation itself is closed). Document the `electricity grid connection`
-   adder in `common_parameters.md`, and decide whether PV CAPEX should keep a
-   flat `all`-horizon value while its FOM percentage rises (F1).
+   reconciliation itself is closed). The `electricity grid connection` adder is
+   now written up in `common_parameters.md` §3.11, and the flat-CAPEX half is
+   fixed — see F1.
 9. **F11** — check whether the TIMES `INDCO2` pin already includes steam-cracker
    process CO₂; if so, net the `naphtha for industry` term (55–94 kt/a) out of
    `custom_potentials.csv`. Decide whether BEVLG/BEBRU should also come from
