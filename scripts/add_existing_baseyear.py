@@ -168,6 +168,8 @@ def add_power_capacities_installed_before_baseyear(
     capacity_threshold: float,
     lifetime_values: dict[str, float],
     renewable_carriers: list[str],
+    agg_limits_file: str | None = None,
+    reconcile_baseyear_forced_build: bool = False,
 ) -> None:
     """
     Add power generation capacities installed before base year.
@@ -250,6 +252,12 @@ def add_power_capacities_installed_before_baseyear(
         countries=countries,
         renewable_carriers=renewable_carriers,
     )
+    if reconcile_baseyear_forced_build and agg_limits_file:
+        from scripts.walloon_scripts.baseyear_forced_build import (
+            reconcile_baseyear_forced_build as _reconcile,
+        )
+
+        _reconcile(df_agg, agg_limits_file, int(baseyear), grouping_years)
     # drop assets which are already phased out / decommissioned
     phased_out = df_agg[df_agg["DateOut"] < baseyear].index
     df_agg.drop(phased_out, inplace=True)
@@ -882,6 +890,16 @@ if __name__ == "__main__":
         capacity_threshold=snakemake.params.existing_capacities["threshold_capacity"],
         lifetime_values=snakemake.params.costs["fill_values"],
         renewable_carriers=renewable_carriers,
+        agg_limits_file=(
+            snakemake.config.get("solving", {})
+            .get("agg_p_nom_limits", {})
+            .get("file")
+        ),
+        reconcile_baseyear_forced_build=bool(
+            snakemake.config.get("electricity", {}).get(
+                "baseyear_reconcile_forced_build", {}
+            ).get("enable", False)
+        ),
     )
 
     if options["heating"]:

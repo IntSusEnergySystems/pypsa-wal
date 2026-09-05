@@ -100,6 +100,12 @@ electricity:
     enable: true
     file: data/walloon/baseyear_pv_split.csv
 
+  # Base-year pins (agg caps, min = max) already determine the full fleet, so
+  # the IRENASTAT current-year share must not be forced on top of them: scale
+  # DateIn == baseyear renewable rows down to the pin headroom.
+  baseyear_reconcile_forced_build:
+    enable: true
+
   extendable_carriers:
     extendable_nuclear_links:
       2025: [FR, GB, NL, LU]
@@ -573,7 +579,11 @@ solving:
     agg_nuclear: true
     agg_ccgt: true
     include_existing: true
-    file: data/agg_p_nom_minmax.csv
+    # Walloon caps (synced from config/input_parameters_for_models.csv by
+    # build_common_parameters.py --write). The scenario overlays repeat this
+    # path; it also lets prepare-time rules (base-year reconciliation) read
+    # the same pins the solve will enforce.
+    file: data/walloon/agg_p_nom_minmax_demande_haute.csv
     # Build-rate limit on new RES per planning period (docs/renewable-potentials.md
     # section 3): growth_multiplier x the best annual addition IRENA has observed
     # 2000-2024 x the length of the period. Applies from the second horizon on; the
