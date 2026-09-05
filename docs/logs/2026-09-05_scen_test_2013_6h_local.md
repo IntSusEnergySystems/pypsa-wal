@@ -122,6 +122,22 @@ latent workflow bug that the review would otherwise have blamed on the model.
   tree there is nothing stale to read and the bug is invisible, so it only
   appears when a scenario is re-run — which is every production re-run.
 
+- **The energy Sankey's electricity-import arrow was a plug.**
+  `_close_energy_graph` derived `imp -> elc_se` from the annual *net* balance of
+  the electricity node, so the arrow was whatever closed that node. On BEWAL
+  2050 it drew **17.236 TWh** of imports and **zero** exports, against a
+  physical 10.0 in / 2.0 out — while this very run was solving a 10 TWh import
+  cap, met exactly. The node balanced perfectly, so nothing warned.
+  **Fix:** pypsa2html `5793e1a` (D20) reads trade from the model's own
+  cross-border branches. The 2050 arrows are now 10.000 in / 1.992 out, and
+  2040 is 6.470 — both on the cap to the third decimal.
+  The mapping error the plug was absorbing is now **visible**:
+  `graph_imbalances` reports `elc_se` short by 5.30 TWh (2040) and 9.23 TWh
+  (2050). It traces to `elc_fe -> res` carrying both the specific-electricity
+  code and a second family of heat-pump / electric-heater codes whose sum
+  exceeds what the network withdraws. That is a taxonomy question for the
+  code-set owner — logged, not papered over.
+
 ## 10. Follow-ups / pending
 
 - Put `GRB_LICENSE_FILE` and `MPLBACKEND=Agg` into `instructions.md`'s local-run
@@ -131,6 +147,9 @@ latent workflow bug that the review would otherwise have blamed on the model.
   `generate_html_report` race before citing any figure from it.
 - 2013/6h numbers are **not** comparable with the 1h/2010 production run; this
   log is a mechanism check, not a result.
+- **`elc_se` mapping hole (5.3 / 9.2 TWh in 2040 / 2050)** — now unhidden by
+  pypsa2html D20. Needs the `elc_fe -> res` code set resolved with ClimAct
+  before the energy Sankey is shown to anyone.
 
 ## 11. Critical review
 

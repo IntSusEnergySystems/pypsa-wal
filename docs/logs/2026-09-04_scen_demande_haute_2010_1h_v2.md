@@ -609,6 +609,15 @@ artefacts should be self-sufficient.
   161.1 / 94.3 / 103.3 / 101.5 EUR/MWh against the files' 133.1 / 89.0 / 97.8 /
   97.1. BEWAL `land transport oil` is a flat **194.0** EUR/MWh in 2050 against
   the file's 24.25. Recompute per node before quoting any price.
+- **The energy Sankey's electricity import/export arrows** were a residual plug
+  until pypsa2html `5793e1a` (D20): `imp -> elc_se` was whatever closed the
+  electricity node, so it carried the real trade *plus* every mis-attribution
+  on that node, and exports never appeared at all. Rebuilt from this run's
+  networks the arrows are 0.84 / 2.79 / 14.10 / 21.18 TWh in and
+  4.67 / 4.32 / 1.64 / 0.77 TWh out — matching F3. **Any Sankey figure taken
+  from the published 20260905 report before that commit overstates Walloon
+  electricity imports** (by ~5.2 TWh in 2040 and ~9.5 TWh in 2050) and shows no
+  exports. Re-render before citing it.
 - **`lignite` at −38.7 EUR/MWh in 2050** — a dual on a carrier with no flow.
 - **Zero-capital-cost capacities** (2050): `electricity distribution grid`
   9 946 MW, `BEV charger` 4 194, `urban central water pits charger/discharger`
