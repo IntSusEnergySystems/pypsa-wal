@@ -51,7 +51,7 @@ Companion docs: [ccs_alignment](ccs_alignment.md) ·
 | 3 | Boucle du Hainaut NTC floor (9 600 MW usable, 2035+) | **done** | `ntc_floors.csv`; applied after `set_transmission_limit` **and** `carry_forward_built_grid` in both `prepare_sector_network` and `add_brownfield`. First model horizon affected is 2040 |
 | 4 | Biogas 4.0 / 6.9 TWh | **done**, source still owed | `907433a6`; 17d |
 | 5 · 7 | Flanders P2H / heat demand plot bugs | **done** | pypsa2html `0d1b904` |
-| 6a | BEWAL 10 TWh import cap | expression **fixed**, flag still off — TWh values owed | **B6** |
+| 6a | BEWAL 10 TWh import cap | **on 5 Sept** — expression fixed, values re-measured, cap registered as a GlobalConstraint | **B6** |
 | 6b | Nuclear primary-energy toggle | **done** — `uranium` / `electricity`, validated; both panel titles state the convention | pypsa2html `9454be9` |
 | 8 | TIMES rooftop share | **done 4 Sept** — base-year fleet split 1.77 GW rooftop / 0.9 GW ground (Elia/ICEDD); share on from 2030 | **B5** (fixed) |
 | 9 | Industry-CC floor (STORAGEMININD) | **done** — reachable once the inventory is gross | **B3** (fixed) |
@@ -259,14 +259,63 @@ still a number the meeting has to pick.
 
 ### B6 — item 6a measures the wrong quantity, three times over
 
-> **FIXED 3 Sept (the expression; the number is still owed).** One constraint
-> over AC and DC together, both legs of every DC pair, physical flows. Point 1
-> is **withdrawn**: `Transfo_Imp` is itself a one-way annual flow, so the
+> **FIXED 3 Sept (the expression). ON 5 Sept (the flag).** One constraint over
+> AC and DC together, both legs of every DC pair, physical flows. Point 1 is
+> **withdrawn**: `Transfo_Imp` is itself a one-way annual flow, so the
 > hourly-positive-part formulation is the right analogue — the earlier 6h
-> *net* table was the wrong yardstick, not the constraint. The flag stays off
-> until the TWh values are re-measured on a solved 1h network with the
-> corrected expression. Guards: `test_import_limit.py` (7 cases; two of them
-> fail when either defect is put back).
+> *net* table was the wrong yardstick, not the constraint. Guards:
+> `test_import_limit.py` (11 cases).
+>
+> **5 Sept — re-measured, three more fixes, flag on.** Measured on the
+> 20260905 solved 1h networks with the corrected expression:
+>
+> | TWh/a | 2025 | 2030 | 2040 | 2050 |
+> |---|---:|---:|---:|---:|
+> | one-way inflow (`Import_p`) | 0.84 | **2.79** | **14.10** | **21.18** |
+> | TIMES cap | — | 2.94 | 6.47 | 10.0 |
+> | net annual balance | −3.83 | −1.52 | +12.46 | +20.41 |
+>
+> The 2030 cap is **slack** — the number that looked impossible in September
+> was measured on the *2025* network with the pre-B6 expression (13.14 TWh).
+> 2040 and 2050 bind at roughly −54 %. So the TIMES values are transferable
+> after all, and the flag is on in both overlays with them.
+>
+> Three further defects fixed at the same time:
+>
+> 1. **Line losses were charged to the importer.** With
+>    `transmission_losses: 2` PyPSA books half of each line's loss against each
+>    end, so a node receives `s − loss/2`. The expression used raw `s` at both
+>    ends — B6 applied the "count what arrives" rule to links (`p × efficiency`)
+>    but lines were lossless when it was written. On the BEWAL border that is
+>    **0.51 TWh (2040) and 0.86 TWh (2050)** of phantom imports, 8–9 % of the
+>    caps they are compared against.
+> 2. **The cap left no trace in the solved network.** It is now registered as a
+>    `GlobalConstraint` per node (`import_limit_BEWAL`) under the
+>    `GlobalConstraint-<name>` convention PyPSA uses to map duals back — the
+>    same pattern as the per-country CO₂ caps. The constant and the **shadow
+>    price of an imported MWh** now survive into the `.nc`, and
+>    `review_run.py` gained a level-4.3b check that recomputes the inflow
+>    independently and compares.
+> 3. **A horizon with no `limit_twh` was skipped at INFO.** An enabled cap that
+>    silently does nothing is the failure class this project keeps finding
+>    (the lifetime override that never reached the model, the `solar-hsat`
+>    hurdle rate that never matched). It now logs a WARNING naming the horizon
+>    and the keys that do exist. 2025 is deliberately uncapped.
+>
+> **Feasibility.** Nothing bounds BEWAL dispatchable capacity from above
+> (`CCGT-all` has a min and no max; OCGT, batteries and H2 turbines are
+> unbounded), so with `load_shedding: false` adequacy can always be met by
+> building — the cap cannot be infeasible on adequacy grounds. The live
+> interaction is CO₂: replacing the capped imports with **unabated** CCGT would
+> cost 2.6 Mt in 2040 against 4.44 Mt of national headroom (fits) and 3.8 Mt in
+> 2050 against 1.10 Mt (**does not fit**). 2050 therefore has to lean on PV
+> (13 GW ground + 46 GW rooftop of headroom, at 57.6 EUR/MWh after the learning
+> fix), storage, and the capture plant the solve already builds
+> (`urban central gas CHP CC` 768 MW_e, `CCGT CC` 74 MW_e). That path exists.
+> If 2050 still returns `infeasible_or_unbounded`, re-solve that horizon alone
+> with `DualReductions: 0`: the default lets Gurobi answer "infeasible **or**
+> unbounded" in 0 iterations, which is what made the September diagnoses cost
+> days, and the guard in `solve_network.py` refuses IIS on that condition.
 
 `add_selfsufficiency_constraints` is off in both overlays and should stay off
 until the values are settled. As written, `Import_p` was not comparable with
@@ -291,10 +340,12 @@ TIMES `Transfo_Imp`:
    is 0.7 everywhere) and links `Link-p / efficiency`. For an energy cap the
    physical flow is what counts (`p × efficiency` arriving at `bus1`).
 
-**Still owed.** Re-measure `Import_p` on a solved 1h network with the corrected
-expression, then choose the TWh values with the meeting — TIMES's 2.94 / 6.47 /
-10 may simply not be transferable to an hourly model that trades with Flanders.
-Keep the label "BEWAL imports include Flanders and Brussels" on any chart.
+**Done (5 Sept).** `Import_p` re-measured on the solved 1h networks; the TIMES
+values are kept. Still true and still owed to the reader: **"BEWAL imports
+include Flanders and Brussels"** belongs on any chart — TIMES-WAL's system
+boundary is Wallonia, so electricity from Flanders is an import, and in 2050
+the intra-Belgian leg (+9.5 TWh net from Flanders, +2.7 from Brussels) is
+larger than the foreign one (+8.2 TWh).
 
 ### B7 — generated files are out of sync; two tests fail
 

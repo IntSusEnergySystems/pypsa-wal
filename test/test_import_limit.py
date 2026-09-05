@@ -74,9 +74,9 @@ def test_absolute_cap_rhs_is_twh_not_a_fraction():
         },
         planning_horizons="2050",
     )
-    assert "import_energy_limit" in n.model.constraints
+    assert "GlobalConstraint-import_limit_BEWAL" in n.model.constraints
     assert "import_positive" in n.model.constraints
-    rhs = float(n.model.constraints["import_energy_limit"].rhs.item())
+    rhs = float(n.model.constraints["GlobalConstraint-import_limit_BEWAL"].rhs.item())
     assert rhs == pytest.approx(10.0 * 1e6)
     assert "Import_p" in n.model.variables
     assert list(n.model.variables["Import_p"].indexes["bus"]) == ["BEWAL"]
@@ -90,9 +90,10 @@ def test_year_without_a_cap_is_skipped():
         {"mode": "absolute", "nodes": ["BEWAL"], "limit_twh": {2050: 10.0}},
         planning_horizons="2025",
     )
-    assert "import_energy_limit" not in n.model.constraints
+    assert "GlobalConstraint-import_limit_BEWAL" not in n.model.constraints
     assert "Import_p" not in n.model.variables
     assert "import_positive" not in n.model.constraints
+    assert "import_limit_BEWAL" not in n.global_constraints.index
 
 
 def test_import_variable_cannot_go_negative():
@@ -212,3 +213,70 @@ def test_line_flow_is_not_inflated_by_s_max_pu():
         f"{flowed:,.0f} MWh crossed under a 500 000 MWh cap — the expression "
         "is scaled by 1/s_max_pu (B6)"
     )
+
+
+def test_cap_is_registered_as_a_global_constraint():
+    """The cap must survive the solve, as the per-country CO2 caps do.
+
+    Named ``GlobalConstraint-<name>`` so PyPSA maps the dual back onto a
+    ``GlobalConstraint`` row. Before this the cap left no trace in the solved
+    ``.nc``: ``review_run.py`` could not check compliance, and the shadow price
+    of an imported MWh -- the number the cap exists to produce -- was discarded
+    with the model.
+    """
+    n = _toy()
+    n.optimize.create_model()
+    _apply(n, twh=7.5)
+    assert "import_limit_BEWAL" in n.global_constraints.index
+    row = n.global_constraints.loc["import_limit_BEWAL"]
+    assert row["constant"] == pytest.approx(7.5e6)
+    assert row["sense"] == "<="
+
+
+def test_missing_horizon_is_warned_not_whispered(caplog):
+    """An enabled cap that does nothing this horizon has to be loud."""
+    n = _toy()
+    n.optimize.create_model()
+    with caplog.at_level("WARNING"):
+        add_selfsufficiency_constraints(
+            n,
+            {"mode": "absolute", "nodes": ["BEWAL"], "limit_twh": {2050: 10.0}},
+            planning_horizons="2035",
+        )
+    assert any("INACTIVE" in r.message for r in caplog.records), caplog.text
+
+
+def test_line_losses_enter_the_import_expression():
+    """With ``transmission_losses`` on, count what reaches the node.
+
+    PyPSA books half the line loss against each end (``constraints.py``:
+    ``Line/loss/bus0`` and ``bus1``, both ``-0.5``), so a node receives
+    ``s - loss/2`` and sends ``s + loss/2``. Charging the importer the full
+    ``s`` books energy that never arrives -- the same "count what arrives" rule
+    B6 applied to links (``p * efficiency``); lines were lossless when B6 was
+    written. On the 20260905 BEWAL networks the difference is 0.51 TWh (2040)
+    and 0.86 TWh (2050), i.e. 8-9 % of the 6.47 / 10.0 TWh caps.
+
+    Asserted structurally rather than on a solved toy: the two-tangent
+    relaxation lets a small toy settle at ``loss = 0``, so an outcome test
+    cannot bite.
+    """
+    n = _toy(load_mw=100.0)
+    n.optimize.create_model(transmission_losses=2)
+    assert "Line-loss" in n.model.variables, "fixture did not enable losses"
+    _apply(n, twh=0.5)
+    loss_labels = set(n.model.variables["Line-loss"].labels.values.ravel().tolist())
+    used = set(n.model.constraints["import_positive"].vars.values.ravel().tolist())
+    assert loss_labels <= used, (
+        "Line-loss is missing from `import_positive`: the cap is charging the "
+        "importer for energy lost in the line"
+    )
+
+
+def test_import_expression_ignores_losses_when_they_are_off():
+    """No `Line-loss` variable, no crash: the guard has to hold."""
+    n = _toy(load_mw=100.0)
+    n.optimize.create_model()  # transmission_losses defaults to 0
+    assert "Line-loss" not in n.model.variables
+    _apply(n, twh=0.5)
+    assert "import_positive" in n.model.constraints

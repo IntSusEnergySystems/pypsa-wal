@@ -897,6 +897,61 @@ def check_ntc(nets, ntc_dir: Path, rep: Report) -> None:
                 rep.ok(sec, msg)
 
 
+def check_import_cap(nets, rep: Report) -> None:
+    """Level 4.3b — the BEWAL electricity import cap (item 6a).
+
+    Recomputes what the constraint measures rather than trusting it: the hourly
+    positive part of the node's **net** inflow, AC lines plus both legs of every
+    cross-region DC pair, counted as it *arrives* (line losses are booked half
+    at each end, DC through ``efficiency``). Intra-Belgian flows count — TIMES-
+    WAL's boundary is Wallonia, so electricity from Flanders is an import.
+    """
+    sec = "4.3b · electricity import cap (item 6a)"
+    reported = False
+    for y, n in nets.items():
+        gc = n.global_constraints
+        rows = gc[gc.index.str.startswith("import_limit_")] if len(gc) else gc.iloc[0:0]
+        w = n.snapshot_weightings.generators
+        loc = n.buses.location
+        for name in rows.index:
+            reported = True
+            node = name[len("import_limit_"):]
+            cap = float(rows.at[name, "constant"]) / 1e6
+            mu = float(rows.at[name, "mu"]) if "mu" in rows.columns else float("nan")
+
+            flows = []
+            lines = n.lines
+            l0, l1 = lines.bus0.map(loc), lines.bus1.map(loc)
+            cross = lines[(l0 == node) ^ (l1 == node)]
+            for name_l in cross.index:
+                # -p1 is what reaches bus1, -p0 what reaches bus0: both are
+                # already net of the half-loss PyPSA books at that end.
+                arriving = (-n.lines_t.p1[name_l]) if l1[name_l] == node else (-n.lines_t.p0[name_l])
+                flows.append(arriving)
+            links = n.links
+            k0, k1 = links.bus0.map(loc), links.bus1.map(loc)
+            crossk = links[((k0 == node) ^ (k1 == node)) & links.carrier.isin(["DC"])]
+            for name_k in crossk.index:
+                arriving = (-n.links_t.p1[name_k]) if k1[name_k] == node else (-n.links_t.p0[name_k])
+                flows.append(arriving)
+            if not flows:
+                rep.warn(sec, f"{y} {node}: cap {cap:.2f} TWh but no cross-region branch found")
+                continue
+            net = pd.concat(flows, axis=1).sum(axis=1)
+            one_way = float(net.clip(lower=0).mul(w).sum()) / 1e6
+            balance = float(net.mul(w).sum()) / 1e6
+            msg = (f"{y} {node}: one-way inflow {one_way:.2f} TWh vs cap {cap:.2f} "
+                   f"| net balance {balance:+.2f} TWh | mu {mu:,.2f} EUR/MWh")
+            if one_way > cap * 1.001:
+                rep.fail(sec, "import cap exceeded — " + msg)
+            elif one_way > cap * 0.999:
+                rep.ok(sec, "binding — " + msg)
+            else:
+                rep.ok(sec, msg)
+    if not reported:
+        rep.info(sec, "no `import_limit_*` GlobalConstraint — item 6a was off in this run")
+
+
 def check_co2(nets, rep: Report) -> None:
     sec = "4.4 · CO2"
     for y, n in nets.items():
@@ -1037,6 +1092,7 @@ def main(argv=None) -> int:
             check_agg_limits(nets, agg, rep)
             check_potentials(nets, args.potentials, rep)
             check_ntc(nets, args.ntc_dir, rep)
+            check_import_cap(nets, rep)
             check_co2(nets, rep)
             check_plausibility(nets, rep)
 

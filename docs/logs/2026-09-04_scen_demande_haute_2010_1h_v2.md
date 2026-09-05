@@ -161,8 +161,10 @@ F1 (the item-8 pin as a ceiling) and all of F2 are **left as is and re-checked
 on the next run**. F9 was not a defect and is closed. The reporting half of F1 is
 fixed: pypsa2html `83a59b0` now splits the PV capacity charts three ways and
 stops counting solar-thermal collectors as PV. The remaining blockers to
-publication are unchanged — F3/F4 (self-sufficiency and its inverted Explorer
-table), F5 (CO₂ trajectory), F7 (2025 pins) and F8 (solid biomass).
+publication are F4 (the inverted Explorer table), F5 (CO₂ trajectory), F7
+(2025 pins) and F8 (solid biomass). **F3 is now fixed in tree**: item 6a is on
+with the TIMES values, after three implementation fixes and a feasibility
+analysis — see the decision box under F3.
 
 ### 11.1 Provenance (level 0) — **pass**
 
@@ -414,6 +416,42 @@ sized on 6 h *net* tables; on a 1 h run the quantity they cap is 2.2× the 2040
 value and 2.1× the 2050 value. **Re-derive the numbers before turning item 6a
 on, and expect it to change the solution materially** — this is not a
 tightening that will pass through unnoticed.
+
+> **Decision (2026-09-05) — item 6a is ON.** The TIMES values are kept
+> (2.94 / 6.47 / 10.0 for 2030/2040/2050; 2025 stays uncapped). The 2030 cap
+> turns out to be **slack** — 2.79 vs 2.94 — so the figure that looked
+> impossible in September (13.14 TWh) was measured on the *2025* network with
+> the pre-B6 expression. 2040 and 2050 bind at about −54 %.
+>
+> Three implementation defects were fixed before switching it on:
+>
+> 1. **Line losses were charged to the importer.** With
+>    `transmission_losses: 2` PyPSA books half of each line's loss at each end,
+>    so a node receives `s − loss/2`; the expression used raw `s`. B6 applied
+>    "count what arrives" to links (`p × efficiency`) but lines were lossless
+>    then. On the BEWAL border that is **0.51 TWh (2040) / 0.86 TWh (2050)** of
+>    phantom imports — 8–9 % of the caps they are measured against.
+> 2. **The cap left no trace in the solved network.** It is now a
+>    `GlobalConstraint` per node (`import_limit_BEWAL`), so the constant and
+>    the **shadow price of an imported MWh** survive into the `.nc`.
+>    `review_run.py` gained a 4.3b check that recomputes the inflow
+>    independently and compares — it reproduces 2.79 / 14.10 / 21.18 on this
+>    run's networks.
+> 3. **A horizon with no `limit_twh` was skipped at INFO**, i.e. an enabled cap
+>    could silently do nothing. Now a WARNING naming the horizon.
+>
+> **On the infeasibility question** (the reason this stayed off): job 11108009
+> was blamed on 6a and then *exonerated* — turning it off did not fix 2030, and
+> the cause was the CCL region rewrite (B1), fixed 3 Sept. Structurally the cap
+> cannot fail on adequacy: nothing bounds BEWAL dispatchable capacity from
+> above and `load_shedding: false` means the model must (and can) build. The
+> live interaction is CO₂ — replacing the capped imports with **unabated**
+> CCGT costs 2.6 Mt in 2040 against 4.44 Mt of headroom (fits) and 3.8 Mt in
+> 2050 against 1.10 Mt (**does not fit**), so 2050 has to lean on PV, storage
+> and the capture plant the solve already builds. That path exists; if 2050
+> still returns `infeasible_or_unbounded`, re-solve it alone with
+> `DualReductions: 0` — the default answer "infeasible **or** unbounded in 0
+> iterations" is what made the September diagnoses cost days.
 
 ### F4 — the published Explorer `imports_exports.csv` reads backwards
 

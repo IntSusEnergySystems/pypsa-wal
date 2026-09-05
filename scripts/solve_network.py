@@ -1701,8 +1701,15 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
         elif isinstance(limit_twh, (int, float)):
             rhs_twh = limit_twh
         if rhs_twh is None:
-            logger.info(
-                "Self-sufficiency absolute cap: no TWh for year %s, skip", year
+            # Loud: a cap that silently does nothing on one horizon is the same
+            # failure class as the lifetime override that never reached the
+            # model (B7) and the `solar-hsat` hurdle rate that never matched.
+            logger.warning(
+                "Self-sufficiency absolute cap is ENABLED but `limit_twh` has "
+                "no entry for planning horizon %s (keys: %s) — the cap is "
+                "INACTIVE this horizon.",
+                year,
+                sorted(settings.get("limit_twh") or {}),
             )
             return
 
@@ -1758,8 +1765,29 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
             # physical flow: `s` is what crosses the border. Dividing by
             # `s_max_pu` (0.7 here) inflated every AC import by 43 %. B6.
             flow = n.model["Line-s"].loc[:, df.index]
-            inflow = flow.groupby(group(df, "bus1")).sum()
-            outflow = flow.groupby(group(df, "bus0")).sum()
+            # With `solving.options.transmission_losses` PyPSA books half the
+            # line loss against each end (constraints.py, `Line/loss/bus0` and
+            # `bus1`, both -0.5), so a node receives `s - loss/2` and sends
+            # `s + loss/2`. Using raw `s` at both ends counts energy that never
+            # arrives. B6 applied this same "count what arrives" rule to links
+            # (`p * efficiency`); lines were lossless when it was written.
+            half_loss = None
+            if "Line-loss" in n.model.variables:
+                loss = n.model["Line-loss"]
+                idx = df.index.intersection(loss.indexes[loss.dims[-1]])
+                if len(idx) == len(df.index):
+                    half_loss = 0.5 * loss.loc[:, df.index]
+                elif len(idx):
+                    logger.warning(
+                        "Self-sufficiency: `Line-loss` covers %d of %d "
+                        "cross-region lines; ignoring losses in the cap.",
+                        len(idx),
+                        len(df.index),
+                    )
+            arriving = flow if half_loss is None else flow - half_loss
+            leaving = flow if half_loss is None else flow + half_loss
+            inflow = arriving.groupby(group(df, "bus1")).sum()
+            outflow = leaving.groupby(group(df, "bus0")).sum()
         else:
             # `p` is withdrawn at bus0; `p * efficiency` arrives at bus1.
             eff = df["efficiency"]
@@ -1790,11 +1818,30 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
 
     if mode == "absolute":
         rhs_mwh = float(rhs_twh) * 1e6
-        n.model.add_constraints(
-            imported_elec <= rhs_mwh, name="import_energy_limit"
-        )
+        # One named constraint per node, under the `GlobalConstraint-<name>`
+        # convention PyPSA uses to map duals back (same as the per-country CO2
+        # caps). Without it the cap left no trace in the solved `.nc`: neither
+        # `review_run.py` nor the report could check compliance, and the
+        # shadow price of an imported MWh -- the most interesting output the
+        # cap produces -- was thrown away with the model.
+        for node in import_buses:
+            gc_name = f"import_limit_{node}"
+            n.model.add_constraints(
+                imported_elec.sel(bus=node) <= rhs_mwh,
+                name=f"GlobalConstraint-{gc_name}",
+            )
+            n.add(
+                "GlobalConstraint",
+                gc_name,
+                constant=rhs_mwh,
+                sense="<=",
+                type="",
+                carrier_attribute="",
+            )
         logger.info(
-            "Capped electricity imports at %s to %.2f TWh/a.",
+            "Capped electricity imports at %s to %.2f TWh/a "
+            "(one-way annual inflow, AC + DC, includes the other Belgian "
+            "regions).",
             import_buses,
             float(rhs_twh),
         )

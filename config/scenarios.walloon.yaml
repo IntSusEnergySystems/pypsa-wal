@@ -77,17 +77,40 @@ scen_demande_haute:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_demande_haute.csv
   self_sufficiency:
-    # Item 6a is OFF pending a decision on the number, not on the code.
-    # The 2030 empty LP blamed on it (job 11108009) was the CCL region
-    # rewrite (B1). What remains true is the magnitude: the constraint caps
-    # the hourly positive part of net cross-border inflow — the right analogue
-    # of TIMES `Transfo_Imp`, which is also a one-way annual flow — and the
-    # 2025 1h network already carries ~13 TWh of it (8.2 from abroad) against
-    # a 2.94 TWh cap for 2030. The expression itself was wrong until B6 (AC
-    # and DC capped separately, DC imports dropped with the `reversed` leg,
-    # AC inflated by 1/s_max_pu), so re-measure on a solved 1h network before
-    # choosing values. See B6 of docs/temporary_improvement_plans.md.
-    self_sufficiency_constraint: false
+    # Item 6a ON (2026-09-05), after re-measuring on the solved 1h networks of
+    # the 20260905 run with the corrected (B6 + loss-aware) expression.
+    #
+    # `Import_p` is the hourly positive part of BEWAL's net inflow summed over
+    # the year — a one-way annual inflow, the analogue of TIMES `Transfo_Imp`.
+    # It counts AC and DC together, both legs of the ALEGrO pair, and **the
+    # other Belgian regions**: TIMES-WAL's system boundary is Wallonia, so
+    # electricity from Flanders is an import. Label every chart accordingly.
+    #
+    # Measured vs cap (TWh/a) on the 20260905 solve:
+    #   2030   2.79  vs 2.94  -> slack, no risk
+    #   2040  14.10  vs 6.47  -> binds, -54 %
+    #   2050  21.18  vs 10.0  -> binds, -53 %
+    # 2025 has no TIMES value and stays uncapped (the solve does 0.84 TWh);
+    # the solver logs a WARNING naming the uncapped horizon.
+    #
+    # Why the 2030 empty LP is not a reason to keep this off: job 11108009 was
+    # blamed on 6a and then exonerated — turning it off did not fix 2030, and
+    # the cause was the CCL region rewrite (B1), fixed 3 Sept.
+    #
+    # Feasibility: nothing caps BEWAL dispatchable capacity from above
+    # (`CCGT-all` has a min and no max; OCGT, batteries and H2 turbines are
+    # unbounded), so with `load_shedding: false` adequacy can always be met by
+    # building. The real interaction is CO2. Substituting the capped imports
+    # with unabated CCGT would cost 2.6 Mt in 2040 against 4.44 Mt of national
+    # headroom (fits) and 3.8 Mt in 2050 against 1.10 Mt (does **not** fit) —
+    # so 2050 has to lean on PV (13 GW ground + 46 GW rooftop of headroom, and
+    # 57.6 EUR/MWh after the learning fix), storage, and the CC plant the
+    # solve already builds (`urban central gas CHP CC` 768 MW_e, `CCGT CC`).
+    # That path exists; if 2050 still comes back infeasible, re-solve that
+    # horizon alone with `DualReductions: 0` to turn "infeasible or unbounded"
+    # into a definite answer and an IIS. See B6 and F3 of
+    # docs/logs/2026-09-04_scen_demande_haute_2010_1h_v2.md.
+    self_sufficiency_constraint: true
     mode: absolute
     nodes:
     - BEWAL
@@ -242,9 +265,9 @@ scen_evflex:
     agg_p_nom_limits:
       file: data/walloon/agg_p_nom_minmax_demande_haute.csv
   self_sufficiency:
-    # Same 6a withdrawal as scen_demande_haute; see B6 of
-    # docs/temporary_improvement_plans.md.
-    self_sufficiency_constraint: false
+    # Item 6a ON, same values and same reasoning as scen_demande_haute above —
+    # keep the two in step so a diff stays a clean EV-flexibility sensitivity.
+    self_sufficiency_constraint: true
     mode: absolute
     nodes:
     - BEWAL
