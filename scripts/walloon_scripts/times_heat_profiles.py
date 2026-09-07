@@ -688,3 +688,107 @@ def _export_path(snakemake) -> Path:
     if network:
         return Path(str(network)).with_name(name)
     return Path(name)
+
+
+# --------------------------------------------------------------------------- #
+# Post-solve diagnostics
+# --------------------------------------------------------------------------- #
+
+#: Fraction of a pinned group's TIMES energy that may go undelivered before the
+#: relaxation stops being a safety valve and becomes the answer.
+RELAXATION_WARN_SHARE = 0.02
+
+
+def report_relaxed_profiles(n, snakemake=None) -> pd.DataFrame:
+    """How much of each pinned TIMES heat profile the solve bought its way out of.
+
+    ``profile.penalty`` makes every pin soft so a mix Wallonia cannot physically
+    deliver relaxes instead of hanging the myopic chain on an IIS. The premise —
+    stated in :func:`add_times_heat_profile_constraints` and inherited by option
+    C — is that the penalty is "10-25x the marginal cost of heat, so relaxing is
+    never cheaper than complying". **That premise fails when a fuel is scarce.**
+    In the 2026-09-06 run the EU ``biomass limit`` priced solid biomass at
+    64.5 EUR/MWh in 2040 and 1202.5 EUR/MWh in 2050, and BEWAL's own
+    ``e_sum_max`` was exhausted (6.00 + 2.25 TWh, both binding), so buying out
+    the biomass-boiler pin at 1000 EUR/MWh was the cheap option: 88 % of the
+    2040 target went undelivered — 4.02 TWh_th re-served by heat pumps — and
+    nothing in the run reported it, because the *total* decentral heat still
+    closed exactly and the absorber makes the group gaps cancel per bus.
+
+    So the relaxation is read back off the solved model and logged, loudly. It
+    is the only place the substitution is visible without re-deriving the whole
+    fidelity check from the networks.
+
+    Returns the per-group frame (empty when nothing relaxed or no pins exist);
+    never raises — a diagnostic must not lose a finished solve.
+    """
+    columns = ["group", "pinned TWh", "unmet TWh", "unmet share", "penalty MEUR"]
+    try:
+        options = times_heat_options(snakemake.config if snakemake else n.config)
+        variables = getattr(getattr(n, "model", None), "variables", {})
+        rows = []
+        for name, scale, penalty in (
+            # The profile variables are declared in TWh_th (UNMET_SCALE) and
+            # bounded above by the group's own target, so the share is readable
+            # straight off the bound; the option-C slack is in MWh_th and
+            # unbounded, so there is no denominator to report.
+            ("TimesHeatProfile-unmet", UNMET_SCALE, options["profile"]["penalty"]),
+            ("TimesHeatMix-slack", 1.0, options["energy_mix"]["penalty"]),
+        ):
+            if name not in variables:
+                continue
+            variable = variables[name]
+            unmet = variable.solution.to_series() * scale / 1e6  # TWh_th
+            try:
+                pinned = variable.upper.to_series() * scale / 1e6
+            except (AttributeError, ValueError):
+                pinned = None
+            for group, value in unmet.items():
+                target = float(pinned[group]) if pinned is not None else float("nan")
+                unmet_twh = float(value)
+                rows.append(
+                    {
+                        "group": str(group),
+                        "pinned TWh": target,
+                        "unmet TWh": unmet_twh,
+                        "unmet share": unmet_twh / target if target else float("nan"),
+                        # TWh_th x EUR/MWh_th = MEUR.
+                        "penalty MEUR": unmet_twh * penalty,
+                    }
+                )
+        frame = pd.DataFrame(rows, columns=columns)
+        frame = frame[frame["unmet TWh"].abs() > 1e-9]
+        if frame.empty:
+            logger.info("TIMES heat pins: every group delivered its profile in full.")
+            return frame
+        detail = ", ".join(
+            f"{row['group']} {row['unmet TWh']:.4f} of {row['pinned TWh']:.4f} TWh_th "
+            f"({row['unmet share']:.1%}, {row['penalty MEUR']:,.0f} MEUR of penalty)"
+            for _, row in frame.iterrows()
+        )
+        serious = frame["unmet share"] > RELAXATION_WARN_SHARE
+        log = logger.warning if serious.any() else logger.info
+        log(
+            "TIMES heat pins relaxed: %.4f TWh_th of %.4f not delivered (%s). The "
+            "absorber (%r) picked it up, so the heat load still closes and the "
+            "group mix is what moved.",
+            frame["unmet TWh"].sum(),
+            frame["pinned TWh"].sum(),
+            detail,
+            options["profile"]["absorber"],
+        )
+        if serious.any():
+            logger.warning(
+                "Groups over %.0f %% unmet: %s. Either the TIMES mix is outside "
+                "what the Walloon fuel envelope can supply — check `biomass limit`, "
+                "the BEWAL `e_sum_max` generators and the country CO2 cap — or "
+                "`sector.times_heat.profile.penalty` (%s EUR/MWh_th) no longer "
+                "dominates the marginal value of the fuel the group needs.",
+                100 * RELAXATION_WARN_SHARE,
+                ", ".join(frame.loc[serious, "group"]),
+                options["profile"]["penalty"],
+            )
+        return frame
+    except Exception:  # pragma: no cover - never lose a solve to a diagnostic
+        logger.warning("Could not read back the TIMES heat relaxation", exc_info=True)
+        return pd.DataFrame(columns=columns)

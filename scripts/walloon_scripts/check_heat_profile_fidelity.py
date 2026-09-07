@@ -52,25 +52,58 @@ def roots() -> tuple[Path, Path]:
     return base / "networks", base / "heating_profiles"
 
 
-def main() -> None:
-    networks, profiles_dir = roots()
-    targets_dir = Path("resources/walloon") / SCENARIO
+#: Columns of the frame :func:`fidelity_frame` returns.
+COLUMNS = [
+    "year",
+    "group",
+    "bus",
+    "pinned TWh",
+    "realised TWh",
+    "energy gap TWh",
+    "peak |gap| MW",
+    "peak gap % of profile peak",
+]
+
+
+def fidelity_frame(
+    networks: Path,
+    profiles_dir: Path,
+    targets_dir: Path,
+    horizons=HORIZONS,
+    node: str = NODE,
+    on_missing=None,
+) -> pd.DataFrame:
+    """One row per (year, group, bus): pinned versus realised heat.
+
+    Split out of :func:`main` so ``review_run.py`` can run the same measurement
+    inside its level-2 soft-link section. Reading the summary of an earlier run
+    is not the same check: on 2026-09-06 the "worst single gap" quoted in the
+    review (−0.033 TWh) came from a three-day-old CSV of the 6h test run, while
+    the total (8.15 TWh) came from the production networks whose worst gap was
+    −2.008 TWh. Two numbers, two runs, one conclusion — and it was "pass".
+
+    The signed gaps cancel per (year, bus), by construction: the absorber takes
+    whatever the pinned groups did not deliver, so the heat load always closes
+    and only the *mix* moves. The number that matters is therefore the gap of
+    the individual group, never the sum over groups.
+    """
     rows = []
-    for year in HORIZONS:
+    for year in horizons:
         net_path = networks / f"base_s_adm___{year}.nc"
         prof_path = profiles_dir / f"base_s_adm___{year}.csv"
-        if not net_path.exists() or not prof_path.exists():
-            print(f"{year}: missing ({net_path.exists()=}, {prof_path.exists()=})")
+        target_path = targets_dir / f"heating_targets_{year}.csv"
+        if not (net_path.exists() and prof_path.exists() and target_path.exists()):
+            if on_missing is not None:
+                on_missing(year, net_path, prof_path, target_path)
             continue
         n = pypsa.Network(net_path)
         w = n.snapshot_weightings.generators
-        buses = decentral_heat_buses(n, NODE)
-        target = pd.read_csv(targets_dir / f"heating_targets_{year}.csv")
+        buses = decentral_heat_buses(n, node)
+        target = pd.read_csv(target_path)
         target = target[target["constrained"]].set_index("group")
         profiles = pd.read_csv(prof_path, header=[0, 1], index_col=0)
         profiles.index = n.snapshots
 
-        print(f"\n=== {year} ===")
         for group, row in target.iterrows():
             carriers = [
                 c.strip() for c in str(row["pypsa_carriers"]).split(";") if c.strip()
@@ -90,7 +123,7 @@ def main() -> None:
                     {
                         "year": year,
                         "group": group,
-                        "bus": bus.replace(f"{NODE} ", ""),
+                        "bus": bus.replace(f"{node} ", ""),
                         "pinned TWh": float((pinned * w).sum()) / 1e6,
                         "realised TWh": float((realised * w).sum()) / 1e6,
                         "energy gap TWh": energy_gap,
@@ -98,8 +131,24 @@ def main() -> None:
                         "peak gap % of profile peak": 100 * peak_gap / scale,
                     }
                 )
-        sub = pd.DataFrame([r for r in rows if r["year"] == year])
-        pd.set_option("display.width", 220)
+    return pd.DataFrame(rows, columns=COLUMNS)
+
+
+def main() -> None:
+    networks, profiles_dir = roots()
+    targets_dir = Path("resources/walloon") / SCENARIO
+
+    def missing(year, net_path, prof_path, target_path):
+        print(
+            f"{year}: missing ({net_path.exists()=}, {prof_path.exists()=}, "
+            f"{target_path.exists()=})"
+        )
+
+    out = fidelity_frame(networks, profiles_dir, targets_dir, on_missing=missing)
+    pd.set_option("display.width", 220)
+    for year in sorted(out["year"].unique()):
+        sub = out[out["year"] == year]
+        print(f"\n=== {year} ===")
         print(sub.drop(columns="year").to_string(index=False, float_format="%.5f"))
         worst = sub.loc[sub["energy gap TWh"].abs().idxmax()]
         print(
@@ -107,15 +156,32 @@ def main() -> None:
             f"{worst['energy gap TWh']:+.5f} TWh"
         )
 
-    out = pd.DataFrame(rows)
     if len(out):
         path = Path("results/_heat_softlink_comparison") / f"profile_fidelity_{PHASE}.csv"
         path.parent.mkdir(parents=True, exist_ok=True)
         out.to_csv(path, index=False)
         print(f"\nWritten to {path}")
+        # Summed over all groups the signed gaps cancel — the absorber sees to
+        # that — so the |sum| is a size, not a verdict. The verdict is the worst
+        # *group*: an 8.15 TWh total made of ±2.008 TWh substitutions between
+        # two groups is a different result from one made of rounding.
+        worst = out.loc[out["energy gap TWh"].abs().idxmax()]
+        share = (
+            abs(worst["energy gap TWh"]) / worst["pinned TWh"]
+            if worst["pinned TWh"]
+            else float("nan")
+        )
         print(
             f"\nTotal |annual gap| over every (year, group, bus): "
             f"{out['energy gap TWh'].abs().sum():.5f} TWh"
+            f"\nWorst single group: {worst['group']} on {worst['bus']} in "
+            f"{worst['year']}, {worst['energy gap TWh']:+.5f} TWh of "
+            f"{worst['pinned TWh']:.5f} pinned ({share:.1%})"
+        )
+        by_bus = out.groupby(["year", "bus"])["energy gap TWh"].sum().abs().max()
+        print(
+            f"Largest signed residual on any (year, bus) after summing groups: "
+            f"{by_bus:.2e} TWh — the total heat load closes; the mix is what moved."
         )
 
 

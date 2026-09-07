@@ -43,6 +43,35 @@ idx = pd.IndexSlice
 spatial = SimpleNamespace()
 
 
+def biomass_fuel_buses(spatial: SimpleNamespace, nodes: pd.Index) -> np.ndarray:
+    """The solid-biomass bus each node's brownfield boilers burn from.
+
+    One bus per node under ``biomass_spatial``, the single ``EU solid biomass``
+    bus without it — which is what ``spatial.biomass.df`` already carries, and
+    the same wiring the brownfield biomass CHP uses.
+
+    Until 2026-09-07 this was ``spatial.biomass.nodes[0]``: the first biomass bus
+    of the *whole model*, alphabetically ``BEBRU solid biomass``.  Every
+    brownfield biomass boiler in every region therefore drew its fuel from
+    Brussels.  In the 2026-09-06 run that put **24.6 TWh of 97.1** on another
+    region's bus in 2030 — 4.48 TWh of it BEWAL's pre-2025 fleet, more than
+    twice the 2.0 TWh Walloon import cap it was bypassing, against a Brussels
+    resource of 0.6 TWh.  No regional biomass potential can bind while a
+    boiler can eat somebody else's, and the ``solid biomass transported``
+    generator on the receiving bus carries no ``e_sum_max`` of its own, so the
+    fuel was in effect free and unlimited.
+    """
+    buses = spatial.biomass.df["nodes"].reindex(nodes)
+    if buses.isna().any():
+        # Loud here rather than a bare KeyError 40 minutes into a prepare.
+        missing = list(buses.index[buses.isna()])
+        raise KeyError(
+            f"No biomass bus for {missing}: `spatial` was built from the AC buses, "
+            "so a heat bus whose `location` is not an AC bus name cannot be wired."
+        )
+    return buses.values
+
+
 def add_build_year_to_new_assets(n: pypsa.Network, baseyear: int) -> None:
     """
     Add build year to new assets in the network.
@@ -809,7 +838,7 @@ def add_heating_capacities_installed_before_baseyear(
                 ].sum()
                 > 0
             ):
-                bus0 = spatial.biomass.nodes[0] if isinstance(spatial.biomass.nodes, pd.Index) else spatial.biomass.nodes
+                bus0 = biomass_fuel_buses(spatial, nodes)
                 n.add(
                     "Link",
                     nodes,

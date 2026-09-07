@@ -246,3 +246,254 @@ consistently with the fix bundle vs v2.
 | 4 | Reconcile R6 (heat-fidelity total vs max) | modeller |
 | 5 | `--whole-file` for `nic5.sh pull` | code |
 | 6 | Confirm Explorer test listing | ops |
+
+---
+
+## 12. Resolution of R1–R4 (2026-09-07, code only — no re-solve yet)
+
+All four findings were traced to a cause and fixed in code. **None of the fixes
+is in the published 20260906/20260907 results**: R1 and R2 change the LP inputs,
+so the numbers below are what the *current* networks say, and the four horizons
+have to be rebuilt and re-solved before anything is republished.
+
+### R1 — `coal for industry` above TIMES — **transfer defect, fixed**
+
+PyPSA-Eur has no coke bus: `prepare_sector_network.add_industry` restates coke
+demand as the hard coal a coke oven would burn to make it,
+`mwh_coal_per_mwh_coke = 1.366`, and charges the whole chain at coal's CO2
+intensity. Correct for a region whose own ovens make its coke. Wallonia has no
+coke oven in TIMES — `COACOK` is produced only by `IMPCOACOK` and consumed only
+by `INDCOK00`, i.e. the region buys finished coke — so the factor invented
+Walloon coal, and Walloon CO2 inside the country cap, that TIMES does not have.
+
+The overshoot is that factor and nothing else:
+
+| | coal | coke | PyPSA `coal + 1.366·coke` | TIMES `coal + coke` | dev | §11 reported |
+|---|---:|---:|---:|---:|---:|---:|
+| 2025 | 2.700 | 1.006 | 4.075 | 3.706 | +9.9 % | +9.8 % |
+| 2030 | 1.876 | 1.162 | 3.463 | 3.038 | +14.0 % | +14.0 % |
+| 2040 | 0.002 | 1.017 | 1.392 | 1.019 | +36.5 % | +36.7 % |
+| 2050 | 0.707 | 1.162 | 2.294 | 1.868 | +22.8 % | +23.4 % |
+
+Fix: `coke_to_coal_factors()` returns 1.0 for the TIMES-driven node and 1.366
+everywhere else. Also `build_industrial_energy_demand_per_node.py` now writes
+`%.6f` instead of `%.2f` — the unit is TWh/a, so two decimals quantised every
+industrial demand to 10 GWh and rounded BEWAL's 2040 coal (0.0024 TWh) to zero.
+
+### R2 — BEWAL electric load below TIMES — **two transfer defects, fixed**
+
+Traced carrier by carrier against the run's own v2 demands. 2050, TWh:
+
+| term | PyPSA | TIMES | gap |
+|---|---:|---:|---:|
+| `industry electricity` | 21.140 | 21.141 | −0.001 (the `%.2f` above) |
+| EV (battery side) | 16.608 | 16.912 | −0.304 — charger loss, *check* artefact |
+| `agriculture electricity` | 0.063 | 0.063 | 0 |
+| `agriculture machinery electric` | 0.272 | — | +0.272, no TIMES row |
+| `electricity` load | 18.635 | 19.146 | **−0.510** |
+
+The −0.510 is two defects that the old check's two offsetting conventions
+almost cancelled:
+
+1. **Distribution losses deducted from a low-voltage TIMES demand.**
+   `insert_electricity_distribution_grid` multiplies every `electricity` load by
+   `efficiency_static` = 0.97 because PyPSA-Eur's source (ENTSO-E) measures
+   demand above the distribution network. The Walloon load is not that number:
+   TIMES routes residential, tertiary, agriculture and transport electricity
+   through `EVTRANS_H-M` (η 0.973) and `EVTRANS_M-L` (η 0.968) and books the
+   demand on `ELCLOW`, downstream of both — the same place as PyPSA's
+   low-voltage bus. Deducting again cost 0.333 / 0.382 / 0.475 / **0.576** TWh.
+   Every other BEWAL electricity carrier already escaped, so the exemption also
+   removes an inconsistency.
+2. **`total rail` instead of `electricity rail`** in the scaling target:
+   `total rail` is electric *and* diesel rail, so the Walloon grid was asked to
+   haul the diesel trains too (+0.053 → +0.066 TWh).
+
+Fixes: `distribution_loss_targets()` drops the TIMES node;
+`WALLOON_ELECTRICITY_CATEGORIES` uses `electricity rail`. Predicted level-2.3
+deviation after a re-solve: **−0.005 / −0.015 / −0.004 / −0.002 %**.
+
+The level-2.3 check itself was comparing the two sides at different points of
+the grid and is rewritten: the EV term is grossed back up by the 0.9 charger
+efficiency (matching check 2.2 and the extraction rule, which measures
+`electricity road` at the charger *input*), and loads with no TIMES row are
+excluded and reported by name instead of silently widening the tolerance. On the
+current networks it reads −1.38 / −1.22 / −0.92 / −0.89 %, i.e. **2025 and 2030
+never passed either** — they were flattered by the charger loss and the
+agricultural machinery cancelling the 3 %.
+
+### R3 — Sankey mapping holes — **two of four fixed upstream (pypsa2html)**
+
+Not "known mapping gaps": two extraction bugs. See pypsa2html `docs/DESIGN_DECISIONS.md` D21.
+
+- `pac_fe` −0.147 TWh, every horizon: the agricultural correction ran *after*
+  the `pac_pe → pac_fe` closure had totalled the outflow. **Fixed.**
+- `elc_se` +7.22 (2040) / +9.29 (2050): the heat pumps' `_2` row carried their
+  **heat output** while the taxonomy books it as electricity, so the node was
+  charged for the ambient intake — 9.1 TWh in 2040. Plus `rural air heat pump`
+  had no mapping at all. **Fixed.**
+- `vap_se` +0.437 (2030): rows that become identical only after
+  `_aggregate_carriers` were never re-grouped, so a retired zero-flow vintage of
+  `urban central resistive heater` took rank 1 and 0.388 TWh_th of district heat
+  was booked as *losses*. **Fixed.**
+- Remaining on BEWAL: `elc_se` 2025 −0.64 TWh and `vap_se` 2025 −0.08 TWh —
+  pumped-hydro round-trip loss (no edge exists for a StorageUnit), the rank-1
+  `H2 pipeline` row, and `urban central heat vent` (deleted as a self-loop
+  because carrier and bus carrier both normalise to `heat`). Each is a taxonomy
+  decision; none is a solve defect.
+
+Whole run: 53 → 45 unbalanced node-years; ALL `elc_se` 2050 +642.9 TWh → balanced.
+
+### R4 — heat fidelity — **reconciled; the "pass" was wrong**
+
+The sum-vs-max discrepancy was two different runs. The 8.15 TWh total came from
+the production networks; the −0.033 TWh "worst single gap" came from
+`profile_fidelity_live.csv` **dated 2026-09-03**, i.e. the 6h test run. Re-run
+on this run's networks, the worst single gap is **−2.008 TWh (2040 biomass
+boiler, rural heat) — 88.1 % of its pinned target**, mirrored on the urban
+decentral bus. 4.03 TWh_th of the TIMES 2040 decentral biomass-boiler heat was
+delivered by heat pumps instead.
+
+Why it was invisible: the absorber makes the signed gaps cancel per (year, bus)
+to 4×10⁻⁷ TWh, so the total decentral heat closes exactly and every aggregate
+check passes. Summing |gaps| over groups is therefore meaningless — an 8.15 TWh
+total made of ±2.008 TWh substitutions reads the same as one made of rounding.
+
+Why it happened: not a code bug. BEWAL's solid biomass was **exhausted** in
+2040 — 6.00 TWh domestic + 2.25 TWh transported, both at `e_sum_max` — with
+7.62 TWh going to the TIMES-pinned industrial demand. The pin needed ~5.25 TWh
+more fuel than existed. In 2050 the EU `biomass limit` priced the marginal MWh
+at **1202.5 EUR/MWh** against a 1000 EUR/MWh_th relaxation penalty, so buying
+out the pin was simply cheaper — the premise in the penalty's own docstring
+("~10–25× the marginal cost of heat, so relaxing is never cheaper than
+complying") is false once a fuel is scarce.
+
+Fixes, all reporting rather than physics — the conflict is real and belongs to
+the modeller:
+
+- `report_relaxed_profiles()` reads `TimesHeatProfile-unmet` off the solved
+  model and logs the relaxed energy, share and penalty per group; called from
+  `solve_network.py` after a certified solution.
+- `review_run.py` gains **level 2.5**, which runs the fidelity measurement on
+  the run's own networks and WARNs on any group under 98 % of its profile,
+  instead of quoting a stale CSV.
+- `check_heat_profile_fidelity.py` now prints the worst *group* and the
+  per-(year, bus) residual next to the |sum|, so the two cannot be confused
+  again.
+
+**Open for the modeller:** the Walloon biomass envelope (`custom_potentials.csv`
+`e_sum_max`) is smaller than what TIMES's own solution spends, once the pinned
+industrial demand and the pinned decentral heat mix are both imposed. Either the
+envelope or one of the two pins has to give.
+
+### R5 — Gurobi conditioning warnings
+
+Not touched; still tolerated per checklist level 1.
+
+### Re-solve required
+
+R1, R2 and the `%.6f` demand precision change the LP for **every** node, so all
+four horizons need `prepare` + solve again before republication. R3 and R4 are
+reporting-only and can be regenerated from the existing networks.
+
+---
+
+## 13. Biomass: the ICEDD potential, and where the "imports" were really coming from
+
+### ICEDD's new Walloon potential, merged
+
+`origin/master` `2f67b01e` raises the Walloon solid-biomass potential from
+**6000 to 9222 GWh/an** in `config/input_parameters_for_models.csv`. Merged into
+`development_plan` (`25680656`) and `build_common_parameters.py --write` pushed
+it into `data/walloon/custom_potentials.csv` for all four horizons.
+
+It corroborates well: TIMES's own Walloon woody supply (`BIOCPS` chips +
+`BIOLOG` logs + `MBOWOO` + `MPPWOO`) peaks at **9.37 TWh** in 2030 and 2040 —
+within 2 % of 9.222.
+
+### What TIMES actually does with biomass trade
+
+Measured on `scen_central_demande_haute_v2_260903_0309.vd`, PJ → TWh:
+
+| | domestic woody | + renewable sludge | imports | exports | net |
+|---|---:|---:|---:|---:|---:|
+| 2025 | 7.758 | 10.284 | **0.000** | 3.334 | 6.950 |
+| 2030 | 9.374 | 11.901 | **0.000** | 1.967 | 9.934 |
+| 2040 | 9.373 | 12.604 | **0.000** | 0.000 | 12.604 |
+| 2050 | 5.298 | 8.529 | **0.000** | 0.000 | 8.529 |
+
+**TIMES Wallonia imports no solid biomass in any horizon.** `IMPBIOPEL` never
+activates; the region is a net *exporter* of pellets in 2025 (3.33 TWh) and of
+chips in 2030 (1.97 TWh). The only `IMP*` flows on bio commodities are
+`BIODST` (biodiesel), `BIOETH` (ethanol) and `BIOEFF` (effluents, in Mt) —
+liquids and biogas feedstock, not solid biomass.
+
+### Defect 1 — every brownfield biomass boiler burned Brussels' biomass
+
+`add_existing_baseyear.py` wired the brownfield boiler `bus0` to
+`spatial.biomass.nodes[0]` — the first biomass bus of the whole model,
+alphabetically **`BEBRU solid biomass`**. Measured on the 2030 network:
+
+| boiler's own region | fuel from `BEBRU solid biomass` | from its own bus |
+|---|---:|---:|
+| BEWAL | **4.481** | 1.110 |
+| FR | 12.454 | 71.272 |
+| DE | 7.318 | 0.000 |
+| BEVLG / GB / LU / NL | 0.329 | 0.070 |
+
+**24.6 TWh of 97.1 TWh** of brownfield biomass-boiler fuel crossed regions in
+2030, all of it onto a Brussels bus whose own resource is 0.6 TWh. BEWAL's
+share, 4.48 TWh, is more than **twice** the 2.0 TWh Walloon import cap it was
+bypassing — and the `solid biomass transported` generator on the receiving bus
+carries no `e_sum_max` of its own (BEBRU drew 24.9 TWh through it in 2030,
+39.5 TWh in 2025), so the fuel was in effect free and unlimited. No regional
+biomass potential can bind while this holds.
+
+Fixed: `biomass_fuel_buses()` returns the per-node bus from
+`spatial.biomass.df`, the same wiring the brownfield biomass CHP already used,
+and still the single `EU solid biomass` bus when `biomass_spatial` is off.
+
+### Defect 2 — two caps on one flow, one of them applying to nothing
+
+| row | value | component | managed? | applied? |
+|---|---:|---|---|---|
+| `solid biomass import` / `e_nom` | 4.0 / 4.0 / 4.5 / 6.0 TWh | Store | yes | **no** — `sector.solid_biomass_import.enable` is false (F8), so the Store is never built |
+| `solid biomass transported` / `e_sum_max` | 2.0 / 2.0 / 2.25 / 3.0 TWh | Generator | **no** — unmanaged orphan | yes, and it binds in 2030 and 2040 |
+
+Exactly half, on a different component, and the one that mattered was invisible
+to `build_common_parameters`. Fixed by swapping their roles in the master CSV:
+the Bioenergy-Europe row is now `status: none` with the reason (its value kept
+as documentation, so re-enabling the feature restores it), and the Valbiom
+`solid biomass transported` cap is now an active managed target. Plus a guard:
+`BEWAL_potentials.py` **warns** when a potential row matches no component
+instead of no-op'ing, which is what let this sit unnoticed.
+
+### The value: recommendation
+
+After the leak fix the Walloon envelope is **11.2 / 11.2 / 11.5 / 12.2 TWh**
+(9.222 domestic + the Valbiom import cap) against TIMES's **10.3 / 11.9 / 12.6 /
+8.5 TWh**, all domestic. Close through 2040, generous in 2050 — where the import
+cap *rises* to 3.0 TWh while TIMES's own supply *falls* to 8.5.
+
+The 2.0–3.0 TWh "import" is, in substance, standing in for a domestic resource:
+TIMES's renewable sludges/residues (`BIOSLU`/`BIOSLUH`, ~2.5–2.8 TWh) count as
+`solid biomass` in the industry extraction rule but are outside ICEDD's
+pellets-and-chips potential. **The clean end state is to book that resource as a
+Walloon potential and take the import cap to zero, matching TIMES exactly.**
+That is an ICEDD data decision, so the cap is left at the conservative Valbiom
+value for now — zeroing it today, before the sludges are added, would simply
+starve 2030.
+
+### Expected effect on the next solve
+
+Biomass supply vs the previous run's demand, TWh:
+
+| | supply before | supply after | demand at the old dispatch | verdict |
+|---|---:|---:|---:|---|
+| 2025 | 8.0 | 11.2 | 8.0 + 2.67 leaked | just fits |
+| 2030 | 8.0 | 11.2 | 8.0 + 4.48 leaked | **~1.3 short** — the model must substitute; those boilers were burning biomass Wallonia does not have |
+| 2040 | 8.25 | 11.5 | 8.25 (rationed) | **+3.2 TWh of headroom** — directly relieves the R4 biomass-boiler pin that went 88 % unmet |
+| 2050 | 9.0 | 12.2 | 6.38 | ample |
+
+So R4's 2040 finding should largely resolve itself, and 2030 becomes the tight
+horizon instead — honestly this time.

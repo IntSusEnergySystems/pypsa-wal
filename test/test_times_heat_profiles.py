@@ -27,6 +27,8 @@ What can silently go wrong here, and what nothing else checks:
 
 from types import SimpleNamespace
 
+import logging
+
 import numpy as np
 import pandas as pd
 import pypsa
@@ -691,3 +693,61 @@ def _reference_profile(n: pypsa.Network, group: str) -> pd.Series:
     )
     w = n.snapshot_weightings.generators
     return reconstruct_profiles(load, pd.Series(SHARES), avail, w)[group].sum(axis=1)
+
+
+# --------------------------------------------------------------------------- #
+# Post-solve: what did the relaxation actually cost?
+# --------------------------------------------------------------------------- #
+
+
+def test_a_pin_the_fuel_cannot_meet_is_reported_after_the_solve(tmp_path, caplog):
+    """A soft constraint that was bought out is a result, not a silent pass.
+
+    The absorber makes the *total* decentral heat close whatever happens, so a
+    group that delivered nothing still leaves every aggregate check green. On
+    2026-09-06 that hid 88 % of the 2040 decentral biomass-boiler target: solid
+    biomass was at its BEWAL `e_sum_max` and the EU `biomass limit` priced the
+    marginal MWh above the 1000 EUR/MWh_th penalty, so relaxing was cheaper than
+    complying — the exact case the penalty's docstring assumes cannot happen.
+
+    Here the gas supply is capped below what the 60 % gas-boiler pin needs.
+    """
+    from scripts.walloon_scripts.times_heat_profiles import report_relaxed_profiles
+
+    n = _toy_network()
+    n.generators.loc[f"{NODE} gas supply", "p_nom"] = 5.0  # far below the pin
+    snakemake = _mock_snakemake(tmp_path, _targets_frame(SHARES))
+    status, condition = n.optimize(
+        solver_name="highs",
+        extra_functionality=lambda net, sns: add_times_heat_profile_constraints(
+            net, sns, snakemake
+        ),
+    )
+    assert (status, condition) == ("ok", "optimal")
+
+    with caplog.at_level(logging.WARNING):
+        frame = report_relaxed_profiles(n, snakemake)
+
+    assert not frame.empty, "a bought-out pin must be reported"
+    gas = frame.set_index("group").loc["gas boiler"]
+    assert gas["unmet TWh"] > 0
+    assert gas["unmet share"] > 0.5
+    assert gas["penalty MEUR"] > 0
+    assert "TIMES heat pins relaxed" in caplog.text
+
+
+def test_a_pin_that_was_met_reports_nothing(tmp_path, caplog):
+    from scripts.walloon_scripts.times_heat_profiles import report_relaxed_profiles
+
+    n = _toy_network()
+    snakemake = _mock_snakemake(tmp_path, _targets_frame(SHARES))
+    n.optimize(
+        solver_name="highs",
+        extra_functionality=lambda net, sns: add_times_heat_profile_constraints(
+            net, sns, snakemake
+        ),
+    )
+    with caplog.at_level(logging.WARNING):
+        frame = report_relaxed_profiles(n, snakemake)
+    assert frame.empty
+    assert "TIMES heat pins relaxed" not in caplog.text

@@ -24,7 +24,12 @@ import pytest
 
 from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
 
-VALBIOM_GWH = 6000.0  # data/walloon/custom_potentials.csv, all horizons
+# A fixture input, deliberately *not* the shipped value: these cases turn on
+# whether the potential sits above or below the upstream PyPSA-Eur capacity,
+# so pinning them to whatever ICEDD last published would silently change which
+# branch each one exercises. The shipped potential (9222 GWh/an since master
+# 2f67b01e) is pinned by test_biomass_import_cap.py instead.
+VALBIOM_GWH = 6000.0
 
 
 def _potentials_file(tmp_path, year, value=VALBIOM_GWH):

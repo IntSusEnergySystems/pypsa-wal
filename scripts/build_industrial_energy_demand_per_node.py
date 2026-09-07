@@ -113,4 +113,9 @@ if __name__ == "__main__":
         logger.info("Skipping demand adjustments — study mode not active.")
 
     fn = snakemake.output.industrial_energy_demand_per_node
-    nodal_df.to_csv(fn, float_format="%.2f")
+    # Six decimals, not two: the unit is TWh/a, so `%.2f` quantised every
+    # industrial demand to 10 GWh and rounded the small ones away entirely —
+    # BEWAL's 2040 `coal` (0.0024 TWh) was written as 0.00, and the transferred
+    # TIMES values arrived at `prepare_sector_network` up to 5 GWh off the
+    # numbers the soft-link check compares them against.
+    nodal_df.to_csv(fn, float_format="%.6f")

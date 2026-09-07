@@ -91,6 +91,14 @@ CF_WINDOWS = {
 ANNUAL_ENERGY_CARRIERS = ("biogas", "solid biomass", "solid biomass transported")
 
 # TIMES row(s) each BEWAL load carrier must reproduce, and the tolerance.
+#
+# `coal for industry` is one PyPSA load for two TIMES carriers because
+# PyPSA-Eur has no coke bus.  It reads `coal + coke` at 1:1 — Wallonia imports
+# finished coke (`IMPCOACOK` is the only source of `COACOK` in the .vd) and has
+# no coke oven, so `prepare_sector_network` does not apply PyPSA-Eur's 1.366
+# MWh-coal-per-MWh-coke oven factor to this node.  Before that fix the load ran
+# +9.9 / +14.0 / +36.5 / +22.8 % above TIMES, which is that factor and nothing
+# else.
 SOFTLINK_MAP = {
     "industry electricity": (["electricity"], 0.002),
     "gas for industry": (["methane"], 0.002),
@@ -100,6 +108,26 @@ SOFTLINK_MAP = {
         ["total domestic aviation", "total international aviation"], 0.002),
     "coal for industry": (["coal", "coke"], 0.02),
 }
+
+#: BEV charger efficiency, i.e. how the flexible EV load is measured.
+#:
+#: TIMES `electricity road` is the draw at the charger *input* (see the
+#: extraction rule: "Measured at the charger INPUT, not BATELCIN"), while
+#: PyPSA's `land transport EV` load sits on the EV battery bus, behind the
+#: charger.  The two are only comparable once the flexible branch is grossed
+#: back up — which check 2.2 already does and the total-electricity check below
+#: has to do as well, or it reports the charger loss as a missing demand
+#: (0.50 % of the BEWAL total in 2040, 0.53 % in 2050).
+BEV_CHARGE_EFFICIENCY = 0.9
+
+#: BEWAL electricity loads with no TIMES counterpart in the level-2.3 row list.
+#:
+#: PyPSA-Eur electrifies a configured share of `total agriculture machinery`;
+#: TIMES reports that machinery as fuel and its `total agriculture electricity`
+#: row does not contain it.  It is a real 0.27 TWh on the Walloon grid — a
+#: PyPSA-side assumption, not a transfer error — so it is named and reported
+#: rather than quietly widening the tolerance.
+UNMATCHED_ELEC_CARRIERS = ("agriculture machinery electric",)
 
 
 class Report:
@@ -363,17 +391,38 @@ def check_softlink(nets, run: Path, scenario: str, rep: Report) -> None:
             msg = f"{y}: {carrier} {have:.3f} vs TIMES {want:.3f} ({dev:+.2%})"
             (rep.ok if abs(dev) <= tol else rep.warn)(sec, msg)
 
-        # --- total electricity
+        # --- total electricity, measured where TIMES measures it
+        #
+        # Every term is brought to the *grid* side, because that is the side
+        # TIMES reports: `electricity road` is metered at the charger input, so
+        # the flexible EV load — which PyPSA books behind the charger, on the EV
+        # battery bus — is grossed back up by BEV_CHARGE_EFFICIENCY.  Loads with
+        # no TIMES row are excluded from the comparison and reported separately,
+        # so a real modelling assumption cannot pass as a matched demand.
         elec_rows = ["total electricity residential", "total electricity services",
                      "electricity road", "electricity rail", "electricity",
                      "total agriculture electricity", "residential cooking electricity"]
         want = float(sum(T.get(r, 0.0) for r in elec_rows))
         ebuses = n.buses.index[(n.buses.location == WAL)
                                & n.buses.carrier.isin(["AC", "low voltage", "EV battery"])]
-        have = load_energy(n, n.loads.index[n.loads.bus.isin(ebuses)]) / 1e6
+        eloads = n.loads.loc[n.loads.index.intersection(
+            n.loads.index[n.loads.bus.isin(ebuses)])]
+        flex = eloads.index[eloads.carrier == "land transport EV"]
+        unmatched = eloads.index[eloads.carrier.isin(UNMATCHED_ELEC_CARRIERS)]
+        matched = eloads.index.difference(unmatched)
+        charger_loss = load_energy(n, flex) / 1e6 * (1 / BEV_CHARGE_EFFICIENCY - 1)
+        outside = load_energy(n, unmatched) / 1e6
+        have = load_energy(n, matched) / 1e6 + charger_loss
         dev = have / want - 1 if want else np.nan
         msg = f"{y}: BEWAL electric load {have:.3f} TWh vs TIMES total {want:.3f} ({dev:+.2%})"
-        (rep.ok if abs(dev) <= 0.005 else rep.warn)(sec, msg)
+        detail = (f"grid side: +{charger_loss:.3f} TWh of BEV charger loss added back; "
+                  f"{outside:.3f} TWh excluded as having no TIMES row "
+                  f"({', '.join(UNMATCHED_ELEC_CARRIERS)})")
+        (rep.ok if abs(dev) <= 0.005 else rep.warn)(sec, msg, detail)
+        if outside:
+            rep.info(sec, f"{y}: BEWAL electricity outside the TIMES rows "
+                          f"{outside:.3f} TWh ({outside / want:+.2%} of the TIMES total)",
+                     ", ".join(UNMATCHED_ELEC_CARRIERS))
 
     if missing:
         rep.warn(sec, "wallon_demands_<year>.csv not found — soft-link checks skipped",
@@ -394,6 +443,77 @@ def check_softlink(nets, run: Path, scenario: str, rep: Report) -> None:
                  "may instead be the pinned peak — read heat delivered, not capacity")
     else:
         rep.ok(sec, f"BEWAL heat-pump capacity non-decreasing (MW: {txt})")
+
+    check_heat_profile_fidelity(run, scenario, rep, sec)
+
+
+#: A pinned heat group that misses this share of its TIMES profile is not a
+#: rounding residual; the mix the soft link exists to transfer did not transfer.
+HEAT_FIDELITY_TOL = 0.02
+
+
+def check_heat_profile_fidelity(run: Path, scenario: str, rep: Report, sec: str) -> None:
+    """2.5 — did the solve deliver the TIMES heat mix, group by group?
+
+    Option B' pins each group's hourly profile and lets the absorber (the heat
+    pump) take whatever the others could not deliver, priced at
+    ``profile.penalty``. That design makes the *total* decentral heat close
+    exactly whatever happens, so every aggregate check passes even when a group
+    was bought out entirely — 2040 delivered 12 % of its pinned decentral
+    biomass-boiler heat and the review still read "pass with caveats", because
+    the number it looked at was the sum of |gaps| over groups (which the
+    absorber makes meaningless) rather than the worst group.
+    """
+    targets = Path.cwd() / "resources"
+    candidates = list(targets.glob(f"*/{scenario}")) + [targets / scenario, run / "resources"]
+    targets_dir = next((c for c in candidates if c.is_dir()), None)
+    profiles_dir = run / "heating_profiles"
+    if targets_dir is None or not profiles_dir.is_dir():
+        rep.info(sec, "2.5 heat-profile fidelity not checked",
+                 "needs <run>/heating_profiles/ and resources/<prefix>/<scenario>/; "
+                 "option B' writes the first only when `sector.times_heat.profile` is on")
+        return
+    try:
+        from scripts.walloon_scripts.check_heat_profile_fidelity import fidelity_frame
+
+        frame = fidelity_frame(run / "networks", profiles_dir, targets_dir)
+    except Exception as exc:  # noqa: BLE001 - a diagnostic must not stop the review
+        rep.warn(sec, "2.5 heat-profile fidelity could not be computed", str(exc))
+        return
+    if frame.empty:
+        rep.info(sec, "2.5 heat-profile fidelity: no pinned groups found")
+        return
+    share = (frame["energy gap TWh"].abs() / frame["pinned TWh"].replace(0.0, np.nan))
+    frame = frame.assign(share=share)
+    residual = frame.groupby(["year", "bus"])["energy gap TWh"].sum().abs().max()
+    rep.ok(sec, f"2.5 decentral heat load closes on every (year, bus) "
+                f"(largest signed residual {residual:.2e} TWh)")
+    # Only shortfalls are findings. The absorber is *supposed* to over-deliver:
+    # its surplus is the mirror image of the shortfalls on the same bus, so
+    # flagging it too would double-report one substitution.
+    short = frame[(frame["energy gap TWh"] < 0) & (frame["share"] > HEAT_FIDELITY_TOL)]
+    short = short.sort_values("share", ascending=False)
+    if short.empty:
+        worst = frame.loc[frame["share"].idxmax()]
+        rep.ok(sec, f"2.5 every TIMES heat group within {HEAT_FIDELITY_TOL:.0%} of its "
+                    f"profile (worst {worst['group']} {worst['bus']} {worst['year']}: "
+                    f"{worst['share']:.2%})")
+        return
+    detail = "\n".join(
+        f"{row['year']} {row['group']} on {row['bus']}: {row['realised TWh']:.4f} of "
+        f"{row['pinned TWh']:.4f} TWh_th pinned ({row['share']:.1%} undelivered)"
+        for _, row in short.iterrows()
+    )
+    rep.warn(sec, f"2.5 {len(short)} TIMES heat group(s) delivered less than "
+                  f"{1 - HEAT_FIDELITY_TOL:.0%} of their profile "
+                  f"({short['energy gap TWh'].abs().sum():.3f} TWh_th in total)",
+             detail + "\n"
+             "the absorber (heat pump) took the difference, so the heat load still "
+             "closes and every aggregate check passes — read this as a mix that did "
+             "not transfer, and check whether the fuel it needed existed at all "
+             "(BEWAL `e_sum_max`, the EU `biomass limit` shadow price, the country "
+             "CO2 cap). The solve log's `report_relaxed_profiles` line says what the "
+             "relaxation cost.")
 
 
 # --------------------------------------------------------------------------- #

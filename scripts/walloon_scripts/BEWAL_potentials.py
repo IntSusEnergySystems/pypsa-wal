@@ -453,11 +453,29 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
         elif carrier == "solid biomass import":
             # remove all solid biomass imports except the one for BEWAL
             # and set the import potential to the one given for BEWAL
-            logger.info(logger_msg_success)
             biomass_imports = n.stores.query("carrier == @carrier")
 
             allowed = "e_nom"
             assert attr == allowed, f"Unsupported attr: {attr!r}; expected {allowed!r}"
+            if biomass_imports.empty:
+                # `sector.solid_biomass_import.enable` is false (F8, 2026-09-05),
+                # so the store this row caps is never built. Saying so is the
+                # whole point: the row sat in custom_potentials.csv looking like
+                # an applied 4.0-6.0 TWh import cap while the cap that actually
+                # bound was the `solid biomass transported` row, at half the
+                # value, on a different component.
+                logger.warning(
+                    "Potential row %r on bus %s (%s = %s) matches no Store in the "
+                    "network and was NOT applied; `sector.solid_biomass_import."
+                    "enable` is off, so the binding import cap is the "
+                    "`solid biomass transported` row.",
+                    carrier,
+                    bus,
+                    attr,
+                    potential,
+                )
+                continue
+            logger.info(logger_msg_success)
             n.stores.loc[
                 biomass_imports.index,
                 ["e_nom_min", attr, "e_nom_max", "e_initial"],

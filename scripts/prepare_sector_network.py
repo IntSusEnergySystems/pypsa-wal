@@ -1710,7 +1710,17 @@ def insert_electricity_distribution_grid(
         logger.info(
             f"Deducting distribution losses from electricity demand: {np.around(100 * (1 - efficiency), decimals=2)}%"
         )
-        n.loads_t.p_set.loc[:, n.loads.carrier == "electricity"] *= efficiency
+        wallon_node = config["run"].get("wallon_node") if times_demand else None
+        deduct = distribution_loss_targets(
+            n.loads, times_demand=times_demand, wallon_node=wallon_node
+        )
+        if wallon_node is not None:
+            logger.info(
+                "TIMES soft link: %s keeps its full electricity load "
+                "(already a low-voltage delivery in TIMES)",
+                wallon_node,
+            )
+        n.loads_t.p_set.loc[:, n.loads_t.p_set.columns.intersection(deduct)] *= efficiency
 
     # this catches regular electricity load and "industry electricity" and
     # "agriculture machinery electric" and "agriculture electricity"
@@ -5200,6 +5210,85 @@ def add_biomass(
         )
 
 
+#: TIMES categories the Walloon ``electricity`` load is scaled onto.
+#:
+#: ``residential cooking electricity`` sits outside ``total electricity
+#: residential`` since the RCOK* stoves were relabelled in TIMES_PyPSA, so it has
+#: to be added here or the Walloon load loses ~0.5 TWh.  ``services data centre
+#: electricity`` is a *child* of ``total electricity services`` and must stay
+#: out of this sum.
+#:
+#: Rail enters as ``electricity rail``, not ``total rail``: the latter is the
+#: whole rail demand, electric *and* diesel (``total energy for transport`` in
+#: the extraction rule), so putting it on the electricity bus asked the Walloon
+#: grid to haul the diesel trains too — 0.053 TWh in 2025 rising to 0.066 TWh in
+#: 2050.  ``electricity road`` already nets ``electricity rail`` out of itself,
+#: so there is no double count either way.
+WALLOON_ELECTRICITY_CATEGORIES = [
+    "total electricity residential",
+    "total electricity services",
+    "electricity rail",
+    "residential cooking electricity",
+]
+
+#: MWh of hard coal a coke oven burns per MWh of coke it delivers (eurostat
+#: energy balance).  PyPSA-Eur has no coke bus, so industrial coke demand is
+#: restated as this much coal and the whole chain's CO2 comes out with the
+#: coal's intensity.
+MWH_COAL_PER_MWH_COKE = 1.366
+
+
+def coke_to_coal_factors(
+    nodes: pd.Index, *, times_demand: bool, wallon_node: str | None
+) -> pd.Series:
+    """Per-node factor turning industrial coke demand into coal-equivalent.
+
+    :data:`MWH_COAL_PER_MWH_COKE` everywhere, except the TIMES-driven Walloon
+    node, which gets 1.0.
+
+    Wallonia has no coke oven in the TIMES model: ``COACOK`` is produced only by
+    ``IMPCOACOK`` and consumed only by ``INDCOK00``, so the region buys finished
+    coke and the coal that made it was burned outside the system boundary.
+    Applying the oven factor there invents Walloon coal — and Walloon CO2,
+    inside the country cap — that TIMES does not have.  On the 2026-09-06 run it
+    put the transferred ``coal for industry`` +9.8 % above TIMES in 2025,
+    +14.0 % in 2030, +36.7 % in 2040 (where coke is essentially the whole
+    demand) and +23.4 % in 2050 — the level-2.3 finding R1, and exactly this
+    factor with nothing else in it.
+    """
+    factors = pd.Series(MWH_COAL_PER_MWH_COKE, index=nodes, dtype=float)
+    if times_demand and wallon_node in factors.index:
+        factors[wallon_node] = 1.0
+    return factors
+
+
+def distribution_loss_targets(
+    loads: pd.DataFrame, *, times_demand: bool, wallon_node: str | None
+) -> pd.Index:
+    """Loads the distribution-grid efficiency is deducted from.
+
+    PyPSA-Eur takes the losses off the ``electricity`` load because its source
+    (ENTSO-E) measures demand at the grid, above the distribution network, and
+    the losses are re-added as the ``electricity distribution grid`` link's
+    efficiency.
+
+    The TIMES-driven Walloon load is not that number.  TIMES routes residential,
+    tertiary, agriculture and transport electricity through ``EVTRANS_H-M`` and
+    ``EVTRANS_M-L`` (η 0.973 and 0.968) and books the demand on ``ELCLOW``,
+    downstream of both — the same place as PyPSA's low-voltage bus.  Deducting
+    there takes the distribution losses off a second time and leaves the region
+    3 % below the number the soft link just pinned it to (0.58 TWh in 2050).
+    Every other BEWAL electricity carrier already escapes, because the match is
+    on the exact carrier name and theirs are ``industry electricity``,
+    ``agriculture electricity`` and so on; exempting the node makes the transfer
+    internally consistent as well.
+    """
+    targets = loads.index[loads.carrier == "electricity"]
+    if times_demand and wallon_node is not None:
+        targets = targets.drop(wallon_node, errors="ignore")
+    return targets
+
+
 def add_industry(
     n: pypsa.Network,
     costs: pd.DataFrame,
@@ -5739,19 +5828,8 @@ def add_industry(
         n.loads_t.p_set[loads_i] *= factor
         #Changing wallon electricity and residential demands with TIMES value
         wallon_elec = pd.read_csv(snakemake.input.wallon_demands,index_col=0)[["TWh"]]
-        # `residential cooking electricity` sits outside `total electricity
-        # residential` since the RCOK* stoves were relabelled in TIMES_PyPSA, so it
-        # has to be added here or the Walloon load loses ~0.5 TWh. `services data
-        # centre electricity` is a *child* of `total electricity services` and must
-        # stay out of this sum.
         sum_result = times_demand_twh(
-            wallon_elec,
-            [
-                'total electricity residential',
-                'total electricity services',
-                'total rail',
-                'residential cooking electricity',
-            ],
+            wallon_elec, WALLOON_ELECTRICITY_CATEGORIES
         ).sum()
         factor_wal = ((sum_result)
                     / (n.loads_t.p_set[wallon_node].sum()/1e6)
@@ -5879,10 +5957,13 @@ def add_industry(
             cf_industry=cf_industry,
         )
 
-        mwh_coal_per_mwh_coke = 1.366  # from eurostat energy balance
+        coke_to_coal = coke_to_coal_factors(
+            industrial_demand.index,
+            times_demand=times_demand,
+            wallon_node=config["run"].get("wallon_node") if times_demand else None,
+        )
         p_set = (
-            industrial_demand["coal"]
-            + mwh_coal_per_mwh_coke * industrial_demand["coke"]
+            industrial_demand["coal"] + coke_to_coal * industrial_demand["coke"]
         ) / nhours
 
         p_set.rename(lambda x: x + " coal for industry", inplace=True)

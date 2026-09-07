@@ -2603,6 +2603,17 @@ if __name__ == "__main__":
             "refusing to export a network without a certified solution."
         )
 
+    # Read the TIMES heat pins back off the solved model. A soft constraint that
+    # was bought out is a result, not a warning-free pass: see
+    # `report_relaxed_profiles` for the 2040 biomass-boiler case it was written
+    # for. Runs without the soft link get an empty frame and no output.
+    if not rolling_horizon:
+        from scripts.walloon_scripts.times_heat_profiles import (
+            report_relaxed_profiles,
+        )
+
+        report_relaxed_profiles(n, snakemake)
+
     n.meta = dict(snakemake.config, **dict(wildcards=dict(snakemake.wildcards)))
     n.export_to_netcdf(snakemake.output.network)
 
