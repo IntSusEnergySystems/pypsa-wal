@@ -161,12 +161,23 @@ resources/walloon/scen_base/            results/walloon/scen_base/
 ```
 
 Each scenario names its own TIMES `.vd` file (`sector.times_file`). Those files
-are gitignored (~75 MB each) — symlink them in before running:
+are gitignored (~75 MB each), so **a fresh clone has none of them** — a pull is
+not enough to run. ICEDD publishes each export to S3; fetch the one the active
+scenario names, then symlink it in:
 
 ```bash
-ln -sfn /path/to/TIMES_PyPSA/data/scen_demande_haute_v01_260727_fix_nuc_2807.vd data/walloon/
+aws s3 cp s3://intervectoriel/test/scenarios/times_20260907/scen_central_demande_haute_v01_260907_0709.vd /path/to/TIMES_PyPSA/data/
+```
+
+```bash
+ln -sfn /path/to/TIMES_PyPSA/data/scen_central_demande_haute_v01_260907_0709.vd data/walloon/
 ln -sfn /path/to/TIMES_PyPSA/data/scen_base_251129_0112.vd                      data/walloon/
 ```
+
+`test_times_scenario_inputs.py` fails if an active scenario names a `.vd` that
+is not resolvable, so `pytest test -k times_scenario_inputs` is the one-second
+check that a machine is ready to run. `aws s3 ls s3://intervectoriel/test/scenarios/`
+lists the exports; the `times_<date>/` folders hold the raw `.vd`.
 
 A scenario overlay is the right place for anything that varies per run — the
 `.vd`, cost overwrites, aggregate capacity limits, hurdle-rate variants. See
