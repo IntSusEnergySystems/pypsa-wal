@@ -766,6 +766,10 @@ class SectorConfig(BaseModel):
         False,
         description="Add option for combined-cycle gas turbines with post-combustion carbon capture (natural gas, not methanol). See docs/ccs_halignment.md.",
     )
+    power_plant_cc_from_year: int | None = Field(
+        None,
+        description="First planning horizon in which carbon capture on power and CHP plants may be built (CCGT CC, urban central gas / solid biomass CHP CC, waste CHP CC, Allam cycle). Earlier horizons get p_nom_max = 0 on those carriers. Industrial capture (process emissions CC, solid biomass / gas for industry CC, SMR CC) is not affected. None keeps the upstream behaviour, i.e. available in every horizon.",
+    )
     dac: bool = Field(True, description="Add option for Direct Air Capture (DAC).")
     co2_vent: bool = Field(
         False,

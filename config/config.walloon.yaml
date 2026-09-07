@@ -438,6 +438,23 @@ sector:
   # methanol.methanol_to_power.ccgt_cc. Costs are composed from the CCGT
   # row plus the DEA "biomass CHP capture" sheet — docs/ccs_halignment.md.
   ccgt_cc: true
+  # First horizon in which carbon capture may be fitted to a *power or CHP*
+  # plant. Earlier horizons get p_nom_max = 0 on `CCGT CC`, `urban central gas
+  # CHP CC`, `urban central solid biomass CHP CC`, `waste CHP CC`, `coal CC`
+  # and the Allam cycle (scripts/walloon_scripts/power_plant_cc.py). Industrial
+  # capture is never touched: `process emissions CC`, `solid biomass for
+  # industry CC`, `gas for industry CC` and `SMR CC` carry item 9's
+  # STORAGEMININD floor, and gating them would contradict it.
+  #
+  # **OFF as shipped** — null means "available in every horizon", the upstream
+  # behaviour, so this option changes no result until someone turns it on. The
+  # intended value is 2040 ("not planned in the short term", 2026-09-05); it is
+  # parked at `status: pending` on the
+  # `config:sector.power_plant_cc_from_year` row of
+  # input_parameters_for_models.csv. To enable: flip that row to
+  # `status: active` and run `build_common_parameters.py --write`, which fills
+  # the value in below — do not hand-edit it.
+  power_plant_cc_from_year:
   # TIMES does not offer DAC. PyPSA-Eur default is true; this overlay turns
   # it off so Walloon runs match. Flip to true to restore. docs/ccs_halignment.md.
   dac: false

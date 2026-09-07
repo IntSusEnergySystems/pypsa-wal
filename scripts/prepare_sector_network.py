@@ -50,6 +50,7 @@ from scripts.walloon_scripts.nuclear_helper import apply_nuclear_inflexibility
 from scripts.walloon_scripts.BEWAL_potentials_overnight import update_BEWAL_potentials
 from scripts.walloon_scripts.set_NTCs import apply_ntc_floors, apply_ntc_limits
 from scripts.walloon_scripts.ptes_bounds import ptes_store_e_nom_max
+from scripts.walloon_scripts.power_plant_cc import disable_power_plant_cc
 
 spatial = SimpleNamespace()
 logger = logging.getLogger(__name__)
@@ -7341,6 +7342,14 @@ if __name__ == "__main__":
 
     if options["allam_cycle_gas"]:
         add_allam_gas(n, costs, pop_layout=pop_layout, spatial=spatial)
+
+    # Optional: no capture on power/CHP plants before a given year ("not
+    # planned in the short term"). No-op while the config value is None, which
+    # is how it ships. Industrial capture is never affected. Runs last so it
+    # catches every CC link regardless of which add_* created it.
+    disable_power_plant_cc(
+        n, investment_year, options.get("power_plant_cc_from_year")
+    )
 
     n = set_temporal_aggregation(
         n, snakemake.params.time_resolution, snakemake.input.snapshot_weightings

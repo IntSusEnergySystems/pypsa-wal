@@ -919,6 +919,7 @@ sector:
   methanation: true
   coal_cc: false
   ccgt_cc: false
+  power_plant_cc_from_year:
   dac: true
   co2_vent: false
   heat_vent:

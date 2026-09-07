@@ -22,6 +22,7 @@ committed, but row count may change when the technology universe moves.
                 ├─► data/walloon/discount_rates.csv        hurdle:<sector>  [generated]
                 └─► config/config.walloon.yaml             config:budget_national
                                                            + costs.social_discountrate (from CSV)
+                                                           + config:sector.<key> scalars
                                                            fill_values stay at PyPSA defaults
 
 Failsafe (patched files only): a patch may only rewrite the ``value`` cell of
@@ -1090,7 +1091,12 @@ def patch_discount_rates(
 
 def _costs_block_span(text: str) -> tuple[int, int] | None:
     """Return [start, end) of the top-level `costs:` block in a YAML file."""
-    m = re.search(r"^costs:\n(?:[ \t].*\n|\n)*", text, flags=re.MULTILINE)
+    return _block_span(text, "costs")
+
+
+def _block_span(text: str, key: str) -> tuple[int, int] | None:
+    """Return [start, end) of a top-level `<key>:` block in a YAML file."""
+    m = re.search(rf"^{re.escape(key)}:\n(?:[ \t].*\n|\n)*", text, flags=re.MULTILINE)
     if not m:
         return None
     return m.start(), m.end()
@@ -1208,6 +1214,84 @@ def patch_costs_scalars(
                 else:
                     patch.notes.append("social_discountrate already in sync")
 
+        if not dry_run and patch.ok and patch.changes:
+            path.write_text(text)
+        patches.append(patch)
+    return patches
+
+
+# --------------------------------------------------------------------------- #
+# config:sector.<key>
+# --------------------------------------------------------------------------- #
+#: `config:sector.<key>` targets that may be synced into the overlay configs.
+#: A key must already exist in the `sector:` block — this patcher rewrites a
+#: value, it does not invent policy switches.
+SECTOR_SCALARS = ("power_plant_cc_from_year",)
+
+
+def _set_sector_scalar(
+    text: str, block: tuple[int, int], key: str, value: str
+) -> tuple[str, str | None, str | None]:
+    """Set `key: value` inside a YAML block. Returns (text, change, error).
+
+    Unlike `_patch_yaml_scalar` this also fills a key whose value is **empty**
+    (`key:`, i.e. YAML null) — which is how an off-by-default option ships, so
+    it is the case the enable path actually has to handle. Any trailing comment
+    is preserved, and the rewritten line always keeps the space after the colon
+    (`key:2040` would be a plain scalar, not a mapping).
+    """
+    start, end = block
+    body = text[start:end]
+    pattern = rf"^(?P<indent>[ \t]*){re.escape(key)}:[ \t]*(?P<val>[^\s#]*)(?P<tail>[ \t]*(?:#.*)?)$"
+    m = re.search(pattern, body, flags=re.MULTILINE)
+    if not m:
+        return text, None, f"missing key {key}"
+    if m.group("val") == value:
+        return text, None, None
+    line = f"{m.group('indent')}{key}: {value}{m.group('tail')}"
+    new_body = body[: m.start()] + line + body[m.end() :]
+    old_val = m.group("val") or "(null)"
+    return (
+        text[:start] + new_body + text[end:],
+        f"sector.{key}: {old_val} -> {value}",
+        None,
+    )
+
+
+def patch_sector_scalars(
+    df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool
+) -> list[Patch]:
+    """Write `config:sector.<key>` rows into the `sector:` block of each config."""
+    targets = collect_targets(df, "config", horizons, nparts=1)
+    patches = []
+    for path in COST_CONFIG_FILES:
+        patch = Patch(path=path)
+        text = path.read_text()
+        span = _block_span(text, "sector")
+        for key in SECTOR_SCALARS:
+            tgt = targets.get((f"sector.{key}",))
+            if tgt is None:
+                continue
+            if span is None:
+                patch.errors.append(f"{path.name}: no top-level `sector:` block")
+                break
+            if not tgt.constant:
+                patch.errors.append(
+                    f"config:sector.{key} varies by horizon; the YAML scalar "
+                    "can only hold a single value"
+                )
+                continue
+            value = fmt_value(next(iter(tgt.values.values())))
+            text2, change, err = _set_sector_scalar(text, span, key, value)
+            if err:
+                patch.errors.append(f"{path.name}: {err} — add it to `sector:`")
+                continue
+            text = text2
+            span = _block_span(text, "sector") or span
+            if change:
+                patch.changes.append(change)
+            else:
+                patch.notes.append(f"sector.{key} already in sync")
         if not dry_run and patch.ok and patch.changes:
             path.write_text(text)
         patches.append(patch)
@@ -1393,6 +1477,7 @@ def cmd_check(df: pd.DataFrame, meta: dict, verbose: bool = False) -> int:
             for cfg in COST_CONFIG_FILES
         ],
         *patch_costs_scalars(df, horizons, dry_run=True),
+        *patch_sector_scalars(df, horizons, dry_run=True),
         *patch_discount_rates(df, meta, horizons, dry_run=True),
     ]
     print(f"input files (planning horizons {list(horizons)}):")
@@ -1435,6 +1520,7 @@ def cmd_write(df: pd.DataFrame, meta: dict, dry_run: bool, verbose: bool) -> int
             for cfg in COST_CONFIG_FILES
         ],
         *patch_costs_scalars(df, horizons, dry_run),
+        *patch_sector_scalars(df, horizons, dry_run),
         *patch_discount_rates(df, meta, horizons, dry_run),
     ]
     for p in patches:

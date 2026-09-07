@@ -1,21 +1,24 @@
-# Improvement plan — status 2026-09-03
+# Improvement plan — status 2026-09-05
 
 Live worklist for the Walloon model. Items 1–10 come from the **27 Aug**
-meeting, 11–17 from **1 Sept**.
+meeting, 11–17 from **1 Sept**. Findings **F1–F13** come from the §11 review of
+the 20260905 production run; **B1–B9** from the 3 Sept code review.
 
-**This revision is a code review and the fix pass that followed it.**
-Everything committed between `7b67b712` and `93bdf848` here, plus pypsa2html
-`9454be9`, was read back against the plan; nine defects were found (B1–B9) and
-eight are now fixed and guarded. Verdicts come from the committed code and
-data, the TIMES vd and the `resources/` CSVs — *not* from a finished solve: the
-1h production run is still unfinished
-([log](logs/2026-09-02_scen_demande_haute_2010_1h.md): 2025 optimal, 2030
-inf-or-unbounded on five successive submissions, all five misdiagnosed).
-**B8 is the one that remains — the chain has to be re-solved from 2025.**
+**All nine B-defects are closed.** B8 — the one that needed a solve rather than
+an edit — was closed by the 1h production run of 4 Sept
+([log](logs/2026-09-04_scen_demande_haute_2010_1h_v2.md), 4/4 optimal, §11
+review done). That review then opened F1–F13, and this revision is the fix pass
+for those: **F1, F3, F5, F7, F8, F9 are closed**, F2 remains open, and F4/F6/F10
+are documented-not-fixed by decision.
 
-**Reference run.** [`2026-08-30 scen_demande_haute @ 2010, 1h`](logs/2026-08-30_scen_demande_haute_2010_1h.md)
-— 4/4 optimal, reviewed (§11), published as `demande-haute-2010-1h`. Every
-"today" number below is from that run.
+**Reference runs.**
+- Production: [`2026-09-04 scen_demande_haute @ 2010, 1h`](logs/2026-09-04_scen_demande_haute_2010_1h_v2.md)
+  — 4/4 optimal, reviewed. **Do not cite its PV, biomass or 2025 capacity
+  numbers**: F1, F7 and F8 all landed after it.
+- Verification: [`2026-09-05 scen_test_2013_6h`](logs/2026-09-05_scen_test_2013_6h_local.md)
+  — three runs on one tree. Run 3 is current: 4/4 optimal, `review_run.py`
+  **FAIL 0** (was 2). 2013 weather at 6h, so it is a mechanism check, **not** a
+  Walloon result — no number from it is comparable with 1h/2010.
 
 **Evidence kept in git, not here.** Long 27 Aug option tables:
 `git show ae753bb3:docs/temporary_improvement_plans.md`. Item-11 press review
@@ -51,7 +54,7 @@ Companion docs: [ccs_alignment](ccs_alignment.md) ·
 | 3 | Boucle du Hainaut NTC floor (9 600 MW usable, 2035+) | **done** | `ntc_floors.csv`; applied after `set_transmission_limit` **and** `carry_forward_built_grid` in both `prepare_sector_network` and `add_brownfield`. First model horizon affected is 2040 |
 | 4 | Biogas 4.0 / 6.9 TWh | **done**, source still owed | `907433a6`; 17d |
 | 5 · 7 | Flanders P2H / heat demand plot bugs | **done** | pypsa2html `0d1b904` |
-| 6a | BEWAL 10 TWh import cap | **on 5 Sept** — expression fixed, values re-measured, cap registered as a GlobalConstraint | **B6** |
+| 6a | BEWAL 10 TWh import cap | **done** — on, and *feasible*: 4/4 optimal, cap binds at 6.47 (2040) and 10.00 TWh (2050) with duals of only −10.7 / −3.5 EUR/MWh | **B6**, F3 |
 | 6b | Nuclear primary-energy toggle | **done** — `uranium` / `electricity`, validated; both panel titles state the convention | pypsa2html `9454be9` |
 | 8 | TIMES rooftop share | **done 4 Sept** — base-year fleet split 1.77 GW rooftop / 0.9 GW ground (Elia/ICEDD); share on from 2030 | **B5** (fixed) |
 | 9 | Industry-CC floor (STORAGEMININD) | **done** — reachable once the inventory is gross | **B3** (fixed) |
@@ -63,6 +66,7 @@ Companion docs: [ccs_alignment](ccs_alignment.md) ·
 | 15 | CCS in installed capacities | **done** — `CCS capacities (fuel input)`, GW of fuel input; `CCGT CC` deliberately left with CCGT | pypsa2html `9454be9` |
 | 16 | Water pits `e_nom_max` | **done** (4 weeks ≈ 99 GWh_th BEWAL 2030); per-vintage caveat **B9** | `ptes_bounds.py` |
 | 17 | Carry-overs (coal soft-link, DE onwind corridor, Sankey WARNs, biogas citation) | open, unchanged | below |
+| 18 | **No CC on power/CHP plants before 2040** | **built 5 Sept, shipped OFF** — `sector.power_plant_cc_from_year` is null and the CSV row is `pending`; flip it to `active` + `--write` to enable | below |
 | — | RES envelope + 2025 historical pin (precondition of 6) | **done for BEWAL and the neighbours; the Flemish half is no longer enforced** | **B1** |
 | — | Collapsed-corridor `tolerance` column | **done** | `dbca25df` |
 
@@ -380,8 +384,14 @@ larger than the foreign one (+8.2 TWh).
 
 ### B8 — the myopic chain is not internally consistent
 
-> **OPEN — this is the one item that needs a run, not an edit.** Every code and
-> data fix above is in, but the 2025 network on the cluster was solved under
+> **CLOSED 4 Sept.** The chain was re-solved from 2025 in
+> [`2026-09-04_scen_demande_haute_2010_1h_v2`](logs/2026-09-04_scen_demande_haute_2010_1h_v2.md)
+> — 4/4 optimal, one constraint set throughout, §11 review done. That review is
+> what produced F1–F13 above. The paragraph below is kept as the reason the
+> diagnostic logging exists.
+>
+> Was: **OPEN — this is the one item that needs a run, not an edit.** Every code
+> and data fix above is in, but the 2025 network on the cluster was solved under
 > the old grouping and carries 8 GW of Belgian offshore against a pin that is
 > now 2 262 MW. **Do not restart at 2030.** Delete the solved networks and run
 > the chain from 2025. As a diagnostic aid, `add_CCL_constraints` now logs
@@ -412,6 +422,143 @@ as the caps that used to bind the extendable tranche only.
 
 ---
 
+## Findings from the 20260905 review (F1–F13)
+
+Full text and decision boxes in
+[`2026-09-04_scen_demande_haute_2010_1h_v2.md`](logs/2026-09-04_scen_demande_haute_2010_1h_v2.md)
+§11. Verified in the 6h tree, [`2026-09-05_scen_test_2013_6h_local.md`](logs/2026-09-05_scen_test_2013_6h_local.md)
+§11–§13.
+
+| # | Finding | State |
+|---|---|---|
+| F1 | Walloon PV collapses by 2050 — CAPEX was flat while FOM % rose | **fixed** `ecbe3215`: every Walloon `investment` override follows technology-data's own rate. PV 2025→2050 now −28 % (ground) / −38 % (rooftop); BEWAL PV grows monotonically to 17.0 GW instead of collapsing to 6.6 |
+| F2 | European VRE decays after 2030 | **open** — the only F-item still untouched |
+| F3 | Explorer import/export orientation inverted | documented, not fixed — ClimAct's extraction library; none of our results read it |
+| F4 | (see §11) | documented |
+| F5 | Global and national CO₂ trajectories disagree; national caps inert after 2025 | **fixed** — `budget_national` now equals `co2_budget` (0.648/0.450/0.250/0.050), anchors moved in the master CSV. The BEWAL national dual goes 0/0/0 → **−63.9 / −29.2 / 0** EUR/t: the caps bind instead of decorating |
+| F6 | 2025 is a 433 EUR/t counterfactual, not a base year | documented — do not present 2025 as "today" |
+| F7 | Four 2025 aggregate-pin FAILs | **fixed** — `0def1c0a` took it to two, then `scale_standing_fleet` closed both. All 14 pins pass |
+| F8 | Walloon solid biomass exceeds the documented potential, twice over | **fixed** — two defects, see below |
+| F9 | Capital costs 13–31 % above `investment × (annuity + FOM)` | **not a defect** — the `electricity grid connection` adder (18 589 EUR/MW/a), +31 % on ground PV and **+0 on rooftop**. Write it into `common_parameters.md` |
+| F10 | Numbers that must not be published as-is | documented — prices are unweighted 8-node means, nuclear is absent from BEWAL rows, etc. |
+| F11–F13 | (see §11) | documented |
+
+### F5 — and the net-zero probe that failed
+
+Worth keeping because it is a *result*, not a bug. With `co2_budget` 2050 set
+to **0.000** (net zero) the model is **infeasible** — a clean Gurobi primal
+certificate, with a control solve at 0.050 on the identical 2040 inheritance
+coming back feasible, so the cap was the sole cause.
+
+The reason is structural. `sector.dac: false`, so every carbon sink is
+biogenic and capped at ~127 Mt (336.9 TWh of biomass × 0.348 tCO₂/MWh, plus
+~9.5 Mt of biogas). A tonne of biogenic carbon can be sequestered **or**
+displace a tonne of fossil fuel, never both — so Fischer-Tropsch kerosene does
+not help. Net zero therefore needs fossil combustion ≤ ~127 Mt against ~230 Mt
+realised, of which **aviation kerosene alone is 106 Mt**. `co2_budget` 2050 is
+back at 0.050. **Net zero is a DAC question or an aviation/HVC demand
+question** — put it on the agenda, it is not a cap that can be tightened.
+
+### F7 — the base-year fleet, and an undeclared dependency
+
+The two remaining FAILs were **one** finding: `add_CCL_constraints` subtracts a
+region row from its parent, so the `BE` row only ever covered BEBRU + BEVLG at
+3 337 − 1 560 = 1 777 MW. The whole BE overshoot was the BEWAL residue.
+
+That residue was never a Walloon measurement. `add_existing_renewables` splits
+one IRENASTAT **country** total across a country's nodes by
+`p_nom_max / p_nom_max.sum()` — remaining *land potential*, not where the
+turbines stand — and Wallonia has the most free land in Belgium. Every other
+country's 2025 onwind pin is already the model's own fleet; BEWAL was the only
+row sourced independently (the Walloon Energy Balance), which is why it was the
+only row that broke. `electricity.baseyear_reconcile_forced_build.scale_standing_fleet`
+(default **false** — it rewrites historical capacity) scales the standing
+vintages pro rata onto the pin: ×0.9207 on BEWAL's 2005–2020 bins.
+
+**Second defect, same family as B7 and as the `generate_html_report` race.**
+Neither the flag nor the caps file was declared on `rule add_existing_baseyear`
+— both were read straight from `snakemake.config`, so editing a pin or flipping
+the switch left the brownfield network stale and the change silently inert. The
+flag is now a `param`, the caps file an `input`.
+
+### F8 — the Walloon biomass was counted twice, twice over
+
+**(a) A code bug.** `update_BEWAL_potentials` wrote the remainder
+`potential − upstream` onto the unsustainable generator (correct) and then
+overwrote the sustainable one with the **full** potential, so BEWAL entered
+every solve with `2 × potential − upstream`: 6.0 + 6.0 TWh in 2025, 6.0 + 3.18
+in 2030, against a 6.0 TWh Valbiom row. The same block also grew the
+Europe-wide `unsustainable biomass limit` by the new remainder without removing
+BEWAL's previous contribution.
+
+**(b) A data decision, and it still needs sign-off.** `solid biomass import`
+(store + link, 4.0/4.0/4.5/6.0 TWh, Bioenergy Europe) and `solid biomass
+transported` (e_sum_max 2.0/2.0/2.25/3.0 TWh, Valbiom) are two estimates of the
+same physical flow, and 2040 used **both** — 6.75 TWh of pellets against a
+documented 2.25. `sector.solid_biomass_import` is now **false**; the Valbiom row
+is the single channel, chosen because it is written as a *Walloon potential*
+rather than one plant's projection. Keeping the other instead would give BEWAL
+10.0/10.0/10.5/12.0 TWh rather than 8.0/8.0/8.25/9.0. **Only one may be
+active** — ask Valbiom/ICEDD which.
+
+| Walloon solid biomass consumed, TWh | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| before | 7.74 | 9.63 | **12.75** | 6.55 |
+| after | 6.00 | 8.00 | 8.25 | 6.39 |
+| documented envelope | 8.00 | 8.00 | 8.25 | 9.00 |
+
+## Item 18 — no carbon capture on power plants before 2040
+
+**Decision 2026-09-05: not planned in the short term.** When enabled, capture
+fitted to *power and CHP plants* is unavailable in every horizon before the
+configured year — `CCGT CC`, `urban central gas CHP CC`, `urban central solid
+biomass CHP CC`, `waste CHP CC`, `coal CC` and the Allam cycle get
+`p_nom_max = 0` (`scripts/walloon_scripts/power_plant_cc.py`).
+
+> **Shipped OFF (2026-09-07).** `sector.power_plant_cc_from_year` is **null**
+> in `config.walloon.yaml` and the CSV row is `status: pending`, so the option
+> is inert and no published result depends on it. Verified on the solved 2030
+> network: with the config value as committed the helper changes **0 links**.
+> To enable, flip the row to `status: active` and run
+> `build_common_parameters.py --write`; that is an LP change and needs its own
+> run and log.
+
+**Industrial capture is deliberately excluded** — `process emissions CC`,
+`solid biomass for industry CC`, `gas for industry CC` and `SMR CC` are what
+item 9's STORAGEMININD floor is built from, and gating them would contradict
+it. This is the scope the meeting asked for ("on power plants"), and it is the
+narrower of the two readings.
+
+The year lives in `config/input_parameters_for_models.csv`
+(`config:sector.power_plant_cc_from_year`, value 2040, `status: pending`) and
+is synced into `config.walloon.yaml` by `build_common_parameters.py` once the
+row goes active — a new `patch_sector_scalars` handles `config:sector.<key>`
+scalars. Verified the sync bites rather than passing silently: with the row
+active, drifting the overlay to 2035 makes `--check` FAIL
+(`sector.power_plant_cc_from_year: 2035 -> 2040`) and `--write` restores it.
+Guard: `test/test_power_plant_cc.py` (9 cases) — one asserts the shipped
+default is off, another that the CSV row and the overlay agree **in both
+states**, so the row can never say one thing while the model does another.
+
+**Effect on results: none, and none expected.** The option is off as shipped.
+Even when it is turned on, the 6h run of 2026-09-05 built **zero** power-plant
+CC before 2040 anyway — `CCGT CC` first appears at 1 813 MW in 2040 and
+`urban central gas CHP CC` only in 2050 — so it is a guard against a
+counterfactual rather than a change of outcome. Not re-solved since
+(deliberately); the next run will confirm.
+
+One workflow side-effect worth knowing: adding the key to the `sector:` block
+changes the `sector` params hash, and several rules take `sector` wholesale, so
+the next invocation rebuilds `build_district_heat_share` (×4),
+`build_transport_demand` (×4), `build_hourly_heat_demand` and
+`build_existing_heating_distribution`. All deterministic, and the **solve count
+is unchanged at 4** — a 105-job re-run becomes 115. The tree already needed
+those 105 jobs for an unrelated `process_cost_data` code change.
+
+Note the tension with the 27 Aug meeting item *"CCGT-CC apparait seulement en
+2050 => impose the TIMES capacity in 2040?"* — that asks to *add* CCGT CC in
+2040, which this item permits and does not address.
+
 ## Still open — no code, decide in a meeting
 
 - **17a. Coal for industry** soft-link gap +10 / +14 / **+37** / +23 % —
@@ -425,15 +572,32 @@ as the caps that used to bind the extendable tranche only.
   publish it as TIMES-consistent. Ask at the same time whether 2025/2030 should
   come down from 8.3 (the cap is non-monotonic today).
 - **6a / 8** need a decision, not only a fix: which import metric, and what
-  `solar-all` means (B5, B6).
+  `solar-all` means (B5, B6). *6a is settled by F3 — the cap is on, feasible,
+  and cheap.*
+- **17e. Which pellet-import channel is real** (F8b). `solid biomass import`
+  4.0/4.0/4.5/6.0 TWh (Bioenergy Europe) or `solid biomass transported`
+  2.0/2.0/2.25/3.0 TWh (Valbiom)? Both describe pellets imported for Wallonia
+  and the model used both. Valbiom is active; Valbiom/ICEDD to confirm.
+- **17f. 2050 net zero needs DAC or less aviation** (F5). `sector.dac: false`
+  makes biomass the only sink, ceiling ~127 Mt, against ~230 Mt of fossil
+  combustion of which aviation kerosene is 106 Mt. Enable DAC, revisit the
+  exogenous aviation/HVC demand, or state that the modelled system does not
+  reach net zero by 2050.
+- **17g. The BEWAL 2025 onwind fleet source** (F7). The Energy-Balance pin
+  (1 560 MW) now wins over the IRENASTAT land-potential split (1 694 MW). If
+  ICEDD prefers the other reading, move the pin instead and switch
+  `scale_standing_fleet` back off.
+- **17h. Write the grid-connection adder into `common_parameters.md`** (F9).
+  18 589 EUR/MW/a on every atlite-profile carrier, **+0 on rooftop PV** — a
+  31 % penalty on ground PV that materially sets the ground-vs-rooftop ranking
+  and is documented nowhere.
 
 ---
 
 ## Order of work
 
 Everything below the line is done and guarded; `python -m pytest test/ -q` is
-**300 passed**, `build_common_parameters.py --check` is `CHECK PASSED`, and
-`check_res_envelope.py` is `OK`.
+**345 passed** and `build_common_parameters.py --check` is `CHECK PASSED`.
 
 ```
 done  B1  carrier-aware CCL grouping; bus countries no longer mutated
@@ -444,27 +608,60 @@ done  B1  carrier-aware CCL grouping; bus countries no longer mutated
       B5  rooftop back inside solar-all; LV alias deleted
       B6  one import constraint, both DC legs, physical flows
       B9  water-pit ceiling applies to the fleet
+      B8  chain re-solved from 2025 (4 Sept, 1h) — closed, and it produced F1-F13
 ─────────────────────────────────────────────────────────────────────────────
-next  B8  re-solve 2025 → 2030 → 2040 → 2050 from scratch, then a §11 review
+      F9  not a defect: the electricity-grid-connection adder explains the gap
+      F1  cost learning follows technology-data; Walloon PV stops collapsing
+      F3  import cap on and feasible; duals only 3-11 EUR/MWh
+      F5  national CO2 caps = system cap; they now bind (0 -> -64 / -29 EUR/t)
+      F7  standing base-year fleet scaled onto the measured pin; 14/14 pins pass
+      F8  Walloon biomass no longer double-counted, imports no longer doubled
+      18  no CC on power/CHP plants before 2040 — built, shipped OFF (inert)
+─────────────────────────────────────────────────────────────────────────────
+next  F2  European VRE decays after 2030 — the last open finding
+      --  a 1h/2010 production re-run: every number in the 20260905 log predates
+          F1, F5, F7, F8 and item 18
 ```
+
+**Two workflow traps found while verifying, both now fixed in tree** — neither
+is a model defect and both only bite on a *re-run*:
+
+- `generate_html_report` declared only the networks as inputs, so the report
+  could be built from the *previous* run's summary CSVs and still carry fresh
+  file timestamps. The BEWAL capacity page showed a fleet from three days
+  earlier while `csvs/nodal_capacities.csv` on disk was correct.
+- `add_existing_baseyear` read the reconciliation flag and the caps file from
+  `snakemake.config` rather than declaring them (F7).
+
+And two environment traps for any non-desktop launch: `GRB_LICENSE_FILE` is not
+exported by a non-interactive shell (Gurobi silently falls back to its
+2 000-variable demo licence), and `matplotlibrc` now pins `backend: Agg`.
 
 **Still owed, and each needs a decision rather than an edit:**
 
-- **B6 / item 6a.** Re-measure `Import_p` on a solved 1h network with the
-  corrected expression, then pick the TWh values. TIMES's 2.94 / 6.47 / 10 may
-  not be transferable to an hourly model that trades with Flanders.
+- ~~**B6 / item 6a.**~~ Done — re-measured on the solved 1h networks; the TIMES
+  values *are* transferable (F3). The cap binds in 2040/2050 at duals of only
+  3–11 EUR/MWh.
 - **B7 leftover.** The 20 JRC/ETRI reference rows keep their source currency and
   reach nothing. If they are ever to be used, they need rebasing or the
   `common_parameters.md` §4.4 "retag only" treatment.
 - **Housekeeping.** `diag2030.sh`, `diag2040.sh`, `diag2040b.sh`,
   `run_20260829.sh`, `solve2025.sh` are still tracked at the repository root.
 
-**What the next run should show, relative to the last published one.** 2025
-Belgian offshore back at ~2 262 MW (was 8 000); 2025 Walloon PV back at the
-4 088 MW pin (was 5 510); 2030 Belgian offshore pinned, so 2030 prices, imports
-and the CO₂ dual all rise; Walloon process emissions 15–18× higher in 2040/2050
-with ~5 Mt/a captured and exported; shorter PV and onwind lifetimes raising
-annuities everywhere.
+**What the next 1h run should show, relative to the published 20260905 one.**
+Every one of these is unverified at 1h — the evidence so far is 6h/2013:
+
+- **Walloon PV grows instead of collapsing** (F1). 6h/2013 gives
+  2.7 / 6.5 / 10.4 / 17.0 GW against the old 4.1 / 7.9 / 8.0 / 6.6.
+- **2025 lands on its pins** (F7). BEWAL onwind 1 568 (pin 1 560), BE onwind
+  3 354 (3 337) — all 14 aggregate checks pass, `review_run.py` FAIL 0.
+- **Walloon biomass inside the documented envelope** (F8): 6.0 / 8.0 / 8.25 /
+  6.4 TWh against 7.7 / 9.6 / 12.8 / 6.5, and no `solid biomass import` links.
+- **The national CO₂ caps bind** (F5): BEWAL dual −64 EUR/t in 2030 and
+  −29 in 2040, where it was ~0.
+- **Costs up a little in every horizon** — 6h/2013 shows +0.1 / +0.8 / +0.9 /
+  +2.3 %, all of it the removal of over-allocations.
+- **No power-plant CC before 2040** (item 18) — nothing, the option ships off.
 
 Interactions to keep in mind when reading the final run: items **6a, 10, 11**
 all move 2050 independence in opposite directions; items **2, 9, 12, 13** all
