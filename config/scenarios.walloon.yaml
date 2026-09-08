@@ -55,8 +55,8 @@ scen_demande_haute:
       # baseyear_pv_split now relabels 1 770 MW of the standing fleet as
       # `solar rooftop` (1 770 + 898 = the 2 668 MW solar-all 2025 pin), so
       # 2025 is differentiated by capacity, not by share, and the TIMES
-      # share binds from 2030 on (71.4 % in 2030, 85.8 % in 2050). See B5 of
-      # docs/temporary_improvement_plans.md.
+      # share binds from 2030 on (70.8 % in 2030, 80.1 % in 2050). See
+      # docs/renewable-potentials.md S9.3 (worklist B5).
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
@@ -66,8 +66,8 @@ scen_demande_haute:
       # floor of 5 077 kt exceeded every capturable source. B4 made the load
       # gross (emitted + captured, 5 434 kt in 2040), so process capture alone
       # reaches 5 162 kt >= the floor and biomass/gas CC add headroom — which
-      # is how TIMES builds it. See B3/B4 of
-      # docs/temporary_improvement_plans.md.
+      # is how TIMES builds it. See docs/ccs_alignment.md S14
+      # (worklist B3/B4).
       enable: true
       node: BEWAL
       file: data/walloon/times_industrial_capture.csv

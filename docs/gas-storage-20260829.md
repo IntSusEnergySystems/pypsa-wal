@@ -1,9 +1,10 @@
 # Gas storage — Wallonia, Loenhout, and the cushion-gas bug
 
-**Archived 29 Aug 2026.** Started as item 1 of the 2026-08-27 meeting review
-([temporary_improvement_plans.md](temporary_improvement_plans.md)); moved here
-once it grew past a roadmap entry into a data correction with Europe-wide
-reach. That file now carries a one-line pointer.
+**Archived 29 Aug 2026.** Started as item 1 of the 2026-08-27 / 09-01 meeting
+worklist (`docs/temporary_improvement_plans.md`, retired 2026-09-08 — recover
+with `git show 64d084c4:docs/temporary_improvement_plans.md`); moved here once
+it grew past a roadmap entry into a data correction with Europe-wide reach.
+**This file is now the only record of item 1.**
 
 **Status: implemented and committed** (branch `fix/run-review-20260825`),
 *not yet re-solved*. Every number below describes the state *before* these fixes.
@@ -16,9 +17,8 @@ are **not** interchangeable:
 | `results/_diagnostics/20260826/base_s_adm___{2040,2050}.nc` | 26 Aug | 8 760 h (1 h) | 2040, 2050 only |
 | `results/times-pypsa/scen_demande_haute/networks/*.nc` | **14 Aug** | 1 460 snapshots (6 h) | all four horizons |
 
-`results/walloon/scen_demande_haute/networks/` — the path
-[temporary_improvement_plans.md](temporary_improvement_plans.md) names as its
-evidence — holds no networks locally. Numbers below are labelled **26 Aug**
+`results/walloon/scen_demande_haute/networks/` — the path the worklist named
+as its evidence — holds no networks locally. Numbers below are labelled **26 Aug**
 where they come from the diagnostics pair and **14 Aug** otherwise. They differ
 enough to matter: 2040 Walloon gas store is 447 GWh on 26 Aug against 184 GWh
 on 14 Aug, and 2040 biogas dispatch is 1.45 TWh on 26 Aug against a binding

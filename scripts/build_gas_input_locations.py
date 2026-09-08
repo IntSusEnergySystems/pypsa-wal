@@ -136,7 +136,7 @@ def build_gas_input_locations(gem_fn, entry_fn, sto_fn, countries):
     # 1406 TWh, but per country the ratio runs from 0.2x (NL, depleted fields, huge
     # cushion) to 15x (BE: Loenhout is an aquifer store, 48 Mm3 cushion against
     # 720 Mm3 working). Belgium was the worst-hit node in the dataset: 545 GWh
-    # instead of Fluxys's 7.6-8.2 TWh. docs/temporary_improvement_plans.md item 1.
+    # instead of Fluxys's 7.6-8.2 TWh. docs/gas-storage-20260829.md (was worklist item 1).
     sto["capacity"] = sto["max_workingGas_M_m3"] * mcm_to_gwh
 
     lng["type"] = "lng"

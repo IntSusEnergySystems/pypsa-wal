@@ -273,13 +273,108 @@ says `BEL`. Walloon clustering (and later `add_CCL_constraints`) can rewrite
 FR / LU / DE branches would be left at the 20 GW default.
 
 **Data source note:** Cross-border NTC values live in `data/walloon/ntc_<horizon>.csv`.
+
+#### 3.1.2 The NTC is a ceiling, and the model does not always reach it
+
+`transmission_limit: vopt` plus `apply_ntc_limits` means the NTC is written as
+`s_nom_max` (AC, grossed up by `1 / s_max_pu`) or `p_nom_max` (DC) — the most
+the optimiser *may* build, not what it *will* build. On the 2026-09-07 run three
+Belgian borders end well below their NTC:
+
+| border-year | NTC | usable built | share | hours at limit |
+|---|---:|---:|---:|---:|
+| 2040 BE–DE | 2 000 | 1 479 | 74 % | 24 % |
+| 2040 BE–GB | 2 400 | 1 000 | 42 % | 52 % |
+| 2050 BE–DE | 3 200 | 1 510 | 47 % | 28 % |
+| 2050 BE–FR | 7 300 | 4 809 | 66 % | 0 % |
+| 2050 BE–GB | 3 800 | 1 548 | 41 % | 48 % |
+
+This is endogenous under-build, not a convention error — the 2025 AC gross-up
+checks out (BE–FR `s_nom` 5 071 × 0.7 = 3 550 = NTC). It still matters when the
+NTC table is quoted as an assumption: **the delivered grid is not the grid the
+table describes**, and BE–GB in particular sits at ~41 % of its NTC while being
+at its limit for half the year. Quote the built capacity, or say "ceiling".
+
+#### 3.1.3 The Boucle du Hainaut floor
+
+`data/walloon/ntc_floors.csv` forces **9 600 MW usable** on BEWAL–BEVLG from
+2035 (Boucle du Hainaut ~6 GW plus the standing ~3.6 GW). The 2040/2050 NTC
+*ceilings* stay at 13.2 / 14.4 GW (HTLS headroom); the floor only pins the
+committed part. It is applied **after** `set_transmission_limit` *and* after
+`carry_forward_built_grid`, in both `prepare_sector_network` and
+`add_brownfield` — order matters, because `set_transmission_limit` rebuilds
+`s_nom_min` from the conductor type and would otherwise discard it (§3.1.1).
+The first horizon affected in the 2025–2030–2040–2050 chain is 2040, where the
+2026-09-07 run delivers exactly 9 600 MW usable.
+
+### 3.2 The Walloon electricity import cap (`self_sufficiency`)
+
+`add_selfsufficiency_constraints` in `scripts/solve_network.py` caps annual
+Walloon electricity imports, transferring TIMES-WAL's own limit:
+`self_sufficiency.limit_twh` = **2.94 / 6.47 / 10.0 TWh** for 2030 / 2040 / 2050
+(2025 is deliberately uncapped). It registers one `GlobalConstraint` per node,
+`import_limit_<node>`, so the constant and the shadow price of an imported MWh
+survive into the solved `.nc`; `review_run.py` level 4.3b re-checks it.
+
+**What the variable measures — read this before quoting any import number.**
+`Import_p ≥ net_total` where `net_total` is the hourly cross-border balance
+summed over *all* borders at once, and `Import_p ≥ 0`. The capped quantity is
+therefore `Σ_t max(0, hourly net balance)` — it nets an export on one border
+against an import on another **within the same hour**. On the 2026-09-07 run:
+
+| BEWAL, TWh/a | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| gross inflow, all borders | 11.58 | 13.66 | 19.92 | 24.50 |
+| gross outflow, all borders | 11.38 | 12.60 | 16.63 | 16.90 |
+| **capped quantity** | 2.31 | **2.94** | **6.47** | **10.00** |
+| annual net balance | +0.20 | +1.06 | +3.28 | +7.60 |
+
+The cap binds exactly in all three capped horizons (duals −9.02 / −13.63 /
+−2.97 EUR/MWh). "Wallonia imports 10 TWh in 2050" is false under either natural
+reading. Three things follow:
+
+1. **Name the quantity on every chart.** Gross inflow is 2.5× the cap; the
+   annual net balance is 0.8× it.
+2. **The measure is resolution-dependent.** At 8 760 h the positive part of a
+   net balance is much larger than at TIMES's handful of time slices, so
+   transferring the TIMES number verbatim makes the PyPSA cap *tighter* than the
+   TIMES one. Conservative, but not equivalent.
+3. **Flanders and Brussels count as "abroad."** TIMES-WAL's system boundary is
+   Wallonia. 8.98 TWh of the 24.50 TWh gross 2050 inflow is intra-Belgian; net,
+   BEWAL takes +2.97 TWh from Flanders and *sends* 1.50 TWh to Brussels.
+
+Four defects were fixed in the expression on 2026-09-03/05 and are guarded by
+`test/test_import_limit.py` (11 cases): AC and DC were capped separately so the
+bound was the larger rather than the sum; the `-reversed` leg of every DC pair
+was filtered out, which dropped ALEGrO's *import* direction entirely; flows were
+inflated (`/ s_max_pu` on lines, `/ efficiency` on links) instead of physical;
+and with `transmission_losses: 2` PyPSA books half of each line loss against
+each end, so raw `s` charged the importer 0.51 TWh (2040) / 0.86 TWh (2050) of
+phantom imports. A horizon with no `limit_twh` now logs a WARNING instead of
+being skipped at INFO.
+
+**Feasibility.** Nothing bounds BEWAL dispatchable capacity from above
+(`CCGT-all` has a min and no max; OCGT, batteries and H2 turbines are
+unbounded), so with `load_shedding: false` adequacy can always be met by
+building — the cap cannot be infeasible on adequacy grounds. The live
+interaction is CO₂.
+
+**Open, no code: how Belgian offshore counts towards Walloon independence.**
+The 1 September 2026 meeting asked to book **50 % of Belgian offshore wind** to
+Wallonia in the independence accounting, on the grounds that offshore is a
+federal competence assumed to be shared equally between the two regions. It is
+**not implemented**: `config/pypsa2html.yaml` carries only the
+`features.nuclear_primary` switch (`uranium` — the fuel is an import — or
+`electricity` — the reactor kWh are domestic), and its comment says so
+explicitly. Decide it before any independence figure is published, because it
+moves the 2050 number by several TWh.
 2030 matches ENTSO-E TYNDP 2024 `ReferenceGrid_Electricity.xlsx` sheet 2030.
 The master CSV (`ntc:BE-*`) holds the *export* direction only; `--write` does
 not touch the reverse rows, which is why both directions are maintained in the
 file. Intra-BE rows are not in the master CSV (`ntc:` targets only accept
 2–3 letter codes).
 
-### 3.2 Elia data in the current workflow
+### 3.3 Elia data in the current workflow
 
 A codebase search shows **no Elia grid topology** (line ratings, hosting
 capacity, or official GTC tables) is ingested anywhere in the Snakemake
@@ -296,7 +391,7 @@ The other Elia-related input is aggregated solar capacity bounds in
 in `doc/data-walloon.rst` as coming from Climact based on the **Elia ADEXFLEX**
 study — a RES potential ceiling, not a network model.
 
-### 3.3 Power flow vs NTC modelling approach (current)
+### 3.4 Power flow vs NTC modelling approach (current)
 
 The current analysis uses **both** concepts, but at different levels:
 
@@ -607,7 +702,7 @@ Goal: resolve **internal Belgian (especially Walloon) transmission constraints**
    - **Keep (short term):** NTC as exogenous `s_nom`/`p_nom` caps on border branches — adequate for scenario and expansion studies at coarse resolution.
    - **Intermediate:** Nodal **DC power flow** with correct line susceptances after finer clustering; validate border flows against ENTSO-E / Elia published exchanges; optionally replace country-pair NTC scaling with **border-point** capacity tables.
    - **Advanced:** Contingency-aware constraints (N‑1 line outages, `pypsa.security.constraint` or PTDF-based limits); post-optimisation **AC power flow** (`n.pf()`) on selected snapshots to flag voltage/reactive issues the LOPF cannot see.
-   - **Data hook:** First use of **Elia** (or ENTSO-E Transparency) grid and flow data here — not present in the current workflow (see §3.2).
+   - **Data hook:** First use of **Elia** (or ENTSO-E Transparency) grid and flow data here — not present in the current workflow (see §3.3).
 
 ### Phase 3 — Validation and operational fidelity (higher effort)
 

@@ -376,21 +376,56 @@ import prices and congestion rent all move with that.
 
 ## 7. Open questions
 
-3. **`BEWAL low voltage` maps to country `BE`**, so Walloon rooftop PV is governed
-   by the Belgian cap rather than the Walloon one. There is commented-out
-   aliasing code in `add_CCL_constraints` intended to fix exactly this. Worth
-   repairing before any Walloon rooftop question is asked of the model — and note
-   that rooftop currently comes out at 0 MW for cost reasons (19 % dearer per MW
-   than ground-mounted), not because of any cap.
-4. **The Belgian 2030 offshore floor (5 800 MW) is not deliverable** — see
-   §4.2. Pin 2030 to the standing 2 262 MW and move the Princess Elisabeth Zone
-   to the 2040 / 2050 floors. **Not implemented** (improvement-plan item 11).
+3. ~~**`BEWAL low voltage` maps to country `BE`**~~ — settled. `add_CCL_constraints`
+   now groups on `(bus location, carrier)` (§9.1), so the Walloon rooftop fleet is
+   covered by whichever row names it. Rooftop is no longer 0 MW either: the
+   base-year split of §9.3 plus the TIMES share pin give BEWAL 1.8 / 4.6 / 10.8 /
+   12.1 GW of rooftop across the four horizons.
+4. ~~**The Belgian 2030 offshore floor (5 800 MW) is not deliverable**~~ —
+   implemented. `BE,offwind-all` is `min = max = 2 262` in 2025 **and** 2030;
+   the Princess Elisabeth Zone becomes a 4 362 MW floor in 2040 and 5 800 MW in
+   2050. Both floors are slack in practice — the model builds to the 8 000 MW
+   land/sea ceiling in 2040.
 5. **The envelope is duplicated across three `agg_p_nom_minmax_*` files** that now
    differ in only 2 of 54 rows (the nuclear caps). Nothing checks them against
    each other, and `build_common_parameters.py` manages only the demande-haute
    one. Proposed fix — scenario values as override files layered on the master
    table — in [`scenario-handling-proposal.md`](scenario-handling-proposal.md).
    **Not implemented.**
+6. **DE 2030 onshore wind, 115 GW, is a collapsed corridor** — the national
+   target sits above the growth cap, so §5.1's `tolerance` machinery lets the
+   target win. It still sets the 2030 European price signal, and the run of
+   2026-09-07 reproduces it exactly (115.00 GW). *Accept the target, or let the
+   growth cap win?* Meeting decision, no code.
+7. **The Walloon biogas figure has no citation** (§9.5). 4.0 TWh in 2040 and
+   6.9 in 2050 come from the ICEDD meeting of 2026-08-27 and appear in no
+   source document; the `.vd` itself runs 7.67 / 8.07 TWh. Do not publish these
+   as TIMES-consistent. Ask at the same time whether 2025/2030 should come down
+   from the Valbiom 8.3 TWh — the trajectory is non-monotonic today.
+8. **Two pellet-import channels describe the same physical flow** (§9.5) and
+   only one may be active. `solid biomass import` (store + link, 4.0 / 4.0 /
+   4.5 / 6.0 TWh, Bioenergy Europe) is **off**; `solid biomass transported`
+   (`e_sum_max` 2.0 / 2.0 / 2.25 / 3.0 TWh, Valbiom) is the single channel,
+   chosen because it is written as a Walloon potential rather than one plant's
+   projection. Valbiom / ICEDD to confirm.
+9. **European onshore wind halves after 2030, and fixed-tilt PV vanishes.**
+   Measured on the 2026-09-07 run — DE onwind 63.9 → 115.0 → 92.0 → 63.2 GW,
+   FR 23.2 → 31.0 → 21.4 → **8.4 GW** (36 % of today's fleet), NL 7.0 → 16.2 →
+   24.2 → 19.8; and `solar` (fixed-tilt ground) is **exactly 0.00 GW in every
+   country in 2050** while `solar-hsat` and `solar rooftop` grow. Both are
+   consistent with the 25-year lifetimes that reached the model with `788cc75a`
+   (`onwind` 30 → 25 y, PV 40 → 25 y): the standing fleet retires inside the
+   horizon and myopic foresight re-picks the cheapest sub-carrier with no memory
+   of what stood there. **This is the European price signal that drives every
+   Walloon investment decision**, so it is not a neighbour-country footnote.
+   Until it is settled: report *total* wind and *total* PV, never the
+   sub-carriers, and do not publish a neighbour-country wind trajectory.
+   *Decision needed: are the 25-year lifetimes intended here?*
+10. **The BEWAL 2025 onshore-wind fleet has two sources** (§9.4). The Walloon
+   Energy Balance pin (1 560 MW) currently wins over PyPSA-Eur's IRENASTAT
+   land-potential split (1 694 MW). If ICEDD prefers the other reading, move the
+   pin and switch `electricity.baseyear_reconcile_forced_build.scale_standing_fleet`
+   back off.
 
 ## 8. Files
 
@@ -414,3 +449,107 @@ python scripts/build_common_parameters.py --check
 python scripts/walloon_scripts/check_res_envelope.py \
     data/walloon/agg_p_nom_minmax_demande_haute.csv
 ```
+
+---
+
+## 9. Aggregate-cap machinery: five traps, and the base year
+
+Retired here on 2026-09-08 from the 27 Aug / 1 Sept meeting worklist
+(`docs/temporary_improvement_plans.md`, deleted; recoverable with
+`git show 64d084c4:docs/temporary_improvement_plans.md`). The B- and item-
+numbers cited in the code refer to that worklist and are kept as labels.
+
+### 9.1 A region row used to detach that region from **every** parent row (B1)
+
+`add_CCL_constraints` collected the level-0 index of the whole caps file and
+rewrote `n.buses.country` for any bus whose *name* was in that set — carrier-
+and horizon-blind. The first-ever `BEVLG` row (`BEVLG,nuclear-all`, `87552368`)
+therefore removed Flanders from **every** `BE,*` row: 2025 built the full 8 GW
+Belgian offshore potential against a 2 262 MW pin, and 2030 came back
+`infeasible_or_unbounded` five times because Elia's whole 10 GW solar remainder
+landed on Brussels.
+
+**Fixed 2026-09-03.** The group key is `(bus location, carrier)` looked up
+against the caps index, falling back to the bus's own country; the bus table is
+never mutated, so solved networks keep real ISO codes. Guard:
+`test/test_ccl_region_rows.py` (6 cases, 4 of which fail on the old code).
+
+**How to apply.** Region rows are only needed where a region genuinely differs
+from its parent — never hand-split a national target across regions, the
+remainder arithmetic does it. After any caps edit, check realised `p_nom_opt`
+*per node*, not just that the CSV parses. `check_res_envelope.py` polices
+`BEVLG` and `BEBRU` rows on the same design as the modelled countries and
+rejects a resurrected hand-split.
+
+### 9.2 A generator `max` still caps only the extendable tranche
+
+In `add_CCL_constraints`, the `include_existing` branch subtracts existing
+capacity from the RHS for *minima* and for *link maxima*, but **not** for
+generator maxima. Under myopic foresight the cap therefore resets at every
+horizon. Diagnostic: the extendable tranche equals the cap **exactly** while the
+total exceeds it. `review_run.py` level 4.1 compares against the total.
+
+### 9.3 The base-year PV fleet had to be split before the TIMES share could bind (B5, item 8)
+
+IRENASTAT delivers the historical fleet labelled entirely `solar` (utility),
+while about two thirds of it is rooftop. Imposing a *share* on that fleet
+demands gigawatts of new rooftop inside a corridor of megawatts.
+`electricity.baseyear_pv_split` therefore relabels **1 770 MW** of the standing
+BEWAL vintages (newest first) as non-extendable `solar rooftop` on
+`BEWAL low voltage` (`data/walloon/baseyear_pv_split.csv`), alongside the
+2 668 MW `solar-all` 2025 pin. 2025 is differentiated by *capacity*; the TIMES
+share (`data/walloon/times_pv_rooftop_share.csv`) binds from 2030. Guards:
+`test/test_baseyear_pv_split.py`, `test/test_rooftop_share.py`.
+
+`rename_solar` maps `solar rooftop` **into** `solar-all`: the Elia numbers in
+the caps file are *total* PV, and `res_build_rates.csv` derives the regional
+split from that total. Taking rooftop out of the group unpins the base year.
+
+> The share file is extracted from the `.vd` by hand and **is not a declared
+> output of any rule**. When `sector.times_file` changes, re-extract it —
+> the 2026-09-07 run shipped a file extracted from the previous export and
+> over-allocated rooftop PV by up to 0.20 GW.
+
+### 9.4 The base-year fleet is reconciled onto the measured pin (F7)
+
+`add_existing_renewables` splits one IRENASTAT **country** total across a
+country's nodes by `p_nom_max / p_nom_max.sum()` — remaining *land potential*,
+not where the turbines stand — and Wallonia has the most free land in Belgium.
+Every other country's 2025 onwind pin is the model's own fleet; BEWAL is the
+only row sourced independently (the Walloon Energy Balance), which is why it was
+the only one that broke.
+`electricity.baseyear_reconcile_forced_build.scale_standing_fleet` (default
+**false** — it rewrites historical capacity) scales the standing vintages pro
+rata onto the pin: ×0.9207 on BEWAL's 2005–2020 bins. Both the flag and the caps
+file are declared on `rule add_existing_baseyear`; reading them from
+`snakemake.config` left the brownfield network stale and the change silently
+inert.
+
+### 9.5 Walloon biomass and biogas potentials
+
+`data/walloon/custom_potentials.csv`, in GWh/an, stored as `e_sum_max` (MWh) on
+annual-energy generators — **never read their `p_nom` as an annual potential**.
+
+| BEWAL | 2025 | 2030 | 2040 | 2050 | source |
+|---|---:|---:|---:|---:|---|
+| `solid biomass` | 9 222 | 9 222 | 9 222 | 9 222 | Valbiom / ICEDD 2021 energy balance (`2f67b01e`) |
+| `solid biomass transported` | 2 000 | 2 000 | 2 250 | 3 000 | Valbiom, imported pellets |
+| `solid biomass import` (off) | 4 000 | 4 000 | 4 500 | 6 000 | Bioenergy Europe — see §7.8 |
+| `biogas` | 8 300 | 8 300 | 4 000 | 6 900 | Valbiom, then the 2026-08-27 meeting — see §7.7 |
+
+Two defects, both fixed 2026-09-05 (F8). `update_BEWAL_potentials` wrote the
+remainder `potential − upstream` onto the unsustainable generator (correct) and
+then overwrote the sustainable one with the **full** potential, so BEWAL entered
+every solve with `2 × potential − upstream`; the same block also grew the
+Europe-wide `unsustainable biomass limit` without removing BEWAL's previous
+contribution. And `solid biomass import` and `solid biomass transported` are two
+estimates of the same pellet flow — 2040 used both, 6.75 TWh against a
+documented 2.25.
+
+> **The EU-wide `biomass limit` binds in every horizon and is what actually
+> rations biomass**, not these regional rows. In the 2026-09-07 run its shadow
+> price runs −47 / −39 / −30 / **−1 087** EUR/MWh, and in 2050 the whole
+> European potential is consumed by exogenous industrial demand, leaving 61.9
+> TWh of regional `e_sum_max` unused (BEWAL 4.45 of 9.22). A slack Walloon row
+> in 2050 is therefore *not* a Walloon statement. See
+> [`ccs_alignment.md`](ccs_alignment.md) §17 for the mechanism.

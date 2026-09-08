@@ -7,9 +7,8 @@
 ``prepare_sector_network`` builds one ``co2 sequestered`` Store per node from
 the clustered CO2StoP CSV and then ``reindex(...).fillna(0.0)``. BEWAL / BEVLG
 / BEBRU have no offshore site that clears ``min_size``, so they used to land
-at 0 with no record that anyone chose that. Item 2 of
-``docs/temporary_improvement_plans.md`` writes the ceiling in
-``custom_potentials.csv`` instead. There is no priced Northern-Lights export.
+at 0 with no record that anyone chose that. ``docs/co2-sequestration-20260829.md``
+(worklist item 2) writes the ceiling in ``custom_potentials.csv`` instead. There is no priced Northern-Lights export.
 """
 
 from __future__ import annotations

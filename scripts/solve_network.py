@@ -769,7 +769,7 @@ def add_CCL_constraints(
     # row, so the 2025 offshore pin grouped nothing (2025 built the full 8 GW
     # potential) and 2030 applied Elia's whole 10 GW solar remainder to
     # Brussels, which has no land left -- an empty LP in 0 barrier iterations.
-    # See B1 in docs/temporary_improvement_plans.md. The bus table is no longer
+    # See docs/renewable-potentials.md S9.1 (worklist B1). The bus table is no longer
     # mutated, so there is nothing to restore afterwards either.
     rows = set(agg_p_nom_minmax.index)
     carriers_in_file = agg_p_nom_minmax.index.get_level_values(1).unique()
@@ -844,8 +844,8 @@ def add_CCL_constraints(
             # corridor; that is a fault in the share pin, not in the group —
             # PyPSA labels the whole historical fleet `solar` while TIMES has
             # 0.5 GW rooftop + 1.4 GW utility in 2025. Item 8 stays off until
-            # that base year is reconciled. See B5 of
-            # docs/temporary_improvement_plans.md.
+            # that base year is reconciled. See docs/renewable-potentials.md
+            # S9.3 (worklist B5).
             "solar rooftop": "solar-all",
         }
         gens = gens.replace(rename_solar)
@@ -1040,7 +1040,7 @@ def add_CCL_constraints(
         # as "infeasible or unbounded in 0 barrier iterations", with no IIS and
         # no clue which group did it: 2030 was misdiagnosed three times that way
         # (items 6a, 8 and 11 in turn) before the cause was found. Say it out
-        # loud instead. B1/B8 of docs/temporary_improvement_plans.md.
+        # loud instead. docs/renewable-potentials.md S9.1 (worklist B1/B8).
         over = rhs_gens[rhs_gens < -1e-6]
         for (country, carrier), gap in over.items():
             logger.warning(

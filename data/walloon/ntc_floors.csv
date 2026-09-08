@@ -1,7 +1,7 @@
 # Usable MW floor. Boucle du Hainaut (~6 GW) + standing BEWAL–BEVLG (~3.6 GW)
 # from 2035. The 2040/2050 NTC *ceilings* stay 13.2 / 14.4 GW (HTLS headroom);
-# this file only forces the committed 9.6 GW. Item 3 of
-# docs/temporary_improvement_plans.md.
+# this file only forces the committed 9.6 GW.
+# docs/network-representation-analysis.md S3.1.3 (worklist item 3).
 year,source_country_code,target_country_code,NTC_MIN_MW
 2035,BEWAL,BEVLG,9600
 2035,BEVLG,BEWAL,9600

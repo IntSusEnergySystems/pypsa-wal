@@ -575,6 +575,41 @@ Ordered by how much they block.
 
 ---
 
+## 8b. Two mechanisms that bite the pinned mix
+
+Retired here on 2026-09-08 from the 27 Aug / 1 Sept meeting worklist
+(`docs/temporary_improvement_plans.md`, deleted; recoverable with
+`git show 64d084c4:docs/temporary_improvement_plans.md`).
+
+### 8b.1 The absorber penalty must exceed the fuel's shadow price
+
+Option B′ buys the pin out whenever the penalty is cheaper than delivering the
+pinned heat, and the penalty is a **constant** (`sector.times_heat.profile.penalty`,
+1 000 EUR/MWh_th) while a fuel's shadow price is not. In the 2026-09-07 run the
+EU `biomass limit` priced solid biomass at ~1 100 EUR/MWh in 2050, so the two
+2050 biomass-boiler groups (rural 0.0458 and urban-decentral 0.0402 TWh_th) were
+dropped entirely and the absorber (heat pump) took the load — every aggregate
+still closes, which is exactly what makes this hard to notice. See
+[`ccs_alignment.md`](ccs_alignment.md) §17 for why biomass costs that much.
+
+**Read the per-group delivery, never the sum of |gaps|** — the absorber makes the
+sum meaningless. `review_run.py` level 2.5 reports the worst group and WARNs
+below 98 %. If a future 2050 pin on a scarce fuel must hold, raise the penalty
+above that fuel's dual or index it.
+
+### 8b.2 The water-pit ceiling applies to the fleet, not to a vintage (item 16 / B9)
+
+`sector.district_heating.ptes.e_nom_max_weeks` (4 weeks) caps water-pit storage.
+`add_brownfield` vintages the stores (`… water pits-2025`, `-2030`, …), so a
+per-vintage ceiling would let the standing fleet reach 4 weeks × horizons.
+`apply_ptes_fleet_cap()` therefore runs in `add_brownfield` after the earlier
+vintages are in: inherited `e_nom` is subtracted and the residual is written on
+the extendable Store. Guard: three cases in `test/test_ptes_e_nom_max.py`. The
+2026-09-07 run holds 8.2 / 22.7 / 36.9 / 74.8 GWh_th at BEWAL, inside the
+ceiling in every horizon. Same pattern as the aggregate caps that used to bind
+the extendable tranche only —
+[`renewable-potentials.md`](renewable-potentials.md) §9.2.
+
 ## 9. Operational hazards
 
 These cost real time and are reproduced here so the next chain does not repeat

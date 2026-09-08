@@ -502,3 +502,159 @@ CCGT-CC (unsolved) and keeps `bioH2` off.
    (TIMES does not build `CO2DAC-01`). Under option B′ with DAC on, the Walloon
    district-heat expansion largely fed DAC (18 Aug R10). That was a PyPSA
    outcome, not a transferred TIMES choice.
+5. **Net zero in 2050 needs DAC or less aviation.** With `co2_budget` 2050 set
+   to **0.000** the model is **infeasible** — a clean Gurobi primal certificate,
+   with a control solve at 0.050 on the identical 2040 inheritance coming back
+   feasible, so the cap was the sole cause. The reason is structural:
+   `sector.dac: false` makes every sink biogenic and caps it at ~127 Mt
+   (336.9 TWh of biomass × 0.348 tCO₂/MWh, plus ~9.5 Mt of biogas), against
+   ~230 Mt of realised fossil combustion of which **aviation kerosene alone is
+   106 Mt**. A tonne of biogenic carbon can be sequestered *or* displace a tonne
+   of fossil fuel, never both, so Fischer-Tropsch kerosene does not help.
+   `co2_budget` 2050 stays at 0.050. **Enable DAC, revisit the exogenous
+   aviation / HVC demand, or state that the modelled system does not reach net
+   zero by 2050** — this is not a cap that can be tightened.
+
+---
+
+## 14. The Walloon industrial capture chain (items 9 and 12)
+
+Retired here on 2026-09-08 from the 27 Aug / 1 Sept meeting worklist
+(`docs/temporary_improvement_plans.md`, deleted; recoverable with
+`git show 64d084c4:docs/temporary_improvement_plans.md`). The item and B-numbers
+cited in the code refer to that worklist and are kept as labels.
+
+### 14.1 The process-emissions load is **gross**, not the atmosphere residual (item 12 / B4)
+
+TIMES splits process CO₂ into two commodities: `INDCO2P`, emitted to the
+atmosphere, and `INDCO2c`, produced by the CC process variants
+(`ICMPRDCC_02`, `ILMQLMPRCC02`, `IGFFLATOXYCC01`, `IGHHOLLOWOXYCC01`,
+`IGHOTOCC01`) and consumed by `STORAGEMININD`. In PyPSA the Load is the input
+to the process-emissions bus, **upstream** of `process emissions CC`, so the
+gross figure is what belongs there.
+
+| kt/a | 2025 | 2030 | 2035 | 2040 | 2045 | 2050 |
+|---|---:|---:|---:|---:|---:|---:|
+| emitted `INDCO2P` | 4 411.6 | 3 946.1 | 964.4 | 357.0 | 327.5 | 281.6 |
+| captured `INDCO2c` = `STORAGEMININD` | 0 | 0 | 4 364.6 | 5 076.9 | 5 120.0 | 4 826.4 |
+| **gross = the BEWAL Load** | **4 411.6** | **3 946.1** | **5 329.0** | **5 433.9** | **5 447.5** | **5 108.0** |
+
+Using the emitted figure alone made 2040/2050 15–18× too low and put the item-9
+floor out of reach. The gross load also restores a Walloon process inventory of
+the right order — PyPSA-Eur's own default is ~2.0 Mt in every horizon, so TIMES
+is ~2.7× higher, not 5–6× lower. Guard:
+`test/test_process_emissions_load.py`.
+
+**Two questions the item raised and nobody has answered:** (i) `INDCO2N`
+(6.0 → 0.4 Mt) is the *combustion* CO₂ of the same industrial processes and is
+correctly excluded, but it has never been checked against the industrial energy
+PyPSA imports; (ii) part of `INDCO2c` comes from oxy-fuel glass and cement units
+and may mix process with combustion carbon — the split needs ICEDD.
+
+### 14.2 The capture floor (item 9 / B3)
+
+`sector.industry_cc_floor` imposes TIMES's `STORAGEMININD` as a minimum on
+BEWAL `process emissions CC` + `solid biomass for industry CC` +
+`gas for industry CC`, from `data/walloon/times_industrial_capture.csv`
+(4 365 / 5 077 / 5 120 / 4 826 kt in 2035/40/45/50). Port mapping and units are
+in `named_pins.py`.
+
+The floor is only reachable **because** the inventory is gross: process capture
+alone gives 5 434 × 0.95 = 5 162 ≥ 5 077 kt in 2040 and 5 108 × 0.95 = 4 853 ≥
+4 826 in 2050, which is how TIMES builds it; biomass and gas CC add ~3.5 Mt of
+further headroom. Against the *net* inventory the ceiling was 4.45 Mt in 2040
+and 3.77 in 2050 even with 100 % of Walloon industrial gas and biomass routed
+through capture — short by 0.6 and 1.1 Mt, and it failed the run at 2040.
+Guard: `test/test_industry_cc_floor.py::test_floor_fits_the_process_inventory`.
+
+> Like the PV rooftop share, this CSV is extracted from the `.vd` **by hand and
+> is not a declared output of any rule**. Re-extract it whenever
+> `sector.times_file` changes.
+
+### 14.3 What the 2026-09-07 run actually captured
+
+| Mt/a at BEWAL | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| `process emissions CC` | 2.162 | 3.602 | 5.052 | 4.856 |
+| `solid biomass for industry CC` | — | 1.658 | 1.853 | 1.419 |
+| `gas for industry CC` | — | 0.876 | 1.260 | 0.820 |
+| `CCGT CC` | — | — | 0.638 | 1.123 |
+| `urban central gas CHP CC` | — | — | — | 1.370 |
+| **total** | **2.162** | **6.136** | **8.802** | **9.588** |
+
+The item-9 floor is met with headroom (8.17 Mt of the three floored carriers in
+2040 against 5.08; 7.09 against 4.83 in 2050).
+
+## 15. No capture on power or CHP plants before a configured year (item 18)
+
+**Built 2026-09-05, shipped OFF, and it stays off.**
+`sector.power_plant_cc_from_year` is `null` in `config/config.walloon.yaml` and
+the `config:sector.power_plant_cc_from_year` row in
+`config/input_parameters_for_models.csv` is `status: pending`, so the option is
+inert and no published result depends on it. When enabled, capture fitted to
+*power and CHP plants* is unavailable in every horizon before the configured
+year — `CCGT CC`, `urban central gas CHP CC`, `urban central solid biomass CHP
+CC`, `waste CHP CC`, `coal CC` and the Allam cycle get `p_nom_max = 0`
+(`scripts/walloon_scripts/power_plant_cc.py`). To enable, flip the row to
+`status: active` and run `build_common_parameters.py --write`; that is an LP
+change and needs its own run and log. Guard: `test/test_power_plant_cc.py`
+(9 cases, one asserting the shipped default is off, one that the CSV row and the
+overlay agree **in both states**).
+
+**Industrial capture is deliberately excluded** — `process emissions CC`,
+`solid biomass for industry CC`, `gas for industry CC` and `SMR CC` are what
+§14.2's floor is built from, and gating them would contradict it. That is the
+scope the meeting asked for ("on power plants") and the narrower of the two
+readings.
+
+**Effect on results: none.** The 2026-09-07 run builds no power-plant CC before
+2040 anyway (`CCGT CC` 0 / 0 / 327 / 882 MW_e, `urban central gas CHP CC` only
+in 2050), so the option is a guard against a counterfactual. Note the tension
+with the 27 Aug meeting item *"CCGT-CC apparait seulement en 2050 ⇒ impose the
+TIMES capacity in 2040?"*, which asks to *add* CCGT CC in 2040 — this option
+permits that and does not address it.
+
+## 16. Every tonne captured in Wallonia leaves Wallonia
+
+`co2 storage e_nom_max` is a documented **0 Mt/a** at BEWAL, BEVLG and BEBRU
+(see [`co2-sequestration-20260829.md`](co2-sequestration-20260829.md)), so the
+net `CO2 pipeline` export from BEWAL equals §14.3's capture, tonne for tonne:
+2.2 / 6.1 / 8.8 / 9.6 Mt a year to DE, FR and LU. For scale, the 2030 figure is
+41 % of the whole BEWAL national CO₂ cap and the 2040 figure is 106 % of it.
+The pipeline carries no route, permit or acceptance constraint. **Label this
+wherever capture is published** — it is the largest physical assumption under
+the Walloon decarbonisation path, and it is an assumption about Germany, not
+about Wallonia.
+
+## 17. The 2050 biomass corner: industrial capture eats the whole European resource
+
+Measured on the 2026-09-07 run. The EU-wide `biomass limit` binds in every
+horizon at −47.4 / −38.5 / −30.5 / **−1 086.8** EUR/MWh, and every solid-biomass
+bus in the model prices at 1 104–1 133 EUR/MWh in 2050.
+
+The mechanism is exact. In 2050 the entire 330.92 TWh potential goes to one
+place — exogenous industrial solid-biomass demand of 303.19 TWh — split
+277.36 TWh through `solid biomass for industry CC` (η 0.90) and 53.56 TWh
+through the plain link (η 1.00). One extra MWh of biomass therefore lets **9
+MWh** of that demand switch from the η 1.0 link to the η 0.9 CC link, each
+capturing ~0.35 tCO₂ at a 407 EUR/t global dual ≈ 1.3 kEUR. The dual is a real
+LP property, not solver noise.
+
+Consequences, all reporting-relevant:
+
+- Nothing is left for CHP, boilers, biomass-to-liquid or biomass-to-methanol —
+  in 2040 those still took 62 TWh.
+- **~27.7 TWh of the European potential (8 %) is burned as the CC parasitic
+  loss** (the 10 % efficiency penalty on 277 TWh) to earn the credit.
+- The **option-B′ absorber penalty of 1 000 EUR/MWh_th is now below the fuel's
+  shadow price**, so the solver pays the penalty and drops the pin. That is the
+  2050 rural / urban-decentral biomass-boiler relaxation. Any future 2050 pin on
+  a scarce fuel will be bought out the same way — see
+  [`heat-softlink.md`](heat-softlink.md) §9.
+- 61.9 TWh of *regional* `e_sum_max` sits unused (FR 43.0, DE 11.4, BEWAL 4.45 +
+  3.00 transported) because the EU aggregate binds first. **A slack Walloon
+  biomass row in 2050 is not a Walloon result** — the split across regions is
+  degenerate.
+- The whole picture rests on `sector.solid_biomass_import: false`. With no
+  import channel and an inelastic industrial demand, the price of the marginal
+  MWh has no anchor.

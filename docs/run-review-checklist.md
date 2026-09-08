@@ -115,6 +115,12 @@ a human step** and lives in section 11 of the solve log.
       present and unused (extendable `CCGT CC` at ~0 MW because TIMES does
       not build it in Wallonia) is a **pass**, and the unused quantity belongs
       in the "must not publish" list only if someone might plot it.
+- [ ] **If `sector.times_file` changed, check the hand-extracted side files.**
+      `data/walloon/times_pv_rooftop_share.csv` and
+      `data/walloon/times_industrial_capture.csv` carry the `.vd` they were
+      extracted from in their own header, and **neither is an output of any
+      rule**, so a `.vd` swap leaves them stale in silence. The 2026-09-07 run
+      shipped both from the previous export.
 - [ ] Copy the table into the run's §11. The next run's previous-SHA is
       *this* run's `git_commit`.
 
@@ -150,7 +156,12 @@ python scripts/walloon_scripts/check_heat_profile_fidelity.py <scenario> live
 ```
 
 Every pinned group should match to solver tolerance; only the absorber may
-deviate. This catches a wrong sign convention or a dropped vintage — both of which
+deviate. **Read the worst group, never the sum of |gaps|** — the absorber makes
+the total close whatever happens. And when a group *is* under-delivered, check
+the shadow price of the fuel it needed before calling it "expected": option B′
+buys the pin out whenever `profile.penalty` (a constant, 1 000 EUR/MWh_th) is
+cheaper than the fuel, and in 2050 the EU `biomass limit` prices solid biomass
+at ~1 100 EUR/MWh ([`heat-softlink.md`](heat-softlink.md) §8b.1). This catches a wrong sign convention or a dropped vintage — both of which
 give a perfectly feasible LP whose answer is silently *not* the TIMES mix. A 2040
 shortfall of ~0.46 TWh_th on the biomass boiler is **expected**: the TIMES 2040 mix
 needs more solid biomass than Wallonia has
@@ -182,6 +193,16 @@ means only the flexible branch is
 `bev_dsm_availability`, so a run with the PyPSA-Eur default 0.5 shows the full
 +5.6 % while the Elia-derived 0.07–0.18 shows less — a small deviation is not
 proof the mechanism is right.
+
+> **Before any level-2 check: regenerate the TIMES demand files.**
+> `resources/<prefix>/<scenario>/wallon_demands_<year>.csv` and
+> `heating_targets_<year>.csv` are what `review_run.py` compares the network
+> against, and a working tree that has not been re-prepared since the `.vd`
+> changed still holds the *previous* export's numbers — every carrier then reads
+> a few tenths of a percent off for no reason.
+> `snakemake <the four wallon_demands_*.csv> --configfile config/config.walloon.yaml
+> --rerun-incomplete --forcerun build_wallon_demands` rebuilds them in ~5 min
+> without touching a network.
 
 ### 2.3 Every other transferred carrier, not just EV
 
@@ -328,6 +349,11 @@ every horizon.
 - [ ] Compare the solved `s_nom_opt` (AC) and `p_nom_opt` (DC) per border against
       `data/walloon/ntc_<year>.csv` (`BEL` rows). They are **not** currently equal —
       see 8.1.
+- [ ] **The NTC is a ceiling, not a target** (`transmission_limit: vopt` writes it
+      as `s_nom_max` / `p_nom_max`), and the model does not always reach it: on
+      the 2026-09-07 run BE–GB is built to 41–42 % of its NTC in 2040/2050 while
+      sitting at its limit half the year. Report the *built* capacity, or say
+      "ceiling". Never quote the NTC table as the modelled grid.
 - [ ] Remember `s_max_pu = 0.7` on AC lines. Usable AC capacity is 70 % of `s_nom`,
       so an NTC written into `s_nom` is delivered as 0.7 × NTC. DC links have no
       such derate, so an NTC written into `p_nom` is delivered in full. Decide which
@@ -342,6 +368,20 @@ every horizon.
 - [ ] Nemo Link and ALEGrO by name: Nemo is **1 000 MW**, ALEGrO is **1 000 MW**.
       Any other number in the solved network is an assumption that must be written
       down.
+
+### 4.3b The electricity import cap (`self_sufficiency`)
+
+- [ ] Read `import_limit_<node>` off `n.global_constraints` — the constant and
+      the dual survive into the `.nc`. `review_run.py` level 4.3b recomputes it.
+- [ ] **Know what it measures before quoting it.** The capped quantity is
+      `Σ_t max(0, hourly *net* cross-border balance)`, not the gross one-way
+      inflow and not the annual net balance. On the 2026-09-07 run the three
+      differ by 24.50 / 10.00 / 7.60 TWh in 2050
+      ([`network-representation-analysis.md`](network-representation-analysis.md)
+      §3.2). It is also resolution-dependent, so an 8 760 h cap is tighter than
+      the TIMES number it was copied from.
+- [ ] **BEBRU and BEVLG are "abroad".** TIMES-WAL's boundary is Wallonia, so
+      intra-Belgian flow counts as import. Say so on every chart.
 
 ### 4.4 CO₂
 
@@ -359,6 +399,13 @@ every horizon.
       calibration of the real 2025 system (see 5.1).
 - [ ] `co2_sequestration_limit` — is it binding? If yes, sequestration is set by the
       cap, not by economics, and every CCS/DAC number is a restatement of the cap.
+- [ ] **`biomass limit` — read its dual, not just whether it binds.** It binds in
+      every horizon; on the 2026-09-07 run it goes −47 / −39 / −30 / **−1 087**
+      EUR/MWh, because by 2050 exogenous industrial demand consumes the whole
+      European potential through the η 0.90 CC link. When it does, **every
+      regional biomass number is a degenerate allocation inside a binding
+      aggregate** and must not be reported as a regional result
+      ([`ccs_alignment.md`](ccs_alignment.md) §17).
 - [ ] `biomass limit` and `unsustainable biomass limit`. Note the 2025
       `biomass limit` is `<= 0` — sustainable solid biomass is *banned* Europe-wide
       in 2025 and all biomass must be "unsustainable". Read 2025 biomass numbers
@@ -501,7 +548,10 @@ Every one of these is a cheap lie-detector.
 - [ ] Mean, median, p05, p95 of the BEWAL `AC` marginal price per horizon. The
       price embeds the CO₂ shadow prices, so it is not comparable with an observed
       day-ahead price unless you say so.
-- [ ] Hours at ≤ 0 EUR/MWh and hours above 200/500/1000. A system with 30 TWh of
+- [ ] Hours at ≤ 0 EUR/MWh and hours above 200/500/1000. **There has never been
+      an hour below zero in any horizon of any run** — `load_shedding: false`, no
+      negative bidding, a well-connected 8-node system. State that before putting
+      the distribution next to an observed day-ahead one. A system with 30 TWh of
       Walloon wind and no hour below ~1.6 EUR/MWh, and no hour above ~430, has
       neither surplus-driven collapse nor scarcity pricing — say why.
 - [ ] Curtailment per VRE carrier (% of available). 5–15 % is normal at high
@@ -558,7 +608,11 @@ A number that moves by 3× between two runs of the same scenario is not a result
 - [ ] **Re-run comparison.** Put the same indicator from every available vintage of
       the scenario side by side (`results/*/<scenario>/csvs/nodal_capacities.csv`).
       Anything that is not stable to ~±20 % should be reported with its range, not
-      as a point value.
+      as a point value. The known movers, measured over the 09-05 / 09-06 / 09-07
+      vintages: **BEWAL battery 2050 3.8 → 7.2 → 14.0 GW**, `CCGT CC` 2040
+      0 → 3.14 → 0.57 GW, CCGT ±50 %, rooftop PV 5.3 → 10.0 → 12.1 GW. Stable to
+      the digit: onwind (cap-bound), `ror`, OCGT, and every system aggregate
+      (`total costs` moved < 1.5 %).
 - [ ] **Resolution sensitivity.** 6 h vs 1 h. Storage, peaking plant and
       curtailment are the expected movers; base-year VRE capacity is not, and if it
       moves, that is the finding.

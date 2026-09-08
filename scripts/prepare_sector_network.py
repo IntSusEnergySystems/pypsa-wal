@@ -2147,7 +2147,7 @@ def add_h2_gas_infrastructure(
         # On working gas the values are physical (DE 320, FR 116, NL 104, GB 51,
         # BE 8.2 TWh) and that same clip would cut Germany, the largest genuine
         # store on the continent, to 173 TWh.
-        # docs/temporary_improvement_plans.md item 1.
+        # docs/gas-storage-20260829.md (was worklist item 1).
         n.stores.loc[gas_i, "e_nom_min"] = e_nom
         floors = e_nom[e_nom > 0] / 1e6
         if not floors.empty:

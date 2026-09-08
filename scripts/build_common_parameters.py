@@ -1321,8 +1321,8 @@ def check_currency(df: pd.DataFrame, meta: dict) -> list[str]:
     (EUR2010/2012/2013) and no PyPSA file reads them; failing on those blocked
     `--write` entirely, which is why the PV/onwind lifetime change of `788cc75a`
     never reached `data/walloon/custom_costs.csv`. `--check` still lists them,
-    as a note rather than an error. See B7 of
-    docs/temporary_improvement_plans.md.
+    as a note rather than an error. See common_parameters.md S8 "Still open"
+    (worklist B7).
     """
     eur_ref = int(meta["EUR_REF"])
     prefix = f"EUR{eur_ref}"

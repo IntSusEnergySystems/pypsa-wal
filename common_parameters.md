@@ -521,3 +521,12 @@ Script that applied targets/notes/additions: `scripts/apply_common_parameters_de
   need a per-potential config override, which pypsa-eur does not have.
 * **Building-retrofit interest rate** (`sector.retrofitting.interest_rate`, still 4 %)
   is outside the cost-table hurdle path — tracked separately.
+* **20 untargeted JRC/ETRI reference rows keep their source currency.** The rows
+  added with `4459a96c` (central gas CHP, central solid biomass CHP, SMR, H2 (l)
+  storage tank) carry `EUR2010/2012/2013`, no `pypsa_wal_target` and no `status`,
+  and nothing in pypsa-wal reads them. `check_currency` is scoped to rows that
+  do carry a `pypsa_wal_target` and lists these as a note — before that, failing
+  on them blocked `--write` entirely, which is how the PV/onwind 25-year lifetime
+  of `788cc75a` sat unapplied in `data/walloon/custom_costs.csv` for weeks. **If
+  the team wants them usable they still need a currency decision**: rebase the
+  values, or apply the §4.4 "retag only" convention.

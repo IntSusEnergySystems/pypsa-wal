@@ -612,6 +612,13 @@ python scripts/build_common_parameters.py --check    # shared-parameter files in
 `--check` failing means a generated file disagrees with
 `config/input_parameters_for_models.csv`; `--write` re-syncs it.
 
+**Writing a guard: make it fail first.** A test that only checks a constant
+reaches the LP proves nothing about whether the constraint is *satisfiable*. In
+the 1 Sept batch every item shipped such a guard, no solve was run between
+items, and the queue produced three misattributed infeasibility diagnoses in a
+row. Verify each new guard **fails on the code it replaces**, and solve one
+horizon before trusting any new binding constraint.
+
 ### Alternative: pixi
 
 [`pixi.toml`](pixi.toml) + `pixi.lock` describe the same environment with pinned
@@ -1410,6 +1417,11 @@ Set `UPLOAD_DATE=$(date +%Y%m%d)` and `UPLOAD_ID="${UPLOAD_DATE}_${RUN_NAME}"`.
    ```
 
    Alternatively, upload directly with `aws s3 sync` (see below).
+
+> **Known defect in the extraction library (not ours, not fixed).** The
+> import/export orientation in ClimAct's `imports_exports.csv` is inverted. No
+> pypsa-wal result reads that file, but anything shown in the Explorer from it
+> has the sign the wrong way round. Flagged 2026-09-05, still open.
 
 ### Steps 2+3 scripted — `nic5.sh extract` / `publish`
 

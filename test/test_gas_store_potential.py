@@ -9,7 +9,7 @@
 from ``gas_input_nodes["storage"]``, which is 0 at BEWAL. The result is an
 unbounded endogenous store on a node whose only two sites (Anderlues,
 Péronnes-lez-Binche) closed on 1 November 2012 — the 26 Aug run built
-130–203 GWh of it. See ``docs/temporary_improvement_plans.md`` item 1.
+130–203 GWh of it. See ``docs/gas-storage-20260829.md`` (worklist item 1).
 
 Flanders must keep Loenhout, so the cap has to be per-bus, not per-carrier.
 """

@@ -2,8 +2,10 @@
 
 **Written 29 Aug 2026.** Follows recommendation 2 of the
 [`scen_demande_haute` @ 2010, 1 h solve log](logs/2026-08-26_scen_demande_haute_2010_1h.md)
-§11.14 C and item 2 of [temporary_improvement_plans.md](temporary_improvement_plans.md)
-("give Belgium a CO₂ sink first"). Companion to
+§11.14 C and item 2 of the 2026-08-27 / 09-01 meeting worklist
+(`docs/temporary_improvement_plans.md`, retired 2026-09-08 — recover with
+`git show 64d084c4:docs/temporary_improvement_plans.md`), "give Belgium a CO₂
+sink first". **This file is now the only record of item 2.** Companion to
 [ccs_alignment.md](ccs_alignment.md), which describes the CCS *technologies*;
 this file is about the *limit* on how much of their output can be buried.
 
@@ -162,8 +164,7 @@ layer had ~1 088 Mt/a of unused headroom across GB, DE and NL: the pooled cap,
 not the geology, was the limiter — and it was set by a number sized for a
 continent.
 
-It also distorts the CCGT-CC question. `temporary_improvement_plans.md` item 2
-reason 3 — *"2040's European sequestration cap is tighter (90 vs 125 Mt)"* — is
+It also distorts the CCGT-CC question. Item 2's reason 3 — *"2040's European sequestration cap is tighter (90 vs 125 Mt)"* — is
 this constraint, not a physical fact about 2040.
 
 ---
@@ -248,15 +249,22 @@ defensible, and no longer absurd.
 
 ## 6. What this does **not** fix
 
-1. **Belgium still has zero storage.** `e_nom_max = 0` for BEWAL, BEVLG and
-   BEBRU (and FR, LU) is untouched. It remains a `fillna(0.0)` on a missing
-   CO₂StoP row rather than a documented scenario choice. Item 2 option C of
-   [temporary_improvement_plans.md](temporary_improvement_plans.md) — a
-   documented Belgian `e_nom_max`, or a priced CO₂ export route to NL/NO — is
-   **still open and still the more important of the two**. What this change
-   does is remove the constraint that was masking it: Walloon CCS is now
-   limited by "Belgium owns no sink and must pay to ship CO₂ to DE/GB", which
-   is a real, arguable statement, instead of by a continental scalar.
+1. ~~**Belgium still has zero storage.**~~ **Closed 2026-09-02 (item 2
+   option C).** The Belgian zeroes are no longer a `fillna(0.0)` on a missing
+   CO₂StoP row: `data/walloon/custom_potentials.csv` now carries explicit
+   `co2 storage, e_nom_max, 0, Mt/a` rows for BEWAL, BEVLG and BEBRU in all
+   four horizons, each with its own source line (no Belgian site clears
+   CO₂StoP's `min_size`; the Campine basin is not quantified for this study;
+   Brussels has no geology). Guard: `test/test_co2_store_potential.py`.
+   Walloon CCS is now limited by "Belgium owns no sink and must ship its CO₂
+   out", which is a real, arguable statement instead of a continental scalar.
+
+   **The consequence is large and must be published with the capture numbers.**
+   Because the sink is zero, *every* tonne captured in Wallonia leaves it by
+   `CO2 pipeline`: 2.2 / 6.1 / 8.8 / 9.6 Mt a year to DE, FR and LU on the
+   2026-09-07 run — 41 % of the whole BEWAL national CO₂ cap in 2030 and 106 %
+   of it in 2040. The pipeline carries no route, permit, tariff or acceptance
+   constraint. See [ccs_alignment.md](ccs_alignment.md) §16.
 2. **2030 is still permissive.** 60 Mt/a is a defensible ceiling but the model
    also has to reach it through the CO₂ network, so effective 2030 storage will
    be whatever capture economics allow below that. If the next solve builds

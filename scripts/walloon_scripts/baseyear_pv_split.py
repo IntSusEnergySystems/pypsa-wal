@@ -6,8 +6,9 @@
 The historical fleet arrives from IRENASTAT labelled entirely `solar`
 (utility), while about two thirds of it is rooftop. Item 8's TIMES share pin
 needs that split in the base year: imposed on an all-utility fleet it demands
-GW of new rooftop inside a corridor of megawatts (docs/temporary_improvement_plans.md
-B5). This moves `rooftop_mw` of the standing BEWAL vintages onto
+GW of new rooftop inside a corridor of megawatts
+(docs/renewable-potentials.md S9.3, worklist B5). This moves `rooftop_mw`
+of the standing BEWAL vintages onto
 `<node> low voltage` as non-extendable `solar rooftop` generators, newest
 vintage first. add_brownfield carries the relabelled fleet forward, so the
 split holds in every later horizon; the agg `solar-all` pin (total PV) and the

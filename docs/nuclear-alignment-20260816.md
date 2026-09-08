@@ -153,6 +153,40 @@ Wallonia. 2025/2030 stay empty — the legacy fleet already reproduces the vd.
 | 2050 FR/GB/NL | unchanged vs Aug-14 (mins binding as before) |
 | objectives 2025/2030 | bit-identical networks reused, not re-solved |
 
+## 5b. Superseded 2026-09-01: Flanders keeps 3 GW in 2050 (item 10)
+
+The §5 expectation of "2050 BEVLG ≈ 0" is **no longer the design**. The meeting
+of 1 September 2026 asked for a symmetric siting policy — 1 GW retrofit + 2 GW
+new build in Flanders, mirroring Wallonia — so the trajectory is now:
+
+| Horizon | BEWAL | BEVLG | BE total | authority |
+|---|---:|---:|---:|---|
+| 2035 / 2040 | 1 030 | 1 000 | 2 030 | the `.vd` (Tihange 3 LTO + Doel 4) |
+| 2045 | 1 750 | 1 000 | 2 750 | siting policy: Doel 4 kept so a 2045 solve can still retrofit it |
+| 2050 | 3 000 | 3 000 | **6 000** | siting policy, **not** TIMES alignment — the `.vd` has Flanders at 0 by 2045 and doubles to 6 GW Belgium-wide here |
+
+This is a **siting policy, not a TIMES alignment**, and every affected row in
+`config/input_parameters_for_models.csv` says so in its `note`. Two mechanical
+points that cost a run when they were missed:
+
+- The `BEVLG` rows for 2035/2040/2045 had to be written explicitly. Adding
+  `BEVLG` to the caps file aliases that bus out of the `BE` remainder, so a
+  2050-only `BEVLG` row would leave Flanders unconstrained in the earlier
+  horizons. (This was the *intended* behaviour of the region-row mechanism; the
+  *unintended* one it also triggered is
+  [`renewable-potentials.md`](renewable-potentials.md) §9.1.)
+- The `BE` totals were raised to 2 750 / 6 000 so the `BEVLG` floors are still
+  feasible after the CCL remainder subtraction.
+
+Verified on the 2026-09-07 production run: 2 030 MW_e Belgium-wide in 2030 and
+2040 (BEWAL 1 030 + BEVLG 1 000), 3 000 + 3 000 MW_e in 2050, every aggregate
+row inside its corridor.
+
+**Reminder for reading results:** nuclear links have `bus0` on the EU uranium
+bus, so **Walloon nuclear appears nowhere in BEWAL's rows of
+`nodal_capacities.csv` / `nodal_costs.csv`** — the whole fleet is booked to
+`EU`. Recompute grouped on `bus1`, in MW_e (`p_nom × efficiency`).
+
 ## 6. Operational inflexibility (2026-08-25)
 
 **Trigger:** nuclear should be must-run (legacy *and* new-build), not a

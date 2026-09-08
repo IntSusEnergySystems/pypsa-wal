@@ -114,6 +114,23 @@ wrong:
 | Mistyped aggregation level | `ValueError` listing the available levels, before the `.vd` is even read. |
 | `scenario.planning_horizons` overridden per scenario | `ValueError` naming both lists and how to resolve it. |
 
+## 4b. Known mapping holes (open)
+
+`review_run.py` level 3 recomputes each Sankey transformation node and WARNs
+when inflow ≠ outflow. Three nodes have been out of balance since the diagrams
+were introduced, and they are **mapping** holes, not solve defects — the
+underlying buses close to 0.00 % in every horizon:
+
+| Node | 2026-09-07 run |
+|---|---|
+| `enc_pe` (primary energy) | one-sided in all four horizons: out 7.53 / 9.43 / 9.99 / 4.35 TWh, in 0 — the inflow is not mapped |
+| `elc_se` (secondary electricity) | −0.618 TWh in 2025 |
+| `vap_se` (secondary steam) | −0.090 TWh in 2025 |
+
+**Do not cite `enc_pe` throughput.** The fix is a `carrier_flows_*` /
+`processes_*` mapping row, not Python. A regression test that fails when one of
+these nodes stops closing is still owed.
+
 ## 5. Why a separate rule, not part of `build_wallon_demands`
 
 `build_wallon_demands` writes into `resources/`, which the

@@ -51,8 +51,8 @@ MODELLED = ("BE", "BEWAL", "DE", "FR", "GB", "NL", "LU")
 # Region rows are not in MODELLED (they need no row of their own — the parent
 # country row covers them), but when one *is* written it has to obey the same
 # design. Leaving them unpoliced is how `BEVLG,offwind-all 2030 min=max=8000`
-# and two hand-split Elia remainders passed a green checker. See B1/B2 of
-# docs/temporary_improvement_plans.md.
+# and two hand-split Elia remainders passed a green checker. See
+# docs/renewable-potentials.md S9.1 (worklist B1/B2).
 POLICED = MODELLED + ("BEVLG", "BEBRU")
 # offshore only exists where there is a coast
 NO_OFFSHORE = ("BEWAL", "LU")
