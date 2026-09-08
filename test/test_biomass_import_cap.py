@@ -39,10 +39,19 @@ def _rows(path, **match):
 
 
 def test_the_icedd_domestic_potential_is_the_one_in_the_derived_file():
-    """master 2f67b01e: 6000 -> 9222 GWh/an, every horizon."""
+    """master 2f67b01e: 6000 -> 9222 GWh/an, every horizon.
+
+    2026-09-08: 9222 -> 6222. The Valbiom 9222 was found to already include the
+    imports that `solid biomass transported` counts separately, so the domestic
+    potential is 9222 - max(imports) = 9222 - 3000. Source note in
+    `config/input_parameters_for_models.csv`.
+
+    `>=` on the year set, not `==`: the file also carries the 5-year grid's
+    2035/2045 rows (`config/config.walloon_5y.yaml`), which a 10-year run ignores.
+    """
     rows = _rows(POTENTIALS, bus="BEWAL", technology="solid biomass", parameter="p_nom")
-    assert {r["year"] for r in rows} == {"2025", "2030", "2040", "2050"}
-    assert {r["value"] for r in rows} == {"9222"}
+    assert {r["year"] for r in rows} >= {"2025", "2030", "2040", "2050"}
+    assert {r["value"] for r in rows} == {"6222"}
 
 
 def test_the_import_cap_that_binds_is_managed_by_the_master_csv():

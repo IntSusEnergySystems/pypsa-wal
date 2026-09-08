@@ -1,0 +1,171 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# ---------------------------------------------------------------------------
+# 5-year planning periods — overlay on config/config.walloon.yaml
+# ---------------------------------------------------------------------------
+#
+# Runs the Walloon model on [2025, 2030, 2035, 2040, 2045, 2050] instead of the
+# shipped [2025, 2030, 2040, 2050]. This file is an *overlay*, merged the same
+# way cluster/config_cluster.yaml is — the base config is never edited, so the
+# 10-year grid stays exactly as it is:
+#
+#   snakemake --configfile config/config.walloon.yaml config/config.walloon_5y.yaml \
+#             --cores 12 --resources mem_mb=100000 -call
+#
+# On the cluster (see cluster/config.sh; RUN_PREFIX must match run.prefix below):
+#
+#   CONFIGFILE="config/config.walloon.yaml config/config.walloon_5y.yaml" \
+#   RUN_PREFIX=walloon_5y ./cluster/nic5.sh run
+#
+# Keeping the artefacts in sync — note the same two files, in the same order:
+#
+#   python scripts/build_common_parameters.py \
+#       --config config/config.walloon.yaml config/config.walloon_5y.yaml --check
+#
+# `--config` makes planning_horizons() read the merged pair, and writes the
+# `budget_national:` block to the LAST file — this one. config.walloon.yaml keeps
+# its own 4-horizon block untouched.
+#
+# Snakemake merges configs key by key (recursive dict update, lists replaced
+# wholesale). So a *dict* below lists only the years it adds and inherits the
+# rest from the base config, while a *list* must be repeated in full.
+#
+# ---------------------------------------------------------------------------
+# Two things to know before reading the results
+# ---------------------------------------------------------------------------
+#
+# 1. MYOPIC DRIFT. Six myopic steps compound investment decisions twice as often
+#    as four. A capacity that was marginal in 2040 gets two chances to be locked
+#    in rather than one. A 5-year trajectory is NOT a refinement of the 10-year
+#    one — it is a different experiment.
+#
+# 2. CUMULATIVE TOTALS ARE NOT COMPARABLE ACROSS GRIDS. pypsa2html weights each
+#    horizon by the gap to the next one, and the last horizon inherits the
+#    previous gap:
+#
+#      2025, 2030, 2040, 2050              -> 5, 10, 10, 10 = 35 years (2025-2060)
+#      2025, 2030, 2035, 2040, 2045, 2050  -> 5,  5,  5, 5, 5, 5 = 30 years (2025-2055)
+#
+#    Every cumulative chart (cumulative cost, cumulative emissions, the CO2
+#    budget comparison) therefore integrates over a different span — a ~14 %
+#    shift with no physical meaning. Do not put a 10-year and a 5-year run's
+#    cumulative figures in the same table without restating both on a common
+#    span. Details: docs/five_year_periods.md S5.
+
+run:
+  # Separate results tree. Network files are named base_s_adm___<year>.nc, so
+  # without this the 6-horizon solves would overwrite the 10-year run's 2025,
+  # 2030, 2040 and 2050 networks in results/walloon/<scenario>/.
+  prefix: "walloon_5y"
+
+scenario:
+  planning_horizons:
+  - 2025
+  - 2030
+  - 2035
+  - 2040
+  - 2045
+  - 2050
+
+existing_capacities:
+  # 2045 was the one gap in the base list. add_existing_baseyear / add_brownfield
+  # bin each vintage into these groups, so without it capacity built in 2045
+  # would be attributed to a neighbouring group and retire up to five years off.
+  grouping_years_power: [1920, 1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050]
+
+electricity:
+  extendable_carriers:
+    # Hold the previous horizon: no Belgian new-build nuclear at 2035 (matching
+    # the scen_demande_haute note "2035/2040 = Tihange 3 LTO + Doel 4 LTO, no new
+    # build"), Belgian nodes extendable from 2040 on. The agg_p_nom caps in
+    # data/walloon/agg_p_nom_minmax_demande_haute.csv already carry 2035 and 2045
+    # columns and pin the actual capacity either way.
+    extendable_nuclear_links:
+      2035: [FR, GB, NL, LU]
+      2045: [BEWAL, BEBRU, BEVLG, FR, GB, NL, LU]
+
+  # Same value as every other horizon; listed so the new horizons do not fall
+  # back to the PyPSA-Eur default.
+  transmission_limit_myopic:
+    2035: vopt
+    2045: vopt
+
+sector:
+  # Linear interpolation of a smooth adoption curve (0.35 @2030 -> 0.81 @2040 ->
+  # 1.0 @2050). Holding instead would plateau for five years and then jump.
+  # BEWAL takes both of its transport shares from TIMES when times_demand is on,
+  # so these bind on the other nodes.
+  land_transport_electric_share:
+    2035: 0.58
+    2045: 0.905
+  land_transport_ice_share:
+    2035: 0.42
+    2045: 0.095
+
+# System-wide CO2 trajectory, as a fraction of 1990. Linear interpolation of the
+# base config's 0.450 @2030 -> 0.250 @2040 -> 0.050 @2050, which is the same rule
+# (`year_rule: interp`) the master CSV applies to budget_national below.
+co2_budget:
+  2035: 0.350
+  2045: 0.150
+
+# Generated from config/input_parameters_for_models.csv by
+# `scripts/build_common_parameters.py --config <base> <this file> --write`.
+# Do not hand-edit: run the tool instead.
+budget_national:
+  2025:
+    BEBRU: 0.648
+    BEVLG: 0.648
+    BEWAL: 0.648
+    DE: 0.648
+    FR: 0.648
+    GB: 0.648
+    NL: 0.648
+    LU: 0.648
+  2030:
+    BEBRU: 0.45
+    BEVLG: 0.45
+    BEWAL: 0.45
+    DE: 0.45
+    FR: 0.45
+    GB: 0.45
+    NL: 0.45
+    LU: 0.45
+  2035:
+    BEBRU: 0.35
+    BEVLG: 0.35
+    BEWAL: 0.35
+    DE: 0.35
+    FR: 0.35
+    GB: 0.35
+    NL: 0.35
+    LU: 0.35
+  2040:
+    BEBRU: 0.25
+    BEVLG: 0.25
+    BEWAL: 0.25
+    DE: 0.25
+    FR: 0.25
+    GB: 0.25
+    NL: 0.25
+    LU: 0.25
+  2045:
+    BEBRU: 0.15
+    BEVLG: 0.15
+    BEWAL: 0.15
+    DE: 0.15
+    FR: 0.15
+    GB: 0.15
+    NL: 0.15
+    LU: 0.15
+  2050:
+    BEBRU: 0.05
+    BEVLG: 0.05
+    BEWAL: 0.05
+    DE: 0.05
+    FR: 0.05
+    GB: 0.05
+    NL: 0.05
+    LU: 0.05

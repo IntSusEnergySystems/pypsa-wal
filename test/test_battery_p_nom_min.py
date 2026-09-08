@@ -102,7 +102,14 @@ def test_custom_potentials_in_sync():
     for (bus, _, param), years in EXPECTED.items():
         rows = batt[(batt["bus"] == bus) & (batt["parameter"] == param)]
         got = {int(y): float(v) for y, v in zip(rows["year"], rows["value"])}
-        assert got == years, bus
+        assert got.items() >= years.items(), bus
+        # The file also carries the 5-year grid's rows (config.walloon_5y.yaml).
+        # They are inert for a 10-year run — BEWAL_potentials.py matches the year
+        # exactly — but the floor is flat from 2030 on, so they must hold it too.
+        extra = {y: v for y, v in got.items() if y not in years}
+        assert set(extra) <= {2035, 2045}, (bus, sorted(extra))
+        held = years[max(years)]
+        assert all(v == held for v in extra.values()), (bus, extra, held)
 
 
 def test_overnight_names_get_the_floor():

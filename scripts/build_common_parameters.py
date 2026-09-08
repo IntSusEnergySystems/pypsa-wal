@@ -39,6 +39,7 @@ Modes:
 from __future__ import annotations
 
 import argparse
+import functools
 import re
 import sys
 from dataclasses import dataclass, field
@@ -83,7 +84,13 @@ HURDLE_SECTORS = (
     "tertiary_reno",  # COM-RENO — config target, no cost-table technology
 )
 VARIANT_NAME_RE = re.compile(r"^[a-z0-9_]+$")
-COST_CONFIG_FILES = (WALLOON_CONFIG,)
+# Config files whose horizons and `budget_national:` block this run manages, in
+# snakemake's `--configfile A B` order (later files override earlier ones). The
+# default is the single Walloon config; `--config A B` selects an overlay such as
+# config/config.walloon_5y.yaml, whose six-horizon grid then drives every patch.
+# The *first* entry owns the horizon-independent `costs:`/`sector:` scalars, the
+# *last* entry owns `budget_national:` — so an overlay never rewrites the base.
+ACTIVE_CONFIGS: tuple[Path, ...] = (WALLOON_CONFIG,)
 
 BUDGET_REGIONS = ("BEBRU", "BEVLG", "BEWAL", "DE", "FR", "GB", "NL", "LU")
 
@@ -117,10 +124,55 @@ def load_master() -> pd.DataFrame:
     return pd.read_csv(CSV_PATH)
 
 
+def _deep_update(base: dict, overlay: dict) -> dict:
+    """Merge `overlay` into `base` the way snakemake merges several --configfile."""
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_update(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def active_config() -> dict:
+    """The merged config of :data:`ACTIVE_CONFIGS`, later files winning."""
+    merged: dict = {}
+    for path in ACTIVE_CONFIGS:
+        _deep_update(merged, yaml.safe_load(path.read_text()) or {})
+    return merged
+
+
+def budget_config() -> Path:
+    """The config file that owns the `budget_national:` block for this horizon set."""
+    return ACTIVE_CONFIGS[-1]
+
+
+def cost_config_files() -> tuple[Path, ...]:
+    """Config files carrying the horizon-independent `costs:` / `sector:` scalars."""
+    return (ACTIVE_CONFIGS[0],)
+
+
 def planning_horizons() -> tuple[int, ...]:
     """Planning horizons of the Walloon run — the horizons artefacts must cover."""
-    cfg = yaml.safe_load(WALLOON_CONFIG.read_text())
+    cfg = active_config()
     return tuple(int(y) for y in cfg["scenario"]["planning_horizons"])
+
+
+@functools.cache
+def known_horizons() -> frozenset[int]:
+    """Every horizon any `config/config.walloon*.yaml` solves.
+
+    Input files are shared by both planning grids, so a row for a horizon *this*
+    run does not solve is legitimate — but only if some config does solve it. A
+    row for 2036 is a typo, and still fails the check.
+    """
+    years: set[int] = set()
+    for path in sorted(ROOT.glob("config/config.walloon*.yaml")):
+        cfg = yaml.safe_load(path.read_text()) or {}
+        years.update(
+            int(y) for y in cfg.get("scenario", {}).get("planning_horizons", []) or []
+        )
+    return frozenset(years)
 
 
 def active_rows(df: pd.DataFrame) -> pd.DataFrame:
@@ -402,10 +454,22 @@ def patch_potentials(
 
         year = int(row["year"])
         if year not in tgt.values:
-            patch.errors.append(
-                f"{POTENTIALS_FILE.name}: row {'/'.join(key)}@{year} has a planning "
-                f"horizon outside {horizons}"
-            )
+            # The file is shared by every planning grid: config.walloon.yaml runs
+            # [2025, 2030, 2040, 2050] and config.walloon_5y.yaml adds 2035/2045.
+            # BEWAL_potentials.py selects `year == planning_horizons` exactly, so a
+            # row for a horizon this run does not solve is inert — carry it through
+            # unpatched instead of failing the run that does not need it. A year no
+            # config solves at all is still an error: that is a typo, not a grid.
+            if year in known_horizons():
+                patch.notes.append(
+                    f"row {'/'.join(key)}@{year} is outside this run's horizons "
+                    f"{list(horizons)} — left untouched (another planning grid uses it)"
+                )
+            else:
+                patch.errors.append(
+                    f"{POTENTIALS_FILE.name}: row {'/'.join(key)}@{year} is not a "
+                    "planning horizon of any config/config.walloon*.yaml"
+                )
             continue
         new = tgt.values[year]
         if same_value(row["value"], new):
@@ -1157,7 +1221,7 @@ def patch_costs_scalars(
     pypsa_fb = pypsa_default_discount_rate()
 
     patches: list[Patch] = []
-    for path in COST_CONFIG_FILES:
+    for path in cost_config_files():
         patch = Patch(path=path)
         text = path.read_text()
         span = _costs_block_span(text)
@@ -1264,7 +1328,7 @@ def patch_sector_scalars(
     """Write `config:sector.<key>` rows into the `sector:` block of each config."""
     targets = collect_targets(df, "config", horizons, nparts=1)
     patches = []
-    for path in COST_CONFIG_FILES:
+    for path in cost_config_files():
         patch = Patch(path=path)
         text = path.read_text()
         span = _block_span(text, "sector")
@@ -1472,10 +1536,9 @@ def cmd_check(df: pd.DataFrame, meta: dict, verbose: bool = False) -> int:
         patch_potentials(df, horizons, dry_run=True),
         *patch_ntc(df, horizons, dry_run=True),
         patch_agg_p_nom(df, horizons, dry_run=True),
-        *[
-            patch_walloon_config(build_budget_national(df, horizons), True, cfg)
-            for cfg in COST_CONFIG_FILES
-        ],
+        patch_walloon_config(
+            build_budget_national(df, horizons), True, budget_config()
+        ),
         *patch_costs_scalars(df, horizons, dry_run=True),
         *patch_sector_scalars(df, horizons, dry_run=True),
         *patch_discount_rates(df, meta, horizons, dry_run=True),
@@ -1515,10 +1578,9 @@ def cmd_write(df: pd.DataFrame, meta: dict, dry_run: bool, verbose: bool) -> int
         patch_potentials(df, horizons, dry_run),
         *patch_ntc(df, horizons, dry_run),
         patch_agg_p_nom(df, horizons, dry_run),
-        *[
-            patch_walloon_config(build_budget_national(df, horizons), dry_run, cfg)
-            for cfg in COST_CONFIG_FILES
-        ],
+        patch_walloon_config(
+            build_budget_national(df, horizons), dry_run, budget_config()
+        ),
         *patch_costs_scalars(df, horizons, dry_run),
         *patch_sector_scalars(df, horizons, dry_run),
         *patch_discount_rates(df, meta, horizons, dry_run),
@@ -1545,7 +1607,7 @@ def cmd_write(df: pd.DataFrame, meta: dict, dry_run: bool, verbose: bool) -> int
         )
         return 1
     if not dry_run:
-        print("Review with: git diff data/walloon config/config.walloon.yaml")
+        print(f"Review with: git diff data/walloon {budget_config().relative_to(ROOT)}")
     return 0
 
 
@@ -1610,7 +1672,29 @@ def main() -> int:
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="also list unmanaged rows"
     )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        nargs="+",
+        default=[WALLOON_CONFIG],
+        metavar="FILE",
+        help=(
+            "config file(s) whose scenario.planning_horizons the artefacts must "
+            "cover, merged in snakemake's --configfile order (later wins). "
+            "Default: config/config.walloon.yaml. Use "
+            "`--config config/config.walloon.yaml config/config.walloon_5y.yaml` "
+            "for the 5-year grid; budget_national is then written to the overlay "
+            "and the base config is left untouched."
+        ),
+    )
     args = parser.parse_args()
+
+    global ACTIVE_CONFIGS
+    missing = [p for p in args.config if not p.is_file()]
+    if missing:
+        parser.error("no such config file: " + ", ".join(str(p) for p in missing))
+    # report_patch() prints paths relative to ROOT, so keep them absolute.
+    ACTIVE_CONFIGS = tuple(p.resolve() for p in args.config)
 
     meta, df = load_meta(), load_master()
     if args.check:

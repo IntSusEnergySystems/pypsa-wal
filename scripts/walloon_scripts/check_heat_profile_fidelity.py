@@ -24,6 +24,7 @@ Usage::
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -40,8 +41,21 @@ from scripts.walloon_scripts.times_heat_softlink import (  # noqa: E402
 
 SCENARIO = sys.argv[1] if len(sys.argv) > 1 else "scen_demande_haute"
 PHASE = sys.argv[2] if len(sys.argv) > 2 else "option_b"
+#: Fallback only, for a tree with no solved networks. Real runs use
+#: :func:`horizons_from` — config.walloon.yaml solves four horizons and the
+#: config.walloon_5y.yaml overlay six, so a pinned list silently skips 2035/2045.
 HORIZONS = [2025, 2030, 2040, 2050]
 NODE = "BEWAL"
+
+
+def horizons_from(networks: Path) -> list[int]:
+    """Planning horizons actually present in a ``networks/`` directory."""
+    years = {
+        int(m.group(1))
+        for p in networks.glob("base_s_adm___*.nc")
+        if (m := re.search(r"___(\d{4})\.nc$", p.name))
+    }
+    return sorted(years) or list(HORIZONS)
 
 
 def roots() -> tuple[Path, Path]:
@@ -144,7 +158,13 @@ def main() -> None:
             f"{target_path.exists()=})"
         )
 
-    out = fidelity_frame(networks, profiles_dir, targets_dir, on_missing=missing)
+    out = fidelity_frame(
+        networks,
+        profiles_dir,
+        targets_dir,
+        horizons=horizons_from(networks),
+        on_missing=missing,
+    )
     pd.set_option("display.width", 220)
     for year in sorted(out["year"].unique()):
         sub = out[out["year"] == year]

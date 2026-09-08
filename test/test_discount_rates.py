@@ -687,6 +687,9 @@ def test_per_technology_override_wins():
 )
 def test_horizon_expansion(shape: str):
     """T16: yearless rows apply to all horizons; hold fills earlier years forward."""
+    # Also guards the shipped grid: config.walloon.yaml stays on 10-year periods.
+    # The 5-year grid is the config.walloon_5y.yaml overlay, never an edit here —
+    # see test_five_year_overlay.py and docs/five_year_periods.md.
     horizons = planning_horizons()
     assert horizons == (2025, 2030, 2040, 2050)
 

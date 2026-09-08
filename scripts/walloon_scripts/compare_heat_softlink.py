@@ -46,6 +46,9 @@ import pypsa
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from scripts.walloon_scripts.check_heat_profile_fidelity import (  # noqa: E402
+    horizons_from,
+)
 from scripts.walloon_scripts.times_heat_softlink import (  # noqa: E402
     decentral_heat_buses,
     heat_injection_terms,
@@ -55,6 +58,10 @@ ARGV = sys.argv[1:]
 SCENARIO = ARGV[0] if ARGV else "scen_demande_haute"
 ARCHIVE = Path("results/_heat_softlink_comparison")
 RESOURCES = Path("resources/walloon") / SCENARIO
+#: Fallback only — the horizons actually compared are read from the archived
+#: networks by :func:`comparison_horizons`, so a 5-year chain
+#: (config/config.walloon_5y.yaml) is reported in full rather than four-sixths of
+#: it. See docs/five_year_periods.md.
 HORIZONS = [2025, 2030, 2040, 2050]
 NODE = "BEWAL"
 
@@ -271,10 +278,22 @@ def available_phases() -> list[str]:
     return present
 
 
+def comparison_horizons(phases: list[str]) -> list[int]:
+    """Horizons every compared phase actually solved.
+
+    The intersection, not the union: a table row needs the same year in each
+    archive to compare anything, and a phase still mid-chain would otherwise
+    produce half-empty rows.
+    """
+    per_phase = [set(horizons_from(ARCHIVE / ph / "networks")) for ph in phases]
+    common = set.intersection(*per_phase) if per_phase else set()
+    return sorted(common) or list(HORIZONS)
+
+
 def collect(phases: list[str]) -> dict:
     """One pass over the archives, so only one year's networks are ever resident."""
     out: dict = {"mix": {}, "flex": [], "capacity": {}, "totals": [], "inputs": []}
-    for year in HORIZONS:
+    for year in comparison_horizons(phases):
         tgt = targets(year).set_index("group")
         mix_rows, cap_rows = {}, {}
         flex = {"horizon": year}
@@ -327,7 +346,7 @@ def main() -> None:
     data = collect(phases)
 
     print("## Decentral heat mix, share of supply\n")
-    for year in HORIZONS:
+    for year in sorted(data["mix"]):
         tbl = data["mix"][year]
         print(md(tbl, "{:.2f}"))
         for phase in phases:
@@ -350,7 +369,7 @@ def main() -> None:
     )
 
     print("## Installed decentral heat capacity, MW_th\n")
-    for year in HORIZONS:
+    for year in sorted(data["capacity"]):
         print(md(data["capacity"][year], "{:.1f}"))
         print()
 

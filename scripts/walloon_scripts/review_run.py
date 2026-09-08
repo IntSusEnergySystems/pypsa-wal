@@ -11,7 +11,9 @@ respected. Judgement calls — "is 14 GW of Walloon onshore wind plausible?" —
 with the human and belong in section 11 of the run's ``docs/logs/`` solve log.
 
 The script never solves anything. It reads a results tree and, unless ``--csv-only``
-is given, the four solved networks.
+is given, the solved networks. The horizon set is discovered from the tree
+(:func:`discover_horizons`), so a 10-year run reviews four and a 5-year run
+(``config/config.walloon_5y.yaml``) reviews six; ``--horizons`` overrides it.
 
 Usage::
 
@@ -35,11 +37,14 @@ from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import yaml
 
 from scripts.walloon_scripts.set_NTCs import read_ntc_pairs
 
 logger = logging.getLogger(__name__)
 
+#: Fallback only, for a tree that holds neither config snapshots nor networks.
+#: Real runs are read with :func:`discover_horizons` — see the note there.
 HORIZONS = (2025, 2030, 2040, 2050)
 WAL = "BEWAL"
 BE_NODES = ("BEWAL", "BEVLG", "BEBRU")
@@ -251,7 +256,46 @@ def links_to(n, node, carrier=None):
 # level 0 — provenance
 # --------------------------------------------------------------------------- #
 
-def check_provenance(run: Path, rep: Report) -> dict:
+def discover_horizons(run: Path) -> tuple[int, ...]:
+    """The planning horizons of *this* run, read from the tree rather than pinned.
+
+    ``config/config.walloon.yaml`` solves ``[2025, 2030, 2040, 2050]``; the
+    ``config/config.walloon_5y.yaml`` overlay solves
+    ``[2025, 2030, 2035, 2040, 2045, 2050]``. A hardcoded list reviews whichever
+    horizons it names and silently skips the rest — a run that looks reviewed and
+    is not, which is the failure mode ``docs/run-review-checklist.md`` exists to
+    prevent.
+
+    What the run was **configured** to solve wins over what is on disk: every
+    per-horizon config snapshot records the full ``scenario.planning_horizons``
+    list, so a chain that died after 2030 is still reviewed against all of its
+    horizons and the missing ones are reported. Discovering from filenames alone
+    would make a stalled run look complete — the 2026-09-07 chain stopped at 2030
+    and its tree holds exactly two of everything.
+
+    Falls back to the years present on disk, then to :data:`HORIZONS`.
+    """
+    for cfg in sorted((run / "configs").glob("config.base_s_adm___*.yaml")):
+        try:
+            declared = yaml.safe_load(cfg.read_text())["scenario"]["planning_horizons"]
+        except (KeyError, TypeError, yaml.YAMLError):
+            continue
+        if declared:
+            return tuple(sorted(int(y) for y in declared))
+
+    years: set[int] = set()
+    for sub, pattern in (
+        ("configs", "config.base_s_adm___*.yaml"),
+        ("networks", "base_s_adm___*.nc"),
+    ):
+        for p in (run / sub).glob(pattern):
+            m = re.search(r"___(\d{4})\.(?:yaml|nc)$", p.name)
+            if m:
+                years.add(int(m.group(1)))
+    return tuple(sorted(years)) or HORIZONS
+
+
+def check_provenance(run: Path, rep: Report, horizons: tuple[int, ...]) -> dict:
     sec = "0 · provenance"
     meta: dict = {}
 
@@ -264,9 +308,15 @@ def check_provenance(run: Path, rep: Report) -> dict:
     else:
         rep.info(sec, "run.json absent (local run)")
 
+    rep.info(sec, f"planning horizons this run is reviewed against: {list(horizons)}")
     cfgs = sorted((run / "configs").glob("config.base_s_adm___*.yaml"))
-    if len(cfgs) != len(HORIZONS):
-        rep.warn(sec, f"expected {len(HORIZONS)} per-horizon config snapshots, found {len(cfgs)}")
+    cfg_years = {
+        int(m.group(1))
+        for c in cfgs
+        if (m := re.search(r"___(\d{4})\.yaml$", c.name))
+    }
+    if missing := sorted(set(horizons) - cfg_years):
+        rep.warn(sec, f"no per-horizon config snapshot for {missing}")
     if cfgs:
         base = cfgs[0].read_text().splitlines()
         for c in cfgs[1:]:
@@ -308,9 +358,9 @@ def check_provenance(run: Path, rep: Report) -> dict:
 # level 1 — solver
 # --------------------------------------------------------------------------- #
 
-def check_solver(run: Path, rep: Report) -> None:
+def check_solver(run: Path, rep: Report, horizons: tuple[int, ...]) -> None:
     sec = "1 · solve"
-    for y in HORIZONS:
+    for y in horizons:
         log = run / "logs" / f"base_s_adm___{y}_solver.log"
         if not log.exists():
             rep.fail(sec, f"{y}: solver log missing")
@@ -1176,6 +1226,8 @@ def main(argv=None) -> int:
                     default=Path("data/walloon/custom_potentials.csv"))
     ap.add_argument("--ntc-dir", type=Path, default=Path("data/walloon"))
     ap.add_argument("--scenario", default=None)
+    ap.add_argument("--horizons", type=int, nargs="+", default=None,
+                    help="override the horizons discovered from the results tree")
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.WARNING)
@@ -1186,14 +1238,15 @@ def main(argv=None) -> int:
     scenario = args.scenario or run.name
 
     rep = Report()
-    check_provenance(run, rep)
-    check_solver(run, rep)
+    horizons = tuple(args.horizons) if args.horizons else discover_horizons(run)
+    check_provenance(run, rep, horizons)
+    check_solver(run, rep, horizons)
 
     if not args.csv_only:
         import pypsa  # imported late so --csv-only works without a solver env
 
         nets = {}
-        for y in HORIZONS:
+        for y in horizons:
             p = run / "networks" / f"base_s_adm___{y}.nc"
             if p.exists():
                 nets[y] = pypsa.Network(str(p))

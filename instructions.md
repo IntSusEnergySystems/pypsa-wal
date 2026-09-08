@@ -725,6 +725,48 @@ snakemake --configfile config/config.walloon.yaml \
 (`cluster/config_cluster.yaml` only overrides `solving.mem_mb`, `solving.cpus`,
 and Gurobi `threads`; it does not change model physics.)
 
+### 5-year planning periods
+
+The shipped grid is 10-year — `[2025, 2030, 2040, 2050]`. To run
+`[2025, 2030, 2035, 2040, 2045, 2050]` instead, add the overlay
+[`config/config.walloon_5y.yaml`](config/config.walloon_5y.yaml) as a **second**
+`--configfile`:
+
+```bash
+snakemake --configfile config/config.walloon.yaml config/config.walloon_5y.yaml --cores 12 --resources mem_mb=100000 -call
+```
+
+Order matters — the overlay is merged on top, exactly as `cluster/config_cluster.yaml`
+is. It sets `run.prefix: walloon_5y`, so results go to
+`results/walloon_5y/<scenario>/` and **the 10-year tree is never touched**; the two
+grids coexist. Without that the six solves would overwrite the 10-year run's
+`base_s_adm___{2025,2030,2040,2050}.nc`.
+
+On the cluster (`RUN_PREFIX` must match `run.prefix`):
+
+```bash
+CONFIGFILE="config/config.walloon.yaml config/config.walloon_5y.yaml" RUN_PREFIX=walloon_5y ./cluster/nic5.sh run
+```
+
+The shared-parameter check takes the same pair. It writes `budget_national` to the
+**last** file given, so the base config is never rewritten:
+
+```bash
+python scripts/build_common_parameters.py --config config/config.walloon.yaml config/config.walloon_5y.yaml --check
+```
+
+> **Two traps.** (1) Six myopic steps compound investment decisions twice as often
+> as four — a 5-year trajectory is a *different experiment*, not a refinement of
+> the 10-year one. (2) pypsa2html weights each horizon by the gap to the next and
+> the last inherits the previous gap, so cumulative charts integrate over 35 years
+> on the 10-year grid and 30 on the 5-year one — a ~14 % shift with no physical
+> meaning. **Never put the two grids' cumulative figures in one table.**
+> [`docs/five_year_periods.md`](docs/five_year_periods.md) §5.
+
+A 5-year chain has never been solved on this model. Run it at 6h first, and read
+the pre-solve biomass budget margin for 2035 and 2045 before queueing 1h — the
+two new horizons are two new chances to land on the cap that stalled 2026-09-07.
+
 ### Reducing runtime for testing
 
 The default Walloon config already uses a **6h** sector time aggregation
