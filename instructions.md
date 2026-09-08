@@ -221,7 +221,7 @@ What is in the tree, and which of it is worth opening first:
 | `networks/` | the solved networks — the ground truth for any number you doubt |
 | `csvs/` | summary tables (`costs.csv`, `nodal_costs.csv`, `energy.csv`, …) — what the charts are built from |
 | `graphs/`, `maps/`, `graphics/` | the Snakemake plots (`costs.svg`, static + interactive balance maps) |
-| `html/` | hub at `html/index.html`; pypsa2html in `html/pypsa/`; TIMES Sankeys in `html/times/` |
+| `html/` | hub at `html/index.html`; pypsa2html in `html/pypsa/`; TIMES Sankeys in `html/times/`; TIMES indicator trajectories in `html/indicators/` |
 | `logs/` | `*_solver.log` (grep `Optimal objective`), `*_python.log` (the TIMES heat budget lines), `*_memory.log` |
 | `configs/` | **the config actually used**, one snapshot per horizon |
 | `heating_profiles/` | option B′ only: the profiles the solve was pinned to |
@@ -557,6 +557,7 @@ weather year 2013, `--cores 20 --resources mem_mb=110000`, 14 Aug 2026):
 | Wall-clock, 135 jobs incl. all 4 myopic solves | **17 min** (~4 min per solve) |
 | pypsa2html report, 75 pages | ~50 s |
 | TIMES Sankey pages, 4 horizons x 2 levels | ~9 s |
+| TIMES indicator pages, 5 pages + CSVs | ~8 s |
 | Peak RAM | ~20 GB of 124 GB |
 
 Observed for the 1h / 2010 run (`scen_demande_haute`, NIC5 `hmem`, 14 Aug 2026):
@@ -1049,7 +1050,8 @@ results/walloon/
 │       │   ├── index.html
 │       │   ├── BEWAL_overview_scen_demande_haute.html
 │       │   └── …
-│       └── times/                      ← TIMES Sankeys (times_pypsa)
+│       ├── times/                      ← TIMES Sankeys (times_pypsa)
+│       └── indicators/                 ← TIMES indicator trajectories (times_pypsa)
 │           ├── index.html              ← redirect to the table
 │           └── times_sankey_index.html
 ├── scen_corrige/html/
@@ -1206,6 +1208,59 @@ workflow is unaffected.
 Full reference — config, the parse-time constraint on `times_sankey` and
 `scenario.planning_horizons`, and the failure modes:
 [`docs/times-sankey.md`](docs/times-sankey.md).
+
+---
+
+## TIMES scenario indicators
+
+The third section of the report, in `html/indicators/`: the **trajectories**
+where the Sankeys are snapshots. An *Indicateurs* page puts every series in one
+table, filterable on catégorie / indicateur / vecteur / technologies, with a
+sparkline and a Δ% column; four charted pages then take final energy demand by
+sector and carrier, greenhouse-gas emissions, heat production by technology, and
+the power fleet, each a stacked bar per planning horizon with the total on top
+and the table it was built from beside it. All of it is also written as CSV.
+Rendered by
+[`times_pypsa.indicator_pages`](https://github.com/IntSusEnergySystems/TIMES_PyPSA)
+from the same `sector.times_file`, so again: **TIMES input, not the PyPSA
+solve**.
+
+```
+results/walloon/<scenario>/html/indicators/
+├── index.html                          ← copy of the index, for a bare URL
+├── times_indicators_index.html         ← start here
+├── times_indicators_catalogue.html     ← Indicateurs [TIMES] (filterable table)
+├── times_indicators_demand.html        ← Consommation d'énergie [TIMES]
+├── times_indicators_emissions.html     ← Émissions de CO2 [TIMES]
+├── times_indicators_heat.html          ← Production de chaleur [TIMES]
+├── times_indicators_power.html         ← Production et capacité électriques [TIMES]
+└── times_indicator_*.csv               ← the table behind each chart
+```
+
+```yaml
+sector:
+  times_indicators:
+    enable: true
+    write_csv: true
+```
+
+Same parse-time constraint as `times_sankey`: keep the block out of scenario
+overlays. Build it alone (no solved network needed):
+
+```bash
+snakemake --configfile config/config.walloon.yaml --cores 1 \
+  results/walloon/scen_demande_haute/html/indicators/times_indicators_index.html
+```
+
+Three things to know before quoting a number from these pages: home EV charging
+counts as Transport (the charger is a transport process, even though it draws
+residential electricity), cogeneration fuel is split between heat and
+electricity so only the heat share is charged to the sector, and aviation
+kerosene is shown but not summed into the transport total. The definitions, and
+a row-by-row reconciliation against the figures ICEDD published in December
+2025, are in
+[`TIMES_PyPSA/INDICATORS.md`](../TIMES_PyPSA/INDICATORS.md); the pypsa-wal side
+is [`docs/times-indicators.md`](docs/times-indicators.md).
 
 ---
 
@@ -1600,7 +1655,8 @@ S3_ENV=prod ./cluster/nic5.sh upload
 │   ├── logs/                       # REQUIRED human solve log per run (see _TEMPLATE_solve_log.md);
 │   │                               #   §11 of each log holds that run's critical review
 │   ├── run-review-checklist.md     # Critical-review procedure for a solved run
-│   └── times-sankey.md             # TIMES Sankey pages in the results html/ folder
+│   ├── times-sankey.md             # TIMES Sankey pages in the results html/ folder
+│   └── times-indicators.md         # TIMES indicator trajectories in the results html/ folder
 ├── cluster/
 │   ├── nic5.sh                    # Local ↔ cluster orchestration (+ extract/publish)
 │   ├── upload_s3.sh               # Publish results/ to Intervectoriel S3
@@ -1616,8 +1672,9 @@ S3_ENV=prod ./cluster/nic5.sh upload
 ├── resources/walloon/<scenario>/       # Intermediate build artefacts
 └── results/walloon/<scenario>/         # Solved networks, CSVs, plots
     ├── explorer/                  # Staged ClimAct CSVs + TIMES .vd for S3 (pypsa/, strategy/, times/)
-    └── html/                      # pypsa2html report + TIMES Sankey pages
-                                   #   (see HTML report / TIMES Sankey sections)
+    └── html/                      # pypsa2html report + TIMES Sankey and
+                                   #   indicator pages (see the HTML report,
+                                   #   TIMES Sankey and TIMES indicator sections)
 ```
 
 `SEPIA/` still exists in the tree but is superseded by the external
@@ -1661,6 +1718,9 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
 | `html_published.url` says `skipped: no passwordless SSH` | User `negawatt` does not yet have `rsa_nopasswd` in `authorized_keys`, or this machine cannot reach the server. On the server: `sudo bash /home/sylvain/scripts/add-pypsa-alias.sh`. To skip: `HTML_PUBLISH=0`. |
 | No `times_sankey_*.html` in `html/`, no error | The rule is gated at parse time. Check for a warning naming `sector.times_file` or `times_pypsa` (`pip install -e ../TIMES_PyPSA`), then that `sector.times_sankey.enable` is `true`. `snakemake --configfile config/config.walloon.yaml --list-rules \| grep build_times_sankey` says whether the rule exists at all — see [`docs/times-sankey.md`](docs/times-sankey.md) §4 |
+| No `times_indicators_*.html` in `html/`, no error | Same parse-time gate as the Sankeys: check for a warning naming `sector.times_file` or `times_pypsa`, then that `sector.times_indicators.enable` is `true`. `snakemake --configfile config/config.walloon.yaml --list-rules \| grep build_times_indicators` says whether the rule exists at all — see [`docs/times-indicators.md`](docs/times-indicators.md) §3 |
+| An indicator chart is missing a technology, and the log says `matches no indicator_power.csv rule` | A new plant type. Add a row to `TIMES_PyPSA/data/indicator_power.csv` above the fallbacks; the log line names the process code. Same for a carrier absent from `indicator_fuels.csv` |
+| Published run has `pypsa/` and `times/` but no `indicators/` | It predates this rule. Do **not** re-run `publish_html` from a results folder that has not built `html/pypsa/` — the rsync uses `--delete` and would remove the PyPSA report. Sync `html/indicators/` on its own and update the remote `index.html` |
 | `scenario.planning_horizons … but the TIMES Sankey outputs were declared for …` | A scenario overlay overrode `scenario.planning_horizons`. The rule's file names are fixed before overlays are applied, so it refuses to label a page with a year nobody asked for. Keep the horizons in the base config, or set `sector.times_sankey.enable: false` for that run |
 | First run hangs on the cutout download | The rules read `data/cutout/archive/<version>/europe-<year>-sarah3-era5.nc` (~6.6 GB), **not** the legacy `cutouts/` symlink. Hardlink or symlink the file in from another checkout if you have it, or wait for the download |
 | `retrieve_osm_boundaries` Overpass 406 errors | Pre-populate `data/osm-boundaries/json/{BA,MD,UA,XK}_adm1.json` from another PyPSA-Eur checkout, or retry later |

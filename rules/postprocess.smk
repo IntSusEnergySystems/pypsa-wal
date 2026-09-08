@@ -903,6 +903,119 @@ def _times_sankey_settings():
 TIMES_SANKEY = _times_sankey_settings()
 
 
+def times_indicator_rule_files(w):
+    """The indicator rule CSVs the pages are built from.
+
+    Declared as rule inputs for the same reason as `times_mapping_files`:
+    editing a fuel or technology mapping must invalidate the pages, or Snakemake
+    keeps serving the chart the old mapping drew.
+    """
+    from times_pypsa.indicators import default_rules_dir
+
+    d = config_provider("sector", "times_mappings_dir", default=None)(w)
+    d = Path(d) if d else Path(default_rules_dir())
+    return [
+        str(d / name)
+        for name in (
+            "indicator_fuels.csv",
+            "indicator_heat.csv",
+            "indicator_power.csv",
+            # Sector and Type per process, and the .NRG. flag per commodity:
+            # the weighting and the sector attribution both read them.
+            "mapping_processes.csv",
+            "AllCommodities.csv",
+        )
+    ]
+
+
+def _times_indicators_settings():
+    """Resolved `sector.times_indicators` block, or None when the report is off.
+
+    Same parse-time gate as `_times_sankey_settings`: the rule's outputs are one
+    file per indicator group, so the list has to exist before the DAG is built.
+    """
+    import importlib.util
+
+    sector_cfg = config.get("sector", {}) or {}
+    cfg = sector_cfg.get("times_indicators", {}) or {}
+    if not cfg.get("enable", False):
+        return None
+    if not sector_cfg.get("times_file"):
+        logger.warning(
+            "sector.times_indicators.enable is true but sector.times_file is unset "
+            "— no TIMES indicator pages will be built."
+        )
+        return None
+    if importlib.util.find_spec("times_pypsa") is None:
+        logger.warning(
+            "sector.times_indicators.enable is true but times_pypsa is not "
+            "importable (pip install -e ../TIMES_PyPSA) — no TIMES indicator "
+            "pages will be built. The rest of the workflow is unaffected."
+        )
+        return None
+
+    from times_pypsa import indicator_page_names
+
+    return {
+        "horizons": [int(y) for y in config["scenario"]["planning_horizons"]],
+        "write_csv": bool(cfg.get("write_csv", True)),
+        # Pages only; the index is declared separately so it is not listed twice.
+        "pages": indicator_page_names(index_name=None),
+    }
+
+
+TIMES_INDICATORS = _times_indicators_settings()
+
+
+def times_indicator_targets():
+    """`rule all` targets for the TIMES indicator pages ([] when off)."""
+    if not TIMES_INDICATORS:
+        return []
+    return expand(
+        RESULTS + "html/indicators/{page}",
+        page=TIMES_INDICATORS["pages"] + ["times_indicators_index.html"],
+        run=config["run"]["name"],
+    )
+
+
+if TIMES_INDICATORS:
+
+    rule build_times_indicators:
+        message:
+            "Rendering TIMES scenario indicators for {wildcards.run}"
+        params:
+            # Parse-time horizons, cross-checked against the run's own list by
+            # the script for the same reason as build_times_sankey.
+            planning_horizons=TIMES_INDICATORS["horizons"],
+            scenario_horizons=config_provider("scenario", "planning_horizons"),
+            write_csv=TIMES_INDICATORS["write_csv"],
+            mappings_dir=config_provider("sector", "times_mappings_dir", default=None),
+        input:
+            times_file=config_provider("sector", "times_file"),
+            # The indicator rule tables, so a mapping fix invalidates the pages.
+            times_mappings=times_indicator_rule_files,
+        output:
+            index=RESULTS + "html/indicators/times_indicators_index.html",
+            pages=expand(
+                RESULTS + "html/indicators/{page}",
+                page=TIMES_INDICATORS["pages"],
+                allow_missing=True,
+            ),
+        log:
+            RESULTS + "logs/build_times_indicators.log",
+        benchmark:
+            RESULTS + "benchmarks/build_times_indicators"
+        threads: 1
+        resources:
+            # Same .vd parse as build_times_sankey, without the per-year link
+            # building; ~0.9 GB peak there, headroom for a larger .vd.
+            mem_mb=8000,
+        conda:
+            "../envs/environment.yaml"
+        script:
+            scripts("build_times_indicators.py")
+
+
 def times_sankey_targets():
     """`rule all` targets for the TIMES Sankey report ([] when it is off)."""
     if not TIMES_SANKEY:

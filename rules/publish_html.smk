@@ -3,6 +3,7 @@
 #   index.html     pypsa-wal hub (this file's write_html_hub rule)
 #   pypsa/         pypsa2html (untouched library; its own index.html)
 #   times/         TIMES Sankey pages (times_pypsa)
+#   indicators/    TIMES scenario indicator pages + CSV tables (times_pypsa)
 #
 # publish_html rsyncs that whole folder to
 # https://pypsa.squoilin.eu/intervec/<scenario>_<YYYYMMDD>/
@@ -14,6 +15,8 @@ def html_hub_inputs():
         files.append(RESULTS + "html/pypsa/index.html")
     if TIMES_SANKEY:
         files.append(RESULTS + "html/times/times_sankey_index.html")
+    if TIMES_INDICATORS:
+        files.append(RESULTS + "html/indicators/times_indicators_index.html")
     return files
 
 
@@ -30,11 +33,12 @@ if html_hub_inputs():
         write_html_hub,
 
     rule write_html_hub:
-        """Tiny landing page that links pypsa2html and TIMES Sankeys."""
+        """Tiny landing page linking pypsa2html, the Sankeys and the indicators."""
         params:
             scenario=_html_scenario_name,
             has_pypsa=HAVE_PYPSA2HTML,
             has_times=bool(TIMES_SANKEY),
+            has_indicators=bool(TIMES_INDICATORS),
         input:
             html_hub_inputs(),
         output:
@@ -51,7 +55,14 @@ if html_hub_inputs():
             if params.has_times:
                 items.append(
                     '  <li><a href="times/times_sankey_index.html">'
-                    "TIMES Sankey diagrams</a></li>"
+                    "TIMES Sankey diagrams</a> — where the energy goes, one "
+                    "diagram per planning horizon</li>"
+                )
+            if params.has_indicators:
+                items.append(
+                    '  <li><a href="indicators/times_indicators_index.html">'
+                    "TIMES scenario indicators</a> — demand, emissions, heat and "
+                    "power trajectories, with the tables behind them</li>"
                 )
             Path(output.index).write_text(
                 "<!DOCTYPE html>\n"
@@ -86,7 +97,7 @@ def _publish_html_enabled():
 
 
 def _publish_html_inputs():
-    """Publish the hub; it already depends on pypsa/ and times/."""
+    """Publish the hub; it already depends on pypsa/, times/ and indicators/."""
     if not html_hub_inputs():
         return []
     return [RESULTS + "html/index.html"]

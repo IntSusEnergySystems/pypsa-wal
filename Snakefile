@@ -227,9 +227,12 @@ rule all:
         # TIMES Sankey diagrams into results/<run>/html/ (empty list when
         # sector.times_sankey is off or times_pypsa is not installed).
         times_sankey_targets(),
+        # TIMES scenario indicators into results/<run>/html/indicators/ (empty
+        # list when sector.times_indicators is off or times_pypsa is missing).
+        times_indicator_targets(),
         # pypsa2html report into html/pypsa/ ([] if the library is not installed).
         pypsa2html_targets(),
-        # Hub page at html/index.html linking pypsa/ and times/.
+        # Hub page at html/index.html linking pypsa/, times/ and indicators/.
         html_hub_targets(),
         # rsync html/ to pypsa.squoilin.eu/intervec/<scenario>_<date>/ when
         # html_publish.enable is set; no-op if SSH as negawatt is unavailable.

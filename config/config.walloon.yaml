@@ -364,6 +364,16 @@ sector:
     units: twh
     # Minimum ribbon in `units`; null keeps every flow (small ribbons included).
     threshold: null
+  # TIMES scenario indicators into results/<prefix>/<run>/html/indicators/: the
+  # trajectory charts and tables (final energy demand by sector and carrier, GHG
+  # emissions, heat production, power fleet) read straight from `times_file`,
+  # not from the PyPSA solve. Third section of the html/index.html hub, beside
+  # pypsa2html and the TIMES Sankeys. Same parse-time caveat as `times_sankey`:
+  # do NOT move this block into a scenario overlay. TIMES_PyPSA/INDICATORS.md
+  times_indicators:
+    enable: true
+    # Write the CSV table beside each chart (the tables are a deliverable too).
+    write_csv: true
   # TIMES heating soft-link. Every switch defaults to the pre-2026-08 behaviour,
   # so removing this block reproduces the old results. Two ALTERNATIVE mix
   # mechanisms — `energy_mix` (option C, annual constraint) and `profile`
