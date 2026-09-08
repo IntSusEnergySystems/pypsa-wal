@@ -171,7 +171,46 @@ Two things to watch that are not just "more of the same":
 
 ---
 
-## 5. Checklist
+## 5. pypsa2html — ready, with one caveat
+
+Checked against `pypsa2html` `2c40825`. **No work required.** The report layer was
+deliberately built horizon-agnostic — its docstrings say so explicitly
+(`year_columns`: *"Replaces the `['2020','2030','2040','2050']` literals that
+appeared in ~20 places and made 2035/2045 structurally impossible"*) — and the
+claim holds up when exercised:
+
+| mechanism | verdict |
+|---|---|
+| `discover_horizons()` | regex is `(\d{4})` against `model.network_pattern`; any 4-digit year is picked up, and `model.planning_horizons: null` in `config/pypsa-wal.yaml` means "discover from disk". |
+| `ctx.year_columns` | derived from the discovered horizons. Returned the right 6 labels for `(2025, 2030, 2035, 2040, 2045, 2050)`. |
+| `ctx.horizon_weights()` | weight = gap to the next horizon, last inherits the previous gap. Six horizons → `[5, 5, 5, 5, 5, 5]`. See the caveat below. |
+| `_interpolate_to()` | puts the packaged `domestic_{gas,oil}_production.csv` tables (quoted 2020/2030/2040/2050) onto any horizon by index interpolation. A 2020→2050 series of 100/120/110/100 gives 115 @2035 and 105 @2045. |
+| positional indexing | only `horizons[0]` (default network) and `horizons[-1]` (`costs_<last>_processed.csv`). Both correct for any horizon set. |
+| chart layout | the single `make_subplots` facets by *technology group*, never by year; bars sit on a categorical x axis, so six bars need no change. Sankey years come from the data index, dispatch pages iterate `ctx.horizons`. |
+| tests | `tests/test_tables.py` already parametrises on `(2025, 2035, 2045)`. 360 tests pass. |
+
+**Caveat — cumulative totals are not comparable across horizon grids.** Because
+the last horizon inherits the previous gap, the weights sum to a different span:
+
+| grid | weights | span |
+|---|---|---|
+| `2025, 2030, 2040, 2050` | 5, 10, 10, 10 | **35 years** (2025–2060) |
+| `2025, 2030, 2035, 2040, 2045, 2050` | 5, 5, 5, 5, 5, 5 | **30 years** (2025–2055) |
+
+Every cumulative chart — cumulative cost, cumulative emissions, the CO2 budget
+comparison — therefore integrates over 35 years today and would integrate over
+30 on a 5-year grid. A ~14 % shift with no physical meaning. This is not a
+pypsa2html defect (gap-to-next is the right rule for a myopic step); it is a
+property of the tail convention. **Do not put a 10-year and a 5-year run's
+cumulative figures in the same table** without restating both on a common span.
+
+The one thing not verified: no report has ever been *built* from six solved
+networks, because none exist. Everything above is unit-level. Build the HTML at
+6h resolution before trusting a 1h run's pages.
+
+---
+
+## 6. Checklist
 
 1. Add 28 rows (14 targets × 2035, 2045) to
    `config/input_parameters_for_models.csv`, preserving CRLF. Ten are copies;
