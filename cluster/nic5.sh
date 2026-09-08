@@ -58,8 +58,11 @@ rssh() { ssh $SSH_OPTS "$REMOTE" "$@"; }
 rssync() { rsync -e "ssh $SSH_OPTS" "$@"; }
 
 snakemake_local() {
+    # $CONFIGFILE is unquoted on purpose: it may name several files in
+    # snakemake's `--configfile A B` order (see cluster/config.sh). With the
+    # single default value this is identical to the quoted form.
     # shellcheck disable=SC2086
-    ( cd "$REPO" && $LOCAL_RUN snakemake --configfile "$CONFIGFILE" "$@" )
+    ( cd "$REPO" && $LOCAL_RUN snakemake --configfile $CONFIGFILE "$@" )
 }
 
 cluster_cpus() {

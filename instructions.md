@@ -742,11 +742,19 @@ is. It sets `run.prefix: walloon_5y`, so results go to
 grids coexist. Without that the six solves would overwrite the 10-year run's
 `base_s_adm___{2025,2030,2040,2050}.nc`.
 
-On the cluster (`RUN_PREFIX` must match `run.prefix`):
+On the cluster, `CONFIGFILE` takes **both** files (it is word-split at every use
+site, and `nic5.sh solve` appends `cluster/config_cluster.yaml` last), and
+`RUN_PREFIX` must match `run.prefix`:
 
 ```bash
 CONFIGFILE="config/config.walloon.yaml config/config.walloon_5y.yaml" RUN_PREFIX=walloon_5y ./cluster/nic5.sh run
 ```
+
+`HORIZONS` is **derived from `CONFIGFILE`** — do not set it by hand. Every loop in
+`nic5.sh` iterates it (prepare, solve, pull, postprocess, S3 metadata), so a stale
+four-horizon value would not fail: it would silently prepare, solve and publish
+four of the six horizons into a tree that looks complete. `cluster/config.sh`
+aborts if it cannot read `scenario.planning_horizons` from the config.
 
 The shared-parameter check takes the same pair. It writes `budget_national` to the
 **last** file given, so the base config is never rewritten:

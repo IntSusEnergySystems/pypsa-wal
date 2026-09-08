@@ -56,9 +56,49 @@ MAX_SLURM_JOBS="${MAX_SLURM_JOBS:-2}"
 # argument anywhere in this tooling (unlike pypsa-eur_negawatt) — switch runs by
 # exporting the variables below, e.g.
 #   RUN_NAME=scen_base ./cluster/nic5.sh <command>
+# CONFIGFILE may name SEVERAL files, space-separated, in snakemake's
+# `--configfile A B` order (later wins) — that is how the 5-year grid is run:
+#   CONFIGFILE="config/config.walloon.yaml config/config.walloon_5y.yaml" \
+#   RUN_PREFIX=walloon_5y ./cluster/nic5.sh run
+# It is deliberately left unquoted at every use site so it word-splits.
 CONFIGFILE="${CONFIGFILE:-config/config.walloon.yaml}"
 RUN_NAME="${RUN_NAME:-scen_demande_haute}"
-HORIZONS="${HORIZONS:-2025 2030 2040 2050}"
+
+# Planning horizons of this run, read from CONFIGFILE rather than repeated here.
+#
+# Every loop in nic5.sh iterates this list — prepare, solve, pull, postprocess
+# and the S3 metadata — so a stale value does not fail the run, it silently runs
+# a *subset* of the horizons and produces a tree that looks complete. Deriving it
+# means the 5-year overlay cannot be half-applied. Export HORIZONS to override.
+_horizons_from_configs() {
+    local f got out="" root
+    # CONFIGFILE is relative to the repo root, but config.sh may be sourced from
+    # anywhere. nic5.sh sets REPO before sourcing; fall back to this file's own
+    # location for any other caller.
+    root="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+    for f in "$@"; do
+        case "$f" in /*) : ;; *) f="$root/$f" ;; esac
+        [ -r "$f" ] || continue
+        got=$(awk '
+            /^[^[:space:]#]/ { in_scenario = ($0 ~ /^scenario:/); in_ph = 0 }
+            in_scenario && /^[[:space:]]+planning_horizons:[[:space:]]*$/ { in_ph = 1; next }
+            in_ph && /^[[:space:]]*-[[:space:]]*[0-9][0-9][0-9][0-9]/ {
+                gsub(/[^0-9]/, ""); print; next
+            }
+            in_ph && /^[[:space:]]*[^ #-]/ { in_ph = 0 }
+        ' "$f" | tr '\n' ' ')
+        [ -n "$got" ] && out="$got"
+    done
+    echo "${out% }"
+}
+# shellcheck disable=SC2086
+HORIZONS="${HORIZONS:-$(_horizons_from_configs $CONFIGFILE)}"
+if [ -z "$HORIZONS" ]; then
+    printf '\033[1;31m[nic5] ERROR:\033[0m %s\n' \
+        "could not read scenario.planning_horizons from: $CONFIGFILE" >&2
+    printf '  %s\n' "export HORIZONS=\"2025 2030 ...\" to set it by hand." >&2
+    exit 1
+fi
 CLUSTERS="${CLUSTERS:-adm}"
 OPTS="${OPTS:-}"
 SECTOR_OPTS="${SECTOR_OPTS:-}"
