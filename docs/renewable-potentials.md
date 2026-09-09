@@ -553,3 +553,85 @@ documented 2.25.
 > TWh of regional `e_sum_max` unused (BEWAL 4.45 of 9.22). A slack Walloon row
 > in 2050 is therefore *not* a Walloon statement. See
 > [`ccs_alignment.md`](ccs_alignment.md) §17 for the mechanism.
+
+### 9.6 The solid-biomass budget: why a horizon stalls, and how to check it before the barrier
+
+The Walloon bus `BEWAL solid biomass` is shared by the biomass-boiler heat pin
+(soft), rigid industry demand (hard) and optional consumers (CHP, liquids,
+methanol — ~0 whenever biomass is scarce). Three failure modes, three
+signatures:
+
+1. **Hard infeasibility** — rigid industry fuel alone exceeds total supply.
+   The LP is empty; `solve_network.py` answers with `compute_infeasibilities()`,
+   a Gurobi IIS that ran 13 h without finishing on the 2040 network
+   ([`heat-softlink.md`](heat-softlink.md) §8.7).
+2. **Boundary stall** — the 2026-09-07 2030 case
+   ([log](logs/2026-09-07_scen_demande_haute_2010_1h_stalled.md)): the budget
+   lands within a fraction of a percent of the cap, the optimal face is
+   near-degenerate, and the barrier crawls (402 iterations, sub-optimal
+   termination). It prints `large rhs` / `large bounds` warnings and looks like
+   numerics; it is not.
+3. **Silent relaxation** — the boiler pin is soft (`profile.penalty`), so if
+   supply covers industry but not the boiler, the solve "succeeds" with the pin
+   partly undelivered and the heat electrified instead. TIMES-consistency is
+   lost without an error; `RELAXATION_WARN_SHARE` (0.02) is the tripwire.
+
+**Anatomy of the budget** (all BEWAL, TWh). Supply is the domestic
+`solid biomass` potential (9 222, flat, every horizon) plus the transported
+import cap (`e_sum_max` 2.000 / 2.000 / **2.125** / 2.250 / **2.625** / 3.000 —
+the 2035/2045 steps are the `hold → interp` flip of `50f95de0`). Since F8 the
+sustainable generator keeps its upstream value and the unsustainable one takes
+the remainder, so the two sum to the potential; the pre-solve report
+(`_biomass_report` in `scripts/walloon_scripts/times_heat_profiles.py`) sums
+per-generator `e_sum_max` on the bus. Demand is the boiler fuel
+(`energies["biomass boiler"] / 0.855`) plus industry fuel, which is the TIMES
+industry figure divided by ~0.9 for the industry-CC capture penalty — not a
+rule of thumb: on the solved 2030 network 4.522 / 0.9 = 5.024 TWh exactly.
+
+The report prints one line per horizon in
+`results/<run>/logs/*_python.log` **before the barrier starts**:
+
+> `biomass boiler profile needs ~5.049 TWh of solid biomass at BEWAL solid
+> biomass, whose own supply caps at 11.222 TWh (imports excepted) …`
+
+and warns whenever the boiler alone claims more than 50 % of domestic supply.
+That line is the instrument: read it for every new or tight horizon as soon as
+its job starts, not after hours of queue.
+
+**How to check without solving.** The line replicates exactly from prepared
+artefacts, which is what caught the 6 222 episode below: boiler heat is
+`share × E_PyPSA_heat` (TIMES share from the constrained decentral rows of
+`heating_targets_{year}.csv` times the decentral heat load, including the
+static agriculture `p_set` — use `decentral_heat_buses()` and
+`decentral_heat_load()` from `scripts.walloon_scripts`, not the TIMES TWh
+column); industry is the `solid biomass` category of
+`wallon_demands_{year}.csv` divided by 0.9; supply is the two
+`custom_potentials.csv` rows. Calibration against the code's own printout:
+2030 predicted 4.810 vs printed 4.786 (<1 %), 2040 exact, and the live 2025
+line of the 5-year run matched the prediction to three decimals
+(2.284 / 11.222).
+
+**Worked example — the 9 222 → 6 222 episode, 2026-09-09.** `50f95de0` cut the
+domestic potential to 6 222 on a double-counting rationale (Valbiom's 9 222
+was read as including the separately-counted imports). The offline check,
+before any solve was queued:
+
+| horizon | demand (boiler + industry) | supply @9 222 | margin | supply @6 222 | margin |
+|---|---:|---:|---:|---:|---:|
+| 2025 | 2.28 + 5.50 = 7.79 | 11.222 | **+3.43** | 8.222 | +0.44, stall-risky |
+| 2030 | 4.81 + 5.02 = 9.83 | 11.222 | **+1.39** | 8.222 | −1.61 |
+| **2035** | 4.74 + 5.55 = 10.30 | 11.347 | **+1.05** | 8.347 | −1.95 |
+| 2040 | 5.05 + 5.58 = 10.63 | 11.472 | **+0.84** | 8.472 | −2.16 |
+| **2045** | 4.87 + 5.59 = 10.46 | 11.847 | **+1.39** | 8.847 | −1.61 |
+| 2050 | 0.10 + 4.83 = 4.93 | 12.222 | +7.29 | 9.222 | +4.29 |
+
+Under 6 222 every horizon 2030–2045 would have been 1.6–2.2 TWh short —
+30–40 % forced relaxation of the boiler pin — and 2025 sat at +5 %, the exact
+knife-edge that stalled 2030 a week earlier. Reverted to 9 222 the same
+morning (`--write`, `--check` passed, 6 rows). Two independent strikes against
+6 222 beyond the arithmetic: TIMES itself burns 8.0–8.7 TWh domestic in
+2030/2040 with zero imports, so a 6.222 domestic cap contradicts the soft link;
+and the 2026-09-07 production run (same demands, 9 222) served every pin with
+1.3–1.7 TWh to spare. Note the restored margins are still tighter than that
+precedent at 2035 (+1.05) and 2040 (+0.84) — both new-or-tight horizons keep
+the read-the-budget-line instruction from §9.6's second paragraph.
