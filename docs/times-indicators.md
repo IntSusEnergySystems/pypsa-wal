@@ -74,7 +74,8 @@ Three consequences worth knowing before reading a chart:
 - **Cogeneration fuel is split.** Only the heat-allocated share is charged to the
   sector; the rest belongs to generation.
 - **Aviation kerosene is shown but not summed** into the transport total — it is
-  an international bunker.
+  an international bunker. On the transport chart it is the hatched grey bar
+  *beside* the stack, so the stacked height is what the total line says.
 
 ## 3. Configuration
 
@@ -88,9 +89,16 @@ sector:
 Read at **parse** time, like `sector.times_sankey`: the rule's outputs are one
 file per indicator group, so the list has to exist before the DAG is built. That
 means the block must **not** be moved into a scenario overlay. `times_file` may
-vary per scenario (it is a rule input, resolved per `{run}`); the script
-cross-checks the parse-time horizons against the run's own
-`scenario.planning_horizons` and stops rather than charting the wrong years.
+vary per scenario (it is a rule input, resolved per `{run}`).
+
+There is no horizon setting. **The pages chart every model year in the `.vd`** —
+2021, 2022, 2025, 2030, 2035, 2040, 2045, 2050 for the Walloon scenarios — not
+`scenario.planning_horizons`. These are the TIMES trajectory, and drawing only
+the four years PyPSA steps through dropped 2021, the calibrated base year every
+number in [`INDICATORS.md`](../../TIMES_PyPSA/INDICATORS.md) is reconciled
+against, and left holes at 2035 and 2045. Nothing downstream reads the pages, so
+the two year lists have no reason to agree, and the rule needs no parse-time
+overlay cross-check (unlike `build_times_sankey`, whose file names carry years).
 
 The rule is skipped, with a warning and no other effect on the workflow, when
 `sector.times_file` is unset or `times_pypsa` is not importable
@@ -123,7 +131,7 @@ Or outside the workflow, straight from a `.vd`:
 
 ```bash
 times-pypsa indicators --vd data/walloon/<scenario>.vd --out-dir /tmp/indicators \
-  --years 2025,2030,2040,2050 --scenario-label "demande haute"
+  --scenario-label "demande haute"
 ```
 
 ## 5. Publishing

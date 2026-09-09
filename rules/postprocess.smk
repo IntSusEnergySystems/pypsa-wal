@@ -957,7 +957,6 @@ def _times_indicators_settings():
     from times_pypsa import indicator_page_names
 
     return {
-        "horizons": [int(y) for y in config["scenario"]["planning_horizons"]],
         "write_csv": bool(cfg.get("write_csv", True)),
         # Pages only; the index is declared separately so it is not listed twice.
         "pages": indicator_page_names(index_name=None),
@@ -984,10 +983,9 @@ if TIMES_INDICATORS:
         message:
             "Rendering TIMES scenario indicators for {wildcards.run}"
         params:
-            # Parse-time horizons, cross-checked against the run's own list by
-            # the script for the same reason as build_times_sankey.
-            planning_horizons=TIMES_INDICATORS["horizons"],
-            scenario_horizons=config_provider("scenario", "planning_horizons"),
+            # No horizon list: these pages chart every model year in the `.vd`,
+            # not the four PyPSA steps through it. That is also why this rule
+            # needs no parse-time/overlay cross-check, unlike build_times_sankey.
             write_csv=TIMES_INDICATORS["write_csv"],
             mappings_dir=config_provider("sector", "times_mappings_dir", default=None),
         input:
