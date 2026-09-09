@@ -35,24 +35,14 @@ if __name__ == "__main__" and "snakemake" not in globals():
 configure_logging(snakemake)
 
 out_dir = Path(snakemake.output.index).parent
-years = [int(y) for y in snakemake.params.planning_horizons]
 
-# `years` is the parse-time horizon list the rule expanded its outputs from;
-# `scenario_horizons` is what this run actually solves. They differ only if a
-# scenario overlay overrode `scenario.planning_horizons`, which the rule cannot
-# follow -- its output file names were fixed before the overlay was applied.
-# Charting the parse-time years anyway would put the wrong horizons in the
-# report, so stop instead.
-scenario_years = [int(y) for y in snakemake.params.scenario_horizons]
-if sorted(set(scenario_years)) != sorted(set(years)):
-    raise ValueError(
-        f"scenario.planning_horizons for run '{snakemake.wildcards.get('run', '')}' "
-        f"is {sorted(set(scenario_years))} but the TIMES indicator outputs were "
-        f"declared for {sorted(set(years))}. The rule reads the horizons at parse "
-        "time, before scenario overlays. Either keep planning_horizons out of the "
-        "scenario overlay, or set sector.times_indicators.enable: false for this run."
-    )
-
+# Every model year in the `.vd`, not `scenario.planning_horizons`. These pages
+# chart the TIMES trajectory, and TIMES solves 2021, 2022, 2025, 2030, 2035,
+# 2040, 2045 and 2050 while PyPSA only steps through four of them; restricting
+# the charts to the PyPSA horizons dropped 2021 -- the calibrated base year the
+# numbers are reconciled against -- along with 2035 and 2045, and drew a
+# trajectory with holes in it. Nothing downstream reads these pages, so the two
+# year lists have no reason to agree.
 mappings_dir = snakemake.params.get("mappings_dir")
 mappings_dir = Path(mappings_dir) if mappings_dir else default_rules_dir()
 
@@ -60,7 +50,6 @@ export_indicator_pages(
     out_dir,
     vd_file=snakemake.input.times_file,
     mappings_dir=mappings_dir,
-    years=years,
     scenario_label=snakemake.wildcards.get("run", ""),
     write_csv=bool(snakemake.params.write_csv),
 )
