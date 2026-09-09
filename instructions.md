@@ -672,6 +672,42 @@ The `-call` flag runs all rules needed for the default `all` target, including
 data retrieval from Zenodo/HTTP, network building, four myopic solves, summary
 CSVs, and plots.
 
+### When Zenodo is down: `--storage-cached-http-skip-remote-checks`
+
+Zenodo outages (HTTP 504) block **every** Snakemake invocation — prepare, solve
+submission, postprocess — even when all the data is already on disk. The
+`snakemake-storage-plugin-cached-http` plugin resolves each `storage()` input at
+**DAG-build time**, before any rule runs, so a cached file does not spare you the
+metadata call. Two records gate the workflow: `4767098` (SciGRID_gas) and
+`10820928` (synthetic electricity demand).
+
+Force Snakemake to trust what is on disk:
+
+```bash
+export SNAKEMAKE_STORAGE_CACHED_HTTP_SKIP_REMOTE_CHECKS=1
+```
+
+or pass `--storage-cached-http-skip-remote-checks` per invocation. The plugin then
+reports every remote object as existing with `mtime=0`, so nothing looks newer
+than the local copy and no metadata request is made. Verified with the network
+fully blocked: without it the DAG build dies on `ConnectError`, with it the same
+build completes normally.
+
+Two things it does **not** do:
+
+* **It does not fetch missing files.** Any output not already on disk still runs
+  its retrieve rule and needs the network for that one file — though usually from
+  `data.pypsa.org`, which is a separate host from Zenodo and is often up when
+  Zenodo is not.
+* **It disables freshness checks for all cached-http storage** (zenodo.org,
+  data.pypsa.org, storage.googleapis.com), so an upstream republish goes
+  unnoticed. Fine for a pinned-version production run — but keep it a per-run
+  flag or export, not a default in `profiles/default/`.
+
+Switching a dataset's `source` in the config is **not** a workaround: the on-disk
+path is `data/<name>/<source>/<version>`, so changing the source changes the
+folder and re-downloads rather than reusing what you have.
+
 ### Local resource settings — 12 threads, 100 GB
 
 The pypsa-eur defaults (`solving.mem_mb: 128000`, `gurobi-default.threads: 32`)
