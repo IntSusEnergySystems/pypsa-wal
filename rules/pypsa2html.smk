@@ -113,21 +113,29 @@ if HAVE_PYPSA2HTML:
                     "output": {"dir": str(pypsa_dir)},
                 },
             )
-            # A scenario overlay not yet listed in config/pypsa2html.yaml still
-            # has to resolve: inject it so build_site can find the networks.
-            if scenario not in cfg.scenario_names:
-                from pypsa2html.config import ScenarioConfig
+            # This rule always reports the tree it was given (results_tree),
+            # even when config/pypsa2html.yaml already lists a scenario of
+            # the same name pointing elsewhere (e.g. scen_demande_haute on
+            # the 10-year tree while this run builds the 5-year overlay).
+            # A conditional inject-only-if-missing silently reports the wrong
+            # tree — seen 2026-09-09, 82 pages of 10-year content in the 5y
+            # folder. So replace any same-named entry, keeping its label.
+            from pypsa2html.config import ScenarioConfig
 
-                cfg.scenarios.append(
-                    ScenarioConfig(
-                        name=scenario,
-                        label=scenario,
-                        results_dir=str(results_tree),
-                        resources_dir=str(results_tree).replace(
-                            "results/", "resources/", 1
-                        ),
-                    )
+            existing = next(
+                (s for s in cfg.scenarios if s.name == scenario), None
+            )
+            cfg.scenarios = [s for s in cfg.scenarios if s.name != scenario]
+            cfg.scenarios.append(
+                ScenarioConfig(
+                    name=scenario,
+                    label=existing.label if existing is not None else scenario,
+                    results_dir=str(results_tree),
+                    resources_dir=str(results_tree).replace(
+                        "results/", "resources/", 1
+                    ),
                 )
+            )
             report = build_site(cfg, scenarios=[scenario])
             logging.info(report.summary())
 
