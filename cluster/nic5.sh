@@ -228,10 +228,21 @@ cmd_push() {
     # (resources/<prefix>, data/bundle, data/osm -> /sylvain/mount) and any
     # symlinked inputs (e.g. data/walloon/*.vd) arrive as REAL files on the
     # cluster instead of dangling absolute symlinks.
-    rssync -arLh --no-g \
+    # `tmp` is excluded unconditionally, not via PUSH_EXCLUDES: it is local
+    # scratch (leftover linopy *.lp dumps -- 9.4 GB on 2026-09-12) AND it is
+    # the very directory REMOTE_ENV points the cluster's TMPDIR at, so pushing
+    # it both wastes the uplink and litters a directory the solve writes to.
+    #
+    # $PUSH_EXCLUDES is unquoted on purpose so it word-splits into rsync
+    # --include/--exclude flags (cluster/config.sh). -z: the tree is mostly
+    # .nc/.csv, and the workstation uplink is the slow leg of the pipeline.
+    # shellcheck disable=SC2086
+    rssync -arLhz --skip-compress=nc/tif/gz/zip/7z/bz2/xz/png/jpg/parquet --no-g \
         --exclude '.git' --exclude '.pixi' \
         --exclude 'results' --exclude '__pycache__' --exclude '*.pyc' \
         --exclude 'cluster/logs' --exclude 'cutouts' --exclude 'data/cutout' \
+        --exclude 'tmp' \
+        $PUSH_EXCLUDES \
         "$REPO/" "${REMOTE}:${REMOTE_DIR}/"
     if [ -d "$REPO/.snakemake/metadata" ]; then
         rssh "mkdir -p '$REMOTE_DIR/.snakemake'"
@@ -394,6 +405,10 @@ cmd_pull() {
     # symlink onto a bigger disk. Without it rsync sees a real directory in the
     # source, deletes the local symlink and writes the networks onto the small
     # disk instead.
+    # Deliberately NOT -z. What comes back is almost entirely solved networks
+    # (229-363 MB each, ~1.3 GB per scenario at 1h resolution), and netCDF4
+    # already stores them zlib-compressed: a measured sample gzips to 97.6 % of
+    # its size, so -z would burn CPU on both ends for ~2 %.
     rssync -arhK --no-g --info=progress2 \
         "${REMOTE}:${REMOTE_DIR}/results/" "$REPO/results/" \
         || msg "(no results dir yet)"

@@ -338,6 +338,46 @@ horizons: 1 h05 + 3 h + 1 h20 + 1 h05):
 built — they are produced before any solve starts, by rules that no scenario
 parameterises (verified: nothing a scenario overrides feeds a shared file).
 
+### 4.2b Data transit — what actually crosses the VPN
+
+**Preprocessing runs here, not on NIC5.** `nic5.sh prepare` is a local Snakemake
+call; the cluster only ever runs the myopic solve chain (`add_brownfield` →
+`solve_sector_network_myopic`). Post-processing, the ClimAct extraction and the
+HTML report are local too. So the cluster never reads a `.vd`, a cutout or a
+cost table — it reads un-solved networks and writes solved ones.
+
+| leg | volume | what it is |
+|---|---:|---|
+| **up**, first push | **≈ 7 GB** scope, less on the wire | `data/` (3.8 GB, ~1.5 GB already there), shared `resources/` (857 MB), 13 × un-solved networks and per-run resources (156 MB each ≈ 2.0 GB), 8 `.vd` (605 MB) |
+| **up**, later pushes | tens of MB | rsync deltas: edited configs and scripts |
+| **down**, pull | **≈ 17 GB** | 13 × ~1.3 GB of solved networks (229–363 MB per horizon at 1 h) |
+| | **≈ 24 GB total** | |
+
+Three things were trimmed on 2026-09-12 to get there, because the workstation
+uplink is the slow leg:
+
+* **`tmp/` is excluded** — 9.4 GB of leftover linopy `*.lp` dumps, and it is the
+  exact directory `REMOTE_ENV` points the cluster's `TMPDIR` at, so pushing it
+  both wasted the uplink and littered a directory the solve writes to.
+* **`PUSH_EXCLUDES`** (cluster/config.sh) drops stale `resources/` trees from
+  other run prefixes (`times-pypsa` 2.7 GB, `walloon-model` 0.9 GB, the 2013 6 h
+  smoke test 0.9 GB) and the seven `.vd` files no active scenario names. `push`
+  uses `-L`, so every symlink arrives as a real file — 15 `.vd` symlinks were
+  1.1 GB of transit for 605 MB of need.
+* Together: push scope **20.9 GB → 6.8 GB**. Clear `PUSH_EXCLUDES` to send
+  everything.
+
+**`-z` is on the push and deliberately off the pull.** The push carries GB of
+geojson/csv that deflate well (with `--skip-compress` for `.nc`/`.tif`); what
+comes back is netCDF4, already zlib-compressed internally — a measured sample
+gzips to **97.6 %** of its size, so compressing the pull would burn CPU on both
+ends for ~2 %.
+
+The 17 GB pull is irreducible: `solving.options.store_model` is already `false`,
+and the solved networks are what every local post-processing step reads. On a
+slow link, pull **per scenario as it finishes** (the combined report is additive,
+§4.4) rather than waiting for all thirteen.
+
 ### 4.3 Pull and post-process locally
 
 ```bash

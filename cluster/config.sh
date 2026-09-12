@@ -197,6 +197,36 @@ EXPLORER_TYPE="${EXPLORER_TYPE-times-pypsa}"
 #   Higher solve runtime for a heavier LP:
 #     SOLVE_RUNTIME=2880 ./cluster/nic5.sh solve
 
+# --- push payload trimming -----------------------------------------------------
+# `push` rsyncs the repo with -L, so every symlink arrives as a real file. Two
+# families are inside that scope, cost GB, and are of no use to a solve:
+#
+#  * stale resources/ trees from OTHER run prefixes. The cluster only ever reads
+#    resources/<RUN_PREFIX>/ plus the shared resources/ root, so trees left from
+#    earlier studies are pure transit. Measured 2026-09-12: times-pypsa 2.7 GB,
+#    walloon-model 0.9 GB, the 2013 6h smoke test 0.9 GB.
+#
+#  * TIMES .vd files that no active scenario names. -L turns 15 symlinks into
+#    1.1 GB of real files; the September batch needs 8 of them (605 MB).
+#
+# Both are trimmed by default. This matters because the workstation's uplink is
+# the slow leg of the whole pipeline. Clear the variable to push everything:
+#   PUSH_EXCLUDES="" ./cluster/nic5.sh push
+#
+# NOTE the .vd rule is include-before-exclude, which is how rsync expresses
+# "keep these, drop the rest of the pattern"; order is significant.
+# Preprocessing runs LOCALLY (`nic5.sh prepare`), so the cluster never reads a
+# .vd at all -- they travel only so that a re-planned DAG up there does not hit
+# a missing input.
+PUSH_EXCLUDES="${PUSH_EXCLUDES-\
+--exclude resources/times-pypsa \
+--exclude resources/walloon-model \
+--exclude resources/walloon_5y \
+--exclude resources/walloon/scen_test_2013_6h \
+--exclude resources/walloon/scen_demande_haute \
+--include data/walloon/*_260911_1109.vd \
+--exclude data/walloon/*.vd}"
+
 # --- local conda invocation ----------------------------------------------------
 # How to run the local environment (used by `nic5.sh prepare` / `postprocess`).
 # --no-capture-output: stream Snakemake progress to the terminal (conda run buffers by default).
