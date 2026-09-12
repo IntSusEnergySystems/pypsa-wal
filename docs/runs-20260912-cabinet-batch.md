@@ -580,7 +580,67 @@ Provenance to record for this batch, beyond the template:
 
 ---
 
-## 10. Open items
+## 10. The 2030 floors against the Plan Air Climat Énergie
+
+Asked 2026-09-12. The PACE 2030 (adopted 21 March 2023) states its renewable
+targets as **annual production**, not capacity, so the honest comparison is in
+GWh; the MW column is a conversion at the model's own BEWAL yield for weather
+2010 (`resources/.../profile_adm_*.nc`): **2 302 full-load hours** for onshore
+wind, **952 h** for non-tracking PV.
+
+| PACE 2030 target | value | source |
+|---|---|---|
+| onshore wind | **6 200 GWh/a** | raised from the 4 600 GWh of the 2019 PACE, to match the −55 % GHG objective |
+| photovoltaic | **5 100 GWh/a ≈ 6 GWc** | PACE 2030 |
+
+| | wind MW | wind GWh | vs PACE | PV MW | PV GWh | vs PACE |
+|---|---:|---:|---:|---:|---:|---:|
+| PACE 2030 (implied) | 2 693 | 6 200 | — | 5 357 | 5 100 | — |
+| **our central floor** (min 2030) | 3 000 | 6 906 | **+11 %** | 6 500 | 6 188 | **+21 %** |
+| realiste cap (max 2030) | 2 366 | 5 447 | −12 % | 3 310 | 3 151 | −38 % |
+
+**The central scenario is more ambitious than the PACE, on both technologies.**
+For wind that is close and defensible: 3 000 MW against 2 693 MW implied, and
+the row's own source line already says `Walloon PNEC-PACE and EDORA technical
+potential`.
+
+**For PV the +21 % is not a deliberate PACE reading** — the row is sourced
+`Climact on Elia ADEXFLEX, Walloon share`, not the PACE at all. The two numbers
+were never reconciled. Worth deciding explicitly whether the central case should
+sit at the PACE (≈ 5 350 MW) or keep the Elia-derived 6 500 MW; the answer
+changes the 2030 corridor of every scenario in the batch, because that floor is
+inherited by all eleven that do not override it.
+
+Note the MW column for PV is basis-dependent and the GWh one is not: PACE's own
+5 100 GWh / 6 GWc implies **850 h**, against the model's 952 h, so part of the
+gap is a yield/DC-AC convention rather than a difference in ambition. Read the
+GWh comparison.
+
+### 10.1 What each trajectory demands of the build rate
+
+This is the part that decides whether "réaliste" deserves its name.
+
+| | wind MW/yr 2026-30 | PV MW/yr 2026-30 |
+|---|---:|---:|
+| PACE 2030 | 227 | 538 |
+| our central floor | **288** | **766** |
+| realiste cap | 161 | **128** |
+| *observed in Wallonia* | *~100–190 (2023–24)* | *~100 MWc added in 2025* |
+
+Wallonia installed about **100 MWc of PV in 2025** against the 500–600 MWc/yr
+the PACE needs. Our central floor asks for **766 MW/yr — roughly 7.7× the
+current rate**, sustained for five years. ICEDD's realistic trajectory asks for
+128 MW/yr, which is what the region is actually doing.
+
+So the realiste sensitivity is not a pessimistic variant of the PACE: it is the
+observed build rate extrapolated, and it lands 38 % below the PACE on PV. That
+is the finding to carry into the presentation — the gap between the central
+scenario and the realiste one is mostly a statement about deployment rates, not
+about costs or technology.
+
+---
+
+## 11. Open items
 
 | # | Item | Who | Blocking? |
 |---|---|---|---|
@@ -588,4 +648,5 @@ Provenance to record for this batch, beyond the template:
 | 2 | **Confirm the swapped-increment correction** (§1.2): 2 366 MW wind / 3 310 MW PV instead of ICEDD's 2 203 / 3 474 | ICEDD | no — one value per file to revert |
 | 3 | Confirm the currency year of the DG CLIMA "recommended parameters for reporting GHG projections in 2025" fuel prices. ICEDD tagged them EUR2021 and that is what the EUR2025 inflation assumes; the parameter file is not publicly fetchable, so it could not be checked here. The uranium row needs no confirmation — its own source note says "Based on IEA 2011 data" and the inflated value (4.6497) reproduces `docs/nuclear-alignment-20260816.md` §7 exactly | ICEDD | no — reversible in one commit |
 | 4 | Nuclear sweep bracket: widen downwards if 4 500 EUR/kW still builds nothing | — | after the first results |
-| 5 | `scen_base`, `scen_corrige`, `scen_nuc11500`, `scen_nuc13500`, `scen_imppel`, `scen_data` are from Nov–Dec 2025 and unmanaged. Retire or migrate to an override file | Sylvain | no |
+| 5 | PV 2030 floor is 6 500 MW from Elia AdeqFlex, 21 % above the PACE's 5 100 GWh, and was never reconciled with it (§10). Central-case decision | Sylvain / cabinet | no |
+| 6 | `scen_base`, `scen_corrige`, `scen_nuc11500`, `scen_nuc13500`, `scen_imppel`, `scen_data` are from Nov–Dec 2025 and unmanaged. Retire or migrate to an override file | Sylvain | no |
