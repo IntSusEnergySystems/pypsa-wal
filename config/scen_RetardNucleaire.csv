@@ -1,10 +1,10 @@
-row_id,type,technology_type,technology_name_fr,technology_name_pypsa,technology_name_times,parameter,year,year_currency,value,units,source,description_complementaire,note_complementaire,data_origin_choice,pypsa_wal_value,pypsa_wal_location,pypsa_wal_target,year_rule,status
-519,local_RES_potential,Electricity production,Capacité nucléaire min (Wallonie),nuclear-all,,p_nom_min,2035.0,,1000.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:min,hold,active
-520,local_RES_potential,Electricity production,Capacité nucléaire min (Wallonie),nuclear-all,,p_nom_min,2040.0,,1000.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:min,hold,active
-521,local_RES_potential,Electricity production,Capacité nucléaire min (Wallonie),nuclear-all,,p_nom_min,2045.0,,1000.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:min,hold,active
-522,local_RES_potential,Electricity production,Capacité nucléaire min (Wallonie),nuclear-all,,p_nom_min,2050.0,,1030.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:min,hold,active
-523,local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2035.0,,1030.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:max,hold,active
-524,local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2040.0,,1030.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:max,hold,active
-525,local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2045.0,,1030.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:max,hold,active
-526,local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2050.0,,1750.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:max,hold,active
-,local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2055.0,,3000.0,MW,,,,TIMES,,,,,
+type,technology_type,technology_name_fr,technology_name_pypsa,technology_name_times,parameter,year,year_currency,value,units,source,description_complementaire,note_complementaire,data_origin_choice,pypsa_wal_value,pypsa_wal_location,pypsa_wal_target,year_rule,status
+local_RES_potential,Electricity production,Capacité nucléaire min (Wallonie),nuclear-all,,p_nom_min,2035.0,,1000.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:min,hold,active
+local_RES_potential,Electricity production,Capacité nucléaire min (Wallonie),nuclear-all,,p_nom_min,2040.0,,1000.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:min,hold,active
+local_RES_potential,Electricity production,Capacité nucléaire min (Wallonie),nuclear-all,,p_nom_min,2045.0,,1000.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:min,hold,active
+local_RES_potential,Electricity production,Capacité nucléaire min (Wallonie),nuclear-all,,p_nom_min,2050.0,,1030.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:min,hold,active
+local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2035.0,,1030.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:max,hold,active
+local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2040.0,,1030.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:max,hold,active
+local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2045.0,,1030.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:max,hold,active
+local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2050.0,,1750.0,MW,,,,TIMES,,,agg:BEWAL:nuclear-all:max,hold,active
+local_RES_potential,Electricity production,Capacité nucléaire max (Wallonie),nuclear-all,,p_nom_max,2055.0,,3000.0,MW,,,,TIMES,,,,,
