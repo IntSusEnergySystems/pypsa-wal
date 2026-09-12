@@ -114,18 +114,18 @@ scenarios:
     label: Nuclear CAPEX 6000 EUR/kW
     results_dir: results/walloon/scen_nuctip_6000
     resources_dir: resources/walloon/scen_nuctip_6000
-  - name: scen_nuctip_5000
-    label: Nuclear CAPEX 5000 EUR/kW
-    results_dir: results/walloon/scen_nuctip_5000
-    resources_dir: resources/walloon/scen_nuctip_5000
-  - name: scen_nuctip_4000
-    label: Nuclear CAPEX 4000 EUR/kW
-    results_dir: results/walloon/scen_nuctip_4000
-    resources_dir: resources/walloon/scen_nuctip_4000
-  - name: scen_nuctip_3000
-    label: Nuclear CAPEX 3000 EUR/kW
-    results_dir: results/walloon/scen_nuctip_3000
-    resources_dir: resources/walloon/scen_nuctip_3000
+  - name: scen_nuctip_6500
+    label: Nuclear CAPEX 6500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_6500
+    resources_dir: resources/walloon/scen_nuctip_6500
+  - name: scen_nuctip_5500
+    label: Nuclear CAPEX 5500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_5500
+    resources_dir: resources/walloon/scen_nuctip_5500
+  - name: scen_nuctip_4500
+    label: Nuclear CAPEX 4500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_4500
+    resources_dir: resources/walloon/scen_nuctip_4500
   - name: scen_central_2013
     label: Central — weather year 2013
     results_dir: results/walloon_2013/scen_central_2013

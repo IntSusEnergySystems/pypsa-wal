@@ -41,17 +41,24 @@ def _rows(path, **match):
 def test_the_icedd_domestic_potential_is_the_one_in_the_derived_file():
     """master 2f67b01e: 6000 -> 9222 GWh/an, every horizon.
 
-    2026-09-08: 9222 -> 6222. The Valbiom 9222 was found to already include the
-    imports that `solid biomass transported` counts separately, so the domestic
-    potential is 9222 - max(imports) = 9222 - 3000. Source note in
-    `config/input_parameters_for_models.csv`.
+    2026-09-08: 9222 -> 6222, on the reading that Valbiom's 9222 already
+    included the imports `solid biomass transported` counts separately, so the
+    domestic potential was 9222 - max(imports) = 9222 - 3000.
+
+    2026-09-09 (`dc364b75`, "solving and documenting biomass infeasibility"):
+    back to **9222**. The subtraction was withdrawn — see
+    `docs/renewable-potentials.md` — and the double-count it was guarding
+    against is now handled by the import cap itself, which ICEDD set to 0 for
+    the central scenario in `4a4116aa`. With no imports there is nothing to
+    subtract, and the two live values are consistent for the first time:
+    domestic 9222, imported 0.
 
     `>=` on the year set, not `==`: the file also carries the 5-year grid's
     2035/2045 rows (`config/config.walloon_5y.yaml`), which a 10-year run ignores.
     """
     rows = _rows(POTENTIALS, bus="BEWAL", technology="solid biomass", parameter="p_nom")
     assert {r["year"] for r in rows} >= {"2025", "2030", "2040", "2050"}
-    assert {r["value"] for r in rows} == {"6222"}
+    assert {r["value"] for r in rows} == {"9222"}
 
 
 def test_the_import_cap_that_binds_is_managed_by_the_master_csv():
@@ -60,7 +67,21 @@ def test_the_import_cap_that_binds_is_managed_by_the_master_csv():
     )
     assert managed, "the only binding import cap must not be an unmanaged orphan"
     assert {r["status"] for r in managed} == {"active"}
-    assert {float(r["value"]) for r in managed} == {2000.0, 2250.0, 3000.0}
+    # ICEDD `4a4116aa` (2026-09-10): "pellet import for wallonia set to 0.0
+    # according to the hypotheses for the 'central scenario' -> no solid biomass
+    # imports". The trajectory this test used to pin (2000 / 2250 / 3000 GWh/a)
+    # was the pre-central-scenario assumption. What still matters — and is what
+    # this test exists for — is that the cap remains MANAGED by the master table
+    # rather than drifting into an unmanaged file, so assert the shape and that
+    # every horizon carries the same decided value.
+    values = {float(r["value"]) for r in managed}
+    assert len(values) == 1, (
+        f"the import cap must be one decided trajectory, got {sorted(values)}"
+    )
+    assert values == {0.0}, (
+        "central-scenario hypothesis is no solid biomass imports for Wallonia; "
+        f"master CSV now says {sorted(values)}"
+    )
 
 
 def test_the_disabled_import_store_no_longer_claims_to_be_applied():

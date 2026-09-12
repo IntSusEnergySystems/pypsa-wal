@@ -7,9 +7,9 @@ BEWAL,solid biomass import,e_nom,4500,GWh/an,2045,"Bioenergy europe 2025 stat re
 BEWAL,solid biomass import,e_nom,6000,GWh/an,2050,"Bioenergy europe 2025 stat report, extrait par Valbiom",Projections avec centrale COGEN aux pellets,
 BEWAL,solid biomass transported,e_sum_max,0,GWh/an,2025,Valbiom,Potentiel annuel de pellets importés destinés à la Wallonie,
 BEWAL,solid biomass transported,e_sum_max,0,GWh/an,2030,Valbiom,Potentiel annuel de pellets importés destinés à la Wallonie,
-BEWAL,solid biomass transported,e_sum_max,2125,GWh/an,2035,Valbiom,Potentiel annuel de pellets importés destinés à la Wallonie,
+BEWAL,solid biomass transported,e_sum_max,0,GWh/an,2035,Valbiom,Potentiel annuel de pellets importés destinés à la Wallonie,
 BEWAL,solid biomass transported,e_sum_max,0,GWh/an,2040,Valbiom,Potentiel annuel de pellets importés destinés à la Wallonie,
-BEWAL,solid biomass transported,e_sum_max,2625,GWh/an,2045,Valbiom,Potentiel annuel de pellets importés destinés à la Wallonie,
+BEWAL,solid biomass transported,e_sum_max,0,GWh/an,2045,Valbiom,Potentiel annuel de pellets importés destinés à la Wallonie,
 BEWAL,solid biomass transported,e_sum_max,0,GWh/an,2050,Valbiom,Potentiel annuel de pellets importés destinés à la Wallonie,
 BEWAL,onwind,p_nom_max,6500,MW,2025,PNEC Wallon et EDORA,"• Potentiel technique, calculé comme la somme de ce qui est plausible d'atteindre en 2030 comme capacité et des projets à l'étude
 • Les statistiques d'installation (fin 2024) indique que la Wallonie est sur la bonne trajectoire pour atteindre son objectif de production de 6200 GWh étoliens onshore annuels (PNEC wallon - scénario WAM)

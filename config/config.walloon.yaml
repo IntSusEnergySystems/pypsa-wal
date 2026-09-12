@@ -26,11 +26,11 @@ run:
   - scen_realiste_nobnd30        # realistic 2030 PV/wind, no 2030 target
   - scen_retardnucleaire         # new nuclear deferred to 2055
   - scen_nuctip_9500             # nuclear CAPEX sweep: tipping-point search,
-  - scen_nuctip_7500             #   capacity free between the LTO floor and
-  - scen_nuctip_6000             #   the central envelope. 9500 = central cost,
-  - scen_nuctip_5000             #   i.e. the sweep's own reference point.
-  - scen_nuctip_4000
-  - scen_nuctip_3000
+  - scen_nuctip_7500             #   capacity free between the LTO floor and the
+  - scen_nuctip_6500             #   central envelope. 9500 = central cost, i.e.
+  - scen_nuctip_6000             #   the sweep's own reference point. Clustered
+  - scen_nuctip_5500             #   on 6000, where earlier analyses put the
+  - scen_nuctip_4500             #   break-even.
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:

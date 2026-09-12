@@ -613,180 +613,6 @@ scen_retardnucleaire:
       2040: 6.47
       2050: 10.0
 
-scen_nuctip_9500:
-  sector:
-    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_nuctip_9500.csv
-    industry_cc_floor:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_nuctip_9500.csv
-  electricity:
-    retrofit_nuclear_once: false
-    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_9500.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_9500.csv
-  solving:
-    agg_p_nom_limits:
-      file: data/walloon/agg_p_nom_minmax_scen_nuctip_9500.csv
-  self_sufficiency:
-    self_sufficiency_constraint: true
-    mode: absolute
-    nodes:
-    - BEWAL
-    limit_twh:
-      2030: 2.94
-      2040: 6.47
-      2050: 10.0
-
-scen_nuctip_7500:
-  sector:
-    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_nuctip_7500.csv
-    industry_cc_floor:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_nuctip_7500.csv
-  electricity:
-    retrofit_nuclear_once: false
-    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_7500.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_7500.csv
-  solving:
-    agg_p_nom_limits:
-      file: data/walloon/agg_p_nom_minmax_scen_nuctip_7500.csv
-  self_sufficiency:
-    self_sufficiency_constraint: true
-    mode: absolute
-    nodes:
-    - BEWAL
-    limit_twh:
-      2030: 2.94
-      2040: 6.47
-      2050: 10.0
-
-scen_nuctip_6000:
-  sector:
-    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_nuctip_6000.csv
-    industry_cc_floor:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_nuctip_6000.csv
-  electricity:
-    retrofit_nuclear_once: false
-    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_6000.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_6000.csv
-  solving:
-    agg_p_nom_limits:
-      file: data/walloon/agg_p_nom_minmax_scen_nuctip_6000.csv
-  self_sufficiency:
-    self_sufficiency_constraint: true
-    mode: absolute
-    nodes:
-    - BEWAL
-    limit_twh:
-      2030: 2.94
-      2040: 6.47
-      2050: 10.0
-
-scen_nuctip_5000:
-  sector:
-    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_nuctip_5000.csv
-    industry_cc_floor:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_nuctip_5000.csv
-  electricity:
-    retrofit_nuclear_once: false
-    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_5000.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_5000.csv
-  solving:
-    agg_p_nom_limits:
-      file: data/walloon/agg_p_nom_minmax_scen_nuctip_5000.csv
-  self_sufficiency:
-    self_sufficiency_constraint: true
-    mode: absolute
-    nodes:
-    - BEWAL
-    limit_twh:
-      2030: 2.94
-      2040: 6.47
-      2050: 10.0
-
-scen_nuctip_4000:
-  sector:
-    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_nuctip_4000.csv
-    industry_cc_floor:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_nuctip_4000.csv
-  electricity:
-    retrofit_nuclear_once: false
-    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_4000.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_4000.csv
-  solving:
-    agg_p_nom_limits:
-      file: data/walloon/agg_p_nom_minmax_scen_nuctip_4000.csv
-  self_sufficiency:
-    self_sufficiency_constraint: true
-    mode: absolute
-    nodes:
-    - BEWAL
-    limit_twh:
-      2030: 2.94
-      2040: 6.47
-      2050: 10.0
-
-scen_nuctip_3000:
-  sector:
-    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_nuctip_3000.csv
-    industry_cc_floor:
-      enable: true
-      node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_nuctip_3000.csv
-  electricity:
-    retrofit_nuclear_once: false
-    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_3000.csv
-  costs:
-    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_3000.csv
-  solving:
-    agg_p_nom_limits:
-      file: data/walloon/agg_p_nom_minmax_scen_nuctip_3000.csv
-  self_sufficiency:
-    self_sufficiency_constraint: true
-    mode: absolute
-    nodes:
-    - BEWAL
-    limit_twh:
-      2030: 2.94
-      2040: 6.47
-      2050: 10.0
-
 scen_central_2013:
   snapshots:
     start: '2013-01-01'
@@ -817,3 +643,178 @@ scen_central_2013:
       2030: 2.94
       2040: 6.47
       2050: 10.0
+
+scen_nuctip_9500:
+  sector:
+    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
+    rooftop_share:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_nofixnuc.csv
+  electricity:
+    retrofit_nuclear_once: false
+    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_9500.csv
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_9500.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_scen_nuctip_9500.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
+scen_nuctip_7500:
+  sector:
+    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
+    rooftop_share:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_nofixnuc.csv
+  electricity:
+    retrofit_nuclear_once: false
+    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_7500.csv
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_7500.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_scen_nuctip_7500.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
+scen_nuctip_6500:
+  sector:
+    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
+    rooftop_share:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_nofixnuc.csv
+  electricity:
+    retrofit_nuclear_once: false
+    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_6500.csv
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_6500.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_scen_nuctip_6500.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
+scen_nuctip_6000:
+  sector:
+    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
+    rooftop_share:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_nofixnuc.csv
+  electricity:
+    retrofit_nuclear_once: false
+    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_6000.csv
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_6000.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_scen_nuctip_6000.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
+scen_nuctip_5500:
+  sector:
+    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
+    rooftop_share:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_nofixnuc.csv
+  electricity:
+    retrofit_nuclear_once: false
+    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_5500.csv
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_5500.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_scen_nuctip_5500.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
+scen_nuctip_4500:
+  sector:
+    times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
+    rooftop_share:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_nofixnuc.csv
+  electricity:
+    retrofit_nuclear_once: false
+    walloon_potentials: data/walloon/custom_potentials_scen_nuctip_4500.csv
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_scen_nuctip_4500.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_scen_nuctip_4500.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+

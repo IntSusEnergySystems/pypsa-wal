@@ -57,7 +57,14 @@ OUT_DIR = ROOT / "config" / "scenarios"
 # EUR2025/kW_e. 9500 is the central value (data/walloon/custom_costs.csv,
 # "Mecatech Forum du nucleaire IEA") and is included so the sweep carries its
 # own reference point: same free-capacity setup, unchanged cost.
-DEFAULT_CAPEX = (9500, 7500, 6000, 5000, 4000, 3000)
+#
+# Bracket chosen around 6000, where earlier analyses put the break-even, with
+# 6500/6000/5500 clustered on it to resolve the crossing and 7500 / 4500 as the
+# outer points that should bracket it. 4500 rather than 3000 as the floor: a
+# value that far below any credible EPC estimate only tells us the model can be
+# made to build nuclear, which is not in doubt. If 4500 still builds nothing,
+# widen downwards in the next round rather than guessing now.
+DEFAULT_CAPEX = (9500, 7500, 6500, 6000, 5500, 4500)
 
 # Walloon nuclear that exists without any new build: Tihange 3 long-term
 # operation, repeatable retrofit (`electricity.retrofit_nuclear_once: false`).

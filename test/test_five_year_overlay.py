@@ -275,7 +275,12 @@ def test_ntc_and_agg_files_exist_for_the_new_horizons():
 
 @pytest.mark.parametrize("target,expected", [
     ("potential:BEWAL:biogas:p_nom", {2035: 6150.0, 2045: 5450.0}),
-    ("potential:BEWAL:solid biomass transported:e_sum_max", {2035: 2125.0, 2045: 2625.0}),
+    # ICEDD 4a4116aa (2026-09-10) set every anchor to 0 ("no solid biomass
+    # imports" in the central scenario), so `interp` interpolates a flat zero.
+    # The trajectory this used to check (2125 / 2625) belonged to the previous
+    # hypothesis; what the test still proves is that the 5-year grid gets a
+    # value for 2035/2045 at all, from the same rule as the 10-year one.
+    ("potential:BEWAL:solid biomass transported:e_sum_max", {2035: 0.0, 2045: 0.0}),
 ])
 def test_interpolated_trajectories(target, expected):
     """The two modeller's calls of docs/five_year_periods.md S1, and their rule.
