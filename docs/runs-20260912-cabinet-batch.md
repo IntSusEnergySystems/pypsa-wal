@@ -61,7 +61,9 @@ demands their `.vd` carries. Both get:
 | `agg:BEWAL:solar-all:max` @2030 | 3 310 MW (ICEDD wrote 3 474 — see below) | `config/scenarios/scen_realiste_*.csv` |
 | `agg:BEWAL:onwind:max` @2030 | 2 366 MW (ICEDD wrote 2 203 — see below) | same |
 | `agg:BEWAL:solar-all:min` @2030 | **dropped** (was 6 500) | same |
-| `agg:BEWAL:onwind:min` @2030 | **dropped** (was 3 000) | same |
+| `agg:BEWAL:onwind:min` @2030 | **dropped** | same |
+| `agg:BE:solar-all:min` @2030 | **dropped** (was 16 500) | same |
+| `agg:BE:onwind:min` @2030 | **dropped** (was 5 000) | same |
 | 2030 CO₂ cap, Belgium only | lifted to 1.0 (= 1990 level) | `config/scenarios.walloon.yaml` |
 
 **The two dropped floors are an addition to ICEDD's file, and they are
@@ -440,38 +442,38 @@ The 2013 cutout is already on disk. No download.
 
 ## 6. Traps that this batch walks into
 
-### 6.1 Parent rows in `agg_p_nom_limits` — **open question for ICEDD**
+### 6.1 Parent rows in `agg_p_nom_limits`
 
 `add_CCL_constraints` groups by `(location, carrier)`, and `BE` is a parent row
-over BEVLG + BEWAL + BEBRU. A cap put on BEWAL alone is undone by the parent.
+over BEVLG + BEWAL + BEBRU. **A cap put on BEWAL alone is undone by the parent.**
+This is the single most expensive trap in the batch, and it is handled in both
+places it occurs.
 
-For the **nuclear** scenarios this is handled: the BE floor moves by the same
-amount as the BEWAL floor, Flanders untouched (§1.3, §1.4). Without it the
-2050 BE floor of 6 000 MW = 3 000 BEVLG + 3 000 BEWAL would re-impose the full
-Walloon build through the parent and the sweep would come out flat — "nuclear is
-always built" — for a reason that has nothing to do with its cost.
+**Nuclear** (§1.3, §1.4): the BE floor moves by the same amount as the BEWAL
+floor, Flanders untouched. Without it the 2050 BE floor of 6 000 MW = 3 000
+BEVLG + 3 000 BEWAL would re-impose the full Walloon build through the parent
+and the sweep would come out flat — "nuclear is always built" — for a reason
+that has nothing to do with its cost.
 
-For the **realiste** scenarios it is **not** handled, because it is a scenario
-definition question rather than a mechanical one:
+**Realistic potentials** (settled 2026-09-12): the Belgian 2030 floors are
+**dropped**, not lowered.
 
-| carrier | BE floor @2030 | BEWAL now capped at | left for Flanders + Brussels | they have today |
-|---|---|---|---|---|
-| `solar-all` | 16 500 MW | 3 474 MW | ≥ 13 026 MW | ~7 083 MW |
-| `onwind` | 5 000 MW | 2 203 MW | ≥ 2 797 MW | ~1 777 MW |
+| carrier | BE floor @2030 | BEWAL capped at | would have been left for Flanders + Brussels | they have today |
+|---|---:|---:|---:|---:|
+| `solar-all` | ~~16 500 MW~~ | 3 310 MW | ≥ 13 000 MW | ~7 100 MW |
+| `onwind` | ~~5 000 MW~~ | 2 366 MW | ≥ 2 800 MW | ~1 780 MW |
 
-Cutting Walloon 2030 PV to a realistic level while holding the Belgian national
-floor at the PNEC target pushes the entire shortfall onto Flanders: +84 % of
-Flemish PV in five years. If "réaliste" means the 2030 targets are not reachable,
-the BE floor should fall by the Walloon shortfall — 16 500 → 13 474 and
-5 000 → 4 203.
+Held, the national floor would not have lowered the Belgian 2030 target at all —
+it would have **transferred the whole Walloon shortfall to Flanders**, +84 % of
+Flemish PV in five years. That contradicts the scenario's own premise, which is
+that the 2030 targets are *not* reached. Dropping rather than re-deriving a
+lower value also avoids inventing a Flemish trajectory that neither ICEDD nor
+Elia published.
 
-`add_CCL_constraints` clips a floor at run time to
-`min(remaining land potential, growth allowance)`, so this may self-limit rather
-than go infeasible — but the clip is computed from generator `p_nom_max`, not
-from the agg cap, so it cannot see the new BEWAL ceiling. **Solve
-`scen_realiste_nets` at 2030 first and check feasibility before launching the
-other twelve** (§7). Ask ICEDD which reading they intend; the fix is two rows in
-`config/scenarios/scen_realiste_*.csv` and one `--write`.
+The **2025 base-year pins survive** (`BE onwind` 3 337, `BE solar-all` 9 751,
+min = max): those are the calibration, not a target. The central scenario keeps
+its 2030 floors — `test_central_keeps_the_belgian_2030_floor` pins that the drop
+is scoped to the realiste pair.
 
 ### 6.2 Why Flanders is never touched
 
@@ -510,8 +512,10 @@ would otherwise waste a night:
 1. **`scen_central`, 2025 + 2030 only.** Proves the shared-resources change, the
    regenerated cost table (ICEDD's inflated fuel prices) and the new softlink
    files produce a feasible, optimal network. ~4 h.
-2. **`scen_realiste_nets`, 2030 only.** The one scenario whose constraint set
-   could be empty (§6.1). ~3 h, and it can run concurrently with gate 1.
+2. **`scen_realiste_nets`, 2030 only.** The scenario with the most rewritten
+   2030 constraint set — Walloon caps below the old floors, both Belgian floors
+   dropped, the 2030 CO₂ cap lifted (§1.2, §6.1). ~3 h, and it can run
+   concurrently with gate 1.
 3. **Everything else**, once both return `Optimal objective`.
 
 Gates 1 and 2 together are one evening; the batch then runs overnight.
@@ -655,7 +659,7 @@ about costs or technology.
 
 | # | Item | Who | Blocking? |
 |---|---|---|---|
-| 1 | BE parent floors in the realiste scenarios (§6.1) — hold at PNEC, or lower by the Walloon shortfall? | ICEDD | no, but gate 2 may force it |
+| 1 | Sludge is now inside the BEWAL `solid biomass` pool (renewable-potentials.md §9.7). PyPSA cannot keep sludge and wood apart on one bus, so the optimiser may burn in boilers what TIMES sends to industry and power. Confirm, or drop `BIOSLU` from the industry extraction instead | ICEDD | no |
 | 2 | **Confirm the swapped-increment correction** (§1.2): 2 366 MW wind / 3 310 MW PV instead of ICEDD's 2 203 / 3 474 | ICEDD | no — one value per file to revert |
 | 3 | Confirm the currency year of the DG CLIMA "recommended parameters for reporting GHG projections in 2025" fuel prices. ICEDD tagged them EUR2021 and that is what the EUR2025 inflation assumes; the parameter file is not publicly fetchable, so it could not be checked here. The uranium row needs no confirmation — its own source note says "Based on IEA 2011 data" and the inflated value (4.6497) reproduces `docs/nuclear-alignment-20260816.md` §7 exactly | ICEDD | no — reversible in one commit |
 | 4 | Nuclear sweep bracket: widen downwards if 4 500 EUR/kW still builds nothing | — | after the first results |

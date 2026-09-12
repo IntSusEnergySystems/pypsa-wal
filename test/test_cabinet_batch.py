@@ -190,6 +190,36 @@ def test_realiste_2030_corridor_is_not_empty(scenario, carrier, cap):
     )
 
 
+@pytest.mark.parametrize("scenario", [s for s in REALISTE if (WAL / f"agg_p_nom_minmax_{s}.csv").exists()])
+@pytest.mark.parametrize("carrier", ["solar-all", "onwind"])
+def test_realiste_drops_the_belgian_2030_floor(scenario, carrier):
+    """The national floor must go too, or the Walloon cap only moves the problem.
+
+    `add_CCL_constraints` groups by (location, carrier) and BE is a parent row
+    over BEVLG + BEWAL + BEBRU. With BEWAL capped at 3 310 MW of PV and the BE
+    floor held at 16 500, the shortfall does not disappear — it is transferred
+    to Flanders, which would have to reach ~13 000 MW against ~7 100 today. The
+    scenario's premise is that the 2030 targets are NOT met, so the national
+    floor cannot survive the regional cap.
+
+    The 2025 base-year pin must SURVIVE: it is the calibration, not a target.
+    """
+    path = WAL / f"agg_p_nom_minmax_{scenario}.csv"
+    assert _agg_cell(path, "BE", carrier, "2030", "min") == "", (
+        f"{scenario}: the Belgian 2030 {carrier} floor is still set; it would "
+        "push the whole Walloon shortfall onto Flanders"
+    )
+    assert _agg_cell(path, "BE", carrier, "2025", "min") != "", (
+        "the 2025 base-year pin is a calibration and must not be dropped"
+    )
+
+
+@pytest.mark.parametrize("carrier,floor", [("solar-all", "16500"), ("onwind", "5000")])
+def test_central_keeps_the_belgian_2030_floor(carrier, floor):
+    """Dropping it is scoped to the realiste pair, not a change to the central case."""
+    assert _agg_cell(CENTRAL_AGG, "BE", carrier, "2030", "min") == floor
+
+
 @pytest.mark.parametrize("scenario", REALISTE)
 def test_realiste_drops_the_2030_rooftop_pin(scenario, scenarios):
     """Neither PV convention describes the realiste 2030 fleet (§3.1)."""
