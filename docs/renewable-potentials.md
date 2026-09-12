@@ -532,8 +532,8 @@ annual-energy generators — **never read their `p_nom` as an annual potential**
 
 | BEWAL | 2025 | 2030 | 2040 | 2050 | source |
 |---|---:|---:|---:|---:|---|
-| `solid biomass` | 9 222 | 9 222 | 9 222 | 9 222 | Valbiom / ICEDD 2021 energy balance (`2f67b01e`) |
-| `solid biomass transported` | 2 000 | 2 000 | 2 250 | 3 000 | Valbiom, imported pellets |
+| `solid biomass` | 11 749 | 11 749 | 11 749 | 11 749 | Valbiom 9 222 (woody/agricultural) **+ 2 527 sludge** — see §9.7 |
+| `solid biomass transported` | **0** | **0** | **0** | **0** | ICEDD `4a4116aa`: no solid-biomass imports in the central scenario |
 | `solid biomass import` (off) | 4 000 | 4 000 | 4 500 | 6 000 | Bioenergy Europe — see §7.8 |
 | `biogas` | 8 300 | 8 300 | 4 000 | 6 900 | Valbiom, then the 2026-08-27 meeting — see §7.7 |
 
@@ -577,9 +577,14 @@ signatures:
    lost without an error; `RELAXATION_WARN_SHARE` (0.02) is the tripwire.
 
 **Anatomy of the budget** (all BEWAL, TWh). Supply is the domestic
-`solid biomass` potential (9 222, flat, every horizon) plus the transported
-import cap (`e_sum_max` 2.000 / 2.000 / **2.125** / 2.250 / **2.625** / 3.000 —
-the 2035/2045 steps are the `hold → interp` flip of `50f95de0`). Since F8 the
+`solid biomass` potential plus the transported import cap. > **Both numbers
+changed on 2026-09-12 and every figure in this subsection is the pre-change
+one** — the potential is now **11 749** (sludge folded in) and the import cap is
+**0** (ICEDD). The method below is unchanged and still the one to use; for the
+current budget read [§9.7](#97-sludge-and-the-end-of-imports--the-2026-09-12-rebalance).
+Historically the potential was 9 222 flat and the import cap ran
+`e_sum_max` 2.000 / 2.000 / **2.125** / 2.250 / **2.625** / 3.000 —
+the 2035/2045 steps being the `hold → interp` flip of `50f95de0`. Since F8 the
 sustainable generator keeps its upstream value and the unsustainable one takes
 the remainder, so the two sum to the potential; the pre-solve report
 (`_biomass_report` in `scripts/walloon_scripts/times_heat_profiles.py`) sums
@@ -611,7 +616,9 @@ column); industry is the `solid biomass` category of
 line of the 5-year run matched the prediction to three decimals
 (2.284 / 11.222).
 
-**Worked example — the 9 222 → 6 222 episode, 2026-09-09.** `50f95de0` cut the
+**Worked example — the 9 222 → 6 222 episode, 2026-09-09** (historical: both
+the supply columns and the demand rows below predate the 2026-09-12 rebalance of
+§9.7; kept because the *method* is what this example teaches).** `50f95de0` cut the
 domestic potential to 6 222 on a double-counting rationale (Valbiom's 9 222
 was read as including the separately-counted imports). The offline check,
 before any solve was queued:
@@ -635,3 +642,58 @@ and the 2026-09-07 production run (same demands, 9 222) served every pin with
 1.3–1.7 TWh to spare. Note the restored margins are still tighter than that
 precedent at 2035 (+1.05) and 2040 (+0.84) — both new-or-tight horizons keep
 the read-the-budget-line instruction from §9.6's second paragraph.
+
+### 9.7 Sludge and the end of imports — the 2026-09-12 rebalance
+
+Two facts arrived from ICEDD on the same day and interact:
+
+1. **The solid-biomass import potential is 0.** `4a4116aa` set
+   `solid biomass transported` to zero in every horizon. This is TIMES-consistent
+   — `IMPBIOPEL` never activates, and Wallonia *exports* 3.33 TWh of pellets in
+   2025 — so the row had no TIMES counterpart to begin with.
+2. **Sludge is outside the Valbiom solid-biomass total.** The 9 222 GWh is
+   woody and agricultural biomass only.
+
+Taken together they broke the balance, because **the PyPSA demand charged
+against that pool does include sludge**:
+`TIMES_PyPSA/data/extraction_rules.csv` lists commodity `BIOSLU` and the process
+group `Fuel Tech - Waste Renewable (IND)` inside the industry `solid biomass`
+category, and TIMES routes **1.568 TWh/a** of sludge to `INDSLU00`.
+
+Supply fell from 11.222 to 9.222 TWh while demand kept counting sludge:
+
+| horizon | boiler fuel | industry fuel | demand | supply 9 222 | supply 11 749 |
+|---|---:|---:|---:|---:|---:|
+| 2025 | 2.84 | 5.50 | 8.34 | +0.89 | **+3.41** |
+| 2030 | 5.44 | 5.03 | 10.47 | **−1.25** | **+1.28** |
+| 2040 | 5.53 | 5.58 | 11.11 | **−1.89** | **+0.64** |
+| 2050 | 1.70 | 4.59 | 6.28 | +2.94 | **+5.47** |
+
+(Boiler fuel = PyPSA decentral heat load × the TIMES share of
+`heating_targets_{year}.csv` ÷ 0.855; industry = the `solid biomass` row of
+`wallon_demands_{year}.csv` ÷ 0.9. Both recomputed on
+`scen_central_v01_260911_1109.vd`; the boiler term is ~14 % above the 2026-09-07
+export because the new `.vd` raises the decentral biomass share — 0.173 vs 0.153
+in 2030, and 0.065 vs 0.004 in 2050.)
+
+A 1.2–1.9 TWh shortfall in 2030 and 2040 would **not** have stopped the run. The
+boiler pin is soft, so the solve "succeeds" with 20–35 % of it undelivered and
+the heat silently electrified — failure mode 3 of §9.6, the one with no error
+message. `RELAXATION_WARN_SHARE` (0.02) would have flagged it only after the
+solve.
+
+**Fix.** The pool now carries the whole Walloon sludge resource, so supply and
+demand count the same fuels: 9 222 + **2 527** = **11 749 GWh/a**. The 2 527 is
+`MINBIOSLU` `VAR_FOut`, flat in every period. Deliberately excluded: `BIOSLUH`
+(0.704 TWh, methanation feedstock → biogas, not solid biomass) and `BIOBOU`
+(0.024 Mt, unmapped).
+
+**2040 is the tight horizon at +0.64 TWh (5 % headroom)** — read the pre-solve
+budget line for it as §9.6 instructs, before trusting the result.
+
+**Open with ICEDD.** PyPSA cannot keep sludge and wood apart on one bus, so
+adding sludge to the pool also lets the optimiser burn it in boilers, whereas
+TIMES puts 1.568 TWh in industry and 0.959 TWh in power. The alternative —
+dropping `BIOSLU` from the industry extraction — would instead understate
+industry fuel against TIMES. Confirm which they prefer.
+

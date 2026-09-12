@@ -596,20 +596,29 @@ wind, **952 h** for non-tracking PV.
 | | wind MW | wind GWh | vs PACE | PV MW | PV GWh | vs PACE |
 |---|---:|---:|---:|---:|---:|---:|
 | PACE 2030 (implied) | 2 693 | 6 200 | — | 5 357 | 5 100 | — |
-| **our central floor** (min 2030) | 3 000 | 6 906 | **+11 %** | 6 500 | 6 188 | **+21 %** |
+| *former central floor* | *3 000* | *6 906* | *+11 %* | *6 500* | *6 188* | *+21 %* |
+| **central floor (min 2030), since 2026-09-12** | **2 248** | 5 175 | −17 % | **3 145** | 2 994 | −41 % |
 | realiste cap (max 2030) | 2 366 | 5 447 | −12 % | 3 310 | 3 151 | −38 % |
 
-**The central scenario is more ambitious than the PACE, on both technologies.**
-For wind that is close and defensible: 3 000 MW against 2 693 MW implied, and
-the row's own source line already says `Walloon PNEC-PACE and EDORA technical
-potential`.
+**The 2030 floor is now deliberately non-binding.** It is the realistic 2030 cap
+minus 5 %, kept only so a number remains on record. The optimiser is expected to
+clear it in every scenario without the constraint ever being active, so the
+2030 Walloon PV and wind fleets become a model outcome rather than an
+assumption.
 
-**For PV the +21 % is not a deliberate PACE reading** — the row is sourced
-`Climact on Elia ADEXFLEX, Walloon share`, not the PACE at all. The two numbers
-were never reconciled. Worth deciding explicitly whether the central case should
-sit at the PACE (≈ 5 350 MW) or keep the Elia-derived 6 500 MW; the answer
-changes the 2030 corridor of every scenario in the batch, because that floor is
-inherited by all eleven that do not override it.
+That replaced two floors that were *above* the PACE: wind 3 000 MW (+11 % in
+production terms) and PV 6 500 MW (+21 %). The PV one was never a PACE reading
+at all — that row is sourced `Climact on Elia ADEXFLEX, Walloon share`, and the
+two anchors had never been reconciled. **Both published anchors are now recorded
+in the `note_complementaire` of their own row** in
+`config/input_parameters_for_models.csv`, with the PACE production target, the
+implied MW at the model's yield, and the build rate each demands — so the
+comparison survives without the value steering the run.
+
+The Belgian parent floors (`agg:BE:onwind:min` 5 000 MW, `agg:BE:solar-all:min`
+16 500 MW) are **unchanged**: they are the national anchors and they still bind
+on the Belgian total. Lowering the Walloon floor only stops dictating how that
+total is split.
 
 Note the MW column for PV is basis-dependent and the GWh one is not: PACE's own
 5 100 GWh / 6 GWc implies **850 h**, against the model's 952 h, so part of the
@@ -623,14 +632,16 @@ This is the part that decides whether "réaliste" deserves its name.
 | | wind MW/yr 2026-30 | PV MW/yr 2026-30 |
 |---|---:|---:|
 | PACE 2030 | 227 | 538 |
-| our central floor | **288** | **766** |
+| *former central floor* | *288* | *766* |
+| central floor (now) | 138 | **95** |
 | realiste cap | 161 | **128** |
 | *observed in Wallonia* | *~100–190 (2023–24)* | *~100 MWc added in 2025* |
 
 Wallonia installed about **100 MWc of PV in 2025** against the 500–600 MWc/yr
-the PACE needs. Our central floor asks for **766 MW/yr — roughly 7.7× the
-current rate**, sustained for five years. ICEDD's realistic trajectory asks for
-128 MW/yr, which is what the region is actually doing.
+the PACE needs. The former floor asked for **766 MW/yr — roughly 7.7× the
+current rate** — sustained for five years, which is why it was replaced. The
+floor now in force asks 95 MW/yr, i.e. slightly less than the region is already
+doing, which is exactly what makes it inactive.
 
 So the realiste sensitivity is not a pessimistic variant of the PACE: it is the
 observed build rate extrapolated, and it lands 38 % below the PACE on PV. That

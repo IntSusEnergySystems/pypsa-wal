@@ -49,16 +49,24 @@ def test_the_icedd_domestic_potential_is_the_one_in_the_derived_file():
     back to **9222**. The subtraction was withdrawn — see
     `docs/renewable-potentials.md` — and the double-count it was guarding
     against is now handled by the import cap itself, which ICEDD set to 0 for
-    the central scenario in `4a4116aa`. With no imports there is nothing to
-    subtract, and the two live values are consistent for the first time:
-    domestic 9222, imported 0.
+    the central scenario in `4a4116aa`.
+
+    2026-09-12: **11749** = 9222 + 2527. ICEDD confirmed sludge is OUTSIDE the
+    Valbiom total, but the PyPSA industry demand charged against this pool
+    includes it (`extraction_rules.csv` lists commodity `BIOSLU` and the
+    `Fuel Tech - Waste Renewable (IND)` group; TIMES sends 1.568 TWh/a to
+    `INDSLU00`). With imports at 0 that left 2030 short 1.25 TWh and 2040 short
+    1.89 TWh — a silent 20-35 % relaxation of the soft biomass-boiler pin, not
+    an error. The pool now carries the whole Walloon sludge resource
+    (`MINBIOSLU` VAR_FOut, 2.527 TWh/a flat) so supply and demand count the
+    same fuels. See `docs/renewable-potentials.md` §9.7.
 
     `>=` on the year set, not `==`: the file also carries the 5-year grid's
     2035/2045 rows (`config/config.walloon_5y.yaml`), which a 10-year run ignores.
     """
     rows = _rows(POTENTIALS, bus="BEWAL", technology="solid biomass", parameter="p_nom")
     assert {r["year"] for r in rows} >= {"2025", "2030", "2040", "2050"}
-    assert {r["value"] for r in rows} == {"9222"}
+    assert {r["value"] for r in rows} == {"11749"}
 
 
 def test_the_import_cap_that_binds_is_managed_by_the_master_csv():
