@@ -1,0 +1,8 @@
+# Extracted from scen_sensibilite_taxshift_plus_260911_1109.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# Rooftop share of TIMES PV plant capacity (VAR_Cap).
+year,share,rooftop_gw,utility_gw
+2030,0.708065,4.294836,1.770762
+2035,0.581111,6.787472,4.892693
+2040,0.604644,9.710929,6.349641
+2045,0.627746,10.707641,6.349641
+2050,0.640689,11.322070,6.349641

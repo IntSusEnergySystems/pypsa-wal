@@ -1,0 +1,7 @@
+# Extracted from scen_sensibilite_taxshift_260911_1109.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# TIMES STORAGEMININD VAR_FOut of CO2STOCK, kt/a.
+year,kt
+2035,4222.712029
+2040,4961.524543
+2045,5031.312049
+2050,4826.400818

@@ -69,8 +69,70 @@ scenarios:
     results_dir: results/walloon/scen_evflex
     resources_dir: resources/walloon/scen_evflex
 
+  # --- September 2026 cabinet batch (docs/runs-20260912-cabinet-batch.md).
+  # A scenario listed here but not solved yet is SKIPPED by
+  # `generate_html_report_all_scenarios`, so the combined report can be
+  # rebuilt after each scenario lands instead of only at the end.
+
+  - name: scen_central
+    label: Central
+    results_dir: results/walloon/scen_central
+    resources_dir: resources/walloon/scen_central
+  - name: scen_taxshift
+    label: Tax shift — single surcharge
+    results_dir: results/walloon/scen_taxshift
+    resources_dir: resources/walloon/scen_taxshift
+  - name: scen_taxshift_plus
+    label: Tax shift — full regional
+    results_dir: results/walloon/scen_taxshift_plus
+    resources_dir: resources/walloon/scen_taxshift_plus
+  - name: scen_biomethane_industrie
+    label: Biomethane reserved for industry
+    results_dir: results/walloon/scen_biomethane_industrie
+    resources_dir: resources/walloon/scen_biomethane_industrie
+  - name: scen_realiste_nets
+    label: Realistic 2030 — non-ETS kept
+    results_dir: results/walloon/scen_realiste_nets
+    resources_dir: resources/walloon/scen_realiste_nets
+  - name: scen_realiste_nobnd30
+    label: Realistic 2030 — no 2030 target
+    results_dir: results/walloon/scen_realiste_nobnd30
+    resources_dir: resources/walloon/scen_realiste_nobnd30
+  - name: scen_retardnucleaire
+    label: Nuclear delayed to 2055
+    results_dir: results/walloon/scen_retardnucleaire
+    resources_dir: resources/walloon/scen_retardnucleaire
+  - name: scen_nuctip_9500
+    label: Nuclear CAPEX 9500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_9500
+    resources_dir: resources/walloon/scen_nuctip_9500
+  - name: scen_nuctip_7500
+    label: Nuclear CAPEX 7500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_7500
+    resources_dir: resources/walloon/scen_nuctip_7500
+  - name: scen_nuctip_6000
+    label: Nuclear CAPEX 6000 EUR/kW
+    results_dir: results/walloon/scen_nuctip_6000
+    resources_dir: resources/walloon/scen_nuctip_6000
+  - name: scen_nuctip_5000
+    label: Nuclear CAPEX 5000 EUR/kW
+    results_dir: results/walloon/scen_nuctip_5000
+    resources_dir: resources/walloon/scen_nuctip_5000
+  - name: scen_nuctip_4000
+    label: Nuclear CAPEX 4000 EUR/kW
+    results_dir: results/walloon/scen_nuctip_4000
+    resources_dir: resources/walloon/scen_nuctip_4000
+  - name: scen_nuctip_3000
+    label: Nuclear CAPEX 3000 EUR/kW
+    results_dir: results/walloon/scen_nuctip_3000
+    resources_dir: resources/walloon/scen_nuctip_3000
+  - name: scen_central_2013
+    label: Central — weather year 2013
+    results_dir: results/walloon_2013/scen_central_2013
+    resources_dir: resources/walloon_2013/scen_central_2013
+
 landing:
-  scenario: scen_demande_haute
+  scenario: scen_central
   node: BEWAL
   page: overview
 

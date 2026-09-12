@@ -21,6 +21,15 @@ hicp_inflation:
   EUR_REF: 2025
   factor_2020_to_2025: 1.257335
   factor_2023_to_2025: 1.051650
+  # Added 2026-09-12 for ICEDD's coal/gas/oil and uranium rows, which arrived
+  # tagged at their source vintage (4a4116aa, 03352c45) rather than EUR_REF.
+  # 2021 is the product of the rates below (2022..2025), the same method that
+  # reproduces the two factors above exactly.
+  factor_2021_to_2025: 1.221900
+  # 2011 predates `rates_eea_percent`; the value is the one already established
+  # in docs/nuclear-alignment-20260816.md S7 for the uranium shortlist price
+  # (3.4122 EUR2011 = 4.6497 EUR2025/MWh_th).
+  factor_2011_to_2025: 1.362669
   rates_eea_percent:
     2021: 2.9
     2022: 9.2

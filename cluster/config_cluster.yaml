@@ -9,8 +9,14 @@
 #
 # Keep solving.cpus / gurobi-default.threads in sync with each other and with
 # the Slurm cpus-per-task set in `nic5.sh solve`.
+#
+# EDIT (2026-09-12): 100 GB -> 80 GB, and the target partition moved to `batch`
+# (cluster/config.sh). Measured peak RSS on the 2026-09-07 1h production run
+# was 22.4 / 28.2 / 29.8 / 29.9 GB across the four horizons, so 80 GB is ~2.7x
+# the worst observed while letting three solves share one 252 GB `batch` node
+# — which is what makes a 13-scenario batch run in one night instead of five.
 solving:
-  mem_mb: 100000
+  mem_mb: 80000
   cpus: &cluster_cpus 16
   solver_options:
     gurobi-default:

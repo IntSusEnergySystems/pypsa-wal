@@ -42,6 +42,7 @@ import argparse
 import functools
 import re
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -55,12 +56,16 @@ WALLOON_CONFIG = ROOT / "config" / "config.walloon.yaml"
 DEFAULT_CONFIG = ROOT / "config" / "config.default.yaml"
 COSTS_FILE = ROOT / "data" / "walloon" / "custom_costs.csv"
 POTENTIALS_FILE = ROOT / "data" / "walloon" / "custom_potentials.csv"
-# TIMES-aligned nuclear (and other) country/carrier caps for scen_demande_haute.
-# Other scenarios keep their own agg files; this patch does not touch them --
-# which is why the decimal-shift typos of 2026-08-26 were in the *unmanaged*
-# base/corrige files. Proposed fix (not implemented): per-scenario override files
-# layered on the master table, see docs/scenario-handling-proposal.md.
+# TIMES-aligned nuclear (and other) country/carrier caps for the central
+# scenario. Sensitivity scenarios no longer keep hand-maintained copies of this
+# file: `--scenario <name>` layers config/scenarios/<name>.csv over the master
+# table and regenerates a per-scenario copy, so every scenario's inputs are
+# managed and `--check` proves it. See docs/scenario-handling-proposal.md
+# (implemented 2026-09-12) and the SCENARIO OVERRIDES section below.
 AGG_FILE = ROOT / "data" / "walloon" / "agg_p_nom_minmax_demande_haute.csv"
+# Per-scenario override tables, same schema as the master CSV. One flat level:
+# a scenario layers over the master, never over another scenario.
+SCENARIO_DIR = ROOT / "config" / "scenarios"
 NTC_GLOB = "ntc_*.csv"
 COST_ARCHIVE_GLOB = "costs_*.csv"
 COST_TABLE_RENAMES = {"solar-utility single-axis tracking": "solar-hsat"}
@@ -122,6 +127,189 @@ def load_meta() -> dict:
 
 def load_master() -> pd.DataFrame:
     return pd.read_csv(CSV_PATH)
+
+
+# --------------------------------------------------------------------------- #
+# SCENARIO OVERRIDES
+#
+# `config/scenarios/<name>.csv` carries only the rows a scenario *changes*,
+# in the master CSV's own schema. Semantics (docs/scenario-handling-proposal.md
+# §4, confirmed 2026-09-12):
+#
+#   key          composite (pypsa_wal_target, year)
+#   granularity  the override replaces the WHOLE row, so `source` and the notes
+#                travel with the deviation instead of being inherited silently
+#   delete       an override row with status `none` drops the baseline row
+#   add          a target the baseline lacks is allowed
+#   chaining     NOT allowed — one flat level over the master
+#
+# Only the three files a scenario can select through config keys are written
+# per scenario (`costs.custom_cost_fn`, `electricity.walloon_potentials`,
+# `solving.agg_p_nom_limits.file`). NTC, discount rates and the config scalars
+# stay global: the grid and the financial frame do not vary per scenario, and
+# anything that must vary belongs in the scenario's YAML overlay.
+# --------------------------------------------------------------------------- #
+def scenario_override_path(scenario: str) -> Path:
+    return SCENARIO_DIR / f"{scenario}.csv"
+
+
+def known_scenarios() -> tuple[str, ...]:
+    if not SCENARIO_DIR.is_dir():
+        return ()
+    return tuple(sorted(p.stem for p in SCENARIO_DIR.glob("*.csv")))
+
+
+# Captured at import time. `scenario_outputs_bound` rebinds the three globals
+# for the length of one scenario, so the central paths have to be read from a
+# snapshot taken before any rebinding — reading the globals inside the bound
+# context would return the scenario's own files and seed them from themselves.
+CENTRAL_OUTPUTS = (COSTS_FILE, POTENTIALS_FILE, AGG_FILE)
+
+
+def scenario_outputs(scenario: str | None) -> tuple[Path, Path, Path]:
+    """(costs, potentials, agg) for `scenario`; the central files when None."""
+    if scenario is None:
+        return CENTRAL_OUTPUTS
+    d = ROOT / "data" / "walloon"
+    return (
+        d / f"custom_costs_{scenario}.csv",
+        d / f"custom_potentials_{scenario}.csv",
+        d / f"agg_p_nom_minmax_{scenario}.csv",
+    )
+
+
+def _row_key(r: pd.Series) -> tuple[str, str]:
+    """Composite override key. NaN year is its own ('yearless') slot."""
+    year = r["year"]
+    return (str(r["pypsa_wal_target"]), "" if pd.isna(year) else str(float(year)))
+
+
+def apply_scenario_overrides(
+    df: pd.DataFrame, scenario: str
+) -> tuple[pd.DataFrame, list[str]]:
+    """Layer `config/scenarios/<scenario>.csv` over the master table.
+
+    Returns the merged frame and a human-readable list of every deviation, so
+    `--report` can show what a scenario changes and against which baseline
+    value. That listing is the mitigation for the failure mode this mechanism
+    introduces: a baseline improvement silently masked by a stale override
+    (proposal §5).
+    """
+    path = scenario_override_path(scenario)
+    if not path.is_file():
+        raise SystemExit(
+            f"no override file for scenario '{scenario}': {path.relative_to(ROOT)}\n"
+            f"  known scenarios: {', '.join(known_scenarios()) or '(none)'}\n"
+            "  an empty scenario (identical to the central case) still needs a "
+            "file with just the header row."
+        )
+    over = pd.read_csv(path)
+    missing = [c for c in df.columns if c not in over.columns]
+    extra = [c for c in over.columns if c not in df.columns]
+    if missing or extra:
+        raise SystemExit(
+            f"{path.relative_to(ROOT)}: schema does not match the master CSV.\n"
+            + (f"  missing column(s): {', '.join(missing)}\n" if missing else "")
+            + (f"  unexpected column(s): {', '.join(extra)}\n" if extra else "")
+        )
+    over = over[df.columns.tolist()]
+
+    # A scenario owns three FILES (costs / potentials / agg). `config:` targets
+    # are patched into config/config.walloon.yaml, which is shared by every
+    # scenario and cannot be swapped per run — so a `config:` row here would be
+    # silently ignored. Refuse instead, and say where the value belongs.
+    cfg_rows = over[over["pypsa_wal_target"].astype(str).str.startswith("config:")]
+    if len(cfg_rows):
+        targets = sorted(set(cfg_rows["pypsa_wal_target"].astype(str)))
+        raise SystemExit(
+            f"{path.relative_to(ROOT)}: {len(cfg_rows)} row(s) target the shared "
+            f"config file and cannot be applied per scenario:\n"
+            + "".join(f"    {t}\n" for t in targets)
+            + "  config/config.walloon.yaml is global. Put these in the "
+            "scenario's own overlay block in config/scenarios.walloon.yaml "
+            "(e.g. `co2_budget:` / `budget_national:`), which IS per scenario, "
+            "and drop the row from this file."
+        )
+
+    base_idx = {_row_key(r): i for i, r in df.iterrows()}
+    merged = df.copy()
+    deltas: list[str] = []
+    added: list[pd.Series] = []
+    dropped: list[int] = []
+    # agg cells to blank in the generated file, see patch_agg_p_nom.
+    cleared: set[tuple[str, str, str, int]] = set()
+
+    for _, r in over.iterrows():
+        if pd.isna(r["pypsa_wal_target"]):
+            raise SystemExit(
+                f"{path.relative_to(ROOT)}: every override row needs a "
+                "pypsa_wal_target — that is the override key."
+            )
+        key = _row_key(r)
+        tgt, year = key[0], key[1] or "all years"
+        if key in base_idx:
+            i = base_idx[key]
+            old = merged.at[i, "value"]
+            if str(r["status"]).strip().lower() == "none":
+                dropped.append(i)
+                deltas.append(f"{tgt} @ {year}: {old} -> DROPPED")
+                parts = tgt.split(":")
+                if parts[0] == "agg" and len(parts) == 4 and key[1]:
+                    cleared.add((parts[1], parts[2], parts[3], int(float(key[1]))))
+                elif parts[0] != "agg":
+                    raise SystemExit(
+                        f"{path.relative_to(ROOT)}: status=none is only supported "
+                        f"for `agg:` targets, got {tgt!r}.\n"
+                        "  A cost or potential file is a complete table: removing a "
+                        "row there means 'fall back to the technology-data / PyPSA "
+                        "default', which is a different change from 'this scenario "
+                        "has no cap'. Set the value you want instead."
+                    )
+                continue
+            merged.loc[i] = r
+            if not (pd.isna(old) and pd.isna(r["value"])) and str(old) != str(
+                r["value"]
+            ):
+                deltas.append(f"{tgt} @ {year}: {old} -> {r['value']}")
+            else:
+                deltas.append(f"{tgt} @ {year}: metadata only (value {old})")
+        else:
+            if str(r["status"]).strip().lower() == "none":
+                deltas.append(f"{tgt} @ {year}: DROP requested but no baseline row")
+                continue
+            added.append(r)
+            deltas.append(f"{tgt} @ {year}: ADDED {r['value']}")
+
+    if dropped:
+        merged = merged.drop(index=dropped)
+    if added:
+        merged = pd.concat([merged, pd.DataFrame(added)], ignore_index=True)
+    return merged.reset_index(drop=True), deltas, cleared
+
+
+def seed_scenario_outputs(scenario: str, write: bool) -> tuple[list[str], list[str]]:
+    """Copy the central generated files into place for a new scenario.
+
+    The patch functions may only rewrite the `value` cell of an existing row —
+    they never add or remove rows. A scenario therefore needs a structurally
+    complete file to patch, and the central one is by definition that file.
+
+    Returns (notes, missing). `missing` is non-empty only when seeding was not
+    allowed to happen (``--check``, or ``--write --dry-run``): a preview must
+    not create files, so the caller reports what is missing instead of
+    patching a file that is not there.
+    """
+    notes: list[str] = []
+    missing: list[str] = []
+    for src, dst in zip(scenario_outputs(None), scenario_outputs(scenario)):
+        if dst.exists():
+            continue
+        if write:
+            dst.write_bytes(src.read_bytes())
+            notes.append(f"seeded {dst.relative_to(ROOT)} from {src.name}")
+        else:
+            missing.append(str(dst.relative_to(ROOT)))
+    return notes, missing
 
 
 def _deep_update(base: dict, overlay: dict) -> dict:
@@ -572,6 +760,7 @@ def patch_agg_p_nom(
     horizons: tuple[int, ...],
     dry_run: bool,
     path: Path | None = None,
+    clear: set[tuple[str, str, str, int]] | None = None,
 ) -> Patch:
     """Patch BE/BEWAL nuclear (etc.) caps in the demande-haute agg file.
 
@@ -657,6 +846,32 @@ def patch_agg_p_nom(
                 f"{old or '(empty)'} -> {new} MW"
             )
             cells[2 + idx] = new
+        lines[li] = ",".join(cells)
+
+    # Cells a scenario override DELETED (`status: none`). Dropping the row from
+    # the layered table only stops it being *managed* — the value seeded from
+    # the central file is still sitting in the cell, and `--check` cannot see it
+    # because nothing claims it any more. That is how the realiste scenarios
+    # first came out with a 2030 corridor of min 6500 / max 3474 MW: an empty
+    # corridor, and an infeasible LP whose cause is three files away from the
+    # error message. A deletion has to blank the cell.
+    for country, carrier, bound, year in sorted(clear or ()):
+        loc = (country, carrier)
+        li = row_at.get(loc)
+        idx = col_index.get((str(year), bound))
+        if li is None or idx is None:
+            continue
+        cells = lines[li].split(",")
+        need = 2 + len(columns)
+        if len(cells) < need:
+            cells.extend([""] * (need - len(cells)))
+        old = cells[2 + idx]
+        if not old:
+            continue
+        patch.changes.append(
+            f"{country} {carrier} {year} {bound}: {old} -> (cleared by override)"
+        )
+        cells[2 + idx] = ""
         lines[li] = ",".join(cells)
 
     if not dry_run and patch.ok and patch.changes:
@@ -1658,6 +1873,87 @@ def cmd_report(df: pd.DataFrame, meta: dict, verbose: bool) -> int:
     return cmd_check(df, meta, verbose)
 
 
+@contextmanager
+def scenario_outputs_bound(scenario: str | None):
+    """Point the three per-scenario output paths at `scenario`'s copies.
+
+    The patch functions read module-level paths. Rebinding them for the length
+    of one scenario keeps the patching logic untouched and makes it impossible
+    for a scenario pass to write to the central files by accident.
+    """
+    global COSTS_FILE, POTENTIALS_FILE, AGG_FILE
+    saved = (COSTS_FILE, POTENTIALS_FILE, AGG_FILE)
+    COSTS_FILE, POTENTIALS_FILE, AGG_FILE = scenario_outputs(scenario)
+    try:
+        yield
+    finally:
+        COSTS_FILE, POTENTIALS_FILE, AGG_FILE = saved
+
+
+def scenario_patches(
+    df: pd.DataFrame, horizons, dry_run: bool, clear=None
+) -> list[Patch]:
+    """The three files a scenario owns. NTC / discount rates / config stay global."""
+    return [
+        patch_costs(df, horizons, dry_run),
+        patch_potentials(df, horizons, dry_run),
+        patch_agg_p_nom(df, horizons, dry_run, clear=clear),
+    ]
+
+
+def run_scenario(
+    scenario: str,
+    df: pd.DataFrame,
+    meta: dict,
+    *,
+    write: bool,
+    dry_run: bool,
+    verbose: bool,
+) -> int:
+    """`--check` or `--write` for one scenario overlay."""
+    merged, deltas, cleared = apply_scenario_overrides(df, scenario)
+    horizons = planning_horizons()
+    print(f"\n=== scenario {scenario} "
+          f"({scenario_override_path(scenario).relative_to(ROOT)}) ===")
+    if deltas:
+        print(f"  overrides vs the central table ({len(deltas)}):")
+        for d in deltas:
+            print(f"      Δ {d}")
+    else:
+        print("  overrides vs the central table: none (identical to central)")
+
+    fails = check_currency(merged, meta) + check_schema(merged)
+    if fails:
+        print("  master CSV + overrides invalid:")
+        for f in fails:
+            print(f"      ✗ {f}")
+        return 1
+
+    # A preview must not create files, so seeding is confined to a real write.
+    seeding = write and not dry_run
+    notes, missing = seed_scenario_outputs(scenario, write=seeding)
+    for n in notes:
+        print(f"      · {n}")
+    if missing:
+        print("  not generated yet:")
+        for m in missing:
+            print(f"      ✗ {m}")
+        print(f"      → run: build_common_parameters.py --write --scenario {scenario}")
+        return 1
+
+    with scenario_outputs_bound(scenario):
+        patches = scenario_patches(merged, horizons, dry_run=not seeding, clear=cleared)
+        for p in patches:
+            report_patch(p, verbose)
+
+    for p in patches:
+        fails.extend(p.errors)
+        fails.extend(p.soft_errors)
+        if not write:
+            fails.extend(f"{p.path.name} out of sync: {c}" for c in p.changes)
+    return 1 if fails else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -1671,6 +1967,22 @@ def main() -> int:
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="also list unmanaged rows"
+    )
+    parser.add_argument(
+        "--scenario",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help=(
+            "also process the scenario overlay config/scenarios/NAME.csv, "
+            "writing data/walloon/{custom_costs,custom_potentials,"
+            "agg_p_nom_minmax}_NAME.csv. Repeatable."
+        ),
+    )
+    parser.add_argument(
+        "--all-scenarios",
+        action="store_true",
+        help="process every overlay in config/scenarios/ (implies --scenario for each)",
     )
     parser.add_argument(
         "--config",
@@ -1697,11 +2009,31 @@ def main() -> int:
     ACTIVE_CONFIGS = tuple(p.resolve() for p in args.config)
 
     meta, df = load_meta(), load_master()
+
+    scenarios = list(known_scenarios()) if args.all_scenarios else list(args.scenario)
+    if scenarios and args.report:
+        parser.error("--report summarises the master table; drop --scenario")
+
+    # The central table first: a scenario is a delta on it, so a broken
+    # baseline has to surface before any overlay is reported.
     if args.check:
-        return cmd_check(df, meta, args.verbose)
-    if args.report:
+        rc = cmd_check(df, meta, args.verbose)
+    elif args.report:
         return cmd_report(df, meta, args.verbose)
-    return cmd_write(df, meta, args.dry_run, args.verbose)
+    else:
+        rc = cmd_write(df, meta, args.dry_run, args.verbose)
+
+    for scenario in scenarios:
+        rc |= run_scenario(
+            scenario, df, meta,
+            write=args.write, dry_run=args.dry_run, verbose=args.verbose,
+        )
+    if scenarios:
+        print(
+            f"\n{len(scenarios)} scenario overlay(s) processed: "
+            + ", ".join(scenarios)
+        )
+    return rc
 
 
 if __name__ == "__main__":

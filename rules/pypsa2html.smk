@@ -164,4 +164,41 @@ if HAVE_PYPSA2HTML:
                 params.config_file,
                 overrides={"root": str(Path.cwd())},
             )
+            # ADDITIVE: report every scenario that is SOLVED, skip the rest.
+            #
+            # config/pypsa2html.yaml lists every scenario the project knows
+            # about, including ones not run yet and retired ones whose trees
+            # were deleted. Handing that whole list to build_site aborts on the
+            # first missing tree, which would mean the combined report can only
+            # ever be built once, at the very end of a batch. Filtering here
+            # lets the same rule be re-run after each scenario lands, each time
+            # producing a report over everything finished so far — which is how
+            # a 14-scenario batch is actually watched.
+            #
+            # "Solved" = at least one network in <results_dir>/networks/. A
+            # scenario whose solve is still running has no network yet, so a
+            # half-written tree cannot enter the report.
+            available, skipped = [], []
+            for s in cfg.scenarios:
+                nets = Path(cfg.root) / s.results_dir / "networks"
+                if nets.is_dir() and any(nets.glob("*.nc")):
+                    available.append(s)
+                else:
+                    skipped.append(s.name)
+            if not available:
+                raise RuntimeError(
+                    "no solved scenario found for the combined report; "
+                    f"looked for */networks/*.nc under: "
+                    f"{', '.join(s.results_dir for s in cfg.scenarios)}"
+                )
+            cfg.scenarios = available
+            if skipped:
+                logging.info(
+                    "skipping %d scenario(s) with no solved network: %s",
+                    len(skipped), ", ".join(sorted(skipped)),
+                )
+            logging.info(
+                "building combined report over %d scenario(s): %s",
+                len(available), ", ".join(s.name for s in available),
+            )
             logging.info(build_site(cfg).summary())

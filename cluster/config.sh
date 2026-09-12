@@ -39,14 +39,34 @@ GUROBI_MODULE_LIC="${GUROBI_MODULE_LIC:-/opt/cecisw/arch/easybuild/2023b/softwar
 # CECI job-efficiency guidance: https://support.ceci-hpc.be/doc/SubmittingJobs/JobEfficiency/
 # The 2026-09-02 item-2 6h solves used `batch` (100 GB, 480 min); restore hmem
 # for 1h production runs.
-SOLVE_PARTITION="${SOLVE_PARTITION:-hmem}"
-# 1440 min for the 1h-resolution solve (360/480 was sized for 6h).
-SOLVE_RUNTIME="${SOLVE_RUNTIME:-1440}"     # minutes
-DEFAULT_PARTITION="${DEFAULT_PARTITION:-hmem}"
+#
+# EDIT (2026-09-12, September cabinet batch): `batch`, not `hmem`.
+#
+# `hmem` is THREE nodes and they are usually all allocated (checked 2026-09-12:
+# 3/0/0/3). A 13-scenario batch queued behind them runs one or two at a time,
+# which is the difference between a one-night batch and a three-day one.
+# `batch` is 70 nodes x 64 cores x 252 GB with a 2-day limit, and on the same
+# check had 2 601 idle cores. The 1h solve never needed hmem anyway: measured
+# peak RSS on the 2026-09-07 production run was 22.4 / 28.2 / 29.8 / 29.9 GB
+# (2025 -> 2050), so the 100 GB previously requested was already 3x the peak.
+#
+# Myopic foresight makes each scenario's four horizons strictly sequential
+# (2025 -> 2030 -> 2040 -> 2050 through add_brownfield), so the parallelism
+# available is ACROSS scenarios, not within one. MAX_SLURM_JOBS is therefore
+# the number of scenarios in flight; set it at or above the batch size or the
+# batch serialises for no reason.
+SOLVE_PARTITION="${SOLVE_PARTITION:-batch}"
+# 12 h per solve job. Longest observed single horizon is ~3 h (2030, 1h
+# resolution, 314 barrier iterations); 12 h is margin for scenarios never
+# solved before without asking for the 2-day maximum, which would hurt backfill.
+SOLVE_RUNTIME="${SOLVE_RUNTIME:-720}"      # minutes
+DEFAULT_PARTITION="${DEFAULT_PARTITION:-batch}"
 DEFAULT_MEM_MB="${DEFAULT_MEM_MB:-16000}"      # light rules (add_brownfield)
 DEFAULT_RUNTIME="${DEFAULT_RUNTIME:-120}"
 DEFAULT_CPUS="${DEFAULT_CPUS:-1}"              # light rules only; never set globally for solve
-MAX_SLURM_JOBS="${MAX_SLURM_JOBS:-2}"
+# One slot per scenario, plus headroom for the light add_brownfield jobs that
+# sit between two horizons of the same scenario.
+MAX_SLURM_JOBS="${MAX_SLURM_JOBS:-16}"
 
 # --- run / scenario ------------------------------------------------------------
 # config/config.walloon.yaml is the only study config: it always runs in
@@ -62,7 +82,43 @@ MAX_SLURM_JOBS="${MAX_SLURM_JOBS:-2}"
 #   RUN_PREFIX=walloon_5y ./cluster/nic5.sh run
 # It is deliberately left unquoted at every use site so it word-splits.
 CONFIGFILE="${CONFIGFILE:-config/config.walloon.yaml}"
-RUN_NAME="${RUN_NAME:-scen_demande_haute}"
+
+# Scenarios of this run, DERIVED from run.name in CONFIGFILE for the same
+# reason HORIZONS is derived below: a hand-maintained copy that falls out of
+# step does not fail, it silently runs a subset and produces a tree that looks
+# complete. Export RUN_NAME to override (space-separated for several):
+#   RUN_NAME="scen_central scen_taxshift" ./cluster/nic5.sh solve
+# Every command loops over the list, so one `solve` submits the whole batch and
+# Snakemake runs the scenarios concurrently up to MAX_SLURM_JOBS.
+_run_names_from_configs() {
+    local f got out="" root
+    root="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+    for f in "$@"; do
+        case "$f" in /*) : ;; *) f="$root/$f" ;; esac
+        [ -r "$f" ] || continue
+        got=$(awk '
+            /^[^[:space:]#]/ { in_run = ($0 ~ /^run:/); in_name = 0 }
+            in_run && /^[[:space:]]+name:[[:space:]]*$/ { in_name = 1; next }
+            in_name && /^[[:space:]]*-[[:space:]]*[A-Za-z_]/ {
+                sub(/^[[:space:]]*-[[:space:]]*/, ""); sub(/[[:space:]]*#.*$/, "");
+                print; next
+            }
+            in_name && /^[[:space:]]*[^ #-]/ { in_name = 0 }
+        ' "$f" | tr '\n' ' ')
+        [ -n "$got" ] && out="$got"
+    done
+    echo "${out% }"
+}
+# shellcheck disable=SC2086
+RUN_NAME="${RUN_NAME:-$(_run_names_from_configs $CONFIGFILE)}"
+if [ -z "$RUN_NAME" ]; then
+    printf '\033[1;31m[nic5] ERROR:\033[0m %s\n' \
+        "could not read run.name from: $CONFIGFILE" >&2
+    printf '  %s\n' "export RUN_NAME=\"scen_central ...\" to set it by hand." >&2
+    exit 1
+fi
+# First scenario, for the handful of single-value display/log paths.
+RUN_NAME_FIRST="${RUN_NAME%% *}"
 
 # Planning horizons of this run, read from CONFIGFILE rather than repeated here.
 #
@@ -115,7 +171,20 @@ RUN_PREFIX="${RUN_PREFIX-walloon}"           # = run.prefix; empty = no prefix
 # The label is what the Explorer dropdown shows and is an editorial choice (the
 # existing scenarios use French names), so set it deliberately -- it is NOT
 # derived from the scenario name. Omit ":<label>" to reuse the scenario name.
-EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS-scen_demande_haute:demande-haute-2010-1h}"
+#
+# EDIT (2026-09-12): derived from RUN_NAME so a 13-scenario batch does not need
+# 13 hand-written pairs that can fall out of step with what actually ran. The
+# default label is the scenario name; override the whole variable to give the
+# Explorer dropdown editorial labels, e.g.
+#   EXPLORER_SCENARIOS="scen_central:central-2010-1h scen_taxshift:tax-shift"
+_default_explorer_scenarios() {
+    local scen out=""
+    for scen in $RUN_NAME; do
+        out+="${scen}:${scen}-2010-1h "
+    done
+    echo "${out% }"
+}
+EXPLORER_SCENARIOS="${EXPLORER_SCENARIOS-$(_default_explorer_scenarios)}"
 # `<type>` in the scenario folder name <type>__<scenario>__YYYYMMDD (used by
 # upload_s3.sh and extract_explorer.sh). An explicitly cleared value means
 # `pypsa` (the single-run Walloon type).

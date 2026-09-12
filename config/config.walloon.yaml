@@ -9,14 +9,82 @@ run:
   # a single run and several are a multi-scenario run — the only difference is how
   # many names are listed. Every name must be a key of run.scenarios.file;
   # `name: all` expands to all of them.
+  # September 2026 cabinet batch. Every name here is a key of
+  # config/scenarios.walloon.yaml, and cluster/config.sh DERIVES its scenario
+  # list from this block, so this is the single place that decides what runs.
+  # Comment a line out to drop that scenario from the batch.
+  #
+  # All 13 are weather year 2010. `scen_central_2013` is deliberately NOT here:
+  # it needs a second --configfile (config/config.weather2013.yaml) and its own
+  # resources tree — see docs/runs-20260912-cabinet-batch.md.
   name:
-  - scen_demande_haute
+  - scen_central                 # reference case, the one that ships Monday
+  - scen_taxshift                # single surcharge across vectors from 2030
+  - scen_taxshift_plus           # + regional levies moved to gas
+  - scen_biomethane_industrie    # biogas volume reserved for industry
+  - scen_realiste_nets           # realistic 2030 PV/wind, non-ETS target kept
+  - scen_realiste_nobnd30        # realistic 2030 PV/wind, no 2030 target
+  - scen_retardnucleaire         # new nuclear deferred to 2055
+  - scen_nuctip_9500             # nuclear CAPEX sweep: tipping-point search,
+  - scen_nuctip_7500             #   capacity free between the LTO floor and
+  - scen_nuctip_6000             #   the central envelope. 9500 = central cost,
+  - scen_nuctip_5000             #   i.e. the sweep's own reference point.
+  - scen_nuctip_4000
+  - scen_nuctip_3000
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
     enable: true
     file: config/scenarios.walloon.yaml
   shared_cutouts: true
+  # Share the weather- and geography-derived resources across scenarios
+  # (2026-09-12, for the September cabinet batch). With the PyPSA-Eur default
+  # `policy: false` every scenario rebuilds its own copy of everything, and the
+  # renewable profiles alone are ~23 of the ~43 benchmarked preprocessing
+  # minutes — paid 14 times over for this batch. `base` keeps per-run only what
+  # carries a `{clusters}`/`{planning_horizons}` wildcard (the TIMES demands,
+  # the sector networks, the brownfield chain) and shares the rest into
+  # `resources/` unprefixed.
+  #
+  # Verified safe for this batch: nothing a scenario overrides feeds a shared
+  # file. `sector.times_file` reaches only `build_wallon_demands`
+  # (`{planning_horizons}`, per-run); `electricity.walloon_potentials` only
+  # `prepare_sector_network` / `add_existing_baseyear` / `add_brownfield`;
+  # `build_BE_powerplants` takes no config at all.
+  #
+  # TWO RULES THAT MUST NOT BE BROKEN:
+  #
+  #  * The `exclude` list below is NOT decoration. The `base` policy decides
+  #    shared-or-not from the FILENAME, so a file is per-run only while its
+  #    name still carries a wildcard. Several rules build an input name with
+  #    the year already substituted — `resources(f"costs_{year}_processed.csv")`
+  #    (build_sector.smk, postprocess.smk) and
+  #    `resources(f"wallon_demands_{baseyear}.csv")` (common.smk, the option-B'
+  #    heat split) — and those strings have no wildcard left, so they resolve to
+  #    the SHARED path while the rule that produces them writes the per-run one.
+  #    Snakemake then fails with MissingInputException naming a file it can see
+  #    on disk under a different prefix. Both are consumers of per-scenario
+  #    inputs anyway (`costs.custom_cost_fn`, which the nuclear sweep varies;
+  #    `sector.times_file`, which every scenario varies), so they must be
+  #    per-run regardless. Listing the whole `build_wallon_demands` output
+  #    family keeps the next f-string from reintroducing the bug.
+  #
+  #  * ONE WEATHER YEAR PER RESOURCES TREE. The shared set contains the
+  #    cutout-derived files (`profile_*`, `availability_matrix_*`,
+  #    `solar_thermal_*`, `temp_*`, `electricity_demand_base_s.nc`). They carry
+  #    no year in their name, so a 2013 scenario run in the same invocation
+  #    would overwrite the 2010 profiles and the two would rebuild each other
+  #    forever. Run another weather year through
+  #    `config/config.weather2013.yaml`, which sets `policy: false` and keeps
+  #    that run's resources entirely inside its own tree.
+  shared_resources:
+    policy: base
+    exclude:
+    - costs_              # process_cost_data <- costs.custom_cost_fn
+    - wallon_demands_     # build_wallon_demands <- sector.times_file
+    - heating_capacities_ # ditto
+    - heating_targets_    # ditto
+    - road_transport_     # ditto
 
 # pypsa2html report (rules/pypsa2html.smk). Skipped at parse time if the library
 # is not importable.

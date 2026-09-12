@@ -1,0 +1,52 @@
+# Weather-year overlay: run a scenario on 2013 instead of 2010.
+#
+#   snakemake --configfile config/config.walloon.yaml config/config.weather2013.yaml ...
+#
+# Pass it as the SECOND --configfile (later files win, snakemake's own order),
+# exactly like config/config.walloon_5y.yaml.
+#
+# WHY THIS FILE EXISTS AT ALL — it is not just two dates.
+#
+# config/config.walloon.yaml sets `run.shared_resources.policy: base` so the
+# cutout-derived resources (renewable profiles, availability matrices, solar
+# thermal, temperature, base electricity demand) are built once and shared by
+# every scenario. Those file names carry no weather year. A 2013 scenario run
+# in the same invocation as the 2010 ones would therefore write 2013 profiles
+# over the 2010 ones, and the next 2010 job would write them back: both trees
+# silently wrong, and Snakemake never complains because every timestamp looks
+# fresh.
+#
+# `policy: false` puts this run's resources back under
+# `resources/<prefix>/<scenario>/` in full, so it shares nothing and cannot
+# collide. The price is one complete preprocessing pass (~43 min on 16 cores),
+# which is the correct price for a different weather year.
+#
+# The 2013 cutout is already on disk (data/cutout/archive/.../
+# europe-2013-sarah3-era5.nc, 6.6 GB) — no download.
+#
+# `run.prefix` is deliberately changed too, so results land in
+# `results/walloon_2013/<scenario>/` and can never be confused with, or
+# overwrite, the 2010 batch.
+#
+# Pair it with a scenario whose NAME also says 2013 (`scen_central_2013`), not
+# with `scen_central`: pypsa2html keys its scenarios by name, so two trees
+# called `scen_central` would collapse into one entry in the combined report.
+# The scenario block repeats the two dates below — same values, so the pair
+# cannot disagree, and whichever way the run is launched the year is right.
+
+run:
+  prefix: walloon_2013
+  shared_resources:
+    policy: false
+    exclude: []
+
+# WEATHER YEAR — snapshots and cutout move together. Changing one alone pairs
+# one year's demand with another year's wind and sun: a run that succeeds and
+# is wrong. See instructions.md, "Selecting the weather year".
+snapshots:
+  start: "2013-01-01"
+  end: "2014-01-01"
+  inclusive: left
+
+atlite:
+  default_cutout: "europe-2013-sarah3-era5"

@@ -44,7 +44,16 @@ source "$HERE/config.sh"
 # RUN_NAME=scen_demande_haute this yields "walloon/scen_demande_haute",
 # so prepare/solve/pull/postprocess all point inside the scenario tree.
 # Empty RUN_PREFIX (a config with no run.prefix) reduces to plain RUN_NAME.
-RUN_DIR_REL="${RUN_PREFIX:+${RUN_PREFIX}/}${RUN_NAME}"
+# One "<prefix>/<scenario>" per scenario in RUN_NAME (which may be a list).
+run_dirs() {
+    local scen
+    for scen in $RUN_NAME; do
+        echo "${RUN_PREFIX:+${RUN_PREFIX}/}${scen}"
+    done
+}
+# First scenario only — for messages and the single-tree log paths. Every
+# target/verification helper loops over run_dirs() instead.
+RUN_DIR_REL="${RUN_PREFIX:+${RUN_PREFIX}/}${RUN_NAME_FIRST}"
 JOBFILE="$HERE/.last_jobs"
 mkdir -p "$HERE/logs"
 
@@ -74,78 +83,90 @@ network_basename() {
 }
 
 solved_targets() {
-    local y base
+    local y base d
     base=$(network_basename)
-    for y in $HORIZONS; do
-        echo "results/${RUN_DIR_REL}/networks/${base}_${y}.nc"
+    for d in $(run_dirs); do
+        for y in $HORIZONS; do
+            echo "results/${d}/networks/${base}_${y}.nc"
+        done
     done
 }
 
 brownfield_targets() {
-    local y base
+    local y base d
     base=$(network_basename)
-    for y in $HORIZONS; do
-        echo "resources/${RUN_DIR_REL}/networks/${base}_${y}_brownfield.nc"
+    for d in $(run_dirs); do
+        for y in $HORIZONS; do
+            echo "resources/${d}/networks/${base}_${y}_brownfield.nc"
+        done
     done
 }
 
 prepare_targets() {
-    local y first base
+    local y first base d
     first=$(echo "$HORIZONS" | awk '{print $1}')
     base=$(network_basename)
-    echo "resources/${RUN_DIR_REL}/networks/${base}_${first}_brownfield.nc"
-    for y in $HORIZONS; do
-        [ "$y" = "$first" ] && continue
-        echo "resources/${RUN_DIR_REL}/networks/${base}_${y}.nc"
+    for d in $(run_dirs); do
+        echo "resources/${d}/networks/${base}_${first}_brownfield.nc"
+        for y in $HORIZONS; do
+            [ "$y" = "$first" ] && continue
+            echo "resources/${d}/networks/${base}_${y}.nc"
+        done
     done
 }
 
 postprocess_targets() {
-    echo "results/${RUN_DIR_REL}/csvs/costs.csv"
-    echo "results/${RUN_DIR_REL}/graphs/costs.svg"
-    echo "results/${RUN_DIR_REL}/csvs/cumulative_costs.csv"
+    local d
+    for d in $(run_dirs); do
+    echo "results/${d}/csvs/costs.csv"
+    echo "results/${d}/graphs/costs.svg"
+    echo "results/${d}/csvs/cumulative_costs.csv"
     # TIMES Sankey pages into results/<run>/html/ (rule build_times_sankey).
     # The index is a sufficient sentinel: all pages and the index are one job,
     # and the index is written last. Set TIMES_SANKEY=0 when the config has
     # sector.times_sankey disabled -- the rule then does not exist and Snakemake
     # aborts with "no rule to produce target".
     if [ "${TIMES_SANKEY:-1}" = "1" ]; then
-        echo "results/${RUN_DIR_REL}/html/times/times_sankey_index.html"
+        echo "results/${d}/html/times/times_sankey_index.html"
     fi
     # pypsa2html + hub + rsync of html/ to pypsa.squoilin.eu.
     # Set HTML_PUBLISH=0 (or PYPSA2HTML=0) when the corresponding rule is not
     # defined, otherwise Snakemake aborts with "no rule to produce target".
     if [ "${PYPSA2HTML:-1}" = "1" ]; then
-        echo "results/${RUN_DIR_REL}/html/pypsa/index.html"
+        echo "results/${d}/html/pypsa/index.html"
     fi
     if [ "${TIMES_SANKEY:-1}" = "1" ] || [ "${PYPSA2HTML:-1}" = "1" ]; then
-        echo "results/${RUN_DIR_REL}/html/index.html"
+        echo "results/${d}/html/index.html"
     fi
     if [ "${HTML_PUBLISH:-1}" = "1" ]; then
-        echo "results/${RUN_DIR_REL}/logs/html_published.url"
+        echo "results/${d}/logs/html_published.url"
     fi
+    done
 }
 
 verify_run_success() {
-    local y t ok=0 base log
+    local y t ok=0 base log d scen
     base=$(network_basename)
     log="$HERE/logs/orchestrate.log"
-    msg "Verifying run for '$RUN_NAME'"
+    msg "Verifying run for: $RUN_NAME"
     if [ -f "$log" ] && grep -qE 'steps \(100%\) done|Complete log' "$log"; then
         msg "  cluster orchestrator: OK ($log)"
     else
         warn "  cluster orchestrator: CHECK $log"
         ok=1
     fi
-    for y in $HORIZONS; do
-        t="results/${RUN_DIR_REL}/networks/${base}_${y}.nc"
+    for d in $(run_dirs); do
+      scen="${d##*/}"
+      msg "  --- $scen ---"
+      for y in $HORIZONS; do
+        t="results/${d}/networks/${base}_${y}.nc"
         if [ -f "$REPO/$t" ]; then
             msg "  solved network $y: OK ($(du -h "$REPO/$t" | awk '{print $1}'))"
         else
             warn "  solved network $y: MISSING ($t)"
             ok=1
         fi
-        t="results/${RUN_DIR_REL}/logs/${base}_${y}_solver.log"
+        t="results/${d}/logs/${base}_${y}_solver.log"
         if [ -f "$REPO/$t" ] && grep -q 'Optimal objective' "$REPO/$t"; then
             msg "  solver log $y: OK (optimal)"
         elif [ -f "$REPO/$t" ]; then
@@ -155,6 +176,7 @@ verify_run_success() {
             warn "  solver log $y: MISSING ($t)"
             ok=1
         fi
+      done
     done
     log="$HERE/logs/postprocess.log"
     if [ -f "$log" ] && grep -qE 'steps \(100%\) done|Nothing to be done|Complete log' "$log"; then
@@ -167,14 +189,16 @@ verify_run_success() {
 }
 
 sync_brownfield_mtimestamps() {
-    local y base bf sol
+    local y base bf sol d
     base=$(network_basename)
-    for y in $HORIZONS; do
-        bf="resources/${RUN_DIR_REL}/networks/${base}_${y}_brownfield.nc"
-        sol="results/${RUN_DIR_REL}/networks/${base}_${y}.nc"
+    for d in $(run_dirs); do
+      for y in $HORIZONS; do
+        bf="resources/${d}/networks/${base}_${y}_brownfield.nc"
+        sol="results/${d}/networks/${base}_${y}.nc"
         if [ -f "$REPO/$bf" ] && [ -f "$REPO/$sol" ]; then
             touch -r "$REPO/$sol" "$REPO/$bf"
         fi
+      done
     done
 }
 
