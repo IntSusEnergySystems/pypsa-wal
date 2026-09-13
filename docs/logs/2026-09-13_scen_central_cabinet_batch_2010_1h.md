@@ -12,7 +12,7 @@
 | Resolution | `clustering.temporal.resolution_sector: 1h` |
 | Horizons | 2025 / 2030 / 2040 / 2050, myopic |
 | Repo branch | `development_plan` |
-| Run recipe | `docs/runs-20260912-cabinet-batch.md` |
+| Run recipe | `docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md` |
 
 ## 2. Goal of the run
 
@@ -97,7 +97,7 @@ outward-facing step that should be a human decision. Local `csvs/`, `graphs/` an
 | # | Issue | Fix |
 |---|---|---|
 | 1 | `cluster_network` and `simplify_network` died with `TypeError: Object of type function is not JSON serializable`. `clustering_for_n_clusters` did `aggregation_strategies.get("buses", dict())` — which **aliases** `config["clustering"]["aggregation_strategies"]` because `buses: {}` has existed in `config.default.yaml` since the Pydantic merge (`8b064878`) — then `setdefault` wrote two lambdas into the live config, which `n.meta = dict(snakemake.config, …)` cannot serialise on export. Latent since January; exposed by `policy: base` because it changed which rules run unscoped | Copy instead of alias, in both scripts |
-| 2 | `prepare_sector_network` refused every scenario at 2025: `TIMES 2025 BEV fleet share 0.0028 is below the road-electricity energy share 0.0036`. The guard compares a **car-only** count share against an **all-road** energy share; its message accounts for the denominator carrying freight but not for the numerator carrying non-car electricity. Wallonia has ~199 kveh of two/three-wheelers, 48 % electric already in 2025, doing **2.9× the electric km of cars** in this export | Guard now gated on its own premise (`CAR_DOMINATED_ROAD_ELECTRICITY = 0.80`): hard error where cars carry ≥80 % of electric road km (2030/2040/2050, at 96–97 %), loud warning below (2025, at 25.5 %). See `docs/runs-20260912-cabinet-batch.md` §12 |
+| 2 | `prepare_sector_network` refused every scenario at 2025: `TIMES 2025 BEV fleet share 0.0028 is below the road-electricity energy share 0.0036`. The guard compares a **car-only** count share against an **all-road** energy share; its message accounts for the denominator carrying freight but not for the numerator carrying non-car electricity. Wallonia has ~199 kveh of two/three-wheelers, 48 % electric already in 2025, doing **2.9× the electric km of cars** in this export | Guard now gated on its own premise (`CAR_DOMINATED_ROAD_ELECTRICITY = 0.80`): hard error where cars carry ≥80 % of electric road km (2030/2040/2050, at 96–97 %), loud warning below (2025, at 25.5 %). See `docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md` §14.3 |
 | 3 | Every per-scenario `html/pypsa/index.html` redirected to `BEWAL_overview_scen_central.html`, which exists only in the central tree — 12 of 13 reports opened on a 404. `config/pypsa2html.yaml` carries one `landing.scenario`, correct for the combined report, applied verbatim by pypsa2html to per-scenario ones | `scripts/walloon_scripts/fix_scenario_report_index.py` repoints each index at the landing page beside it. Idempotent; leaves pypsa2html and the combined report untouched |
 | 4 | `cluster/probe.sh` reported `0/4` and `STOPPED-PARTIAL` for scenarios with demonstrably solved networks, and a blank Slurm column throughout (Snakemake names jobs with UUIDs, so no job maps to a scenario) | Not fixed — monitoring used a direct file-count matrix instead. **Worth fixing before the next batch**; as it stands the probe would not have detected a real stall |
 
@@ -172,7 +172,7 @@ cost sensitivities in this batch.
 ```
 
 Against ~100–190 MW/yr observed for wind in 2023–24 and ~100 MWc of PV in 2025
-(`docs/runs-20260912-cabinet-batch.md` §10.1). Note the 2030 floor was
+(`docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md` §11.1). Note the 2030 floor was
 deliberately set non-binding at 2 248 MW and the model cleared it by 77 %: the
 3 977 MW is the optimiser's own choice, not a constraint. This strengthens rather
 than weakens the realiste sensitivity's premise — the gap between central and

@@ -6,7 +6,7 @@
 
 Each test here pins something that was got wrong once while the batch was being
 built, and whose failure mode is a run that completes and is quietly wrong
-rather than one that stops. See docs/runs-20260912-cabinet-batch.md.
+rather than one that stops. See docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md.
 """
 
 from pathlib import Path
@@ -57,7 +57,7 @@ def test_run_name_is_the_batch(run_names):
     """
     assert run_names == BATCH, (
         "run.name in config/config.walloon.yaml has drifted from the batch "
-        "documented in docs/runs-20260912-cabinet-batch.md §1"
+        "documented in docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md §1"
     )
 
 
