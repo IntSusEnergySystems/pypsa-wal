@@ -1168,6 +1168,63 @@ group is an extra synthetic node (explicit members, never a prefix match) so
 self-sufficiency and every other nodal chart can be read for Belgium as a
 whole; see pypsa2html [D18](https://github.com/squoilin/pypsa2html/blob/main/docs/DESIGN_DECISIONS.md).
 
+### Sensitivity analyses (parameter sweeps)
+
+A family of runs differing in **one number** is a sensitivity, not a set of
+scenarios. Six runs at six nuclear investment costs answer a single question,
+and the answer is a curve; listing them as scenarios would put six
+near-identical entries in the dropdown and bury the scenarios that genuinely
+differ.
+
+Mark each run on its own entry in
+[`config/pypsa2html.yaml`](config/pypsa2html.yaml) and declare what the family
+means:
+
+```yaml
+scenarios:
+  - name: scen_nuctip_4500
+    results_dir: results/walloon/scen_nuctip_4500
+    resources_dir: resources/walloon/scen_nuctip_4500
+    sensitivity: {sweep: nuclear_capex, value: 4500}      # ← the marker
+
+sensitivities:
+  - id: nuclear_capex
+    label: Nuclear investment cost
+    parameter: {label: Overnight investment cost of new nuclear, unit: EUR2025/kW_e}
+    nodes: [BEWAL, BE]
+    metrics:
+      - {table: capacity, kind: power, rows: [nuclear], label: Installed nuclear capacity, unit: GW}
+    description: "<p>HTML shown above the chart.</p>"
+```
+
+A scenario carrying `sensitivity:` is a **sweep point**: it gets no pages of its
+own, never appears in the scenario dropdown, and is excluded from the
+cross-scenario overview. Each sweep becomes one section of the shared
+**Sensitivity analyses** page, with the swept value on the x axis and one line
+per planning horizon (a second dropdown view transposes it to one line per
+swept value over time).
+
+`rows:` are summed and matched case-insensitively against the extracted table's
+row labels. A row the run did not build reads **zero** — a point on the curve —
+while a point whose whole table is missing breaks the line instead of dropping
+it to the origin, so an unsolved point is visibly absent rather than silently
+read as "built nothing".
+
+Check the wiring before building; `inspect` prints every sweep, its points and
+any that are unsolved:
+
+```bash
+pypsa2html inspect --config config/pypsa2html.yaml
+```
+
+Cross-references are validated at load: a marker naming an undeclared sweep, a
+sweep with no points, and two points at the same value are all errors, because
+each is otherwise a silently missing or doubled marker on a published curve.
+
+**Adding a sweep changes the left navigation, so the whole site has to be
+rebuilt** — the page list is rendered into every page. See
+[pypsa2html D22](https://github.com/squoilin/pypsa2html/blob/main/docs/DESIGN_DECISIONS.md).
+
 ### Where the output goes
 
 `output.dir` contains `{scenario}`, so each scenario's pages land **inside that
