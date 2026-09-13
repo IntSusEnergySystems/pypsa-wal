@@ -905,6 +905,54 @@ After a successful local solve, publish results to the Wallonie Explorer with
 `./cluster/nic5.sh upload` (raw results) followed by the ClimAct CSV extraction
 described in [Publishing to Wallonie Explorer (S3)](#publishing-to-wallonie-explorer-s3).
 
+### Disk preflight — check `/` as well as `/home`
+
+**Run this before any overnight batch, and again in the monitoring loop:**
+
+```bash
+df -h / /home | awk 'NR==1 || /\/$|\/home/'
+```
+
+Abort or clear space if either is under ~10 GB free.
+
+`results/`, `resources/` and the cthreshold_capacityutouts all live on `/home`, so that is the
+partition everyone watches — and it is not the one that fails. On 2026-09-13 the
+September cabinet batch was killed mid-post-processing by the **root** partition
+filling: `/var/log/syslog` had reached **54 GB in a single day** (the previous
+day's rotation was 74 MB) because the Pop!_OS COSMIC theme portal was retrying a
+broken D-Bus connection in a tight loop, ~10 000 identical lines per 20 000, at
+about 1.8 MB/s:
+
+```
+cosmic-session[…]: ERROR cosmic::theme::portal > Failed to get the contrast
+                   Portal(ZBus(InputOutput(Os { code: 32, BrokenPipe })))
+```
+
+Nothing in the run caused it and no results were lost — `/home` still had 1.9 TB —
+but **every tool broke at once and none of them blamed the disk**: `ssh` to the
+cluster timed out during banner exchange, `conda run` failed, and Snakemake's
+temporary files could not be written. Diagnosing that from the symptoms costs far
+more than the one-line check above.
+
+When it happens:
+
+```bash
+du -xh --max-depth=1 / | sort -rh | head          # find the partition's hog
+ls -lSh /var/log | head                           # usually a runaway log
+sudo truncate -s 0 /var/log/syslog                # reclaim without rotating
+```
+
+Use `truncate`, not `rm`: `rsyslog` keeps the file open, so deleting it frees
+nothing until the daemon restarts. Then fix the source — for the COSMIC loop, log
+out and back in, or `sudo systemctl restart cosmic-session.service`.
+
+Two habits that make a long batch survive this class of problem:
+
+* put the disk check in the same loop that polls the run, for **both** partitions;
+* keep long-running output out of `/` — `TMPDIR` included. `cluster/config.sh`
+  already points the cluster's `TMPDIR` at scratch; do the same locally
+  (`export TMPDIR=$PWD/tmp`) before a long local run.
+
 ---
 
 ## Running the optimisation on NIC5 / CÉCI

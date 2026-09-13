@@ -2864,6 +2864,38 @@ def add_ice_cars(
 #: the share come from the SAME classes. docs/ev-charging-softlink.md S2.
 EV_FLEET_CLASSES = ("cars",)
 
+#: Above this car share of electric road km, `electricity road` is essentially a
+#: car quantity and the fleet-share/energy-share inequality is a real invariant
+#: (see the guard in `add_land_transport`). Below it, non-car electric classes --
+#: in practice Wallonia's ~199 kveh of two- and three-wheelers, 48 % electric
+#: already in 2025 -- carry enough of the numerator that the inequality can
+#: legitimately reverse, and enforcing it would reject a self-consistent export.
+#: 2026-09-11 exports: 0.255 at 2025, 0.959 at 2030.
+CAR_DOMINATED_ROAD_ELECTRICITY = 0.80
+
+
+def times_car_share_of_road_electricity(
+    road_transport_shares_file, classes=EV_FLEET_CLASSES
+) -> float:
+    """Car share of *electric* road activity (vkm), across all vehicle classes.
+
+    Tells the caller whether TIMES's `electricity road` is a car quantity or not,
+    which is what decides whether a car-only fleet share may be compared against
+    the all-road electricity energy share. Activity rather than energy because
+    the `.vd` export gives one `electricity road` total and no per-class split;
+    vkm is the finest shared denominator available.
+
+    Returns 0.0 when no road class is electrified at all, so a horizon with no
+    electric road transport never claims to be car-dominated.
+    """
+    fleet = pd.read_csv(road_transport_shares_file)
+    electric = fleet[fleet["pypsa_engine_type"] == "electric"]
+    total_km = float(electric["activity_bvkm"].sum())
+    if total_km <= 0:
+        return 0.0
+    car_km = float(electric.loc[electric["vehicle_class"].isin(classes), "activity_bvkm"].sum())
+    return car_km / total_km
+
 
 def times_ev_fleet(
     road_transport_shares_file, classes=EV_FLEET_CLASSES
@@ -3028,15 +3060,49 @@ def add_land_transport(
         times_cars, times_bev_share = times_ev_fleet(
             snakemake.input.road_transport_shares
         )
+        # The comparison below pits a CAR-ONLY count share against an ALL-ROAD
+        # energy share, so it is only an invariant while cars carry essentially
+        # all of the road electricity. `total road` in the denominator carries
+        # freight the car count excludes -- that is accounted for in the message
+        # -- but `electricity road` in the NUMERATOR also carries every non-car
+        # electric class, and that was not. Two- and three-wheelers are the case
+        # that matters: TIMES gives Wallonia ~199 kveh of them, 48 % electric,
+        # already in 2025 and identical across the 2026-09-07 and 2026-09-11
+        # exports. Once the car fleet electrifies they are noise (96 % of
+        # electric road km are cars at 2030), but in a year where cars are barely
+        # electrified they dominate the numerator and the inequality legitimately
+        # reverses. Gate the check on its own premise instead of asserting it
+        # unconditionally. docs/ev-charging-softlink.md S2.
+        car_km_share = times_car_share_of_road_electricity(
+            snakemake.input.road_transport_shares
+        )
         if times_bev_share < shares_wal["electric"] - 1e-9:
-            raise ValueError(
+            detail = (
                 f"TIMES {investment_year} BEV fleet share {times_bev_share:.4f} is "
                 f"below the road-electricity energy share "
-                f"{shares_wal['electric']:.4f}. That cannot happen: a BEV converts "
-                "more of its final energy into km than an ICE, and the energy "
-                "denominator also carries freight the car count excludes. One of "
-                "the two extractions is wrong."
+                f"{shares_wal['electric']:.4f}, and cars are {car_km_share:.1%} of "
+                "electric road km."
             )
+            if car_km_share >= CAR_DOMINATED_ROAD_ELECTRICITY:
+                raise ValueError(
+                    f"{detail} With cars carrying that much of the road "
+                    "electricity the fleet share must exceed the energy share: a "
+                    "BEV converts more of its final energy into km than an ICE, "
+                    "and the energy denominator also carries freight the car "
+                    "count excludes. One of the two extractions is wrong."
+                )
+            if logger:
+                logger.warning(
+                    "%s Non-car electric road transport (mostly two- and "
+                    "three-wheelers) therefore dominates `electricity road`, so "
+                    "the fleet/energy inequality does not apply and the check is "
+                    "not enforced at this horizon. The EV LOAD is unaffected -- it "
+                    "reproduces the transferred `electricity road` exactly -- but "
+                    "the charger p_nom and battery e_nom rest on the car count, "
+                    "so verify that count with ICEDD before using this horizon's "
+                    "EV flexibility.",
+                    detail,
+                )
         if wallon_node in number_cars.index:
             if logger:
                 logger.info(

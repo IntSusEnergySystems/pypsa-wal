@@ -409,9 +409,16 @@ def clustering_for_n_clusters(
     if aggregation_strategies is None:
         aggregation_strategies = dict()
 
-    line_strategies = aggregation_strategies.get("lines", dict())
+    # Copy, do not alias: `aggregation_strategies` is `config["clustering"]
+    # ["aggregation_strategies"]` itself, and `buses: {}` has existed in
+    # config.default.yaml since the Pydantic validation merge (8b064878). Calling
+    # setdefault on the aliased dict writes the two lambdas below straight into
+    # the live config, and `nc.meta = dict(snakemake.config, ...)` then fails with
+    # "Object of type function is not JSON serializable" when the network is
+    # exported. These are runtime defaults and must never reach the config.
+    line_strategies = dict(aggregation_strategies.get("lines", dict()))
 
-    bus_strategies = aggregation_strategies.get("buses", dict())
+    bus_strategies = dict(aggregation_strategies.get("buses", dict()))
     bus_strategies.setdefault("substation_lv", lambda x: bool(x.sum()))
     bus_strategies.setdefault("substation_off", lambda x: bool(x.sum()))
 

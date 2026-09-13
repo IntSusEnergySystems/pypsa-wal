@@ -319,9 +319,12 @@ def aggregate_to_substations(
     busmap = n.buses.index.to_series()
     busmap.loc[no_substation_i] = dist.where(country_mask, np.inf).idxmin(0)
 
-    line_strategies = aggregation_strategies.get("lines", dict())
+    # Copy, do not alias — same reason as in cluster_network.py: setdefault on the
+    # aliased config dict leaks the two lambdas into snakemake.config, which
+    # `n.meta = dict(snakemake.config, ...)` cannot serialise on export.
+    line_strategies = dict(aggregation_strategies.get("lines", dict()))
 
-    bus_strategies = aggregation_strategies.get("buses", dict())
+    bus_strategies = dict(aggregation_strategies.get("buses", dict()))
     bus_strategies.setdefault("substation_lv", lambda x: bool(x.sum()))
     bus_strategies.setdefault("substation_off", lambda x: bool(x.sum()))
 

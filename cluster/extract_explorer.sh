@@ -124,12 +124,31 @@ times_file_for() {
     # sector.times_file for one scenario: the scenarios file overrides the base
     # config, mirroring how Snakemake merges them.
     local scen="$1"
-    python3 - "$REPO" "$CONFIGFILE" "$scen" <<'PY'
+    # $CONFIGFILE is UNQUOTED on purpose so it word-splits, exactly as at every
+    # other use site (cluster/config.sh). It may name several files in
+    # snakemake's `--configfile A B` order -- that is how the 2013 weather year
+    # and the 5-year grid are run. Quoting it here made the 2013 run die with
+    #   FileNotFoundError: '.../config/config.walloon.yaml config/config.weather2013.yaml'
+    # AFTER a successful extraction, so the CSVs were written and only the .vd
+    # staging was lost (observed 2026-09-13). $scen moves ahead of the file list
+    # so the trailing arguments can be a variable number of configs.
+    # shellcheck disable=SC2086
+    python3 - "$REPO" "$scen" $CONFIGFILE <<'PY'
 import sys, pathlib, yaml
-repo, configfile, scen = sys.argv[1:4]
-base = yaml.safe_load(open(pathlib.Path(repo, configfile), encoding="utf-8")) or {}
-vd = (base.get("sector") or {}).get("times_file")
-sfile = ((base.get("run") or {}).get("scenarios") or {}).get("file")
+repo, scen = sys.argv[1:3]
+configfiles = sys.argv[3:]
+# Later files win, as snakemake does. Only the two keys below are needed, so a
+# key-wise override is enough -- no deep merge required.
+vd = None
+sfile = None
+for cf in configfiles:
+    cfg = yaml.safe_load(open(pathlib.Path(repo, cf), encoding="utf-8")) or {}
+    v = (cfg.get("sector") or {}).get("times_file")
+    if v:
+        vd = v
+    s = ((cfg.get("run") or {}).get("scenarios") or {}).get("file")
+    if s:
+        sfile = s
 if sfile:
     p = pathlib.Path(repo, sfile)
     if p.exists():

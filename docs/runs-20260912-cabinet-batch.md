@@ -665,3 +665,47 @@ about costs or technology.
 | 4 | Nuclear sweep bracket: widen downwards if 4 500 EUR/kW still builds nothing | — | after the first results |
 | 5 | PV 2030 floor is 6 500 MW from Elia AdeqFlex, 21 % above the PACE's 5 100 GWh, and was never reconciled with it (§10). Central-case decision | Sylvain / cabinet | no |
 | 6 | `scen_base`, `scen_corrige`, `scen_nuc11500`, `scen_nuc13500`, `scen_imppel`, `scen_data` are from Nov–Dec 2025 and unmanaged. Retire or migrate to an override file | Sylvain | no |
+| 7 | **The 2025 Walloon BEV car fleet collapsed 52× between the 7 Sept and 11 Sept exports** (248 880 → 4 757 cars; road electricity 0.895 → 0.103 TWh). Neither figure is credible against reality — Wallonia's real 2025 BEV stock is in the tens of thousands, so 248 880 looks like a Belgium-wide total applied to the region and 4 757 is roughly 10× too low. Confirm which is right and re-export 2025 if needed. See §12 | ICEDD | no — 2025 only, and the EV *load* is exact either way |
+
+---
+
+## 12. The 2025 EV fleet guard (found 2026-09-12, during the batch launch)
+
+`add_land_transport` refused every scenario at 2025 with
+
+```
+ValueError: TIMES 2025 BEV fleet share 0.0028 is below the road-electricity
+energy share 0.0036. ... One of the two extractions is wrong.
+```
+
+**The guard's premise had a gap.** It compares a **car-only** count share against
+an **all-road** energy share. Its message accounts for the energy *denominator*
+carrying freight that the car count excludes, but not for the energy *numerator*
+carrying every non-car electric class. TIMES gives Wallonia ~199 kveh of two- and
+three-wheelers, **48 % electric already in 2025** — a figure that is byte-identical
+in the 7 Sept and 11 Sept exports. Once cars electrify they are noise; in a year
+where cars are barely electrified they dominate `electricity road` and the
+inequality legitimately reverses.
+
+Car share of electric road km, 11 Sept exports:
+
+| horizon | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| cars as share of electric road km | **0.255** | 0.959 | 0.973 | 0.967 |
+
+**Fix.** The check is now gated on its own premise rather than asserted
+unconditionally (`CAR_DOMINATED_ROAD_ELECTRICITY = 0.80`, `scripts/prepare_sector_network.py`):
+
+* cars ≥ 80 % of electric road km → **hard error**, exactly as before. This is
+  2030, 2040 and 2050 — every horizon the cabinet results rest on;
+* below it → **loud warning** naming both shares, because the inequality is not
+  an invariant in that regime. This is 2025 only.
+
+**What is and is not affected.** The 2025 EV **load** is untouched: it is built
+from the TIMES *energy* ratio and reproduces the transferred `electricity road`
+exactly (`test_split_draws_exactly_the_transferred_demand`). Only the 2025 charger
+`p_nom` and battery `e_nom` — which multiply the car *count* — inherit the
+questionable fleet, i.e. 2025 EV *flexibility*, on 0.1 TWh of EV demand. 2030
+onwards is unaffected and still fully guarded.
+
+**Do not read 2025 EV flexibility from this batch** until open item 7 is settled.
