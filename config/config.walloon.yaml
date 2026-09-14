@@ -16,7 +16,7 @@ run:
   #
   # All 13 are weather year 2010. `scen_central_2013` is deliberately NOT here:
   # it needs a second --configfile (config/config.weather2013.yaml) and its own
-  # resources tree — see docs/runs-20260912-cabinet-batch.md.
+  # resources tree — see docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md.
   name:
   - scen_central                 # reference case, the one that ships Monday
   - scen_taxshift                # single surcharge across vectors from 2030

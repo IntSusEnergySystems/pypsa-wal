@@ -797,9 +797,25 @@ found this horizon and **no other**; its sister `scen_realiste_nets` solved 2050
 normally.
 
 Escalation: `cluster/config_numericfocus.yaml` (`NumericFocus: 3`, `ScaleFlag: 2`),
-relaunched as Slurm job 11155390. It converged where the first attempt sat flat —
-residual `5.20e+09 → 5.23e+07` over iterations 19→42 — at ~6.7× the cost per
-iteration (~147 s against ~22 s).
+relaunched as Slurm job 11155390. **It worked:**
+
+```
+Barrier solved model in 200 iterations and 27120.78 seconds
+Optimal objective 2.65017175e+11
+```
+
+Where the first attempt sat flat at `7.42e+12` for ten iterations and gave up, the
+retry descended monotonically the whole way: `5.20e+09` (iter 19) → `5.23e+07`
+(42) → `1.62` (185) → converged at 200. Cost: **7 h32 against ~1 h30 for a normal
+2050 horizon**, ~6.7× the time per iteration (~147 s against ~22 s). Well inside
+the 12 h walltime.
+
+For scale, the sister scenario `scen_realiste_nets` landed at `2.6118e+11`, so
+`nobnd30`'s `2.65017e+11` is ~1.5 % higher — consistent with its larger demands
+and confirming the answer is the real optimum, not an artefact of the harder
+numerics.
+
+**The batch is therefore 52/52 networks, every one `Optimal objective`.**
 
 #### Root cause — two factors, diagnosed 2026-09-13
 
@@ -933,7 +949,32 @@ are user-session D-Bus clients stuck retrying a broken session bus, which is why
 two unrelated-looking things failed together. **A logout or reboot clears both.**
 
 A separate, benign cause of the same ssh symptom: **the S3 upload saturates the
-uplink** (§5.5).
+uplink** (§5.5). While it runs, `ssh nic5` fails during banner exchange. Not a
+fault — check the cluster between chunks.
+
+**E1 recurred the same afternoon, worse and better understood.** After the
+reboot, syslog grew again at **42 MB/s** — 24 GB of free root in ten minutes.
+Two things were learned that the first occurrence hid:
+
+* **The run is not involved.** The flood continued at full rate with every
+  Snakemake process killed. An earlier hypothesis — that the plotting rules,
+  which do run with `QT_QPA_PLATFORM=wayland` and no `MPLBACKEND`, were querying
+  the portal — was **wrong**.
+* **Restarting the portal is not the fix.** `systemctl --user restart
+  org.freedesktop.impl.portal.desktop.cosmic.service` drops syslog growth from
+  42 MB/s to ~6 KB/10 s and looks like a cure, but it only restarts the *server*.
+  `cosmic-session` holds a stale D-Bus connection and retries the call forever;
+  it was still emitting **32 500 messages per 30 s** into the journal, with
+  rate-limiting hiding them from the file while `rsyslogd` burned **115 % CPU**
+  (in `in:imuxsock`, not the journal backlog). Only restarting the *client* —
+  i.e. logging out — stops it.
+
+Prevention, so the next occurrence is an annoyance rather than a stopped run:
+`scripts/walloon_scripts/harden_host_logging.sh` (one-time, root) caps the
+journal, tightens its rate limit, size-rotates syslog and drops the message;
+`scripts/walloon_scripts/check_host_health.sh` detects all of §9 in one call and
+self-heals the two user services with `--fix`. Full write-up, including what does
+*not* work, in [`run_from_home_computer.md`](../../run_from_home_computer.md) §4.
 
 ## 16. What must change before the next batch
 
@@ -1059,6 +1100,59 @@ Best landed in the pypsa2html work rather than retrofitted.
 
 Until then, **do not present any per-node cost or capacity chart involving
 nuclear** without stating what it omits.
+
+### 16b.3 Applying the fix — four things that bit during the regeneration
+
+The `make_summary` change is three lines; re-deriving the outputs from it was the
+awkward part. In order met:
+
+**1. `--rerun-triggers mtime` does not see a code change.** The first
+regeneration reported `Nothing to be done` and exited 0 — the CSVs exist and no
+*input* is newer, so Snakemake is content. A script edit is invisible to it.
+Always `--forcerun make_summary`, and check the job plan is non-empty before
+walking away:
+
+```
+Job stats:  make_summary 48 · make_global_summary 12 · generate_html_report 12
+```
+
+**2. The 2013 run needs the same flag, separately.** Its post-process ran "2 of 2
+steps (100 %) done" and looked fine while leaving the old CSVs in place, because
+the sentinel targets were already satisfied. Silent, and only caught by grepping
+the output for a `BEWAL,nuclear` row.
+
+**3. `generate_html_report` needs ~28 GB and `--cores 8` will OOM the machine.**
+Eight concurrent jobs against 124 GB of RAM:
+
+```
+14:25:59 Out of memory: Killed process (claude-desktop)
+14:26:00 Out of memory: Killed process (python3.13)  anon-rss: 28 GB
+```
+
+The kernel took the report jobs *and* the desktop session. The failures read as
+eight `Error in rule generate_html_report` with logs that simply stop mid-write —
+no exception, because there wasn't one. Cap it explicitly:
+
+```bash
+--resources mem_mb=90000 --set-resources generate_html_report:mem_mb=30000   # max 3 concurrent
+```
+
+**4. The ClimAct extraction must be re-run too.** The explorer CSVs derive from
+the same summary outputs, so six scenarios extracted before the fix carried the
+old `EU` attribution. Uploading then would have put a mix of corrected and
+uncorrected data on S3. Re-extract every scenario after any `make_summary`
+change, not only the ones you re-solved.
+
+A fifth, unrelated but blocking: a **Zenodo outage** (HTTP 504) stalled the whole
+invocation before any rule ran — `snakemake-storage-plugin-cached-http` resolves
+every `storage()` input at DAG-build time, so a fully cached tree still makes the
+metadata call. The documented remedy
+(`SNAKEMAKE_STORAGE_CACHED_HTTP_SKIP_REMOTE_CHECKS=1`, instructions.md "When
+Zenodo is down") is now applied automatically by
+`scripts/walloon_scripts/run_headless.sh`, which is the wrapper that should be
+used for all local post-processing: it also forces `MPLBACKEND=Agg` /
+`QT_QPA_PLATFORM=offscreen`, puts `TMPDIR` on `/home`, and detaches with
+`setsid nohup` so a timeout cannot orphan a child onto the same output.
 
 ## 17. Publication
 

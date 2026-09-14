@@ -69,7 +69,7 @@ scenarios:
     results_dir: results/walloon/scen_evflex
     resources_dir: resources/walloon/scen_evflex
 
-  # --- September 2026 cabinet batch (docs/runs-20260912-cabinet-batch.md).
+  # --- September 2026 cabinet batch (docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md).
   # A scenario listed here but not solved yet is SKIPPED by
   # `generate_html_report_all_scenarios`, so the combined report can be
   # rebuilt after each scenario lands instead of only at the end.
@@ -102,51 +102,59 @@ scenarios:
     label: Nuclear delayed to 2055
     results_dir: results/walloon/scen_retardnucleaire
     resources_dir: resources/walloon/scen_retardnucleaire
-  # NUCLEAR CAPEX SWEEP — deliberately NOT in the report (2026-09-13).
+  # NUCLEAR CAPEX SWEEP — a sensitivity, not six scenarios (2026-09-13).
   #
   # scen_nuctip_{9500,7500,6500,6000,5500,4500} are six points of one parametric
-  # sweep, not six scenarios. They answer a single question — how low new-nuclear
-  # CAPEX must go before the optimiser fills the 2 GW envelope — and that answer
-  # is a capacity curve read across the six, not six dashboards to browse.
-  # Listing them here would put six near-identical entries in the dropdown and
-  # bury the seven scenarios that are genuinely different.
+  # sweep. They answer a single question — how low new-nuclear CAPEX must go
+  # before the optimiser fills the 2 GW envelope — and that answer is a capacity
+  # curve read across the six, not six dashboards to browse.
   #
-  # They are also NOT run through the ClimAct extraction and NOT uploaded to S3,
-  # for the same reason. The sweep is analysed on its own in the nuclear-sweep
-  # solve log.
+  # The `sensitivity:` marker below is what makes that true in the report: a
+  # scenario carrying it gets no pages of its own, never appears in the scenario
+  # dropdown, and is excluded from the cross-scenario overview. It feeds the
+  # `nuclear_capex` block under `sensitivities:` at the bottom of this file,
+  # which draws the curve on the Sensitivity analyses page.
+  #
+  # They are still NOT run through the ClimAct extraction and NOT uploaded to S3
+  # as scenario trees; the sweep's own solve log carries its analysis.
   #
   # A further reason not to publish them side by side: their objective values are
   # NOT comparable. The swept `cost:nuclear:investment` also reprices the
   # annuitised EXISTING Tihange LTO fleet, so cross-point cost differences are an
   # artefact — see §11 F4 of
   # docs/logs/2026-09-13_scen_central_cabinet_batch_2010_1h.md. The capacity
-  # reading is valid; the cost reading is not.
-  #
-  # Uncomment to build the sweep's own comparison report.
-  # - name: scen_nuctip_9500
-  #   label: Nuclear CAPEX 9500 EUR/kW
-  #   results_dir: results/walloon/scen_nuctip_9500
-  #   resources_dir: resources/walloon/scen_nuctip_9500
-  # - name: scen_nuctip_7500
-  #   label: Nuclear CAPEX 7500 EUR/kW
-  #   results_dir: results/walloon/scen_nuctip_7500
-  #   resources_dir: resources/walloon/scen_nuctip_7500
-  # - name: scen_nuctip_6000
-  #   label: Nuclear CAPEX 6000 EUR/kW
-  #   results_dir: results/walloon/scen_nuctip_6000
-  #   resources_dir: resources/walloon/scen_nuctip_6000
-  # - name: scen_nuctip_6500
-  #   label: Nuclear CAPEX 6500 EUR/kW
-  #   results_dir: results/walloon/scen_nuctip_6500
-  #   resources_dir: resources/walloon/scen_nuctip_6500
-  # - name: scen_nuctip_5500
-  #   label: Nuclear CAPEX 5500 EUR/kW
-  #   results_dir: results/walloon/scen_nuctip_5500
-  #   resources_dir: resources/walloon/scen_nuctip_5500
-  # - name: scen_nuctip_4500
-  #   label: Nuclear CAPEX 4500 EUR/kW
-  #   results_dir: results/walloon/scen_nuctip_4500
-  #   resources_dir: resources/walloon/scen_nuctip_4500
+  # reading is valid; the cost reading is not. That is why the sweep declares a
+  # capacity metric and no cost metric.
+  - name: scen_nuctip_9500
+    label: Nuclear CAPEX 9500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_9500
+    resources_dir: resources/walloon/scen_nuctip_9500
+    sensitivity: {sweep: nuclear_capex, value: 9500}
+  - name: scen_nuctip_7500
+    label: Nuclear CAPEX 7500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_7500
+    resources_dir: resources/walloon/scen_nuctip_7500
+    sensitivity: {sweep: nuclear_capex, value: 7500}
+  - name: scen_nuctip_6500
+    label: Nuclear CAPEX 6500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_6500
+    resources_dir: resources/walloon/scen_nuctip_6500
+    sensitivity: {sweep: nuclear_capex, value: 6500}
+  - name: scen_nuctip_6000
+    label: Nuclear CAPEX 6000 EUR/kW
+    results_dir: results/walloon/scen_nuctip_6000
+    resources_dir: resources/walloon/scen_nuctip_6000
+    sensitivity: {sweep: nuclear_capex, value: 6000}
+  - name: scen_nuctip_5500
+    label: Nuclear CAPEX 5500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_5500
+    resources_dir: resources/walloon/scen_nuctip_5500
+    sensitivity: {sweep: nuclear_capex, value: 5500}
+  - name: scen_nuctip_4500
+    label: Nuclear CAPEX 4500 EUR/kW
+    results_dir: results/walloon/scen_nuctip_4500
+    resources_dir: resources/walloon/scen_nuctip_4500
+    sensitivity: {sweep: nuclear_capex, value: 4500}
   - name: scen_central_2013
     label: Central — weather year 2013
     results_dir: results/walloon_2013/scen_central_2013
@@ -159,7 +167,7 @@ landing:
 
 output:
   dir: results/walloon/{scenario}/html/pypsa
-  pages: [overview, emissions, sankeys, fec, demands, costs, capacities, dispatch, maps]
+  pages: [overview, sensitivity, emissions, sankeys, fec, demands, costs, capacities, dispatch, maps]
   shared_maps: true
   plotly: cdn
 
@@ -169,3 +177,41 @@ features:
   # Accounting switch only — no 50 % Belgian-offshore attribution to Wallonia.
   nuclear_primary: uranium
 
+# --- Parameter sweeps -------------------------------------------------------
+#
+# Each entry becomes one section of the "Sensitivity analyses" page, drawn from
+# the scenarios that carry a matching `sensitivity:` marker above. Those
+# scenarios have no pages of their own — see the comment on the sweep points.
+
+sensitivities:
+  - id: nuclear_capex
+    label: Nuclear investment cost
+    parameter:
+      label: Overnight investment cost of new nuclear
+      unit: EUR2025/kW_e
+    # Wallonia is the question; Belgium is shown beside it to make visible that
+    # Flanders is untouched (its 1 000 / 3 000 MW are fixed in every point), so
+    # the whole Belgian movement is Walloon. The BE parent row of
+    # `agg_p_nom_limits` was lowered with the BEWAL one — without that the
+    # sweep would have come out flat for a reason unrelated to cost
+    # (docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md §7.1).
+    nodes: [BEWAL, BE]
+    metrics:
+      - table: capacity
+        kind: power
+        rows: [nuclear]
+        label: Installed nuclear capacity
+        unit: GW
+    description: >
+      <p>Six runs of the <code>nofixnuc</code> TIMES export differing only in
+      <code>cost:nuclear:investment</code>, with the Walloon nuclear floor
+      relaxed to the 1&nbsp;GW Tihange&nbsp;3 long-term operation at 2045 and
+      2050 and the maximum left at the central scenario's envelope
+      (1&nbsp;750&nbsp;/&nbsp;3&nbsp;000&nbsp;MW). The question is how low the
+      investment cost has to go before the optimiser fills that envelope. On the
+      10-year grid only the 2050 relaxation is active, so the answer is read at
+      2050; 2025–2040 are pinned and flat by construction.</p>
+      <p><strong>Read the capacity, not the cost.</strong> The swept cost also
+      reprices the annuitised <em>existing</em> Tihange fleet, so objective
+      values are not comparable across the six points — which is why no cost
+      metric is plotted here. See §11&nbsp;F4 of the central solve log.</p>

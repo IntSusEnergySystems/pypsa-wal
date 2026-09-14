@@ -60,12 +60,42 @@ def assign_locations(n: pypsa.Network) -> None:
         )
 
 
+def assigned_location(n: pypsa.Network, c: str, port: str = "") -> pd.Series:
+    """Grouper returning the location `assign_locations` put on the component.
+
+    Use this instead of the string ``"location"`` for anything that belongs to a
+    *component* rather than to one of its ports — cost and capacity above all.
+
+    PyPSA's built-in ``location`` grouper (``pypsa.statistics.grouping.Groupers``)
+    is a registered method, so it takes precedence over a column of the same name
+    and re-derives the location as ``bus{port} -> n.buses.location``. For a branch
+    component that is ``bus0``, and for every Link whose input is an EU-level
+    carrier bus that is ``"EU"``. The whole of :func:`assign_locations` — which
+    deliberately picks the first *non-EU* bus — was therefore discarded, and the
+    capital cost and capacity of Walloon nuclear (``bus0 = "EU uranium"``) were
+    reported at ``EU`` instead of ``BEWAL``. Measured on the September 2026 batch,
+    ``scen_central`` 2050: 2 017 MEUR/a of capex and 3 000 MW_e, i.e. a quarter of
+    the Walloon annual cost, missing from every per-node chart. Oil boilers
+    (``bus0 = "EU oil"``) were hit the same way at 2025-2040.
+
+    **Not for energy balances.** There the port matters and the built-in grouper is
+    right: a nuclear Link withdraws uranium at ``EU`` and injects electricity at
+    ``BEWAL``, and both rows are wanted. `calculate_nodal_energy_balance` keeps the
+    string grouper for exactly that reason.
+
+    See docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md §16b.
+    """
+    return n.c[c].static["location"].rename("location")
+
+
 def calculate_nodal_capacity_factors(n: pypsa.Network) -> pd.Series:
     """
     Calculate the regional dispatched capacity factors / utilisation rates for each technology carrier based on location bus attribute.
     """
     comps = n.one_port_components ^ {"Store"} | n.passive_branch_components
-    return n.statistics.capacity_factor(comps=comps, groupby=["location", "carrier"])
+    return n.statistics.capacity_factor(
+        comps=comps, groupby=[assigned_location, "carrier"]
+    )
 
 
 def calculate_capacity_factors(n: pypsa.Network) -> pd.Series:
@@ -91,7 +121,7 @@ def calculate_nodal_costs(n: pypsa.Network) -> pd.Series:
     pd.Series
         MultiIndex Series with levels ["cost", "component", "location", "carrier"]
     """
-    grouper = ["location", "carrier"]
+    grouper = [assigned_location, "carrier"]
     costs = pd.concat(
         {
             "capital": n.statistics.capex(groupby=grouper),
@@ -132,7 +162,7 @@ def calculate_nodal_capacities(n: pypsa.Network) -> pd.Series:
     pd.Series
         MultiIndex Series with levels ["component", "location", "carrier"]
     """
-    return n.statistics.optimal_capacity(groupby=["location", "carrier"])
+    return n.statistics.optimal_capacity(groupby=[assigned_location, "carrier"])
 
 
 def calculate_capacities(n: pypsa.Network) -> pd.Series:
