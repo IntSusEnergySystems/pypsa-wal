@@ -48,10 +48,11 @@ horizon is used. Output:
 
 > **Three profiles, two loads.** The three live in the data and the weights, but
 > the network gets one flexible load and one inflexible load carrying the blended
-> natural+local shape. Physically equivalent — both are exogenous shapes — so the
-> only thing lost is the ability to *report* natural and local separately.
-> Splitting them is a reporting change, not a modelling one
-> ([§6](#6-remaining-work)).
+> natural+local shape. Physically equivalent — both are exogenous shapes, so
+> nothing about the LP changes. The report recovers the third bar anyway: the
+> blend is linear with published weights, so `build_ev_charging_mode_split.py`
+> re-derives the two shape components and pypsa2html splits the solved load in
+> their ratio ([§6](#6-remaining-work)).
 
 ### 1.2 Horizon-varying parameters
 
@@ -575,10 +576,17 @@ the config.
 
 **Reporting (optional)**
 
-8. **Split the blended inflexible load into `natural` and `local` carriers** so
-   the three profiles are visible in the summaries and the explorer. Needs a new
-   carrier plus colour and nice-name entries in `config.default.yaml`. Physically
-   a no-op.
+8. ~~**Split the blended inflexible load into `natural` and `local` carriers**~~
+   **Done as a reporting-only resource, not new carriers.** The blend is linear
+   with published weights, so `scripts/walloon_scripts/build_ev_charging_mode_split.py`
+   re-derives the two shape components exactly and writes
+   `resources/<run>/ev_charging_mode_split_s_{clusters}_{planning_horizons}.csv`;
+   pypsa2html reads it and splits the solved inflexible load in their ratio,
+   snapshot by snapshot, for the "EV charging energy by mode" chart. No new
+   carrier and no `config.default.yaml` entry — only pypsa2html's own palette
+   gained a "Local charging" colour. A tree without the file (built before this
+   change) still reports the old two-mode chart, so nothing already solved goes
+   stale.
 9. ~~**Cap the flexible share** at `1 − public_share`.~~ **Done as a test**, not
    as a runtime cap: `test_flexible_share_stays_under_the_public_charging_ceiling`
    checks both the market share and the whole steerable share against `1 − public`

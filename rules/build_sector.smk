@@ -1549,6 +1549,40 @@ rule build_transport_demand:
         scripts("build_transport_demand.py")
 
 
+rule build_ev_charging_mode_split:
+    message:
+        "Recovering the natural/local charging split for {wildcards.planning_horizons}"
+    # Reporting only. `build_transport_demand` blends Elia's natural (V0) and
+    # local (V1H+V2H) curves into one inflexible load, so the network carries two
+    # loads where Elia has three modes. The blend is linear with known weights,
+    # so this rule separates them again exactly for the report. It is a SEPARATE
+    # rule on purpose: a second output on `build_transport_demand` would mark
+    # that rule -- and every solve downstream of it -- out of date.
+    params:
+        snapshots=config_provider("snapshots"),
+        drop_leap_day=config_provider("enable", "drop_leap_day"),
+        sector=config_provider("sector"),
+        charging_weights=config_provider("sector", "local_bev_dsm"),
+    input:
+        clustered_pop_layout=resources("pop_layout_base_s_{clusters}.csv"),
+        natural_charging_profile=config_provider(
+            "sector", "bev_natural_charging_profile_fn"
+        ),
+    output:
+        mode_split=resources(
+            "ev_charging_mode_split_s_{clusters}_{planning_horizons}.csv"
+        ),
+    threads: 1
+    resources:
+        mem_mb=2000,
+    log:
+        logs("build_ev_charging_mode_split_s_{clusters}_{planning_horizons}.log"),
+    benchmark:
+        benchmarks("build_ev_charging_mode_split/s_{clusters}_{planning_horizons}")
+    script:
+        "../scripts/walloon_scripts/build_ev_charging_mode_split.py"
+
+
 rule build_district_heat_share:
     message:
         "Building district heating penetration share data for {wildcards.clusters} clusters and {wildcards.planning_horizons} planning horizon"

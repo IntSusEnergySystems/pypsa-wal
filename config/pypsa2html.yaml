@@ -172,10 +172,16 @@ output:
   plotly: cdn
 
 features:
-  # Primary-energy independence: count nuclear as imported uranium (fuel is
-  # not mined here, default) or as the electricity the reactors produce.
+  # Primary-energy independence: how a reactor's output counts.
+  #   uranium             fuel heat, imported (~3x electrical output; IEA physical-
+  #                       energy-content convention)
+  #   electricity         electrical output, domestic
+  #   electricity_import  electrical output, still imported (agreed convention,
+  #                       2026-09-15: the fuel is not mined here, so nuclear stays
+  #                       on the import side; only the magnitude changes from heat
+  #                       to electricity)
   # Accounting switch only — no 50 % Belgian-offshore attribution to Wallonia.
-  nuclear_primary: uranium
+  nuclear_primary: electricity_import
 
 # --- Parameter sweeps -------------------------------------------------------
 #

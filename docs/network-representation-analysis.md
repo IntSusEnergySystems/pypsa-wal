@@ -363,11 +363,22 @@ interaction is CO₂.
 The 1 September 2026 meeting asked to book **50 % of Belgian offshore wind** to
 Wallonia in the independence accounting, on the grounds that offshore is a
 federal competence assumed to be shared equally between the two regions. It is
-**not implemented**: `config/pypsa2html.yaml` carries only the
-`features.nuclear_primary` switch (`uranium` — the fuel is an import — or
-`electricity` — the reactor kWh are domestic), and its comment says so
-explicitly. Decide it before any independence figure is published, because it
-moves the 2050 number by several TWh.
+**not implemented** — `config/pypsa2html.yaml`'s `features.nuclear_primary`
+switch is an accounting choice about nuclear only, not offshore wind, and
+carries no such attribution. Decide the offshore question before any
+independence figure is published, because it moves the 2050 number by several
+TWh.
+
+**Resolved 2026-09-15: the nuclear convention.** `features.nuclear_primary` has
+three settings: `uranium` (fuel heat, imported — the IEA physical-energy-content
+convention, ~3x electrical output), `electricity` (electrical output, *domestic*),
+`electricity_import` (electrical output, *still imported* — only the magnitude
+changes, not which side of the ledger it sits on). `electricity` conflates two
+independent choices — it resizes nuclear *and* reclassifies it as domestic at
+the same time — which roughly doubles the headline independence number and
+reads as a bigger effect than it is. `electricity_import` is the agreed
+convention: the fuel is not mined here, so nuclear stays an import; only its
+size changes. `config/pypsa2html.yaml` now ships `electricity_import`.
 2030 matches ENTSO-E TYNDP 2024 `ReferenceGrid_Electricity.xlsx` sheet 2030.
 The master CSV (`ntc:BE-*`) holds the *export* direction only; `--write` does
 not touch the reverse rows, which is why both directions are maintained in the

@@ -1154,6 +1154,198 @@ used for all local post-processing: it also forces `MPLBACKEND=Agg` /
 `QT_QPA_PLATFORM=offscreen`, puts `TMPDIR` on `/home`, and detaches with
 `setsid nohup` so a timeout cannot orphan a child onto the same output.
 
+## 16c. `CCGT CC` was missing from every carbon chart — found and corrected 2026-09-15
+
+Found while investigating a result that looked wrong: in the BEWAL **carbon
+Sankey** of `scen_retardnucleaire`, the `Gas Emissions` node did not balance —
+8.26 MtCO2 in against 3.08 out at 2050. It was a pypsa2html extraction bug, not a
+model error, and it affected **every scenario of this batch from 2040 on**.
+
+**Root cause, in `pypsa2html/extract/emissions.py`.** `CARBON_FLOWS` matches
+`CCGT` with `match="exact"` on purpose, so the unabated row does not swallow the
+CC variant, and carries no `CCGT CC` row of its own; the module docstring says
+unlisted capture links are added by topology in `_discover_capture_flows()`.
+That function identifies a capture link as one with a port on the atmosphere bus
+*and* one on a stored bus, through `_is_atmosphere_carrier()` — which accepted
+only the string `"co2 atmosphere"`. **PyPSA-Eur *names* that bus `co2
+atmosphere` but gives it the carrier `co2`**, so the test never passed and the
+function returned `()` on every horizon of every scenario. `CCGT CC` is the only
+capture carrier with no static row (SMR CC, gas for industry CC, process
+emissions CC, urban central gas CHP CC and both biomass CCs are all covered), so
+it was the only one lost — and from 2040 the largest.
+
+`tests/test_ccs_variants.py` built its fixture with the atmosphere bus carrier
+spelled `"co2 atmosphere"`, which no real network uses, so the suite passed
+throughout. **The fix is one word plus a parametrised fixture** — the test now
+runs both spellings and fails on the old code.
+
+**What was wrong in the published reports** (BEWAL, MtCO2):
+
+| | central 2040 | central 2050 | retard 2040 | retard 2050 |
+|---|---:|---:|---:|---:|
+| CO2 sequestration, as published | 8.256 | 7.578 | 8.238 | 7.950 |
+| CO2 sequestration, correct | 9.696 | 10.563 | 9.784 | **12.759** |
+| net CO2, as published | 9.995 | 3.368 | 9.990 | 3.238 |
+| net CO2, correct | 10.071 | 3.525 | 10.071 | 3.491 |
+
+Walloon 2050 carbon capture was understated by **28 % (central)** and **38 %
+(retardnucleaire)**. The carbon-Sankey gas-node gap at 2050, all eight published
+scenarios, before → after: central −3.25 → −0.11, taxshift −3.21 → −0.11,
+taxshift_plus −3.22 → −0.11, biomethane_industrie −3.00 → −0.07, realiste_nets
+−2.97 → −0.07, realiste_nobnd30 −2.69 → −0.08, **retardnucleaire −5.18 → −0.12**,
+central_2013 −3.64 → −0.10.
+
+The residual ~0.1 Mt is **not** the same bug: `model.flow_threshold` is 0.1 —
+TWh for energy but **MtCO2 for carbon** — and it zeroes real rows such as
+`gas for industry CC1` (0.089) and `urban central gas CHP CC1` (0.043). Worth a
+separate carbon-specific threshold; left as is for now.
+
+**Why it mattered most in `scen_retardnucleaire`.** With new nuclear deferred,
+BEWAL 2050 runs 25.6 TWh of gas through CCGT CC (central: 15.9), so the dropped
+row is the largest single carbon flow in the region. That scenario is also where
+the second question landed — the large gas imports — and those are **real**:
+gross pipeline in 49.3 TWh, out 14.4, **net 34.9 TWh** (central 24.2), of which
+the whole +10.7 TWh delta is CCGT CC. Nuclear 3 000 → 1 005 MW_e drops nuclear
+generation 22.8 → 7.7 TWh, replaced by CCGT CC +5.6 TWh_e, solar-hsat +3.9 TWh
+and rooftop PV. Note the gross figure is inflated by transit: ~14 TWh/yr crosses
+BEWAL to Luxembourg on `gas pipeline new` in every horizon (19.1 TWh in 2025).
+The Sankey uses net, correctly.
+
+### 16c.1 The correction and the republication
+
+Rebuilt the three page types that read the carbon extraction — `sankeys`
+(carbon Sankey), `emissions` (CO2 by sector / by source / cumulative) and
+`overview` (cumulative emissions) — for the eight published scenarios:
+
+```bash
+pypsa2html build -c config/pypsa2html.yaml --only overview --only emissions --only sankeys \
+  -s scen_central -s scen_taxshift -s scen_taxshift_plus -s scen_biomethane_industrie \
+  -s scen_realiste_nets -s scen_realiste_nobnd30 -s scen_retardnucleaire -s scen_central_2013
+```
+
+242 pages, 0 failures, 321 s, 28 GB peak — **one process, not eight**: the first
+scenario builds every scenario's extraction for the cross-scenario overview and
+the remaining seven reuse the pool (~28 s each). This is the cheap way to do a
+partial rebuild and it sidesteps the §16b.3 item 3 OOM entirely.
+
+Uploaded **in place** into the existing `<scenario>_20260913/` folders — the URLs
+the cabinet already has — with rsync **filtered to those 30 files per scenario
+and no `--delete`**, so the other 52 pages, `times/`, `indicators/` and the
+hand-fixed remote `index.html` were untouched. Verified afterwards by fetching
+`https://pypsa.squoilin.eu/scen_retardnucleaire_20260913/pypsa/BEWAL_sankeys_scen_retardnucleaire.html`
+over HTTPS and re-reading the gas node out of the served plotly payload.
+
+Two things found on the way and **not** changed:
+
+1. `scen_central_2013`'s published tree is a 16:05 build while its local tree is
+   a 17:24 rebuild of the same summary CSVs (`nodal_costs.csv` is 16:02, before
+   both) — a leftover of the §16b.3 double regeneration. Only the 30 corrected
+   pages were pushed, so the rest of that folder is still the 16:05 build. The
+   two should be numerically identical; confirm before the next publication.
+2. **The same defect exists independently in the ClimAct extraction** — see §18.
+
+## 16d. Grid costs — transmission was missing, and shared assets were billed by alphabet
+
+Asked 2026-09-15: *are the grid costs in the total, and how are they split between
+the regions an interconnector joins?* Two answers, both defects, both now fixed
+and republished.
+
+**1. Transmission cost was in the model but in no chart.** `costs.csv` has always
+carried it — 2050 `capital,Line,AC` 848.7 M€/a plus `capital,Link,DC` 2 482.7 —
+and `nodal_costs.csv` carried it per location. It was dropped at the display
+layer: `cost_table()` in pypsa2html `extract/tables.py` removed carriers
+`{AC, DC}` whenever the model had more than one node, "because transmission is
+attributed separately". **Nothing attributed it separately** — the constant was
+referenced exactly twice, at its definition and at that drop — so the cost simply
+left the report. `cost_table` feeds the costs page *and* the overview's cost
+sections, so it was absent from every cost chart. The *capacity* page kept AC/DC
+on purpose (`kind == "power"`), which is why the report showed transmission
+capacity but no transmission cost — the asymmetry that prompted the question.
+
+**2. What was in `nodal_costs.csv` was not a regional share.**
+`assign_locations` gives a branch its first non-EU bus, which for every AC line
+and HVDC link is `bus0`, so an interconnector was charged **in full to one end**.
+Measured: `booked == loc(bus0)` for all 33 branches, and — because the clustering
+is one node per region — **33 of 33 are cross-border**, so every euro of
+transmission cost was attributed this way. Worse, `bus0` is the alphabetically
+earlier region code in all 11 AC lines. Wallonia paid for its links to `FR` and
+`LU` and nothing for its links to `BEBRU` and `BEVLG`, purely because of how the
+codes sort. Rename a neighbour and the bill moves with the optimum untouched.
+The Wallonia–Germany HVDC corridor is modelled as a forward link plus a
+`-reversed` twin, and the rule sent 64.3 M€ to BEWAL and 51.0 M€ to DE.
+
+### 16d.1 The fix
+
+`share_across_endpoints()` in `scripts/make_summary.py` splits a per-element
+statistic equally between the **real** regions the component touches, and
+`calculate_nodal_costs` / `calculate_nodal_capacities` now go through it. Two
+properties make it safe:
+
+* **EU-level ports are ignored**, exactly as `assign_locations` ignores them, so
+  nuclear on `EU uranium` and oil boilers on `EU oil` keep the §16b attribution —
+  verified byte-identical.
+* **It redistributes, it does not rescale**: nodal sums still reproduce the
+  untouched `costs.csv` to 4·10⁻⁵ EUR at every horizon.
+
+Only six carriers move — `AC`, `DC`, and the `CO2` / `H2` / `gas` / `gas new`
+pipelines (68 of 1 599 rows). Pipelines are in scope deliberately: same defect,
+same fix, and splitting the electricity interconnector while leaving the CO₂
+pipeline beside it on `bus0` would be incoherent. `electricity distribution grid`
+and every conversion Link are single-region and untouched.
+
+On the pypsa2html side the drop is gone; `features: {transmission_costs: false}`
+now means "leave AC/DC out" and is the only way to get the old behaviour. Both
+repos gained a test that fails without the change.
+
+**What moved** (BEWAL, M€/a, `scen_central`):
+
+| | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| cost chart, as published | 7 233 | 6 489 | 7 306 | 10 124 |
+| cost chart, now | 7 304 | 6 563 | 7 400 | 10 140 |
+| …of which transmission (new row) | 87.6 | 135.4 | 164.3 | **154.6** |
+
+The BEWAL total barely moves at 2050 (+16 M€) because the new transmission row
+(+154.6) nearly cancels the pipeline cost it stops over-carrying (−138). At 2040
+the effect is larger, +94 M€. Wallonia's transmission **capacity** on the
+capacities page goes 6.01 → 12.06 GW: it now counts half of every line it
+touches instead of only the lines that sorted first.
+
+One welcome side effect: the study-wide `ALL` cost chart now equals the system
+total — 521 814 M€/a at 2050, against 518 482 before, which was short by exactly
+the transmission it dropped.
+
+The nuclear CAPEX sweep is **unaffected**: nuclear is a single-region Link, its
+rows are byte-identical, and the sweep declares a capacity metric only.
+
+### 16d.2 Rerun and republication
+
+`--forcerun make_summary` for the 13 cabinet scenarios (52 + 13 jobs) and again
+for `scen_central_2013` with its second configfile. **The trap is that a plain
+`--forcerun` wants to re-solve 52 networks** — `solve_sector_network_myopic`
+appears in the dry-run job list. Do what `cluster/nic5.sh postprocess` does
+first: `touch -r <solved> <brownfield>` for every horizon, then
+`snakemake --touch` the solved networks. After that the plan is exactly
+`make_summary 52 · make_global_summary 13` and nothing else.
+
+Then `pypsa2html build --only overview --only costs --only capacities --only
+sensitivity` for the eight published scenarios — 250 pages, 0 failures, 420 s —
+and rsync of those 31 files per scenario into the existing `<scenario>_20260913/`
+folders, filtered by name and **without `--delete`**. Verified by fetching the
+live page and reading the series back out of the plotly payload.
+
+`scen_demande_haute` was deliberately **left alone**. It is listed as a browsable
+scenario but has no summary CSVs at all — the published build logs "no data for
+scenario High demand" 480 times — so regenerating it would have added an old,
+unmanaged run (§18 item 6) to the cabinet's comparison charts. Its `.snakemake`
+incomplete markers were cleared and its CSVs built, then set aside; one
+`make_summary` run brings it back if it is ever wanted.
+
+*Still a convention, not a truth:* a 50/50 split is the simple choice. A
+length- or flow-weighted split would need the share of each line inside each
+region, which point-to-point clustered lines do not carry. Say so when the
+number is presented.
+
 ## 17. Publication
 
 Post-processing ran with `SKIP_S3_UPLOAD=1 HTML_PUBLISH=0` throughout the batch —
@@ -1180,3 +1372,4 @@ networks, inside every published scenario's `html/pypsa/` folder (§1.4).
 | 6 | `scen_base`, `scen_corrige`, `scen_nuc11500`, `scen_nuc13500`, `scen_imppel`, `scen_data` are from Nov–Dec 2025 and unmanaged. Retire or migrate to an override file | Sylvain | no |
 | 7 | **The 2025 Walloon BEV car fleet collapsed 52× between the 7 and 11 Sept exports** (248 880 → 4 757 cars; road electricity 0.895 → 0.103 TWh). Neither figure is credible — Wallonia's real 2025 BEV stock is in the tens of thousands, so 248 880 looks like a Belgium-wide total applied to the region and 4 757 is ~10× too low. Confirm which is right and re-export 2025 if needed (§14.3) | ICEDD | no — 2025 only, and the EV *load* is exact either way |
 | 8 | Walloon onshore wind sits **at its 6 500 MW potential ceiling at both 2040 and 2050**, so the post-2030 wind fleet is an assumption, not a result. A sensitivity on that potential would be more informative than any cost sensitivity in this batch (central review F1) | Sylvain | no |
+| 9 | **The ClimAct explorer understates Walloon CO2 capture by the same 4.809 Mt** (2050; 1.547 at 2040) — a second, independent instance of §16c with a different cause. `strategy_metrics_mapping.csv` line 31 in the extraction tool (`~/svn/climact-pypsa-eur_results_extraction-88d352b59aa4/`, not a git checkout) sums `Hydrogen production CC, Industry CC, Central heat production CC` and **omits `Power supply CC`**, which `production_energy_df.csv` does export. Wallonia 2050 reads 7.950 Mt/an where it should read 12.759. Affects the CSVs already on S3 for all eight scenarios; fixing it needs a mapping edit, a re-extraction and a re-upload | Sylvain / ClimAct | **yes — published data is wrong** |

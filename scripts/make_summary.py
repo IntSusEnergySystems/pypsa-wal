@@ -60,6 +60,85 @@ def assign_locations(n: pypsa.Network) -> None:
         )
 
 
+#: Bus ``location`` values that are not a real region. ``assign_locations``
+#: spells the absence of one as ``"EU"``; the sharing rule below agrees with it.
+NO_LOCATION = frozenset({"", "EU", "nan", "None"})
+
+
+def endpoint_locations(n: pypsa.Network, c: str) -> pd.Series:
+    """Per element of component ``c``, the real regions its buses touch.
+
+    A Series of tuples, in bus-column order and de-duplicated. ``("EU",)`` when
+    every bus is EU-level, which is how :func:`assign_locations` spells "no
+    region" — so a Link on an EU carrier bus keeps the behaviour that function
+    already gives it.
+    """
+    static = n.c[c].static
+    bus_cols = sorted(static.filter(regex=r"^bus\d*$").columns)
+    if not bus_cols or static.empty:
+        return pd.Series([("EU",)] * len(static), index=static.index, dtype=object)
+
+    locs = static[bus_cols].apply(lambda col: col.map(n.buses.location))
+
+    def distinct(row) -> tuple:
+        seen = []
+        for value in row:
+            if isinstance(value, str) and value not in NO_LOCATION and value not in seen:
+                seen.append(value)
+        return tuple(seen) or ("EU",)
+
+    return locs.apply(distinct, axis=1)
+
+
+def share_across_endpoints(n: pypsa.Network, per_element: pd.Series) -> pd.Series:
+    """Regionalise a per-element statistic, splitting shared assets equally.
+
+    ``assign_locations`` gives a branch a *single* location — its first non-EU
+    bus, which for every AC line, HVDC link and cross-border pipeline is
+    ``bus0``. An interconnector was therefore charged in full to one of the two
+    regions it connects, and which one is decided by the bus order the base
+    network happens to carry: for all 11 AC lines of the Walloon model that is
+    simply the alphabetically earlier region code, so Wallonia paid for its
+    links to ``FR`` and ``LU`` and nothing for its links to ``BEBRU`` and
+    ``BEVLG``. Rename a neighbour's code and the bill moves, with the optimum
+    untouched.
+
+    Here an asset spanning several regions is split equally between them, so a
+    regional figure reads "this region's share of the assets it is connected by"
+    rather than "the assets whose code sorts first". Two things are deliberately
+    *not* changed: an asset wholly inside one region (the distribution grid,
+    every conversion Link) is untouched, and so is a Link whose other ports are
+    EU-level carrier buses — nuclear on ``EU uranium``, oil boilers on
+    ``EU oil`` — which keeps the attribution §16b established.
+
+    Region sums still reproduce the system total: this redistributes, it does
+    not rescale. Pass a statistic computed with ``groupby=False`` so that the
+    per-element values carry pypsa's own definition of capex/opex/capacity.
+
+    See docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md §16d.
+    """
+    frames = []
+    for component in per_element.index.get_level_values("component").unique():
+        values = per_element.xs(component, level="component")
+        static = n.c[component].static
+        frame = pd.DataFrame(
+            {
+                "value": values,
+                "location": endpoint_locations(n, component).reindex(values.index),
+                "carrier": static["carrier"].reindex(values.index).astype(str),
+            }
+        )
+        frame["value"] /= frame["location"].map(len)
+        frame = frame.explode("location")
+        frame["component"] = component
+        frames.append(frame)
+
+    if not frames:
+        return pd.Series(dtype=float, name="value")
+    out = pd.concat(frames, ignore_index=True)
+    return out.groupby(["component", "location", "carrier"])["value"].sum()
+
+
 def assigned_location(n: pypsa.Network, c: str, port: str = "") -> pd.Series:
     """Grouper returning the location `assign_locations` put on the component.
 
@@ -120,12 +199,15 @@ def calculate_nodal_costs(n: pypsa.Network) -> pd.Series:
     -------
     pd.Series
         MultiIndex Series with levels ["cost", "component", "location", "carrier"]
+
+    An asset that spans two regions — an AC line, an HVDC link, a cross-border
+    pipeline — has its cost split equally between them rather than booked to
+    whichever end happens to be ``bus0``; see :func:`share_across_endpoints`.
     """
-    grouper = [assigned_location, "carrier"]
     costs = pd.concat(
         {
-            "capital": n.statistics.capex(groupby=grouper),
-            "marginal": n.statistics.opex(groupby=grouper),
+            "capital": share_across_endpoints(n, n.statistics.capex(groupby=False)),
+            "marginal": share_across_endpoints(n, n.statistics.opex(groupby=False)),
         }
     )
     costs.index.names = ["cost", "component", "location", "carrier"]
@@ -161,8 +243,15 @@ def calculate_nodal_capacities(n: pypsa.Network) -> pd.Series:
     -------
     pd.Series
         MultiIndex Series with levels ["component", "location", "carrier"]
+
+    Shared assets are split between the regions they connect, on the same rule
+    as the costs, so that the capacity chart and the cost chart describe the
+    same half-of-an-interconnector; see :func:`share_across_endpoints`.
     """
-    return n.statistics.optimal_capacity(groupby=[assigned_location, "carrier"])
+    capacities = share_across_endpoints(n, n.statistics.optimal_capacity(groupby=False))
+    capacities.index.names = ["component", "location", "carrier"]
+
+    return capacities
 
 
 def calculate_capacities(n: pypsa.Network) -> pd.Series:

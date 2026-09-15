@@ -78,6 +78,18 @@ if HAVE_PYPSA2HTML:
             capacities=RESULTS + "csvs/capacities.csv",
             energy_balance=RESULTS + "csvs/energy_balance.csv",
             metrics=RESULTS + "csvs/metrics.csv",
+            # Reporting-only: lets the EV charts show Elia's three charging
+            # modes instead of two. pypsa2html reads it from resources_dir and
+            # degrades to the old natural/smart split when it is absent, so an
+            # older results tree still reports.
+            ev_mode_split=expand(
+                resources(
+                    "ev_charging_mode_split_s_{clusters}_{planning_horizons}.csv"
+                ),
+                clusters=config["scenario"]["clusters"],
+                planning_horizons=config["scenario"]["planning_horizons"],
+                allow_missing=True,
+            ),
             config_file=PYPSA2HTML_CONFIG,
         output:
             index=RESULTS + "html/pypsa/index.html",
