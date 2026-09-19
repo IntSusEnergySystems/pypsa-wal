@@ -552,7 +552,7 @@ documented 2.25.
 > European potential is consumed by exogenous industrial demand, leaving 61.9
 > TWh of regional `e_sum_max` unused (BEWAL 4.45 of 9.22). A slack Walloon row
 > in 2050 is therefore *not* a Walloon statement. See
-> [`ccs_alignment.md`](ccs_alignment.md) §17 for the mechanism.
+> [`ccs_alignment.md`](ccs_alignment.md) §13 for the mechanism.
 
 ### 9.6 The solid-biomass budget: why a horizon stalls, and how to check it before the barrier
 
@@ -696,4 +696,134 @@ adding sludge to the pool also lets the optimiser burn it in boilers, whereas
 TIMES puts 1.568 TWh in industry and 0.959 TWh in power. The alternative —
 dropping `BIOSLU` from the industry extraction — would instead understate
 industry fuel against TIMES. Confirm which they prefer.
+
+## 10. Onshore wind full-load hours: TIMES 1 885 h vs PyPSA ~2 300–2 425 h (administration question, 2026-09-16)
+
+**Question received from the administration.** TIMES-WAL uses 1 885 equivalent
+full-load hours (FLH) for Walloon onshore wind; recomputing PyPSA-Wal's own
+result as `production / installed capacity` gives ~2 307 h — a **+22 %** gap.
+The Walloon energy-balance figure for 2024 is, if anything, *below* TIMES'
+1 885 h. Two hypotheses were raised: (a) the weather year (2010) is
+particularly favourable to wind; (b) PyPSA does not distinguish the ageing
+existing fleet (older, shorter, lower-CF turbines) from new-build, whereas the
+real fleet-average FLH is dragged down by the former.
+
+**Verdict: (b) is confirmed as the dominant mechanism; (a) is ruled out — the
+weather year moves the number by ~5 % and, if anything, in the wrong
+direction.**
+
+### 10.1 The weather year is not the explanation
+
+`scripts/walloon_scripts/compare_weather_years.py` holds a fixed fleet and only
+swaps the weather year, which isolates this effect cleanly. Its own output
+([`docs/figures/weather_year_BEWAL_2050.md`](figures/weather_year_BEWAL_2050.md))
+shows Wallonia's wind yield on the **same fleet** is *lower* in 2010 than in
+2013 (14.97 vs 15.76 TWh, **−5.1 %**). Recomputing the BEWAL onwind resource
+capacity factor directly from the on-disk atlite profiles confirms it at node
+level:
+
+| resource profile | mean p_max_pu | FLH |
+|---|---:|---:|
+| `resources/.../profile_adm_onwind.nc` (2010, shipped) | 0.2628 | 2 302 h |
+| `resources/walloon_2013/.../profile_adm_onwind.nc` (2013) | 0.2769 | 2 425 h |
+
+2013 is the *better* wind year at BEWAL, by ~5 %. The reported gap against
+TIMES is +22 %, an order of magnitude larger and the opposite sign of what
+"2010 is optimistic" would predict. Weather-year choice is real (§ the figure
+above; see also [`docs/five_year_periods.md`](five_year_periods.md) and
+[`instructions.md`](../instructions.md) "Selecting the weather year") but it
+is not what is driving this discrepancy.
+
+### 10.2 PyPSA applies one modern turbine curve to the whole fleet, existing and new alike
+
+`config/config.default.yaml:227` sets
+`renewable.onwind.resource.turbine: Vestas_V112_3MW` — hub height 80 m, a
+turbine model commercialised around 2011 — and nothing in
+`config/config.walloon.yaml` or `config/config.walloon_5y.yaml` overrides it
+for BEWAL. `scripts/build_renewable_profiles.py` *can* take a
+`{build_year: turbine_model}` mapping (a vintage-specific power curve), but
+every config in this repo passes a plain string, so the rule produces exactly
+**one** `p_max_pu` time series per node/carrier — no vintage axis at all.
+
+More importantly, `scripts/add_existing_baseyear.py:376-390` gives the
+**standing (brownfield) fleet the identical profile**, copied verbatim from
+the base-year extendable generator:
+
+```python
+name_suffix_by = f" {resource_class} {generator}{suffix}-{baseyear}"
+p_max_pu = n.generators_t.p_max_pu[capacity.index + name_suffix_by]
+...
+n.add("Generator", ..., p_max_pu=p_max_pu.rename(columns=n.generators.bus),
+      build_year=grouping_year, ...)
+```
+
+So the 2005, 2010, 2015 and 2020 Walloon onshore-wind vintage bins — real
+turbines that are on average shorter, smaller-rotor and lower-CF than a V112 —
+are all credited with the same resource as a hypothetical brand-new one. No
+`correction_factor` compensates: it is `1.0` for `onwind` in every config
+checked (it is only ≠ 1 for the offshore carriers, `0.8855`, which is
+unrelated).
+
+This is directly observable on a solved network — the BEWAL onwind resource
+FLH is flat regardless of how old the fleet behind it is:
+
+| horizon | BEWAL onwind fleet | resource FLH (`mean(p_max_pu)×8760`) | actual FLH (`p/p_nom_opt`) |
+|---|---:|---:|---:|
+| 2025 | 1 568 MW, 84 % pre-2020 | 2 302 h | 2 299 h |
+| 2030 | 3 977 MW | 2 302 h | 2 274 h |
+| 2040 | 6 500 MW | 2 302 h | 2 258 h |
+| 2050 | 6 500 MW | 2 302 h | 2 252 h |
+
+(`results/walloon/scen_central`; the small and growing gap between the resource
+and actual columns is curtailment, not a vintage effect — see § run-review
+5.4.) The 2025 base-year fleet, 84 % of which predates 2020, gets exactly the
+same 2 302 h as the fully-new 2050 fleet. The infrastructure to do otherwise
+already exists — `existing_capacities.grouping_years_power` creates one
+`Generator` per vintage bin precisely so lifetime/retirement can be tracked
+per cohort — it is simply not used to vary the resource.
+
+### 10.3 The 2 300–2 425 h figure is not a PyPSA artefact in isolation
+
+Cross-checking against the Walloon planning bodies' own numbers
+(`config/input_parameters_for_models.csv`, the `BEWAL onwind p_nom_max` row,
+sourced to PNEC/EDORA): *"la Wallonie est sur la bonne trajectoire pour
+atteindre son objectif de production de 6 200 GWh éoliens onshore annuels"*
+against the same source's ~2 700 MW near-term capacity figure implies
+**6 200 000 / 2 700 ≈ 2 296 h** — i.e. EDORA/PNEC's own planning assumption for
+*future* Walloon onshore wind is essentially the same number PyPSA reports
+(2 296 vs 2 302–2 425 h). PyPSA is not inventing an optimistic number; it is
+correctly reproducing the FLH of a modern turbine fleet. The mismatch with
+TIMES is not "PyPSA is wrong", it is **TIMES's 1 885 h being a
+backward-looking, all-vintages-blended average and PyPSA's number being a
+forward-looking, all-new-turbine average**, applied uniformly across the
+entire fleet including the pre-2020 tranche that TIMES (correctly) still
+prices at the lower, observed rate.
+
+### 10.4 To do
+
+- **This document previously carried no discussion of onshore wind FLH at
+  all**; the `docs/run-review-checklist.md` §5.4 "22–27 %" expected range
+  (≡ 1 927–2 366 h) is itself unsourced and simply brackets the same
+  modern-turbine figure — it will not catch this issue because it is
+  calibrated to the same assumption that causes it. Consider re-deriving that
+  range from an explicit, cited fleet-average target instead of a plausibility
+  band centred on the atlite output.
+- **Not urgent to fix for new build** — PyPSA-Eur correctly wants a modern
+  turbine's CF for capacity added from here on, which is the economically
+  relevant question for investment decisions.
+- **Worth fixing (or at least flagging clearly) for the existing/base-year
+  fleet**, whose reported energy is what a reader will naturally compare
+  against ICEDD's observed 2024 Walloon energy balance. Two options, neither
+  implemented:
+  1. Apply a lower `correction_factor` (or an explicit older-turbine curve, e.g.
+     an 80 m/2 MW-class model) specifically to the pre-2020 `grouping_year`
+     bins in `add_existing_baseyear.py`, calibrated to land on ~1 885 h.
+  2. Leave the mechanics as-is but state explicitly, in every place this
+     number is reported (run-review checklist, Explorer, cabinet slides),
+     that **PyPSA's Walloon onshore-wind FLH is a new-turbine figure applied to
+     the whole fleet**, not a TIMES-comparable blended-fleet average, so the
+     two numbers answer different questions and should not be plotted as if
+     they measure the same thing.
+- No code change made yet — this section documents the finding for the
+  administration's question and for whoever picks up the fix.
 

@@ -4,7 +4,7 @@
 
 """BEWAL process-emissions load carries the TIMES **gross** fossil process CO2.
 
-``docs/ccs_alignment.md`` S14.1 (worklist item 12, corrected by B4). The PyPSA
+``docs/ccs_alignment.md`` S11.1 (worklist item 12, corrected by B4). The PyPSA
 Load is the injection onto the process-emissions bus, *upstream* of
 ``process emissions CC``. TIMES splits the same quantity in two: ``INDCO2P``
 (``VAR_Comnet``) is what reaches the atmosphere and ``INDCO2c`` (``VAR_FOut``

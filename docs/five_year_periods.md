@@ -64,7 +64,7 @@ read-only, but the config is not.
 > | `BE{WAL,VLG,BRU}/battery/p_nom_min` | 410 / 1860 / 0 | flat from 2030 on |
 > | `co2 storage`, `gas storage` | 0 | zero in every horizon |
 > | `solid biomass import/e_nom` | 4000 / 4500 | hold; the row is inert (`sector.solid_biomass_import.enable: false`) |
-> | **`process emissions/p_set`** | **5329.0 / 5447.5** | **not a judgement call** — TIMES-derived, and all six horizons are already published in [`ccs_alignment.md`](ccs_alignment.md) §14.1 |
+> | **`process emissions/p_set`** | **5329.0 / 5447.5** | **not a judgement call** — TIMES-derived, and all six horizons are already published in [`ccs_alignment.md`](ccs_alignment.md) §11.1 |
 > | `biogas/p_nom` | 6150 / 5450 | modeller's decision, 2026-09-08: linear interpolation |
 > | `solid biomass transported/e_sum_max` | 2125 / 2625 | modeller's decision, 2026-09-08: linear interpolation |
 >

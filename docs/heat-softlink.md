@@ -590,7 +590,7 @@ EU `biomass limit` priced solid biomass at ~1 100 EUR/MWh in 2050, so the two
 2050 biomass-boiler groups (rural 0.0458 and urban-decentral 0.0402 TWh_th) were
 dropped entirely and the absorber (heat pump) took the load — every aggregate
 still closes, which is exactly what makes this hard to notice. See
-[`ccs_alignment.md`](ccs_alignment.md) §17 for why biomass costs that much.
+[`ccs_alignment.md`](ccs_alignment.md) §13 for why biomass costs that much.
 
 **Read the per-group delivery, never the sum of |gaps|** — the absorber makes the
 sum meaningless. `review_run.py` level 2.5 reports the worst group and WARNs

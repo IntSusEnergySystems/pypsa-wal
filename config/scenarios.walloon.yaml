@@ -76,7 +76,7 @@ scen_demande_haute:
       # floor of 5 077 kt exceeded every capturable source. B4 made the load
       # gross (emitted + captured, 5 434 kt in 2040), so process capture alone
       # reaches 5 162 kt >= the floor and biomass/gas CC add headroom — which
-      # is how TIMES builds it. See docs/ccs_alignment.md S14
+      # is how TIMES builds it. See docs/ccs_alignment.md S11
       # (worklist B3/B4).
       enable: true
       node: BEWAL

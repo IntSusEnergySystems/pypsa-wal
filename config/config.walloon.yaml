@@ -555,7 +555,7 @@ sector:
   methanol:
     regional_methanol_demand: true
   # CO2 storage -- geology limits the long run, deployment limits the short one.
-  # Full rationale: docs/co2-sequestration-20260829.md. Retried 2026-09-02 with
+  # Full rationale: docs/co2-sequestration.md. Retried 2026-09-02 with
   # BarHomogeneous (the 30 Aug revert was the exact error that flag fixes) and
   # with a documented Belgian e_nom_max of 0 (item 2; export to DE/NL/GB).
   #

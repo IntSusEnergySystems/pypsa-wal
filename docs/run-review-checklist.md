@@ -405,7 +405,7 @@ every horizon.
       European potential through the η 0.90 CC link. When it does, **every
       regional biomass number is a degenerate allocation inside a binding
       aggregate** and must not be reported as a regional result
-      ([`ccs_alignment.md`](ccs_alignment.md) §17).
+      ([`ccs_alignment.md`](ccs_alignment.md) §13).
 - [ ] `biomass limit` and `unsustainable biomass limit`. Note the 2025
       `biomass limit` is `<= 0` — sustainable solid biomass is *banned* Europe-wide
       in 2025 and all biomass must be "unsustainable". Read 2025 biomass numbers
