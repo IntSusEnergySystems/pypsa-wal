@@ -205,6 +205,18 @@ residual emissions, capture sizing and the electricity penalty together.
 4. **The shared CCGT-CCS cost cell is still empty**, so the two models will
    diverge on overnight cost until it is filled and `--write`n.
 5. **Allam costs remain TODO** in technology-data.
+6. **Process capture carries no energy penalty at all** [V].
+   `BEWAL process emissions CC` has three ports — process emissions in,
+   `co2 atmosphere` slip, `co2 stored` — and no electricity or heat input;
+   [`prepare_sector_network.py:5981`](../scripts/prepare_sector_network.py:5981)
+   reads only `capital_cost`, `capture_rate` and `lifetime` from `cement capture`
+   under the comment `# assume enough local waste heat for CC`. The DEA rows for
+   `electricity-input` (0.020) and `compression-electricity-input` (0.075
+   MWh_e/tCO₂) are in `costs_*.csv` and go unread — **0.095 MWh_e/t, worth
+   8.8–9.5 EUR/t**, on the largest and most price-invariant capture block in the
+   model (≈5.0 Mt/a at 2040, ±1.6 % across all 16 solved scenarios). This is item 1
+   above seen on the *process* side rather than the power side. See
+   [`co2-sequestration.md`](co2-sequestration.md) §10.3.3.
 
 ---
 
@@ -373,7 +385,7 @@ CO₂ of the same industrial processes and is correctly excluded, but it has nev
 been checked against the industrial energy PyPSA imports. (ii) Part of `INDCO2c`
 comes from oxy-fuel glass and cement units and may mix process with combustion
 carbon; that split has to be settled on the TIMES side before the Load is final
-([`co2-sequestration.md`](co2-sequestration.md) §11 item 7).
+([`co2-sequestration.md`](co2-sequestration.md) §12 item 7).
 
 ### 11.2 The capture floor (item 9 / B3)
 
@@ -408,7 +420,7 @@ headroom. Against the *net* inventory the ceiling was 4.45 Mt in 2040 and 3.77 i
 The floor is met with headroom (8.17 Mt of the three floored carriers in 2040
 against 5.08; 7.09 against 4.83 in 2050) — and it stays slack in the later cabinet
 batch too, so **the floor is not what drives the capture volume**
-([`co2-sequestration.md`](co2-sequestration.md) §9.2).
+([`co2-sequestration.md`](co2-sequestration.md) §10.2).
 
 ---
 
@@ -531,7 +543,7 @@ changes *which* technology captures, not whether biomass binds.
 ## 15. Recommendations to align the two models
 
 Technology side only; the disposal-side plan is in
-[`co2-sequestration.md`](co2-sequestration.md) §9 and §11.
+[`co2-sequestration.md`](co2-sequestration.md) §10 and §12.
 
 1. **Give PyPSA a CCGT-CC retrofit option, or label the stand-in.** TIMES
    retrofits 1.74 GW from 2035 at ~86 % capture; PyPSA can only build greenfield
