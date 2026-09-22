@@ -31,6 +31,9 @@ from scripts.walloon_scripts.nuclear_helper import (
 )
 from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
 from scripts.walloon_scripts.ptes_bounds import apply_ptes_fleet_cap
+from scripts.walloon_scripts.sequestration_bounds import (
+    apply_sequestration_fleet_cap,
+)
 from scripts.walloon_scripts.set_NTCs import apply_ntc_floors
 
 logger = logging.getLogger(__name__)
@@ -454,6 +457,14 @@ if __name__ == "__main__":
         MILP = False,
     )
     apply_nuclear_inflexibility(n, snakemake.config)
+
+    # Lever A (docs/co2-sequestration.md S5.2): the CO2StoP ceiling
+    # prepare_sector_network wrote applies to this horizon's Store, and
+    # brownfield has just added the earlier vintages on the same bus. Without
+    # this, DE reached 2.64x its own annual ceiling by 2050. Must run BEFORE
+    # update_BEWAL_potentials, whose documented Belgian override (0 t) does
+    # the same arithmetic for BEWAL/BEVLG/BEBRU and has to have the last word.
+    apply_sequestration_fleet_cap(n)
 
     update_BEWAL_potentials(
         n=n,

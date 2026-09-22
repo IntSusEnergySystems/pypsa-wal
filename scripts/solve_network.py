@@ -47,7 +47,7 @@ from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 from scripts.prepare_sector_network import determine_emission_sectors
 from scripts.walloon_scripts.named_pins import (
     add_industry_cc_floor,
-    add_rooftop_share_constraint,
+    add_rooftop_floor_constraint,
     lookup_year_value,
     planning_year,
 )
@@ -833,19 +833,21 @@ def add_CCL_constraints(
         rename_solar = {
             "solar": "solar-all",
             "solar-utility": "solar-all",
+            # `solar-hsat` is not built in the Walloon config any more
+            # (removed 2026-09-22, only ground-mounted `solar` and
+            # `solar rooftop` remain); the mapping is kept so a config that
+            # re-enables it still lands in the right group.
             "solar-hsat": "solar-all",
             # Rooftop belongs in the group. The numbers in the caps file are
             # Elia's *total* PV fleet (BE 9 751 MW in 2025, BEWAL 4 088), and
             # res_build_rates.csv derives the regional split from that same
             # total. With rooftop outside, the base-year pin bounded utility
             # alone and the 2025 solve came out at 5 510 MW of Walloon PV
-            # against a 4 088 MW pin. It was taken out on 2026-09-02 because
-            # item 8's share pin then needs ~1.4 GW of rooftop inside a 20 MW
-            # corridor; that is a fault in the share pin, not in the group —
-            # PyPSA labels the whole historical fleet `solar` while TIMES has
-            # 0.5 GW rooftop + 1.4 GW utility in 2025. Item 8 stays off until
-            # that base year is reconciled. See docs/renewable-potentials.md
-            # S9.3 (worklist B5).
+            # against a 4 088 MW pin. The base year is differentiated by
+            # capacity since `electricity.baseyear_pv_split` (1 770 MW of the
+            # standing fleet relabelled `solar rooftop`), so item 8 — now an
+            # absolute rooftop floor, not a share — no longer fights this
+            # group. See docs/renewable-potentials.md S9.3 (worklist B5).
             "solar rooftop": "solar-all",
         }
         gens = gens.replace(rename_solar)
@@ -2200,13 +2202,29 @@ def extra_functionality(
         add_selfsufficiency_constraints(n, ss, planning_horizons)
 
     sector_cfg = config.get("sector") or {}
-    rooftop_cfg = sector_cfg.get("rooftop_share") or {}
+    if sector_cfg.get("rooftop_share") is not None:
+        # Renamed 2026-09-22 when the share pin became an absolute floor
+        # (named_pins.py module docstring). Silently ignoring the old key
+        # would drop the TIMES PV alignment without a trace.
+        raise ValueError(
+            "sector.rooftop_share was replaced by sector.rooftop_floor "
+            "(an absolute rooftop capacity floor in GW, column `rooftop_gw` "
+            "of the same CSV). Update the config or scenario overlay."
+        )
+    rooftop_cfg = sector_cfg.get("rooftop_floor") or {}
     if rooftop_cfg.get("enable"):
         year = planning_year(planning_horizons)
-        share = lookup_year_value(rooftop_cfg, year, "shares", "share")
+        gw = lookup_year_value(rooftop_cfg, year, "gw", "rooftop_gw")
         node = rooftop_cfg.get("node", "BEWAL")
-        if share is not None:
-            add_rooftop_share_constraint(n, node, float(share))
+        if gw is None:
+            logger.warning(
+                "Rooftop floor enabled but no value for %s in %s; "
+                "no floor this horizon.",
+                year,
+                rooftop_cfg.get("file"),
+            )
+        else:
+            add_rooftop_floor_constraint(n, node, float(gw))
     cc_cfg = sector_cfg.get("industry_cc_floor") or {}
     if cc_cfg.get("enable"):
         year = planning_year(planning_horizons)

@@ -648,6 +648,20 @@ Place the licence file at `~/gurobi.lic` or set:
 export GRB_LICENSE_FILE=/path/to/gurobi.lic
 ```
 
+**`~/.gurobi/gurobi.lic` is not one of the places Gurobi looks.** The search
+order is `GRB_LICENSE_FILE`, the current directory, then `$HOME/gurobi.lic` — a
+licence in `$HOME/.gurobi/` is silently ignored and `gurobipy` falls back to the
+size-limited licence bundled with the pip package. The symptom is a solve that
+builds the LP normally and then dies on
+
+```
+gurobipy._exception.GurobiError: Model too large for size-limited license
+```
+
+which reads like a model problem and is not one. Cost a 12-minute chain on
+2026-09-22. Check with `env | grep GRB` before a local run, or export the path in
+the same command that launches snakemake.
+
 On NIC5, Gurobi uses a **floating token-server licence**; `./cluster/nic5.sh setup`
 copies the module licence to `~/gurobi.lic` automatically (see cluster section below).
 

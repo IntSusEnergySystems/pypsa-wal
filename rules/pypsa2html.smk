@@ -148,6 +148,19 @@ if HAVE_PYPSA2HTML:
                     ),
                 )
             )
+            # `landing.scenario` names the page html/pypsa/index.html
+            # redirects to. This rule builds ONE scenario, so the landing page
+            # must be that one; the value configured in config/pypsa2html.yaml
+            # is for the cross-scenario site. Left alone, a run whose name is
+            # not the configured landing scenario produced a report whose
+            # entry point 404s — index.html redirected to
+            # BEWAL_overview_scen_central.html while the pages on disk were
+            # ..._scen_central_6h.html (seen 2026-09-22 on scen_central_6h:
+            # all 82 pages present, only the front door wrong). Set here and
+            # not through `load_config` overrides, because load_config
+            # validates landing.scenario against the configured scenario list
+            # and this run's scenario is appended just above.
+            cfg.landing.scenario = scenario
             report = build_site(cfg, scenarios=[scenario])
             logging.info(report.summary())
 

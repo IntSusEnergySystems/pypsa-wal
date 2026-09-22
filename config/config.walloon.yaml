@@ -162,8 +162,8 @@ electricity:
   # 2025 Walloon PV fleet: relabel rooftop_mw of the standing `solar`
   # vintages as non-extendable `solar rooftop` on the LV bus (item 8 / plan
   # B5). Together with the solar-all 2025 pin (total PV) this differentiates
-  # the base-year fleet rooftop vs ground-mounted; the TIMES share applies
-  # from 2030 on (sector.rooftop_share).
+  # the base-year fleet rooftop vs ground-mounted; the TIMES rooftop floor
+  # applies from 2030 on (sector.rooftop_floor).
   baseyear_pv_split:
     enable: true
     file: data/walloon/baseyear_pv_split.csv
@@ -184,7 +184,35 @@ electricity:
     # scaled to it (x0.9207 on the 2005/2010/2015/2020 bins).
     scale_standing_fleet: true
 
+  # Single-axis tracking PV dropped 2026-09-22. Wallonia's ground-mounted
+  # potential is agrivoltaics and industrial brownfield (13 GW,
+  # custom_potentials.csv), for which the Walloon sources price and size
+  # *fixed-tilt* plant; `solar-hsat` was an unsourced second ground-mounted
+  # technology with its own 37.8 GW land-availability potential and a
+  # different land-use factor. Keeping both meant the `solar_potential`
+  # land-use constraint traded one against the other on a capacity_per_sqkm
+  # ratio nobody had reviewed. Only ground-mounted `solar` and `solar rooftop`
+  # remain. This list replaces config.default.yaml's wholesale (snakemake
+  # merges dicts, not lists), so the non-solar entries are repeated verbatim.
+  renewable_carriers:
+  - solar
+  - onwind
+  - "offwind-ac"
+  - "offwind-dc"
+  - "offwind-float"
+  - hydro
+
   extendable_carriers:
+    # Same list as config.default.yaml minus `solar-hsat`; see the comment on
+    # renewable_carriers above.
+    Generator:
+    - solar
+    - onwind
+    - "offwind-ac"
+    - "offwind-dc"
+    - "offwind-float"
+    - OCGT
+    - CCGT
     extendable_nuclear_links:
       2025: [FR, GB, NL, LU]
       2030: [FR, GB, NL, LU]
@@ -234,13 +262,20 @@ pypsa_eur:
   - offwind-ac
   - offwind-dc
   - offwind-float
-  - solar-hsat
   - solar
   - ror
 
 existing_capacities:
   grouping_years_power: [1920, 1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030, 2035, 2040, 2050]
-  threshold_capacity: 0
+  # 10 MW, the PyPSA-Eur default, restored 2026-09-22 (lever B,
+  # docs/co2-sequestration.md S10). At 0 every asset the LP left at a
+  # rounding-error capacity was carried into the next horizon as a fixed
+  # vintage: ~1 278 near-zero components by 2040 and a 17-order spread of
+  # variable bounds, which is what tipped scen_realiste_nobnd30 2050 into
+  # genuine numerical failure. The threshold also filters the base-year
+  # existing-capacity bins (add_existing_baseyear), so it must be changed with
+  # a full myopic chain re-run from 2025, never mid-chain.
+  threshold_capacity: 10
   # Age distribution of the inherited heat-pump stock, overriding the linear
   # 1980-2019 spread that PyPSA-Eur assumes for every heating technology.
   # `decentral air-sourced heat pump` has an 18-year technology-data lifetime
@@ -400,9 +435,13 @@ sector:
 
   times_demand: true
   times_file: data/walloon/scen_base_coherence_3110.vd
-  # Item 8: TIMES rooftop share of PV plant capacity (ERNW VAR_Cap). Default
-  # off; scen_demande_haute turns it on. Repair the LV country alias first.
-  rooftop_share:
+  # Item 8: absolute floor on Walloon rooftop PV, from TIMES `VAR_Cap` of the
+  # ERNW_PV roof processes (`rooftop_gw` column). Replaced the rooftop *share*
+  # pin on 2026-09-22 — see scripts/walloon_scripts/named_pins.py. Ground-
+  # mounted PV gets no floor and no ceiling beyond custom_potentials.csv.
+  # Default off; the scenario overlays turn it on with their own .vd-derived
+  # file.
+  rooftop_floor:
     enable: false
     node: BEWAL
     file: data/walloon/times_pv_rooftop_share.csv

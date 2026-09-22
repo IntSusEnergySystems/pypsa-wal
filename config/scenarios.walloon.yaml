@@ -58,15 +58,13 @@ scen_corrige:
 scen_demande_haute:
   sector:
     times_file: data/walloon/scen_central_demande_haute_v01_260907_0709.vd
-    rooftop_share:
-      # Item 8 ON again (2026-09-04). The obstacle was the base year: PyPSA
-      # labelled the whole 2025 fleet `solar`, so a share of total capacity
-      # needed GW of new rooftop inside a 20 MW corridor. electricity.
-      # baseyear_pv_split now relabels 1 770 MW of the standing fleet as
-      # `solar rooftop` (1 770 + 898 = the 2 668 MW solar-all 2025 pin), so
-      # 2025 is differentiated by capacity, not by share, and the TIMES
-      # share binds from 2030 on (70.8 % in 2030, 80.1 % in 2050). See
-      # docs/renewable-potentials.md S9.3 (worklist B5).
+    rooftop_floor:
+      # Item 8 ON again (2026-09-04), converted from a share to an absolute
+      # floor on 2026-09-22. electricity.baseyear_pv_split relabels 1 770 MW
+      # of the standing fleet as `solar rooftop` (1 770 + 898 = the 2 668 MW
+      # solar-all 2025 pin), so 2025 is differentiated by capacity and the
+      # TIMES floor binds from 2030 on (4.89 GW in 2030, 13.92 GW in 2050 for
+      # this file). See docs/renewable-potentials.md S9.3 (worklist B5).
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
@@ -152,7 +150,7 @@ scen_test_2013_6h:
       resolution_sector: 6h
   sector:
     times_file: data/walloon/scen_central_demande_haute_v01_260907_0709.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share.csv
@@ -245,7 +243,7 @@ scen_data:
 scen_evflex:
   sector:
     times_file: data/walloon/scen_central_demande_haute_v01_260907_0709.vd
-    rooftop_share:
+    rooftop_floor:
       # Item 8 on with the base-year fleet split; same as scen_demande_haute.
       enable: true
       node: BEWAL
@@ -343,12 +341,14 @@ scen_evflex:
 #
 # Three things make these blocks longer than they look:
 #
-# 1. `rooftop_share` and `industry_cc_floor` are TIMES *outputs* fed back into
+# 1. `rooftop_floor` and `industry_cc_floor` are TIMES *outputs* fed back into
 #    PyPSA, so they are per-scenario, not shared. They are extracted from each
 #    .vd by scripts/walloon_scripts/extract_times_softlink_values.py — never by
-#    hand. They differ materially between scenarios (2030 rooftop share: 0.65
-#    central vs 0.70 taxshift), so reusing the central files would turn every
-#    sensitivity into a hybrid.
+#    hand. They differ materially between scenarios (2040 rooftop capacity:
+#    10.47 GW central vs 9.68 GW taxshift), so reusing the central files would
+#    turn every sensitivity into a hybrid. The `rooftop_gw` column of those
+#    CSVs is the floor; the `share` column is the superseded pin and is kept
+#    only as provenance.
 #
 # 2. `self_sufficiency.limit_twh` is identical (2.94 / 6.47 / 10.0) in all eight
 #    .vd files — TIMES `Transfo_Imp` is a binding bound there, not a free
@@ -365,7 +365,45 @@ scen_evflex:
 scen_central:
   sector:
     times_file: data/walloon/scen_central_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_central.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_central.csv
+  electricity:
+    retrofit_nuclear_once: false
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_demande_haute.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
+# Local 6 h validation of the 2026-09-22 package (rooftop floor replacing the
+# rooftop share, `solar-hsat` removed, per-vintage sequestration ceiling fixed,
+# `threshold_capacity` 0 -> 10). Identical to `scen_central` in every other
+# respect, and deliberately given its OWN run name: 6 h and 1 h write the same
+# file paths, so running it as `scen_central` would overwrite the 1 h cabinet
+# batch in results/walloon/scen_central. Weather stays 2010, so it shares the
+# cutout-derived resources with the batch rather than rebuilding them.
+# Launch with `config/config.test6h_central.yaml` as a third --configfile.
+# docs/co2-sequestration.md §11 step 0/1/2.
+scen_central_6h:
+  clustering:
+    temporal:
+      resolution_sector: 6h
+  sector:
+    times_file: data/walloon/scen_central_v01_260911_1109.vd
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_central.csv
@@ -391,7 +429,7 @@ scen_central:
 scen_taxshift:
   sector:
     times_file: data/walloon/scen_sensibilite_taxshift_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_taxshift.csv
@@ -417,7 +455,7 @@ scen_taxshift:
 scen_taxshift_plus:
   sector:
     times_file: data/walloon/scen_sensibilite_taxshift_plus_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_taxshift_plus.csv
@@ -443,7 +481,7 @@ scen_taxshift_plus:
 scen_biomethane_industrie:
   sector:
     times_file: data/walloon/scen_sensibilite_biomethane_industrie_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_biomethane_industrie.csv
@@ -469,7 +507,7 @@ scen_biomethane_industrie:
 scen_realiste_nets:
   sector:
     times_file: data/walloon/scen_sensibilite_realiste_nets_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_realiste_nets.csv
@@ -528,7 +566,7 @@ scen_realiste_nets:
 scen_realiste_nobnd30:
   sector:
     times_file: data/walloon/scen_sensibilite_realiste_nobnd30_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_realiste_nobnd30.csv
@@ -587,7 +625,7 @@ scen_realiste_nobnd30:
 scen_retardnucleaire:
   sector:
     times_file: data/walloon/scen_sensibilite_retardnucleaire_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_retardnucleaire.csv
@@ -621,7 +659,7 @@ scen_central_2013:
     default_cutout: europe-2013-sarah3-era5
   sector:
     times_file: data/walloon/scen_central_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_central.csv
@@ -647,7 +685,7 @@ scen_central_2013:
 scen_nuctip_9500:
   sector:
     times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
@@ -676,7 +714,7 @@ scen_nuctip_9500:
 scen_nuctip_7500:
   sector:
     times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
@@ -705,7 +743,7 @@ scen_nuctip_7500:
 scen_nuctip_6500:
   sector:
     times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
@@ -734,7 +772,7 @@ scen_nuctip_6500:
 scen_nuctip_6000:
   sector:
     times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
@@ -763,7 +801,7 @@ scen_nuctip_6000:
 scen_nuctip_5500:
   sector:
     times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv
@@ -792,7 +830,7 @@ scen_nuctip_5500:
 scen_nuctip_4500:
   sector:
     times_file: data/walloon/scen_sensibilite_nofixnuc_v01_260911_1109.vd
-    rooftop_share:
+    rooftop_floor:
       enable: true
       node: BEWAL
       file: data/walloon/times_pv_rooftop_share_scen_nofixnuc.csv

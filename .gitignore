@@ -120,3 +120,4 @@ cluster/logs/bisectB.pid
 # Generated figures for the slide decks — regenerate with
 # scripts/walloon_scripts/{compare_weather_years,plot_cost_segments,make_weather_year_slide}.py
 docs/figures/
+run6h.log

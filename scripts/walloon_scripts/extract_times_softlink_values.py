@@ -10,8 +10,11 @@ inheriting the central scenario's numbers turns a sensitivity into a hybrid.
 
     self_sufficiency.limit_twh   VAR_Act of `Transfo_Imp`   (one-way annual
                                  Walloon electricity inflow, TWh/a)
-    sector.rooftop_share         VAR_Cap of the ERNW_PV-* plant processes
-                                 (roof / (roof + greenfield))
+    sector.rooftop_floor         VAR_Cap of the ERNW_PV-* roof processes,
+                                 in GW (`rooftop_gw`). The `share` column is
+                                 kept as provenance; since 2026-09-22 the
+                                 model reads the absolute floor, not the
+                                 share.
     sector.industry_cc_floor     VAR_FOut of CO2STOCK at `STORAGEMININD`
                                  (industrial CO2 captured, kt/a)
 
@@ -69,11 +72,11 @@ PV_GROUND = ("ERNW_PV-GreenField_SOL_N",)
 
 # Demand-side PV, excluded by the convention above. All four are behind-the-
 # meter and therefore rooftop. Excluding them is only harmless while the plant
-# processes dominate: PyPSA's `add_rooftop_share_constraint` compares `solar
-# rooftop` against the WHOLE BEWAL solar fleet, so the honest TIMES analogue
-# includes these. Kept out of the default to preserve the share the central
-# scenario has been run with; `--include-demand-side` switches convention and
-# the divergence is always reported.
+# processes dominate: `add_rooftop_floor_constraint` floors the whole BEWAL
+# `solar rooftop` fleet, so the honest TIMES analogue includes these. Kept out
+# of the default to preserve the capacities the central scenario has been run
+# with; `--include-demand-side` switches convention and the divergence is
+# always reported.
 PV_DEMAND_SIDE = ("RSDPVELC", "COMPVELC", "INDPVELC", "AGRPVELC")
 
 # Report loudly when the two conventions disagree by more than this (per unit).
@@ -217,9 +220,10 @@ def main() -> int:
               f"{SHARE_DIVERGENCE_WARN:.0%}:")
         for y, (a, b) in diverging.items():
             print(f"#   {y}: {a:.4f} ({convention})  vs  {b:.4f} ({alt})")
-        print("#   PyPSA pins `solar rooftop` against the WHOLE BEWAL solar fleet, so a "
-              "\n#   large gap means the pinned share does not describe that fleet. "
-              "Review\n#   before running, or turn rooftop_share off for this scenario.")
+        print("#   PyPSA floors the WHOLE BEWAL `solar rooftop` fleet at `rooftop_gw`, "
+              "\n#   so a large gap means the extracted capacity does not describe that "
+              "fleet.\n#   Review before running, or turn rooftop_floor off for this "
+              "scenario.")
 
     print("\n# industrial capture (kt/a)")
     print(_fmt(capture, 2))
@@ -246,9 +250,10 @@ def main() -> int:
         rp = WAL / f"times_pv_rooftop_share_{args.scenario}.csv"
         cp = WAL / f"times_industrial_capture_{args.scenario}.csv"
         hdr = f"# Extracted from {args.vd.name} by scripts/walloon_scripts/{Path(__file__).name}.\n"
-        # `rooftop_gw` / `utility_gw` are not read by the model (only `share`
-        # is); they are carried so a reviewer can see whether the pinned share
-        # corresponds to a capacity PyPSA can actually reach.
+        # `rooftop_gw` is what the model reads (sector.rooftop_floor).
+        # `share` and `utility_gw` are carried so a reviewer can see the
+        # composition the floor comes out of; `utility_gw` is NOT imposed —
+        # ground-mounted PV is left to the optimiser.
         caps = pv_capacity_gw(vd, args.include_demand_side)
         rp.write_text(
             hdr + f"# Rooftop share of TIMES PV capacity (VAR_Cap, {convention}).\n"
@@ -265,7 +270,7 @@ def main() -> int:
         )
         print(f"\nwrote {rp.relative_to(ROOT)}\nwrote {cp.relative_to(ROOT)}")
         print("\nYAML for config/scenarios.walloon.yaml:")
-        print(f"  sector:\n    rooftop_share:\n      enable: true\n      node: BEWAL\n"
+        print(f"  sector:\n    rooftop_floor:\n      enable: true\n      node: BEWAL\n"
               f"      file: {rp.relative_to(ROOT)}\n"
               f"    industry_cc_floor:\n      enable: true\n      node: BEWAL\n"
               f"      file: {cp.relative_to(ROOT)}")

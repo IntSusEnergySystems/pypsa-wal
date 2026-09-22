@@ -70,7 +70,7 @@ def test_scenario_inputs_exist(scenario, scenarios):
 
     for label, path in [
         ("times_file", sector.get("times_file")),
-        ("rooftop_share", (sector.get("rooftop_share") or {}).get("file")),
+        ("rooftop_floor", (sector.get("rooftop_floor") or {}).get("file")),
         ("industry_cc_floor", (sector.get("industry_cc_floor") or {}).get("file")),
         ("agg_p_nom_limits", ((block.get("solving") or {}).get("agg_p_nom_limits") or {}).get("file")),
         ("custom_cost_fn", (block.get("costs") or {}).get("custom_cost_fn")),
@@ -100,12 +100,12 @@ def test_softlink_files_are_scenario_specific(scenario, scenarios):
     """No scenario may point at another's TIMES-derived files.
 
     The failure this prevents: a sensitivity silently inheriting the central
-    export's rooftop share or capture floor, which makes it a hybrid of itself
-    and the central case. 2030 rooftop share is 0.651 central vs 0.347
-    realiste, so the error is large and invisible.
+    export's rooftop floor or capture floor, which makes it a hybrid of itself
+    and the central case. 2040 rooftop capacity is 10.47 GW central vs 9.68 GW
+    taxshift, so the error is large and invisible.
     """
     sector = scenarios[scenario]["sector"]
-    for key in ("rooftop_share", "industry_cc_floor"):
+    for key in ("rooftop_floor", "industry_cc_floor"):
         path = (sector.get(key) or {}).get("file")
         if path is None:
             continue
@@ -223,7 +223,7 @@ def test_central_keeps_the_belgian_2030_floor(carrier, floor):
 @pytest.mark.parametrize("scenario", REALISTE)
 def test_realiste_drops_the_2030_rooftop_pin(scenario, scenarios):
     """Neither PV convention describes the realiste 2030 fleet (§3.1)."""
-    path = ROOT / scenarios[scenario]["sector"]["rooftop_share"]["file"]
+    path = ROOT / scenarios[scenario]["sector"]["rooftop_floor"]["file"]
     if not path.exists():
         pytest.skip(f"{path.name} not generated yet")
     df = pd.read_csv(path, comment="#")

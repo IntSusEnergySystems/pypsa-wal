@@ -3,8 +3,20 @@
 # SPDX-License-Identifier: MIT
 """TIMES-aligned LP pins applied at solve time (items 8 and 9).
 
-Rooftop share and industry-CC capture are not CCL rows: they constrain a
-*ratio* of extendable generators and an *annual mass* of captured CO₂.
+The rooftop floor and the industry-CC capture floor are not CCL rows: they
+constrain an *absolute capacity* of one carrier at one node and an *annual
+mass* of captured CO₂.
+
+Item 8 used to be a **share** pin (``solar rooftop`` >= s x solar-all). It was
+replaced by an absolute floor on 2026-09-22: a share fixes the *composition*
+of the Walloon PV fleet without fixing its size, and it does so by making
+every MW of ground-mounted PV drag 1/s - 1 MW of dearer rooftop along.
+`docs/co2-sequestration.md` S7.2 measured the consequence — ground-mounted PV
+earning +4 790 EUR/MW/a stopped at 6 % of its potential because of the bundle,
+so the model's cheapest abatement was suppressed by a TIMES *composition*
+assumption. The floor transfers what TIMES actually decides (how much roof is
+used) and leaves the ground-mounted tranche to the optimiser. There is
+deliberately **no** floor and no ceiling on ground-mounted PV.
 """
 
 from __future__ import annotations
@@ -16,8 +28,6 @@ import pandas as pd
 import xarray as xr
 
 logger = logging.getLogger(__name__)
-
-SOLAR_ALL_CARRIERS = ("solar", "solar-utility", "solar-hsat", "solar rooftop")
 
 # Captured CO₂ sits on `co2 stored`. Atmosphere terms are the complement
 # (uncaptured, or the BECCS credit) and must not be added here.
@@ -58,31 +68,50 @@ def lookup_year_value(cfg: dict, year: int | None, inline_key: str, file_col: st
     return None
 
 
-def add_rooftop_share_constraint(n, node: str, share: float) -> None:
-    """``solar rooftop`` ≥ ``share`` × all solar at ``node`` (by location)."""
-    if share <= 0:
+def add_rooftop_floor_constraint(n, node: str, gw: float) -> None:
+    """Standing ``solar rooftop`` capacity at ``node`` ≥ ``gw`` GW.
+
+    ``gw`` is TIMES ``VAR_Cap`` of the rooftop PV plant processes
+    (``ERNW_PV-{Buildings,Large_Roof,RES_Homes}``) — the ``rooftop_gw`` column
+    of ``data/walloon/times_pv_rooftop_share*.csv``. The sum runs over *every*
+    vintage at the node, standing and extendable, because the ceiling TIMES
+    reports is a fleet figure, not this horizon's addition.
+
+    Ground-mounted PV is deliberately untouched: no floor, no ceiling, no
+    ratio to rooftop. Only ``p_nom_max`` (13 GW at BEWAL,
+    ``custom_potentials.csv``) and the CCL build rate bound it.
+    """
+    if gw is None or float(gw) <= 0:
         return
     loc = n.generators.bus.map(n.buses.location)
     rooftop = n.generators.index[
         (n.generators.carrier == "solar rooftop") & (loc == node)
     ]
-    total = n.generators.index[
-        n.generators.carrier.isin(SOLAR_ALL_CARRIERS) & (loc == node)
-    ]
-    lhs_r = _p_nom_sum(n, rooftop)
-    lhs_t = _p_nom_sum(n, total)
-    if lhs_r is None or lhs_t is None:
-        logger.warning(
-            "Rooftop share: no solar generators at %s, skip.", node
+    lhs = _p_nom_sum(n, rooftop)
+    if lhs is None:
+        logger.warning("Rooftop floor: no rooftop PV generators at %s, skip.", node)
+        return
+    mw = float(gw) * 1e3
+    if isinstance(lhs, float):
+        # Every vintage at the node is non-extendable: there is no decision
+        # variable to constrain, so the floor is either already met or the LP
+        # would be infeasible for a reason the solver could not explain.
+        if lhs + 1e-6 < mw:
+            raise ValueError(
+                f"Rooftop floor at {node}: {mw:.0f} MW required but only "
+                f"{lhs:.0f} MW of non-extendable rooftop PV exists and none "
+                "is extendable — the LP cannot reach the floor."
+            )
+        logger.info(
+            "Rooftop floor at %s already met by %.0f MW of standing capacity "
+            "(floor %.0f MW); no constraint added.",
+            node,
+            lhs,
+            mw,
         )
         return
-    n.model.add_constraints(
-        lhs_r >= float(share) * lhs_t,
-        name=f"rooftop_share_{node}",
-    )
-    logger.info(
-        "Pinned %s rooftop PV to ≥ %.1f %% of solar-all.", node, 100 * share
-    )
+    n.model.add_constraints(lhs >= mw, name=f"rooftop_floor_{node}")
+    logger.info("Pinned %s rooftop PV to ≥ %.0f MW (TIMES %.3f GW).", node, mw, gw)
 
 
 def add_industry_cc_floor(n, node: str, kt: float) -> None:
