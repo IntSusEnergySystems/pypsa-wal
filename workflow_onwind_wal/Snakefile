@@ -1,0 +1,394 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Wal
+# SPDX-License-Identifier: MIT
+#
+# Stand-alone land-eligibility workflow for Walloon onshore wind.
+#
+# It shares nothing with the main PyPSA-Wal Snakefile except two read-only
+# inputs — the region shapes and the atlite cutout — so it can be run, broken
+# and re-run without touching the model.
+#
+#   cd workflow_onwind_wal
+#   snakemake -c4 --configfile config.yaml --rerun-triggers mtime
+#
+# Targets:
+#   all        everything, including the figures and the report tables
+#   download   only the retrieval of the Walloon open-data layers
+#   report     the LaTeX report in docs/onwind_potential_wallonia/
+
+from pathlib import Path
+
+configfile: "config.yaml"
+
+
+DATA = "data"
+RES = "resources"
+OUT = "results"
+
+SCENARIOS = list(config["scenarios"])
+TURBINES = list(config["turbines"])
+TURBINES = [t for t in TURBINES if isinstance(config["turbines"][t], dict)]
+REGIONS = ["admin", "model"]
+
+# S0 reproduces PyPSA-Eur and is turbine-independent for the land side, but the
+# capacity factor still depends on the machine, so it is run for every class.
+WALLOON_SOURCES = [
+    "pds_zones",
+    "pds_roads",
+    "pds_rail",
+    "pds_waterways",
+    "pds_hv_lines",
+    "pds_landscape",
+    "adesa_landscape",
+    "natura2000",
+    "reserves_forest",
+    "reserves_domanial",
+    "reserves_agreed",
+    "wetlands",
+    "caves",
+    "karst",
+    "landslide",
+    "steep_slopes",
+    "flood",
+    "water_capture",
+    "address_points",
+]
+
+
+wildcard_constraints:
+    scenario="|".join(SCENARIOS),
+    turbine="|".join(TURBINES),
+    region="|".join(REGIONS),
+    source="|".join(config["sources"]),
+
+
+rule all:
+    input:
+        f"{OUT}/tables/potential_summary.csv",
+        f"{OUT}/tables/exclusion_waterfall.csv",
+        f"{OUT}/tables/sensitivity.csv",
+        f"{OUT}/tables/comparison.csv",
+        f"{OUT}/figures/map_scenarios.png",
+        f"{OUT}/figures/map_reference.png",
+        f"{OUT}/figures/map_eligible.png",
+        f"{OUT}/figures/waterfall.png",
+        f"{OUT}/figures/sensitivity.png",
+        f"{OUT}/figures/region_mismatch.png",
+
+
+rule download:
+    input:
+        expand(f"{DATA}/{{source}}.gpkg", source=WALLOON_SOURCES),
+
+
+rule report:
+    input:
+        "../docs/onwind_potential_wallonia/onwind_potential_wallonia.pdf",
+
+
+# ---------------------------------------------------------------------------
+# Retrieval
+# ---------------------------------------------------------------------------
+rule retrieve_wallonia_layer:
+    message:
+        "Retrieving {wildcards.source} from the Géoportail de la Wallonie"
+    params:
+        spec=lambda w: config["sources"][w.source],
+    output:
+        # Deliberately not protected(): editing config.yaml would otherwise make
+        # snakemake want to re-download, and refuse to.  Downloads are cached by
+        # file existence — run with `--rerun-triggers mtime` after a config edit
+        # so a changed buffer does not trigger a 9-minute address-point refetch.
+        f"{DATA}/{{source}}.gpkg",
+        f"{DATA}/{{source}}.meta.json",
+    log:
+        "logs/retrieve_{source}.log",
+    threads: 1
+    retries: 2
+    script:
+        "scripts/retrieve_wallonia_layer.py"
+
+
+# ---------------------------------------------------------------------------
+# Regions
+# ---------------------------------------------------------------------------
+rule build_regions:
+    message:
+        "Building the administrative and model Walloon regions"
+    params:
+        region=config["region"],
+        crs=config["atlite"]["crs"],
+    input:
+        shapes=config["region"]["shapes"],
+        fallback=config["region"]["fallback_shapes"],
+    output:
+        regions=f"{RES}/regions.gpkg",
+        mismatch=f"{RES}/region_mismatch.gpkg",
+        stats=f"{RES}/region_stats.json",
+    log:
+        "logs/build_regions.log",
+    script:
+        "scripts/build_regions.py"
+
+
+# ---------------------------------------------------------------------------
+# Exclusion layers (one set per turbine class, because setbacks scale with the
+# machine)
+# ---------------------------------------------------------------------------
+rule build_exclusion_layers:
+    message:
+        "Building Walloon exclusion layers for turbine class {wildcards.turbine}"
+    params:
+        crs=config["atlite"]["crs"],
+        plan_de_secteur=config["plan_de_secteur"],
+        setbacks=config["setbacks"],
+        forest_split=config["forest_split"],
+        turbine=lambda w: config["turbines"][w.turbine],
+    input:
+        unpack(
+            lambda w: {s: f"{DATA}/{s}.gpkg" for s in WALLOON_SOURCES}
+        ),
+        regions=f"{RES}/regions.gpkg",
+    output:
+        layers=f"{RES}/exclusions_{{turbine}}.gpkg",
+        layer_dir=directory(f"{RES}/exclusions_{{turbine}}"),
+        dwelling_raster=f"{RES}/dwelling_setback_{{turbine}}.tif",
+        stats=f"{RES}/exclusions_{{turbine}}.json",
+        areas=f"{OUT}/tables/exclusion_areas_{{turbine}}.csv",
+    log:
+        "logs/build_exclusion_layers_{turbine}.log",
+    resources:
+        mem_mb=16000,
+    script:
+        "scripts/build_exclusion_layers.py"
+
+
+# ---------------------------------------------------------------------------
+# Availability
+# ---------------------------------------------------------------------------
+def availability_input(w):
+    inp = {
+        "regions": f"{RES}/regions.gpkg",
+        "cutout": config["atlite"]["cutout"],
+    }
+    if config["scenarios"][w.scenario]["mode"] == "corine":
+        inp["corine"] = config["forest_split"]["corine"]
+        inp["natura"] = "../data/bundle/natura/natura.tiff"
+    else:
+        inp["layers"] = f"{RES}/exclusions_{w.turbine}"
+        inp["dwelling_raster"] = f"{RES}/dwelling_setback_{w.turbine}.tif"
+    return inp
+
+
+rule build_availability:
+    message:
+        "Land eligibility: {wildcards.scenario} / {wildcards.turbine} / {wildcards.region}"
+    params:
+        crs=config["atlite"]["crs"],
+        res=config["atlite"]["excluder_resolution"],
+        scenario=lambda w: config["scenarios"][w.scenario],
+    input:
+        unpack(availability_input),
+    output:
+        availability=f"{RES}/availability_{{scenario}}_{{turbine}}_{{region}}.nc",
+        stats=f"{RES}/availability_{{scenario}}_{{turbine}}_{{region}}.json",
+    log:
+        "logs/build_availability_{scenario}_{turbine}_{region}.log",
+    threads: config["atlite"]["nprocesses"]
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/build_availability.py"
+
+
+rule build_potential:
+    message:
+        "Potential: {wildcards.scenario} / {wildcards.turbine} / {wildcards.region}"
+    params:
+        crs=config["atlite"]["crs"],
+        turbine=lambda w: config["turbines"][w.turbine],
+        capacity_densities=config["capacity_densities"],
+        spacing_crosswind=config["turbines"]["spacing_crosswind"],
+        spacing_downwind=config["turbines"]["spacing_downwind"],
+    input:
+        availability=f"{RES}/availability_{{scenario}}_{{turbine}}_{{region}}.nc",
+        regions=f"{RES}/regions.gpkg",
+        cutout=config["atlite"]["cutout"],
+    output:
+        table=f"{OUT}/potential/{{scenario}}_{{turbine}}_{{region}}.csv",
+        profile=f"{OUT}/profiles/{{scenario}}_{{turbine}}_{{region}}.csv",
+    log:
+        "logs/build_potential_{scenario}_{turbine}_{region}.log",
+    threads: 2
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/build_potential.py"
+
+
+# ---------------------------------------------------------------------------
+# Collection and reporting
+# ---------------------------------------------------------------------------
+rule collect_results:
+    message:
+        "Collecting potentials and building the report tables"
+    params:
+        config=config,
+    input:
+        potentials=expand(
+            f"{OUT}/potential/{{scenario}}_{{turbine}}_{{region}}.csv",
+            scenario=SCENARIOS,
+            turbine=TURBINES,
+            region=REGIONS,
+        ),
+        availability_stats=expand(
+            f"{RES}/availability_{{scenario}}_{{turbine}}_{{region}}.json",
+            scenario=SCENARIOS,
+            turbine=TURBINES,
+            region=REGIONS,
+        ),
+        exclusion_stats=expand(f"{RES}/exclusions_{{turbine}}.json", turbine=TURBINES),
+        region_stats=f"{RES}/region_stats.json",
+        fragmentation=f"{OUT}/tables/fragmentation.json",
+    output:
+        summary=f"{OUT}/tables/potential_summary.csv",
+        waterfall=f"{OUT}/tables/exclusion_waterfall.csv",
+        sensitivity=f"{OUT}/tables/sensitivity.csv",
+        comparison=f"{OUT}/tables/comparison.csv",
+        headline=f"{OUT}/tables/headline.json",
+    log:
+        "logs/collect_results.log",
+    script:
+        "scripts/collect_results.py"
+
+
+rule plot_maps:
+    message:
+        "Plotting the eligibility maps"
+    params:
+        config=config,
+    input:
+        regions=f"{RES}/regions.gpkg",
+        mismatch=f"{RES}/region_mismatch.gpkg",
+        layers=lambda w: f"{RES}/exclusions_{config['reference_turbine']}.gpkg",
+        availability=expand(
+            f"{RES}/availability_{{scenario}}_{{turbine}}_admin.nc",
+            scenario=SCENARIOS,
+            turbine=[config["reference_turbine"]],
+        ),
+    output:
+        scenarios=f"{OUT}/figures/map_scenarios.png",
+        reference=f"{OUT}/figures/map_reference.png",
+        mismatch=f"{OUT}/figures/region_mismatch.png",
+    log:
+        "logs/plot_maps.log",
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/plot_maps.py"
+
+
+rule plot_eligible_map:
+    message:
+        "Plotting the final eligibility raster at {params.res} m"
+    params:
+        config=config,
+        res=config["atlite"]["excluder_resolution"],
+    input:
+        regions=f"{RES}/regions.gpkg",
+        layer_dir=f"{RES}/exclusions_{config['reference_turbine']}",
+        dwelling_raster=f"{RES}/dwelling_setback_{config['reference_turbine']}.tif",
+    output:
+        figure=f"{OUT}/figures/map_eligible.png",
+        raster=f"{OUT}/eligible_land.tif",
+        fragmentation=f"{OUT}/tables/fragmentation.json",
+    log:
+        "logs/plot_eligible_map.log",
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/plot_eligible_map.py"
+
+
+rule plot_summary:
+    message:
+        "Plotting the waterfall and sensitivity charts"
+    params:
+        config=config,
+    input:
+        summary=f"{OUT}/tables/potential_summary.csv",
+        waterfall=f"{OUT}/tables/exclusion_waterfall.csv",
+        sensitivity=f"{OUT}/tables/sensitivity.csv",
+        headline=f"{OUT}/tables/headline.json",
+    output:
+        waterfall=f"{OUT}/figures/waterfall.png",
+        sensitivity=f"{OUT}/figures/sensitivity.png",
+    log:
+        "logs/plot_summary.log",
+    script:
+        "scripts/plot_summary.py"
+
+
+DOCDIR = "../docs/onwind_potential_wallonia"
+
+
+rule make_report_inputs:
+    message:
+        "Generating the LaTeX macros and table fragments"
+    params:
+        config=config,
+    input:
+        headline=f"{OUT}/tables/headline.json",
+        summary=f"{OUT}/tables/potential_summary.csv",
+        waterfall=f"{OUT}/tables/exclusion_waterfall.csv",
+        sensitivity=f"{OUT}/tables/sensitivity.csv",
+        comparison=f"{OUT}/tables/comparison.csv",
+        exclusion_stats=expand(f"{RES}/exclusions_{{turbine}}.json", turbine=TURBINES),
+        source_meta=expand(f"{DATA}/{{source}}.meta.json", source=WALLOON_SOURCES),
+    output:
+        macros=f"{DOCDIR}/generated/macros.tex",
+        waterfall_tex=f"{DOCDIR}/generated/table_waterfall.tex",
+        sensitivity_tex=f"{DOCDIR}/generated/table_sensitivity.tex",
+        comparison_tex=f"{DOCDIR}/generated/table_comparison.tex",
+        full_tex=f"{DOCDIR}/generated/table_full.tex",
+        sources_tex=f"{DOCDIR}/generated/table_sources.tex",
+    log:
+        "logs/make_report_inputs.log",
+    script:
+        "scripts/make_report_inputs.py"
+
+
+rule build_report:
+    message:
+        "Compiling the LaTeX report"
+    input:
+        tex=f"{DOCDIR}/onwind_potential_wallonia.tex",
+        generated=[
+            f"{DOCDIR}/generated/macros.tex",
+            f"{DOCDIR}/generated/table_waterfall.tex",
+            f"{DOCDIR}/generated/table_sensitivity.tex",
+            f"{DOCDIR}/generated/table_comparison.tex",
+            f"{DOCDIR}/generated/table_full.tex",
+            f"{DOCDIR}/generated/table_sources.tex",
+        ],
+        figures=[
+            f"{OUT}/figures/map_scenarios.png",
+            f"{OUT}/figures/map_reference.png",
+            f"{OUT}/figures/map_eligible.png",
+            f"{OUT}/figures/waterfall.png",
+            f"{OUT}/figures/sensitivity.png",
+            f"{OUT}/figures/region_mismatch.png",
+        ],
+    output:
+        f"{DOCDIR}/onwind_potential_wallonia.pdf",
+    log:
+        "logs/build_report.log",
+    shell:
+        """
+        set -e
+        here=$PWD
+        mkdir -p {DOCDIR}/figures
+        cp {input.figures} {DOCDIR}/figures/
+        cd {DOCDIR}
+        latexmk -pdf -interaction=nonstopmode \
+            onwind_potential_wallonia.tex > $here/{log} 2>&1
+        """

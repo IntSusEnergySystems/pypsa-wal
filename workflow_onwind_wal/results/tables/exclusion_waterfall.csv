@@ -1,0 +1,13 @@
+region,scenario,title,in_ladder,eligible_area_km2,share_of_region_pct,removed_vs_previous_km2
+admin,S0_pypsa_eur,PyPSA-Eur default (CORINE + Natura 2000),False,3756.5,22.22,
+admin,S1_zoning,+ plan de secteur zoning (CoDT),True,8520.8,50.4,8384.6
+admin,S2_setbacks,+ dwellings and infrastructure setbacks (CDR 2024),True,1398.5,8.27,7122.3
+admin,S3_nature,"+ Natura 2000, reserves, wetlands, caves",True,1211.2,7.16,187.3
+admin,S4_landscape,+ landscape protection perimeters (PIP / ADESA),True,923.3,5.46,287.9
+admin,S5_risk,"+ flood, karst, landslide, water-capture protection",True,869.6,5.14,53.7
+model,S0_pypsa_eur,PyPSA-Eur default (CORINE + Natura 2000),False,3597.1,23.74,
+model,S1_zoning,+ plan de secteur zoning (CoDT),True,7121.8,47.01,8027.8
+model,S2_setbacks,+ dwellings and infrastructure setbacks (CDR 2024),True,1309.4,8.64,5812.4
+model,S3_nature,"+ Natura 2000, reserves, wetlands, caves",True,1122.9,7.41,186.5
+model,S4_landscape,+ landscape protection perimeters (PIP / ADESA),True,852.2,5.63,270.7
+model,S5_risk,"+ flood, karst, landslide, water-capture protection",True,812.6,5.36,39.6

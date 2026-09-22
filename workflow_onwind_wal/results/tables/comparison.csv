@@ -1,0 +1,10 @@
+source,basis,region,capacity_mw,energy_twh
+PyPSA-Wal today (input_parameters_for_models.csv),"PNEC wallon / EDORA, expert judgement",BEWAL (model),6500.0,21.14
+PyPSA-Eur land eligibility (CORINE + Natura 2000),"this study, scenario S0",BEWAL (model),18270.0,58.98
+Walloon legal constraint set,"this study, scenario S5_risk",BEWAL (model),4127.0,13.42
+Walloon legal constraint set,"this study, scenario S5_risk",Wallonia (administrative),4417.0,14.37
+"Walloon legal constraint set, patches >= 1 turbine array","this study, S5_risk, developability filter",Wallonia (administrative),2066.0,6.72
+"Walloon legal constraint set, patches >= 4 turbine arrays","this study, S5_risk, strict developability filter",Wallonia (administrative),394.0,1.28
+"SPW/Gembloux favourable-zone update 2022, '180 m' case","site-by-site simulation, additional potential only",Wallonia (administrative),,3.96
+"Installed fleet, end 2024",EDORA / Renouvelle,Wallonia (administrative),1528.0,
+PNEC / PACE 2030 onshore-wind target,Walloon Government,Wallonia (administrative),,6.2

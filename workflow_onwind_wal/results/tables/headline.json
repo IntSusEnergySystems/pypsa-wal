@@ -1,0 +1,90 @@
+{
+  "reference_scenario": "S5_risk",
+  "reference_turbine": "T185_NREL4",
+  "reference_turbine_label": "NREL 2020ATB 4.0 MW (tip 185 m)",
+  "reference_density_case": "derived",
+  "reference_density_mw_km2": 5.079,
+  "admin": {
+    "region_area_km2": 16905.4,
+    "eligible_area_km2": 869.62,
+    "eligible_share_pct": 5.14,
+    "p_nom_max_mw": 4417.0,
+    "flh_h": 3253.0,
+    "energy_twh": 14.366,
+    "n_turbines": 1104
+  },
+  "model": {
+    "region_area_km2": 15149.6,
+    "eligible_area_km2": 812.6,
+    "eligible_share_pct": 5.36,
+    "p_nom_max_mw": 4127.0,
+    "flh_h": 3252.0,
+    "energy_twh": 13.421,
+    "n_turbines": 1032
+  },
+  "pypsa_eur_baseline": {
+    "admin_eligible_area_km2": 3756.53,
+    "admin_p_nom_max_mw": 19079.0,
+    "model_eligible_area_km2": 3597.1,
+    "model_p_nom_max_mw": 18270.0
+  },
+  "region_stats": {
+    "admin_area_km2": 16905.4,
+    "model_area_km2": 15149.6,
+    "walloon_area_outside_model_km2": 2190.8,
+    "model_area_outside_wallonia_km2": 434.9,
+    "crs": "EPSG:3035",
+    "model_coverage_pct": 89.6
+  },
+  "benchmarks": {
+    "installed_2024_mw": 1528,
+    "model_p_nom_max_mw": 6500,
+    "target_2030_gwh": 6200,
+    "spw2022_new_gwh": 3959,
+    "spw2022_strict_ha": 17468,
+    "spw2022_enlarged_ha": 27221,
+    "model_profile_flh_2013": 2425,
+    "model_profile_flh_2010": 2302
+  },
+  "model_range_mw": [
+    2327.0,
+    7059.0
+  ],
+  "admin_range_mw": [
+    2489.0,
+    7560.0
+  ],
+  "zoning_only_km2": 8520.8,
+  "largest_step": {
+    "scenario": "S2_setbacks",
+    "title": "+ dwellings and infrastructure setbacks (CDR 2024)",
+    "removed_km2": 7122.3,
+    "share_of_predecessor_pct": 83.6
+  },
+  "setback_cut_pct": 83.6,
+  "remaining_steps_removed_km2": 528.9,
+  "energy_density_gwh_km2": {
+    "T136_V112": 16.8,
+    "T185_NREL4": 16.5,
+    "T208_NREL55": 17.1
+  },
+  "fragmentation": {
+    "n_patches": 5290,
+    "footprint_km2": 0.788,
+    "median_patch_km2": 0.03,
+    "area_km2": 882.8,
+    "area_in_patches_ge_1_turbine_km2": 406.7,
+    "area_in_patches_ge_4_turbines_km2": 77.5,
+    "largest_patch_km2": 8.6,
+    "share_ge_1_turbine_pct": 46.1,
+    "share_ge_4_turbines_pct": 8.8
+  },
+  "developable": {
+    "all_km2": 882.8,
+    "all_mw": 4484,
+    "ge1_km2": 406.7,
+    "ge1_mw": 2066,
+    "ge4_km2": 77.5,
+    "ge4_mw": 394
+  }
+}

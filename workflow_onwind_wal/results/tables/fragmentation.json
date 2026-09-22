@@ -1,0 +1,11 @@
+{
+  "n_patches": 5290,
+  "footprint_km2": 0.788,
+  "median_patch_km2": 0.03,
+  "area_km2": 882.8,
+  "area_in_patches_ge_1_turbine_km2": 406.7,
+  "area_in_patches_ge_4_turbines_km2": 77.5,
+  "largest_patch_km2": 8.6,
+  "share_ge_1_turbine_pct": 46.1,
+  "share_ge_4_turbines_pct": 8.8
+}

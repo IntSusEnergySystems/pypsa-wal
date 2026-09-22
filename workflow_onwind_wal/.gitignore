@@ -1,0 +1,11 @@
+# Downloaded GIS source data and derived rasters are reproducible: only the
+# code, the config and the small summary tables are versioned.
+data/
+resources/
+logs/
+.snakemake/
+*.log
+results/figures/
+results/potential/
+results/profiles/
+results/*.tif

@@ -1,0 +1,375 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Wal
+# SPDX-License-Identifier: MIT
+#
+# Configuration of the stand-alone Walloon onshore-wind land-eligibility
+# workflow.  Every exclusion layer is declared here, with the legal instrument
+# it implements, so that the constraint set can be audited without reading a
+# single line of Python.
+#
+# See docs/onwind_potential_wallonia/ for the accompanying report.
+
+version: "1.0"
+
+# ---------------------------------------------------------------------------
+# Region of interest
+# ---------------------------------------------------------------------------
+region:
+  # The BEWAL polygon used by the PyPSA-Wal model itself, so that the potential
+  # computed here is directly substitutable for the model's p_nom_max.
+  shapes: "../resources/regions_onshore_base_s_adm.geojson"
+  name: "BEWAL"
+  # Fallback if the model resources have not been built: dissolve the Walloon
+  # provinces out of the NUTS3 shapes shipped with PyPSA-Eur.
+  fallback_shapes: "../resources/nuts3_shapes.geojson"
+  fallback_prefix: ["BE3"]          # NUTS-1 code of the Walloon Region
+
+# ---------------------------------------------------------------------------
+# Weather data
+# ---------------------------------------------------------------------------
+atlite:
+  cutout: "../cutouts/europe-2013-sarah3-era5.nc"
+  nprocesses: 4
+  excluder_resolution: 100          # m, the raster on which exclusions are burnt
+  crs: 3035                         # ETRS89 / LAEA Europe, equal-area
+
+# ---------------------------------------------------------------------------
+# Turbine classes
+#
+# The three classes mirror the three "scénarios de base" of the 2022
+# SPW/Gembloux update of the Walloon favourable-zone map (150 m / 180 m /
+# 210 m total tip height), so the two studies can be compared line by line.
+# `spacing_crosswind` x `spacing_downwind` are rotor-diameter multiples; the
+# resulting capacity density is derived, not assumed.
+# ---------------------------------------------------------------------------
+turbines:
+  T136_V112:
+    atlite_model: "Vestas_V112_3MW"
+    p_nom: 3.0                      # MW
+    hub_height: 80                  # m
+    rotor_diameter: 112             # m
+    label: "V112 / 3.0 MW (tip 136 m)"
+    comment: >-
+      PyPSA-Eur's default onshore turbine and a fair proxy for the standing
+      Walloon fleet.  Retained so that the baseline of this study reproduces
+      the number the model uses today.
+  T185_NREL4:
+    atlite_model: "NREL_ReferenceTurbine_2020ATB_4MW"
+    p_nom: 4.0
+    hub_height: 110
+    rotor_diameter: 150
+    label: "NREL 2020ATB 4.0 MW (tip 185 m)"
+    comment: >-
+      Reference class.  Closest available match to the "180 m" scenario of the
+      2022 Walloon favourable-zone update, and to what is actually being
+      permitted in Wallonia since the 2024 reference framework.
+  T208_NREL55:
+    atlite_model: "NREL_ReferenceTurbine_2020ATB_5.5MW"
+    p_nom: 5.5
+    hub_height: 120
+    rotor_diameter: 175
+    label: "NREL 2020ATB 5.5 MW (tip 208 m)"
+    comment: >-
+      Upper class, matching the "210 m" scenario of the 2022 update.
+
+  spacing_crosswind: 5              # rotor diameters
+  spacing_downwind: 7               # rotor diameters
+
+reference_turbine: "T185_NREL4"
+
+# Capacity densities carried through every scenario, in MW/km^2 of eligible
+# land.  `derived` is replaced at run time by p_nom / (5D x 7D).
+capacity_densities:
+  pypsa_eur: 3.0                    # PyPSA-Eur's config.default.yaml value
+  derived: null                     # computed from the turbine geometry
+  dense: 8.0                        # 4D x 6D packing, upper bound
+
+reference_density: "derived"
+
+# ---------------------------------------------------------------------------
+# Source datasets (Walloon open data, CC-BY 4.0, ESRI-REST services of
+# https://geoservices.wallonie.be).  `count` is the feature count observed on
+# 2026-09-22 and is only used to sanity-check the download.
+# ---------------------------------------------------------------------------
+sources:
+  pds_zones:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 22
+    fields: ["AFFECT", "DESCRIPTION"]
+    count: 43797
+    simplify: 25
+    title: "Plan de secteur — zones d'affectation"
+  pds_roads:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 9
+    fields: ["STYPE", "DESCRIPTION"]
+    count: 5420
+    title: "Plan de secteur — réseau routier"
+  pds_rail:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 11
+    fields: ["STYPE", "DESCRIPTION"]
+    count: 911
+    title: "Plan de secteur — réseau ferroviaire"
+  pds_waterways:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 13
+    fields: ["STYPE", "DESCRIPTION"]
+    count: 1
+    title: "Plan de secteur — voies navigables"
+  pds_hv_lines:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 12
+    fields: ["STYPE", "DESCRIPTION"]
+    count: 1016
+    title: "Plan de secteur — lignes électriques haute tension"
+  pds_landscape:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 17
+    fields: ["DESCRIPTION"]
+    count: 1456
+    simplify: 25
+    title: "Plan de secteur — périmètres d'intérêt paysager"
+  adesa_landscape:
+    service: "AMENAGEMENT_TERRITOIRE/ADESA"
+    layer: 1
+    fields: []
+    simplify: 25
+    title: "Périmètres d'intérêt paysager de l'inventaire ADESA"
+  natura2000:
+    service: "FAUNE_FLORE/NATURA2000"
+    layer: 9
+    fields: []
+    count: 240
+    page_size: 240
+    simplify: 25            # m; a quarter of the exclusion raster cell
+    title: "Réseau Natura 2000 — périmètres des sites en vigueur"
+  reserves_forest:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 1
+    fields: []
+    count: 20
+    title: "Réserves forestières"
+  reserves_domanial:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 2
+    fields: []
+    count: 306
+    simplify: 25
+    title: "Réserves naturelles domaniales"
+  reserves_agreed:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 3
+    fields: []
+    count: 264
+    simplify: 25
+    title: "Réserves naturelles agréées"
+  wetlands:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 4
+    fields: []
+    count: 73
+    simplify: 25
+    title: "Zones humides d'intérêt biologique"
+  caves:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 0
+    fields: []
+    count: 80
+    title: "Cavités souterraines d'intérêt scientifique"
+  karst:
+    service: "AMENAGEMENT_TERRITOIRE/CONTR_KARST"
+    layer: 0
+    fields: []
+    simplify: 25
+    title: "Zones de contraintes karstiques"
+  landslide:
+    service: "AMENAGEMENT_TERRITOIRE/RISQ_EBOULT"
+    layer: 0
+    fields: []
+    simplify: 25
+    title: "Contraintes physiques liées aux éboulements"
+  steep_slopes:
+    service: "AMENAGEMENT_TERRITOIRE/RISQ_EBOULT"
+    layer: 1
+    fields: []
+    simplify: 25
+    title: "Versants supérieurs à 30 degrés"
+  flood:
+    # "Zones inondables" of the EU Floods Directive mapping, overflow scenario,
+    # extreme return period.  The companion runoff layer holds 5.2 M polygons
+    # and is deliberately not used: sheet runoff is a micro-scale phenomenon
+    # that does not preclude a turbine foundation, whereas the integral
+    # constraint of the Walloon favourable-zone map is the flood-prone extent
+    # of watercourses.  See report §4.7.
+    service: "EAU/ZI"
+    layer: 2
+    fields: []
+    count: 39893
+    simplify: 25
+    title: "Zones inondables — débordement, période de retour extrême"
+  water_capture:
+    service: "EAU/PROTECT_CAPT"
+    layer: 2
+    fields: []
+    simplify: 25
+    title: "Zones de prévention rapprochée (IIa) des captages"
+  address_points:
+    service: "DONNEES_BASE/ICAR_ADR_PT"
+    layer: 1
+    fields: []
+    count: 1512246
+    title: "Points d'adresse ICAR"
+    page_size: 2000
+    workers: 6
+  urban_fabric_continuous:
+    service: "HABITAT/TISSU_URBANISE"
+    layer: 0
+    fields: []
+    title: "Tissu urbanisé — continu"
+  urban_fabric_semicontinuous:
+    service: "HABITAT/TISSU_URBANISE"
+    layer: 1
+    fields: []
+    title: "Tissu urbanisé — semi-continu"
+  urban_fabric_open:
+    service: "HABITAT/TISSU_URBANISE"
+    layer: 2
+    fields: []
+    title: "Tissu urbanisé — ouvert"
+
+# ---------------------------------------------------------------------------
+# Plan de secteur zoning
+#
+# `AFFECT` codes of the "Zones d'affectation" layer.  The 2013 Walloon
+# favourable-zone map and its 2022 update treat the plan de secteur as a
+# POSITIVE list: a turbine may only stand in a zone that is not listed as an
+# integral exclusion.  We reproduce that logic explicitly.
+# ---------------------------------------------------------------------------
+plan_de_secteur:
+  # Zones in which a wind turbine is admissible without further restriction.
+  eligible_unconditional:
+    - "Activité économique mixte"
+    - "Activité économique industrielle"
+    - "Activité économique spécifique Agro-Economique"
+    - "Activité économique spécifique Grande Distribution"
+    - "Activité économique spécifique Risque majeur"
+    - "Aménagement communal concerté à caractère économique"
+    - "Centre d'enfouissement technique"
+    - "Centre d'enfouissement technique désaffecté"
+    - "Dépendances d'extraction"
+    - "Loisirs"
+    - "Services publics et équipements communautaires"
+  # Agricultural land: admissible only within `agri_max_distance_to_pic` of the
+  # main communication infrastructure (PIC, CoDT art. R.II.21-1) or of an
+  # economic-activity zone.
+  eligible_conditional_agriculture:
+    - "Agricole"
+  agri_max_distance_to_pic: 1500    # m
+  # Forest: broad-leaved stands are an integral exclusion; coniferous stands
+  # are admissible within `conifer_max_distance_to_pic` of a PIC.  The
+  # broad-leaved / coniferous split is not in the plan de secteur, so it is
+  # taken from CORINE (see `forest_split` below).
+  eligible_conditional_forest:
+    - "Forestière"
+  conifer_max_distance_to_pic: 750  # m
+  # Residential zones: setback applies (see `setbacks.habitat_zone`).
+  habitat_zones:
+    - "Habitat"
+    - "Habitat à caractère rural"
+    - "Habitat vert"
+    - "Aménagement communal concerté"
+  # Integral exclusions from the plan de secteur itself.
+  excluded:
+    - "Agricole"                    # everything outside the 1.5 km corridor
+    - "Forestière"                  # everything outside the conifer corridor
+    - "Espaces verts"
+    - "Naturelle"
+    - "Parc"
+    - "Eau"
+    - "Extraction à destination agricole"
+    - "Extraction à destination forestière"
+    - "Extraction à destination espaces verts"
+    - "Extraction à destination zone naturelle"
+
+# Broad-leaved vs coniferous split inside plan-de-secteur forest zones.
+# CORINE grid codes: 23 = broad-leaved, 24 = coniferous, 25 = mixed.
+# Mixed stands are treated as broad-leaved (conservative).
+forest_split:
+  corine: "../data/bundle/corine/g250_clc06_V18_5.tif"
+  coniferous_codes: [24]
+  broadleaved_codes: [23, 25]
+
+# ---------------------------------------------------------------------------
+# Setbacks.  `formula` entries are evaluated with H = total tip height and
+# D = rotor diameter of the turbine class under study.
+# ---------------------------------------------------------------------------
+setbacks:
+  habitat_zone:
+    cdr2013: "4 * H"                # Cadre de référence 2013
+    cdr2024: "500 + H / 2"          # Cadre de référence 2024, in force 25/04/2024
+    default: "cdr2024"
+  scattered_dwellings: 400          # m, from every ICAR address point
+  motorway: 50                      # m  (+ the blade-length rule below)
+  road: "D / 2"                     # 1.5 x blade length ~ 0.75 D; see report §4.4
+  road_multiplier: 1.5              # applied to the blade length (D/2)
+  railway: 190
+  railway_high_speed: 140
+  hv_line: "1.5 * D"
+  waterway: 0                       # no quantified rule in the CDR
+
+# ---------------------------------------------------------------------------
+# Scenario ladder.  Each scenario adds the layers of the previous one.
+# `layers` are keys of the exclusion catalogue built by
+# scripts/build_exclusion_layers.py.
+# ---------------------------------------------------------------------------
+scenarios:
+  S0_pypsa_eur:
+    title: "PyPSA-Eur default (CORINE + Natura 2000)"
+    mode: "corine"                  # reproduces determine_availability_matrix.py
+    corine_grid_codes: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+                        26, 27, 28, 29, 31, 32]
+    corine_distance_grid_codes: [1, 2, 3, 4, 5, 6]
+    corine_distance: 1000
+    natura: true
+  S1_zoning:
+    title: "+ plan de secteur zoning (CoDT)"
+    mode: "walloon"
+    layers: ["pds_ineligible"]
+  S2_setbacks:
+    title: "+ dwellings and infrastructure setbacks (CDR 2024)"
+    mode: "walloon"
+    layers: ["pds_ineligible", "habitat_setback", "dwelling_setback",
+             "infrastructure_setback"]
+  S3_nature:
+    title: "+ Natura 2000, reserves, wetlands, caves"
+    mode: "walloon"
+    layers: ["pds_ineligible", "habitat_setback", "dwelling_setback",
+             "infrastructure_setback", "nature"]
+  S4_landscape:
+    title: "+ landscape protection perimeters (PIP / ADESA)"
+    mode: "walloon"
+    layers: ["pds_ineligible", "habitat_setback", "dwelling_setback",
+             "infrastructure_setback", "nature", "landscape"]
+  S5_risk:
+    title: "+ flood, karst, landslide, water-capture protection"
+    mode: "walloon"
+    layers: ["pds_ineligible", "habitat_setback", "dwelling_setback",
+             "infrastructure_setback", "nature", "landscape", "risk"]
+
+reference_scenario: "S5_risk"
+
+# ---------------------------------------------------------------------------
+# Benchmarks quoted in the report
+# ---------------------------------------------------------------------------
+benchmarks:
+  installed_2024_mw: 1528           # Walloon fleet end-2024 (EDORA / Renouvelle)
+  model_p_nom_max_mw: 6500          # value currently used by PyPSA-Wal
+  target_2030_gwh: 6200             # PNEC/PACE Walloon onshore-wind target
+  spw2022_new_gwh: 3959             # 2022 favourable-zone update, "180 m" case
+  spw2022_strict_ha: 17468
+  spw2022_enlarged_ha: 27221
+  # Full-load hours of the BEWAL onwind profile the model itself carries, on the
+  # same 2013 weather year and the same V112 turbine.  Used to validate this
+  # workflow end to end; see docs/renewable-potentials.md section 10.1.
+  model_profile_flh_2013: 2425
+  model_profile_flh_2010: 2302
