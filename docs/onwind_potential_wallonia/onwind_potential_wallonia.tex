@@ -76,17 +76,17 @@ placing individual machines rather than by multiplying area by a density.
 The answer is a range, and the reason it is a range is stated rather than
 averaged away. Against the full constraint set, \AdminEligible{}~\si{\square
 \kilo\metre} of the Walloon Region survive every exclusion ---
-\AdminEligibleShare{}\,\% of the territory. Allocating machines on that land
-under the array spacing of the reference class, with no rule about how they
-group, gives \FreePnom{}~MW: an upper bound that corresponds to a carpet of lone
-turbines across the Region and satisfies no landscape criterion at all. Adding
-the two structural rules of the Walloon framework --- at least four machines per
-farm, and the indicative \SI{4}{}--\SI{6}{\kilo\metre} between farms --- brings
-it to \IfdLow{}--\IfdHigh{}~MW in \IfdSixFarms{} to \IfdFourFarms{} farms, against
-the \FleetFarms{} farms standing in Wallonia today. Applying
-a documented allowance for the two constraint families that still have no public
-geometry gives a credible technical potential of
-\textbf{\CredibleLowGW{}--\CredibleHighGW{}~GW}, central estimate
+\AdminEligibleShare{}\,\% of the territory. Allocating machines on it at
+\PlaceRotorD{}~rotor diameters apart, with no rule about how they group, gives
+\FreePnom{}~MW: a land-and-wake bound that puts a near-continuous band of
+turbines through every corridor in the Region. Grouping them into farms and
+applying the landscape criterion the framework actually states --- at least
+\PlaceAzimuth{}° of every village's horizon, within \PlaceHorizonRadius{}~km,
+free of turbines --- gives \PlacePnom{}~MW in \PlaceFarms{} farms of
+\PlacePerFarm{} machines, against the \FleetFarms{} farms of \FleetPerFarm{}
+standing in Wallonia today. A documented allowance for the two constraint
+families that still have no public geometry gives a credible technical potential
+of \textbf{\CredibleLowGW{}--\CredibleHighGW{}~GW}, central estimate
 \CredibleCentralGW{}~GW.
 
 Five results matter more than the headline number.
@@ -95,8 +95,9 @@ Five results matter more than the headline number.
 not the wind.} The setbacks from habitat zones and from scattered dwellings
 remove \SetbackCut{}\,\% of the land the plan de secteur admits, in one step.
 What then decides the answer is not how much land survives but how the machines
-on it may be grouped: the inter-farm distance alone moves the result by a factor
-of \num{1.6}.
+on it may be arranged: the open-horizon criterion alone costs
+\HorizonCostPct{}\,\% of the grouped capacity, and the three siting rules
+together cost more than the entire constraint ladder below the setbacks.
 
 \textbf{Every constraint in the set is one the standing fleet avoids.} Measured
 against the \FleetN{} turbines built in Wallonia, no layer in the reference
@@ -112,13 +113,13 @@ allocation raises the figure substantially; the \CapToday{}~MW cap sits inside
 the credible range rather than far above it.
 
 \textbf{BREGILAB's \BregTotalGW{}~GW is the same quantity as this study's
-upper bound, not as its answer.} Converted step by step onto BREGILAB's own
-conventions --- its machine ($\times\BregStepTurbine$) and its $5D$ spacing
-($\times\BregStepSpacing$) --- this study's land gives
+land-and-wake bound, not as its answer.} This study now uses BREGILAB's own
+spacing rule, so only the machine separates the two free allocations
+($\times\BregStepTurbine$): on their V112 this study's land gives
 \BregOursVOneTwelveSpacing{}~MW, so their constraint set is in fact
 \emph{tighter} than this one by $\times\BregStepConstraints$. What separates
 \BregTotalGW{}~GW from \CredibleCentralGW{}~GW is not the geography: it is that
-their allocation has no grouping rule and this one applies the framework's.
+their allocation carries no landscape rule and this one carries the framework's.
 
 \textbf{PyPSA-Eur's default land analysis is not usable here.} It returns
 \BasePnom{}~MW for the Walloon Region, because it admits broad-leaved forest,
@@ -316,41 +317,124 @@ overhanging ineligible land, and its access track and cabling cross ineligible
 land as a matter of course. That is legally correct here, because every Walloon
 setback is measured from the \emph{mast}.
 
-This study therefore allocates machines explicitly, in two nested models.
+This study therefore allocates machines explicitly. Three rules decide how many
+fit, and because together they matter more than the whole constraint ladder
+below the setbacks, each is justified separately below and each is tested
+against the \FleetN{} machines standing in Wallonia (§\ref{sec:calibration}).
 
-\paragraph{The free model} walks the eligible cells and accepts a machine
-wherever no previously accepted machine lies closer than a minimum inter-turbine
-distance. The distance is $\sqrt{5\times7}\,D = \PlaceSpacing{}$~m for the
-reference class --- the isotropic spacing that gives one machine the same land
-as one cell of the $5D\times7D$ array, so the wake criterion is the same as the
-density convention it replaces. This is the algorithm VITO uses in the Dynamic
-Energy Atlas, and it is what BREGILAB reports (§\ref{sec:bregilab}).
+\subsubsection{Rule 1 --- how close two machines may stand}
 
-\paragraph{The farm model} adds the two structural rules of the Walloon
-framework that the free allocation violates:
+The allocation walks the eligible cells and accepts a machine wherever no
+previously accepted machine lies closer than a minimum inter-turbine distance.
+That distance is a wake criterion, and three readings of it are carried:
 
-\begin{description}
-  \item[Regroupement.] The cadre de référence gives priority to grouping
-    machines rather than dispersing them, and since 24~January~2024 a
-    \emph{parc éolien} means at least four turbines. A site that cannot take
-    four machines is not a wind farm and is dropped.
-  \item[Inter-distance.] The same framework gives an indicative minimum distance
-    of \SI{4}{}--\SI{6}{\kilo\metre} between wind farms, to protect the
-    landscape and to avoid encircling villages. Farm centres are therefore
-    allocated first, under their own minimum distance, and machines only
-    afterwards inside each farm.
-\end{description}
+\begin{table}[htbp]\centering\small
+\caption{Minimum inter-turbine distance, in rotor diameters, and what it gives
+on the reference land before any grouping rule.}
+\label{tab:spacing}
+\begin{tabular}{llrr}
+\toprule
+case & basis & $d/D$ & free allocation [\si{\mega\watt}] \\
+\midrule
+\emph{observed} & median nearest neighbour of the standing Walloon fleet
+  & \SpObsD{} & \SpObsFree{} \\
+\emph{crosswind} & nearest-neighbour distance of a $5D\times7D$ array; the rule
+  BREGILAB uses & \SpCrossD{} & \SpCrossFree{} \\
+\emph{isotropic} & $\sqrt{5\times7}\,D$, the area-equivalent of that array
+  & \SpIsoD{} & \SpIsoFree{} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Farm sites are taken in decreasing order of how much eligible land lies within
-\SI{1.8}{\kilo\metre} of them, so the allocation settles where a farm can
-actually be laid out; a candidate that cannot yield four machines is skipped
-without blocking its neighbours.
+\textbf{The reference is \SpCrossD{}\,$D$, and the isotropic reading it replaces
+was an error.} Converting an area-per-turbine into an isotropic \emph{minimum
+separation} forbids exactly the pairs the convention it comes from contains: in
+a $5D\times7D$ array the closest two machines are $5D$ apart, not
+$\sqrt{35}\,D$. It also assumes a two-dimensional array, whereas Walloon wind
+farms are predominantly strings along a road, a ridge or a field boundary, where
+there is no downwind row and the $7D$ never binds. The physical floor is lower
+still --- about $3D$, below which wake-induced turbulence takes a machine
+outside the standard IEC~61400-1 load case --- and the standing Walloon fleet
+sits at a median of \FleetMachineNNPFifty{}~m between neighbours, about
+\SpObsD{}\,$D$ at the \SI{100}{\metre}-class rotor of that fleet, with a
+quarter of machines closer than \FleetMachineNNPTwentyFive{}~m.
+\SpCrossD{}\,$D$ is therefore already the conservative end of practice.
 
-\finding{The choice between these two models is worth more than the entire
-constraint set below the setbacks. The free allocation gives \FreePnom{}~MW; the
-farm model on the same land gives \PlacePnom{}~MW, \FarmShareOfFree{}\,\% of it.
-An onshore-wind potential quoted without saying which of the two it is cannot be
-compared with anything.}
+\subsubsection{Rule 2 --- how many machines make a project}
+
+The free allocation is the land-and-wake bound: \FreePnom{}~MW,
+\FreeTurbines{} machines. It is not a plausible build-out, but not for the
+reason one might expect. Only \FreeIsolatedPct{}\,\% of its machines are
+isolated: the carpet it produces is almost fully connected, a near-continuous
+band of turbines across every eligible corridor in the Region. What it lacks is
+not company but structure.
+
+Machines are therefore required to come in groups of at least
+\PlaceMinTurbines{} within a farm radius. The 2024 framework does define a
+\emph{parc éolien} as a project of at least four machines, but that is a
+definition of which permitting regime applies, with explicit reductions for
+repowering, for extensions of an existing park and for machines above
+\SI{3.2}{\mega\watt} --- which the reference class is. The rule is applied here
+on empirical grounds instead: \FleetInBigFarms{}\,\% of the standing Walloon
+machines are in groups of four or more, so a group of four is what Walloon wind
+development actually produces, whatever the regulation permits.
+
+\subsubsection{Rule 3 --- how much of a village's horizon may be occupied}
+
+The rule that decides the answer is the landscape one, and the 2013 cadre de
+référence states it precisely:
+
+\begin{quote}\small\itshape
+Sauf lorsque les éoliennes sont implantées le long des autoroutes, une référence
+indicative à une inter-distance minimale de 4~km à 6~km, en fonction des
+résultats de l'étude d'incidence sera prise en considération. Un azimut (ou un
+angle horizontal) minimal sans éoliennes doit être préservé pour chaque village;
+celui-ci sera d'au moins 130°, sur une distance de 4~km. Un examen de
+l'encerclement sera réalisé sur une distance de 9~km dans le cadre de l'EIE.
+\end{quote}
+
+Four things in that sentence matter, and an earlier version of this study
+respected none of them.
+
+\begin{enumerate}
+  \item The \SI{4}{}--\SI{6}{\kilo\metre} figure is a \emph{référence
+    indicative} that \emph{sera prise en considération} in the light of the
+    impact assessment. It is not a minimum distance, and treating it as a hard
+    floor between all farms is stricter than the text.
+  \item It does not apply \emph{le long des autoroutes} --- and the Walloon
+    zoning rule concentrates the eligible land within \SI{1.5}{\kilo\metre} of
+    exactly that infrastructure in the first place (§\ref{sec:corridor}), which
+    is where \SI{82}{\percent} of the standing fleet stands.
+  \item The operative criterion is not a distance between farms at all. It is
+    an \textbf{open horizon seen from each village}: at least
+    \PlaceAzimuth{}° of azimuth free of turbines, within
+    \PlaceHorizonRadius{}~km.
+  \item All of it is from the 2013 framework. The framework adopted on
+    24~January~2024, in force since 25~April~2024, replaced it and does not
+    carry the inter-distance; it asks instead for grouping along the landscape's
+    structuring lines and for village encirclement to be assessed.
+\end{enumerate}
+
+The open-horizon criterion is therefore implemented as written. Every village
+--- a contiguous block of plan-de-secteur habitat zoning above
+\SI{10}{\hectare}, \HorizonSettlements{} of them --- carries the arcs its
+surrounding machines occupy, each machine subtending the angle its rotor covers
+from the village centre. A candidate farm is refused if admitting it would take
+any village's largest turbine-free arc below \PlaceAzimuth{}°. Farms are still
+required not to overlap, at \PlaceInterfarm{}~km between centres, which is the
+geometry of the standing fleet and not a rule (§\ref{sec:calibration}).
+
+The \SI{4}{}--\SI{6}{\kilo\metre} inter-distance is kept, labelled as a
+\textbf{2013-legacy policy sensitivity}: what the answer would be if a repealed
+indicative reference were applied as a binding minimum.
+
+\finding{Of the three rules, the third is the expensive one. Machines grouped
+into farms but with no landscape criterion give \NoHorizonPnom{}~MW; the
+open-horizon test refuses \HorizonRefused{} candidate farms and brings that to
+\PlacePnom{}~MW, \HorizonCostPct{}\,\% less. Applying the repealed
+\SI{4}{}--\SI{6}{\kilo\metre} inter-distance on top would take it to
+\IfdSixMW{}--\IfdFourMW{}~MW. An onshore-wind potential quoted without saying
+which landscape rule it carries cannot be compared with anything.}
 
 % =====================================================================
 \section{The Walloon regulatory framework}\label{sec:rules}
@@ -477,6 +561,7 @@ partial constraints
 \end{table}
 
 \subsection{The one zoning rule that dominates: the agricultural corridor}
+\label{sec:corridor}
 
 The Walloon methodology does not treat agricultural land as uniformly available.
 It admits it only within \SI{1.5}{\kilo\metre} of a PIC or of an
@@ -683,21 +768,72 @@ the map:
     instead.
 \end{itemize}
 
-\subsection{The farm model reproduces the shape of the existing fleet}
+\subsection{The geometry the placement model is calibrated on}
+\label{sec:fleetgeometry}
 
-The calibration also supplies the only direct test of the allocation model of
-§\ref{sec:placement}. Grouping the standing turbines by single linkage at
-\FleetFarmLink{}~km turns them into \FleetFarms{} wind farms of
-\FleetPerFarm{} machines on average, of which \FleetFarmsFour{} have at least
-four machines and the largest has \FleetLargestFarm{}.
+The same \FleetN{} machines fix the parameters of the placement model, which is
+why none of them is taken from a rule. Grouped by single linkage at
+\FleetFarmLink{}~km they form \FleetFarms{} wind farms.
 
-\finding{The farm model predicts \PlaceFarms{} farms of \PlacePerFarm{}
-machines on average at the reference inter-distance. Wallonia has
-\FleetFarms{} farms of \FleetPerFarm{}. The model gets the \emph{size} of a
-Walloon wind farm right to a machine, and says the Region could host about twice
-as many of them --- which is the kind of statement a technical potential should
-make. A method that produced farms of two machines, or of thirty, would not be
-describing Wallonia.}
+\begin{table}[htbp]\centering\small
+\caption{The spatial geometry of Walloon wind as it stands, and what the
+placement model takes from it.}
+\label{tab:fleetgeom}
+\begin{tabular}{lrrrrl}
+\toprule
+ & p5 & p25 & median & p90 & model \\
+\midrule
+distance between neighbouring machines [\si{\metre}]
+  & \FleetMachineNNPFive{} & \FleetMachineNNPTwentyFive{}
+  & \FleetMachineNNPFifty{} & \FleetMachineNNPNinety{}
+  & \PlaceSpacing{} (\PlaceRotorD{}\,$D$) \\
+farm radius [\si{\metre}]
+  & \FleetFarmRadPFive{} & \FleetFarmRadPTwentyFive{}
+  & \FleetFarmRadPFifty{} & \FleetFarmRadPNinety{}
+  & \PlaceRadius{} \\
+distance between neighbouring farms [\si{\metre}]
+  & \FleetFarmNNPFive{} & \FleetFarmNNPTwentyFive{}
+  & \FleetFarmNNPFifty{} & \FleetFarmNNPNinety{}
+  & \PlaceInterfarm{}~km \\
+machines per farm & \multicolumn{4}{c}{\FleetPerFarm{} on average, largest
+  \FleetLargestFarm{}} & \PlacePerFarm{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\finding{The farm radius is set at the observed p75 and the separation between
+farm centres at twice that, \PlaceInterfarm{}~km, which sits inside the observed
+p10--p25 band: the model forbids no farm geometry that Wallonia has actually
+permitted. A \SI{4}{\kilo\metre} floor would forbid a great deal of it ---
+\FleetFarmNNBelowFour{}\,\% of the standing farms have a neighbour closer than
+that. The indicative figure of the 2013 framework is therefore not a description
+of Walloon practice either, which is a second reason not to make it the
+reference.}
+
+\subsection{The open-horizon criterion, tested on the fleet}
+\label{sec:horizoncheck}
+
+The landscape rule of §\ref{sec:placement} is the most consequential single
+assumption in this study, so it is worth knowing whether the machines that exist
+respect it. Of \HorizonSettlements{} settlements, \HorizonAffected{}
+(\HorizonAffectedPct{}\,\%) have at least one standing turbine within
+\PlaceHorizonRadius{}~km. Among those, the largest turbine-free arc has a median
+of \HorizonArcPFifty{}°, a 5th percentile of \HorizonArcPFive{}° and a 1st
+percentile of \HorizonArcPOne{}°.
+
+\finding{\HorizonFailing{} of the \HorizonAffected{} affected villages ---
+\HorizonFailingPct{}\,\% --- fall below the \PlaceAzimuth{}° threshold. The
+criterion is not an invention of this report: Walloon wind development observes
+it almost without exception, and the implementation used in the placement model
+reproduces that. A test that flagged a third of the existing fleet would have
+been measuring something else.}
+
+\caveat{The test is applied forward and greedily: farms are considered in
+decreasing order of surrounding eligible land and refused if they would close a
+village's horizon, and the standing fleet is not seeded into it, because this is
+a gross potential in which the hypothetical fleet replaces the existing one. A
+better ordering would fit more machines, so the figure is a lower bound given
+the criterion.}
 
 \caveat{Only \FleetRefPct{}\,\% of the standing fleet survives the full
 constraint set --- \FleetRefN{} of \FleetN{} machines. That is not a defect of
@@ -803,24 +939,36 @@ large enough for four --- which is why this study places machines rather than
 multiplying by a density (§\ref{sec:placement}).
 
 \begin{table}[htbp]\centering\footnotesize
-\caption{Allocation results. \emph{free} is the minimum-distance allocation with
-no grouping rule; \emph{farm} adds the four-machine minimum and the inter-farm
-distance. \emph{array} spacing is $\sqrt{5\times7}\,D$, \emph{bregilab} is $5D$.}
+\caption{Allocation results. \emph{free} is the minimum-distance allocation
+alone; \emph{grouped} keeps only machines in groups of \PlaceMinTurbines{} or
+more; \emph{farm} allocates farm sites first; \emph{farm~+~horizon} adds the
+\PlaceAzimuth{}° open-horizon criterion. Spacings as in
+Table~\ref{tab:spacing}.}
 \label{tab:placement}
 \input{generated/table_placement}
 \end{table}
 
 \begin{table}[htbp]\centering\small
-\caption{The farm model across the inter-distance band the cadre de référence
-gives as indicative. Reference turbine class, array spacing.}
-\label{tab:interfarm}
-\begin{tabular}{lrrr}
+\caption{What each rule costs, reference turbine class and
+\PlaceRotorD{}\,$D$ spacing. Only the first two rows are technical; the rest are
+landscape policy.}
+\label{tab:rulecost}
+\begin{tabular}{p{0.50\linewidth}rrr}
 \toprule
-inter-farm distance & farms & machines & $P$ [\si{\mega\watt}] \\
+ & farms & machines & $P$ [\si{\mega\watt}] \\
 \midrule
-\SI{4}{\kilo\metre} & \IfdFourFarms{} & \IfdFourTurbines{} & \IfdFourMW{} \\
-\SI{5}{\kilo\metre} & \IfdFiveFarms{} & \IfdFiveTurbines{} & \IfdFiveMW{} \\
-\SI{6}{\kilo\metre} & \IfdSixFarms{} & \IfdSixTurbines{} & \IfdSixMW{} \\
+free allocation, \PlaceSpacing{}~m between machines
+  & -- & \FreeTurbines{} & \FreePnom{} \\
++ groups of \PlaceMinTurbines{} or more, farms \PlaceInterfarm{}~km apart
+  & \NoHorizonFarms{} & \IfdTwoSixTurbines{} & \NoHorizonPnom{} \\
++ open horizon, \PlaceAzimuth{}° within \PlaceHorizonRadius{}~km
+  \textbf{(reference)}
+  & \PlaceFarms{} & \PlaceTurbines{} & \PlacePnom{} \\
+\midrule
+\emph{2013-legacy policy:} farms \SI{4}{\kilo\metre} apart, with open horizon
+  & \IfdFourFarms{} & \IfdFourTurbines{} & \IfdFourMW{} \\
+\emph{2013-legacy policy:} farms \SI{6}{\kilo\metre} apart, with open horizon
+  & \IfdSixFarms{} & \IfdSixTurbines{} & \IfdSixMW{} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -829,16 +977,17 @@ inter-farm distance & farms & machines & $P$ [\si{\mega\watt}] \\
 \AdminEligible{}~\si{\square\kilo\metre}, \FreePnom{}~MW at an effective
 \FreeDensity{}~MW/\si{\square\kilo\metre} of eligible land. That density is far
 above any array density because the wake spacing between two machines on
-different patches is satisfied by the ineligible land between them --- but the
-result is a carpet of isolated turbines that satisfies no landscape criterion.
-Under the framework's own grouping rules the same land carries
+different patches is satisfied by the ineligible land between them. Only
+\FreeIsolatedPct{}\,\% of those machines are isolated, so the objection to it is
+not that the turbines are lonely --- it is that they form a continuous band
+across every corridor in the Region, and that is what the landscape criterion
+exists to prevent. Under the framework's own rules the same land carries
 \PlaceTurbines{} machines in \PlaceFarms{} farms of \PlacePerFarm{} on average,
-\PlacePnom{}~MW, and the inter-distance alone moves that between \IfdHigh{} and
-\IfdLow{}~MW.}
+\PlacePnom{}~MW.}
 
 The free allocation depends on the order in which the land is walked: a
 pseudo-random order gives a result \FreeOrderSpread{}\,\% below the row-major
-one. The farm model does not have that sensitivity, because its farm sites are
+one. The farm models do not have that sensitivity, because their farm sites are
 ordered by how much eligible land surrounds them rather than by position.
 
 \subsection{The residual allowance}\label{sec:residual}
@@ -875,7 +1024,7 @@ and it pushes the same way as the other two.
 
 \begin{table}[htbp]\centering\small
 \caption{From eligible land to a technical potential, administrative Walloon
-Region, reference turbine class.}
+Region, reference turbine class at \PlaceRotorD{}\,$D$ spacing.}
 \label{tab:answer}
 \begin{tabular}{p{0.52\linewidth}rr}
 \toprule
@@ -886,14 +1035,18 @@ eligible land, all implemented constraints
 $\times$ capacity density, \refDensity{}~MW/\si{\square\kilo\metre}
   & \AdminPnom{} & \emph{convention only} \\
 free allocation, \PlaceSpacing{}~m between machines
-  & \FreePnom{} & \emph{upper bound} \\
-farm allocation, \SI{4}{}--\SI{6}{\kilo\metre} between farms
-  & \IfdLow{}--\IfdHigh{} & \\
+  & \FreePnom{} & \emph{land and wake bound} \\
++ grouping into farms
+  & \NoHorizonPnom{} & \\
++ open horizon, \PlaceAzimuth{}° within \PlaceHorizonRadius{}~km
+  & \PlacePnom{} & \emph{gross reference} \\
 $\times$ residual allowance, central
   & \ResCentral{} & \textbf{central estimate} \\
 \midrule
 credible technical potential
   & \CredibleLow{}--\CredibleHigh{} & \\
+\emph{if the 2013 indicative inter-distance were applied as a rule}
+  & \LegacyLow{}--\LegacyHigh{} & \\
 \midrule
 PyPSA-Wal cap today & \CapToday{} & \\
 standing fleet, end 2024 & \Installed{} & \\
@@ -905,9 +1058,12 @@ standing fleet, end 2024 & \Installed{} & \\
 administrative Walloon Region is
 \textbf{\CredibleLowGW{}--\CredibleHighGW{}~GW}, central estimate
 \CredibleCentralGW{}~GW, on the reference turbine class and the 2024 regulatory
-framework. The range is not statistical: its lower end is the
-\SI{6}{\kilo\metre} inter-farm distance with the full residual allowance, its
-upper end the \SI{4}{\kilo\metre} distance with none.}
+framework. The range is the residual-allowance bracket of §\ref{sec:residual}
+applied to the reference case; it is not statistical. Applying the repealed
+\SI{4}{}--\SI{6}{\kilo\metre} inter-distance of the 2013 framework as a binding
+rule instead would give \LegacyLow{}--\LegacyHigh{}~MW, and choosing a machine
+spacing of \SpObsD{}\,$D$ or \SpIsoD{}\,$D$ instead of \SpCrossD{}\,$D$ would
+move the gross reference between \SpObsMW{} and \SpIsoMW{}~MW.}
 
 \subsection{An earlier reading of this study said 2--4.5~GW. It was wrong}
 \label{sec:retraction}
@@ -1046,8 +1202,7 @@ the same machine, and a useful independent check that the two resource models
 agree.
 
 \paragraph{The bridge.} Table~\ref{tab:bregilab} converts this study's free
-allocation onto BREGILAB's conventions one factor at a time. The three factors
-are multiplicative and exact.
+allocation onto BREGILAB's conventions. Both factors are exact.
 
 \begin{table}[htbp]\centering\small
 \caption{Bridge from this study's free allocation to BREGILAB's
@@ -1062,15 +1217,11 @@ and is the constraint-set difference.}
     \SI{136}{\metre} machine. Under the 2024 framework its habitat setback is
     \HabitatSetbackVOneTwelve{}~m against \HabitatSetback{}~m for the reference
     class, so more land survives: \BregOursArea{}~\si{\square\kilo\metre}
-    against \AdminEligible{}. A smaller machine buys eligible land \emph{and}
-    packs tighter, and the two effects compound --- which is why the turbine
-    class is not a detail when comparing two potentials.
-  \item[Spacing convention, $\times\BregStepSpacing$.] $5D$ isotropic against
-    $\sqrt{5\times7}\,D$. BREGILAB's rule is a wake-avoidance minimum distance,
-    not an array layout: on a contiguous site it corresponds to
-    \BregDensity{}~MW/\si{\square\kilo\metre} for the V112, against the
-    \refDensity{}~MW/\si{\square\kilo\metre} this study derives from the
-    reference machine at array spacing.
+    against \AdminEligible{}, and at a fixed $5D$ the smaller rotor also packs
+    tighter. The two effects compound, which is why the turbine class is not a
+    detail when comparing two potentials. \emph{This is now the only convention
+    difference:} following the review of §\ref{sec:placement} this study uses
+    BREGILAB's own $5D$ spacing rule, so the spacing factor is one.
   \item[Constraint set, $\times\BregStepConstraints$.] What is left. It is
     \emph{below} one: with BREGILAB's machine and BREGILAB's spacing, this
     study's eligible land carries \BregOursVOneTwelveSpacing{}~MW against their
@@ -1167,11 +1318,12 @@ by 2030 plus the project pipeline --- and this report produces a land-and-siting
 envelope. That the two land in the same place is a coincidence of construction,
 not a confirmation.
 
-Second, \CapToday{}~MW is only reachable at the permissive end of the
-inter-distance band and with no allowance for the unmapped constraint families:
-at \SI{4}{\kilo\metre} the farm model gives \IfdFourMW{}~MW gross. At the
-midpoint it gives \IfdFiveMW{}~MW and at \SI{6}{\kilo\metre}
-\IfdSixMW{}~MW, both before any allowance.
+Second, \CapToday{}~MW is above the gross reference case
+(\PlacePnom{}~MW) and is reachable only by dropping the open-horizon criterion
+altogether, which would give \NoHorizonPnom{}~MW, and then allowing for none of
+the unmapped constraint families. If instead the 2013 indicative inter-distance
+were applied as a rule, the envelope would be \LegacyLow{}--\LegacyHigh{}~MW
+and the cap would be roughly twice it.
 
 \subsection{Three independent cross-checks}\label{sec:crosschecks}
 
@@ -1182,13 +1334,16 @@ the chain against things that are known independently of it.
 
 \paragraph{The size of a Walloon wind farm.} The farm model predicts
 \PlacePerFarm{} machines per farm; the \FleetN{} standing turbines group into
-farms of \FleetPerFarm{} (§\ref{sec:calibration}). The model is reproducing the
+farms of \FleetPerFarm{} (§\ref{sec:fleetgeometry}). The model reproduces the
 layout the Walloon landscape and the Walloon rules actually produce, which is
-the single strongest evidence that the allocation is not an artefact.
+the single strongest evidence that the allocation is not an artefact. Note that
+this is not circular: the farm \emph{radius} is calibrated on the fleet, but
+the number of machines that fit inside it is not --- that comes from the
+eligible raster and the wake spacing.
 
-\paragraph{The number of wind farms.} The model places \PlaceFarms{} farms at
-the reference inter-distance against the \FleetFarms{} that exist, i.e. it says
-Wallonia could host of order twice as many wind farms as it has. That is the
+\paragraph{The number of wind farms.} The model places \PlaceFarms{} farms
+against the \FleetFarms{} that exist, i.e. it says Wallonia could host of order
+twice as many wind farms as it has. That is the
 right order for a technical potential: much more than a factor two would be
 implausible in a Region this settled, and less than one would contradict the
 existence of a project pipeline.
@@ -1229,18 +1384,33 @@ stated with the direction in which it moves the result.
     be about \SI{10}{\percent} lower.}
   \item[Capacity comes from placing machines,] not from multiplying area by a
     density (§\ref{sec:placement}). \emph{The density convention would give
-    \AdminPnom{}~MW, less than half the farm model, for reasons that have
+    \AdminPnom{}~MW, about half the reference case, for reasons that have
     nothing to do with the land.}
-  \item[Minimum inter-turbine distance] $\sqrt{5\times7}\,D = \PlaceSpacing{}$~m,
-    the isotropic equivalent of a $5D\times7D$ array.
-    \emph{$5D$ would raise the capacity by about a fifth.}
-  \item[Inter-farm distance] \SI{5}{\kilo\metre}, the midpoint of the
-    framework's indicative \SI{4}{}--\SI{6}{\kilo\metre} band, with the whole
-    band reported. \emph{The single largest source of spread in the result:
-    \IfdSixMW{}~MW at \SI{6}{\kilo\metre} against \IfdFourMW{}~MW at
-    \SI{4}{\kilo\metre}.}
-  \item[Minimum farm size] four machines, the definition in force since
-    24~January~2024.
+  \item[Minimum inter-turbine distance] \PlaceRotorD{}\,$D$ = \PlaceSpacing{}~m,
+    the nearest-neighbour distance of a $5D\times7D$ array and the rule VITO
+    uses. \emph{The physical floor is about $3D$; the standing Walloon fleet
+    sits at \SpObsD{}\,$D$; the area-equivalent $\sqrt{5\times7}\,D$ would give
+    \SpIsoMW{}~MW instead of \SpCrossMW{}~MW and is an over-reading
+    (§\ref{sec:placement}).}
+  \item[Minimum farm size] \PlaceMinTurbines{} machines, applied because
+    \FleetInBigFarms{}\,\% of the standing fleet is in groups that size, not
+    because the 2024 definition of a \emph{parc éolien} forbids fewer --- it
+    does not, and it exempts machines above \SI{3.2}{\mega\watt} in any case.
+  \item[Farm radius and separation] \PlaceRadius{}~m and \PlaceInterfarm{}~km,
+    the observed p75 farm radius and twice it, which sits inside the observed
+    p10--p25 band of farm separations (§\ref{sec:fleetgeometry}).
+    \emph{Calibrated, not imposed: the model forbids no farm geometry Wallonia
+    has permitted.}
+  \item[Landscape criterion] the open horizon of the 2013 framework ---
+    \PlaceAzimuth{}° free within \PlaceHorizonRadius{}~km of every village above
+    \SI{10}{\hectare}. \emph{The single most expensive siting rule,
+    \HorizonCostPct{}\,\% of the grouped capacity, and the one the standing
+    fleet demonstrably respects (§\ref{sec:horizoncheck}).}
+  \item[The 2013 indicative \SI{4}{}--\SI{6}{\kilo\metre} inter-distance is
+    \emph{not} applied.] It is an indicative reference subordinate to the impact
+    assessment, it does not apply along motorways, and the 2024 framework that
+    replaced the 2013 one does not carry it. \emph{Applying it as a rule would
+    give \LegacyLow{}--\LegacyHigh{}~MW instead of \ResCentral{}~MW.}
   \item[Habitat setback] the 2024 framework, $500 + H/2$. \emph{The 2013 rule
     ($4H$) is more restrictive for every class considered here.}
   \item[Scattered dwellings] \SI{400}{\metre} around every ICAR address point.
@@ -1335,10 +1505,13 @@ None of these is a gap that invalidates the result; each would narrow the range.
     partial-constraint layers.} They exist and the favourable-zone cartography
     uses them. They would replace the residual allowance, which is the widest
     single term in the range, with geometry.
-  \item \textbf{Ask for the inter-distance the Region actually applies.} The
-    framework says \SI{4}{}--\SI{6}{\kilo\metre} indicatively; that band alone
-    spans \IfdSixMW{}--\IfdFourMW{}~MW. A single figure would halve the
-    uncertainty at a stroke.
+  \item \textbf{Ask SPW Territoire how the 2024 framework's encirclement test is
+    applied in practice.} The 2013 text gave a \PlaceAzimuth{}° open horizon
+    over \PlaceHorizonRadius{}~km and an encirclement examination over
+    \SI{9}{\kilo\metre}; the 2024 text asks for encirclement to be assessed
+    without fixing either number. The open-horizon threshold is worth
+    \HorizonCostPct{}\,\% of the answer, and the \SI{9}{\kilo\metre}
+    examination is not represented at all.
   \item \textbf{Request WALOUS 2018 as a grid, or CARTOFOR when it is
     published.} Either would replace a 2006 \SI{250}{\metre} raster with a
     Walloon product and would implement the CoDT broad-leaved rule where it

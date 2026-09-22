@@ -157,17 +157,17 @@ if __name__ == "__main__":
     ref_ifd = float(cfg["placement"]["farm"]["reference_interfarm_distance_m"])
     ref_model = cfg["placement"]["reference_model"]
 
-    def place(turbine, case=ref_place, model=None, order=None, interfarm=None):
+    def place(turbine, case=ref_place, model=None, variant=None, interfarm=None):
         model = ref_model if model is None else model
         sel = placement[
             (placement["turbine"] == turbine)
             & (placement["spacing_case"] == case)
             & (placement["model"] == model)
         ]
-        if model == "farm":
+        if model.startswith("farm"):
             sel = sel[sel["interfarm_distance_m"] == (interfarm or ref_ifd)]
         else:
-            sel = sel[sel["order"] == (order or "row_major")]
+            sel = sel[sel["variant"] == (variant or "row_major")]
         if sel.empty:
             raise RuntimeError(f"missing placement {turbine}/{case}/{model}")
         return sel.iloc[0]
@@ -216,14 +216,22 @@ if __name__ == "__main__":
     # Placement: the headline capacity
     # ------------------------------------------------------------------
     p = place(ref_turbine)
+    no_h = place(ref_turbine, model="farm")
     free = place(ref_turbine, model="free")
-    free_rand = place(ref_turbine, model="free", order="random")
+    free_rand = place(ref_turbine, model="free", variant="random")
+    grouped = place(ref_turbine, model="grouped")
     interfarm_values = sorted(placement["interfarm_distance_m"].dropna().unique())
+    spacings = cfg["placement"]["spacings_rotor_diameters"]
     headline["placement"] = {
         "model": ref_model,
         "case": ref_place,
         "min_distance_m": float(p["min_distance_m"]),
+        "min_distance_rotor_diameters": float(p["min_distance_rotor_diameters"]),
         "interfarm_distance_m": ref_ifd,
+        "farm_radius_m": float(cfg["placement"]["farm"]["radius_m"]),
+        "min_turbines": int(cfg["placement"]["farm"]["min_turbines"]),
+        "min_free_azimuth_deg": float(cfg["placement"]["landscape"]["min_free_azimuth_deg"]),
+        "horizon_radius_m": float(cfg["placement"]["landscape"]["horizon_radius_m"]),
         "n_farms": int(p["n_farms"]),
         "turbines_per_farm": float(p["turbines_per_farm"]),
         "n_turbines": int(p["n_turbines"]),
@@ -231,6 +239,12 @@ if __name__ == "__main__":
         "effective_density_mw_km2": float(p["effective_density_mw_km2"]),
         "land_per_turbine_km2": float(p["land_per_turbine_km2"]),
         "energy_twh": round(float(p["p_nom_max_mw"]) * ref_flh / 1e6, 3),
+        "farms_refused_by_horizon": int(p["farms_refused_by_horizon"]),
+        "horizon_cost_pct": round(
+            100 * (1 - float(p["p_nom_max_mw"]) / float(no_h["p_nom_max_mw"])), 0
+        ),
+        "no_horizon_p_nom_max_mw": float(no_h["p_nom_max_mw"]),
+        "no_horizon_n_farms": int(no_h["n_farms"]),
         "free_p_nom_max_mw": float(free["p_nom_max_mw"]),
         "free_n_turbines": int(free["n_turbines"]),
         "free_density_mw_km2": float(free["effective_density_mw_km2"]),
@@ -239,6 +253,9 @@ if __name__ == "__main__":
             * abs(float(free_rand["p_nom_max_mw"]) - float(free["p_nom_max_mw"]))
             / float(free["p_nom_max_mw"]),
             1,
+        ),
+        "free_isolated_pct": round(
+            100 * (1 - float(grouped["n_turbines"]) / float(free["n_turbines"])), 1
         ),
         "farm_share_of_free_pct": round(
             100 * float(p["p_nom_max_mw"]) / float(free["p_nom_max_mw"]), 0
@@ -251,8 +268,19 @@ if __name__ == "__main__":
                 "n_farms": int(place(ref_turbine, interfarm=d)["n_farms"]),
                 "n_turbines": int(place(ref_turbine, interfarm=d)["n_turbines"]),
                 "p_nom_max_mw": float(place(ref_turbine, interfarm=d)["p_nom_max_mw"]),
+                "no_horizon_mw": float(
+                    place(ref_turbine, model="farm", interfarm=d)["p_nom_max_mw"]
+                ),
             }
             for d in interfarm_values
+        },
+        "by_spacing": {
+            k: {
+                "rotor_diameters": float(spacings[k]),
+                "free_mw": float(place(ref_turbine, case=k, model="free")["p_nom_max_mw"]),
+                "p_nom_max_mw": float(place(ref_turbine, case=k)["p_nom_max_mw"]),
+            }
+            for k in spacings
         },
         "by_turbine": {
             t: {
@@ -294,16 +322,19 @@ if __name__ == "__main__":
     ]
     headline["residual"] = residual
 
-    # Credible range.  Two independent uncertainties are compounded: the 4-6 km
-    # band the cadre de référence gives for the inter-distance between farms,
-    # and the residual allowance for the constraint families with no geometry.
-    # The turbine class is deliberately held at the reference machine: it is a
-    # technology choice, not an uncertainty about the land.
-    by_ifd = headline["placement"]["by_interfarm"]
-    lo = round(min(v["p_nom_max_mw"] for v in by_ifd.values()) * residual["high"]["survival"])
-    hi = round(max(v["p_nom_max_mw"] for v in by_ifd.values()) * residual["low"]["survival"])
-    headline["credible_range_mw"] = [lo, hi]
+    # Credible range.  The reference case is the practice-calibrated farm
+    # geometry with the open-horizon criterion; the range is the residual
+    # allowance bracket applied to it.  The 2013 indicative inter-distance is a
+    # *policy* choice rather than an uncertainty about the land, so it is
+    # reported separately rather than compounded into the headline range.
+    headline["credible_range_mw"] = list(residual["p_nom_max_range_mw"])
     headline["credible_central_mw"] = residual["central"]["p_nom_max_mw"]
+    by_ifd = headline["placement"]["by_interfarm"]
+    legacy = [v["p_nom_max_mw"] for d, v in by_ifd.items() if float(d) >= 4000]
+    headline["legacy_policy_mw"] = [
+        round(min(legacy) * residual["central"]["survival"]),
+        round(max(legacy) * residual["central"]["survival"]),
+    ]
 
     # External plausibility anchor: how the resulting deployment density
     # compares with the onshore fleet Germany has actually built.
@@ -375,17 +406,17 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------
     # BREGILAB reconciliation
     #
-    # The gap between this study and the 11.4 GW of the Dynamic Energy Atlas is
-    # decomposed into three factors whose product is exact:
+    # This study now uses BREGILAB's own spacing rule (5 D), so the bridge from
+    # its free allocation to theirs has only two steps, both exact:
     #   turbine class   smaller machine -> smaller setbacks -> more eligible land
-    #   spacing         5 D isotropic against sqrt(5x7) D
     #   constraint set  everything that is left
+    # The third factor, the one that separates their headline from this study's
+    # answer, is not in the bridge at all: they report the free allocation and
+    # this study reports the farm allocation with the landscape criterion.
     # ------------------------------------------------------------------
-    # BREGILAB reports the free allocation, so the bridge starts from ours.
     v112 = cfg.get("bregilab_turbine", "T136_V112")
     ours_ref = float(free["p_nom_max_mw"])
-    ours_v112_array = float(place(v112, model="free")["p_nom_max_mw"])
-    ours_v112_breg = float(place(v112, case="bregilab", model="free")["p_nom_max_mw"])
+    ours_v112_breg = float(place(v112, case="crosswind", model="free")["p_nom_max_mw"])
     breg_total = float(breg["wallonia_total_gw"]) * 1000.0
 
     headline["bregilab"] = {
@@ -414,16 +445,15 @@ if __name__ == "__main__":
             0,
         ),
         "ours_reference_mw": ours_ref,
-        "ours_v112_array_mw": ours_v112_array,
         "ours_v112_bregilab_spacing_mw": ours_v112_breg,
-        "step_turbine_class": round(ours_v112_array / ours_ref, 3),
-        "step_spacing": round(ours_v112_breg / ours_v112_array, 3),
+        "step_turbine_class": round(ours_v112_breg / ours_ref, 3),
         "step_constraint_set": round(breg_total / ours_v112_breg, 3),
         "total_ratio": round(breg_total / ours_ref, 3),
         "vs_central": round(breg_total / max(residual["central"]["p_nom_max_mw"], 1), 2),
         "vs_farm": round(breg_total / max(float(p["p_nom_max_mw"]), 1), 2),
         "our_v112_eligible_area_km2": float(place(v112, model="free")["eligible_area_km2"]),
         "ours_farm_mw": float(p["p_nom_max_mw"]),
+        "ours_free_mw": float(free["p_nom_max_mw"]),
     }
 
     Path(snakemake.output.headline).write_text(json.dumps(headline, indent=2))

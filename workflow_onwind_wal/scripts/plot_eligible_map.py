@@ -50,7 +50,11 @@ if __name__ == "__main__":
     placement = pd.read_csv(snakemake.input.placement)
     ref = placement[
         (placement["spacing_case"] == cfg["placement"]["reference_case"])
-        & (placement["order"] == "row_major")
+        & (placement["model"] == cfg["placement"]["reference_model"])
+        & (
+            placement["interfarm_distance_m"]
+            == float(cfg["placement"]["farm"]["reference_interfarm_distance_m"])
+        )
     ].iloc[0]
     eligible_km2 = frag["area_km2"]
 
@@ -84,8 +88,8 @@ if __name__ == "__main__":
                 label=(
                     f"{frag['n_patches']:,} patches, median "
                     f"{frag['median_patch_km2'] * 100:.0f} ha; the allocation "
-                    f"model fits {int(ref['n_turbines']):,} machines "
-                    f"({ref['p_nom_max_mw']:,.0f} MW)"
+                    f"model fits {int(ref['n_turbines']):,} machines in "
+                    f"{int(ref['n_farms']):,} farms ({ref['p_nom_max_mw']:,.0f} MW)"
                 ).replace(",", " "),
             ),
         ],

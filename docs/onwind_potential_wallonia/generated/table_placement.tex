@@ -1,38 +1,107 @@
 \begin{tabular}{lllrlrrr}
 \toprule
-turbine & model & spacing & $d$ [\si{\metre}] & variant & farms & machines & $P$ [\si{\mega\watt}] \\
+turbine & model & spacing & $d/D$ & variant & farms & machines & $P$ [\si{\mega\watt}] \\
 \midrule
-V112 / 3.0 MW (tip 136 m) & free & array & 663 & row major order & -- & 4\,533 & 13\,599 \\
- & free & array & 663 & random order & -- & 3\,912 & 11\,736 \\
- & free & bregilab & 560 & row major order & -- & 5\,468 & 16\,404 \\
- & free & bregilab & 560 & random order & -- & 4\,639 & 13\,917 \\
- & farm & array & 663 & 4 km apart & 369 & 2\,615 & 7\,845 \\
- & farm & array & 663 & 5 km apart & 275 & 2\,020 & 6\,060 \\
- & farm & array & 663 & 6 km apart & 213 & 1\,650 & 4\,950 \\
- & farm & bregilab & 560 & 4 km apart & 384 & 3\,263 & 9\,789 \\
- & farm & bregilab & 560 & 5 km apart & 283 & 2\,511 & 7\,533 \\
- & farm & bregilab & 560 & 6 km apart & 220 & 2\,078 & 6\,234 \\
+V112 / 3.0 MW (tip 136 m) & free & observed & 4.3 & row major & -- & 6\,492 & 19\,476 \\
+ & grouped & observed & 4.3 & row major & -- & 6\,377 & 19\,131 \\
+ & free & observed & 4.3 & random & -- & 5\,523 & 16\,569 \\
+ & free & crosswind & 5.0 & row major & -- & 5\,468 & 16\,404 \\
+ & grouped & crosswind & 5.0 & row major & -- & 5\,345 & 16\,035 \\
+ & free & crosswind & 5.0 & random & -- & 4\,639 & 13\,917 \\
+ & free & isotropic & 5.9 & row major & -- & 4\,533 & 13\,599 \\
+ & grouped & isotropic & 5.9 & row major & -- & 4\,404 & 13\,212 \\
+ & free & isotropic & 5.9 & random & -- & 3\,912 & 11\,736 \\
+ & farm & observed & 4.3 & 2.6 km apart & 599 & 4\,246 & 12\,738 \\
+ & farm + horizon & observed & 4.3 & 2.6 km apart & 410 & 3\,070 & 9\,210 \\
+ & farm & observed & 4.3 & 4.0 km apart & 369 & 2\,832 & 8\,496 \\
+ & farm + horizon & observed & 4.3 & 4.0 km apart & 313 & 2\,436 & 7\,308 \\
+ & farm & observed & 4.3 & 5.0 km apart & 280 & 2\,221 & 6\,663 \\
+ & farm + horizon & observed & 4.3 & 5.0 km apart & 258 & 2\,068 & 6\,204 \\
+ & farm & observed & 4.3 & 6.0 km apart & 213 & 1\,769 & 5\,307 \\
+ & farm + horizon & observed & 4.3 & 6.0 km apart & 208 & 1\,733 & 5\,199 \\
+ & farm & crosswind & 5.0 & 2.6 km apart & 559 & 3\,515 & 10\,545 \\
+ & farm + horizon & crosswind & 5.0 & 2.6 km apart & 394 & 2\,590 & 7\,770 \\
+ & farm & crosswind & 5.0 & 4.0 km apart & 351 & 2\,339 & 7\,017 \\
+ & farm + horizon & crosswind & 5.0 & 4.0 km apart & 293 & 1\,979 & 5\,937 \\
+ & farm & crosswind & 5.0 & 5.0 km apart & 264 & 1\,814 & 5\,442 \\
+ & farm + horizon & crosswind & 5.0 & 5.0 km apart & 238 & 1\,670 & 5\,010 \\
+ & farm & crosswind & 5.0 & 6.0 km apart & 204 & 1\,469 & 4\,407 \\
+ & farm + horizon & crosswind & 5.0 & 6.0 km apart & 199 & 1\,439 & 4\,317 \\
+ & farm & isotropic & 5.9 & 2.6 km apart & 497 & 2\,570 & 7\,710 \\
+ & farm + horizon & isotropic & 5.9 & 2.6 km apart & 365 & 1\,910 & 5\,730 \\
+ & farm & isotropic & 5.9 & 4.0 km apart & 325 & 1\,726 & 5\,178 \\
+ & farm + horizon & isotropic & 5.9 & 4.0 km apart & 277 & 1\,482 & 4\,446 \\
+ & farm & isotropic & 5.9 & 5.0 km apart & 246 & 1\,343 & 4\,029 \\
+ & farm + horizon & isotropic & 5.9 & 5.0 km apart & 228 & 1\,244 & 3\,732 \\
+ & farm & isotropic & 5.9 & 6.0 km apart & 191 & 1\,066 & 3\,198 \\
+ & farm + horizon & isotropic & 5.9 & 6.0 km apart & 187 & 1\,045 & 3\,135 \\
 \midrule
-NREL 2020ATB 4.0 MW (tip 185 m) & free & array & 887 & row major order & -- & 3\,271 & 13\,084 \\
- & free & array & 887 & random order & -- & 2\,818 & 11\,272 \\
- & free & bregilab & 750 & row major order & -- & 3\,809 & 15\,236 \\
- & free & bregilab & 750 & random order & -- & 3\,251 & 13\,004 \\
- & farm & array & 887 & 4 km apart & 320 & 1\,734 & 6\,936 \\
- & farm & array & 887 & 5 km apart & 240 & 1\,337 & 5\,348 \\
- & farm & array & 887 & 6 km apart & 192 & 1\,110 & 4\,440 \\
- & farm & bregilab & 750 & 4 km apart & 345 & 2\,137 & 8\,548 \\
- & farm & bregilab & 750 & 5 km apart & 251 & 1\,622 & 6\,488 \\
- & farm & bregilab & 750 & 6 km apart & 199 & 1\,345 & 5\,380 \\
+NREL 2020ATB 4.0 MW (tip 185 m) & free & observed & 4.3 & row major & -- & 4\,275 & 17\,100 \\
+ & grouped & observed & 4.3 & row major & -- & 4\,127 & 16\,508 \\
+ & free & observed & 4.3 & random & -- & 3\,668 & 14\,672 \\
+ & free & crosswind & 5.0 & row major & -- & 3\,809 & 15\,236 \\
+ & grouped & crosswind & 5.0 & row major & -- & 3\,659 & 14\,636 \\
+ & free & crosswind & 5.0 & random & -- & 3\,251 & 13\,004 \\
+ & free & isotropic & 5.9 & row major & -- & 3\,271 & 13\,084 \\
+ & grouped & isotropic & 5.9 & row major & -- & 3\,121 & 12\,484 \\
+ & free & isotropic & 5.9 & random & -- & 2\,818 & 11\,272 \\
+ & farm & observed & 4.3 & 2.6 km apart & 466 & 2\,379 & 9\,516 \\
+ & farm + horizon & observed & 4.3 & 2.6 km apart & 333 & 1\,753 & 7\,012 \\
+ & farm & observed & 4.3 & 4.0 km apart & 309 & 1\,616 & 6\,464 \\
+ & farm + horizon & observed & 4.3 & 4.0 km apart & 263 & 1\,396 & 5\,584 \\
+ & farm & observed & 4.3 & 5.0 km apart & 227 & 1\,225 & 4\,900 \\
+ & farm + horizon & observed & 4.3 & 5.0 km apart & 218 & 1\,182 & 4\,728 \\
+ & farm & observed & 4.3 & 6.0 km apart & 180 & 993 & 3\,972 \\
+ & farm + horizon & observed & 4.3 & 6.0 km apart & 176 & 970 & 3\,880 \\
+ & farm & crosswind & 5.0 & 2.6 km apart & 423 & 1\,938 & 7\,752 \\
+ & farm + horizon & crosswind & 5.0 & 2.6 km apart & 307 & 1\,428 & 5\,712 \\
+ & farm & crosswind & 5.0 & 4.0 km apart & 282 & 1\,314 & 5\,256 \\
+ & farm + horizon & crosswind & 5.0 & 4.0 km apart & 245 & 1\,149 & 4\,596 \\
+ & farm & crosswind & 5.0 & 5.0 km apart & 213 & 1\,005 & 4\,020 \\
+ & farm + horizon & crosswind & 5.0 & 5.0 km apart & 204 & 968 & 3\,872 \\
+ & farm & crosswind & 5.0 & 6.0 km apart & 175 & 838 & 3\,352 \\
+ & farm + horizon & crosswind & 5.0 & 6.0 km apart & 171 & 820 & 3\,280 \\
+ & farm & isotropic & 5.9 & 2.6 km apart & 367 & 1\,590 & 6\,360 \\
+ & farm + horizon & isotropic & 5.9 & 2.6 km apart & 272 & 1\,190 & 4\,760 \\
+ & farm & isotropic & 5.9 & 4.0 km apart & 249 & 1\,094 & 4\,376 \\
+ & farm + horizon & isotropic & 5.9 & 4.0 km apart & 218 & 963 & 3\,852 \\
+ & farm & isotropic & 5.9 & 5.0 km apart & 190 & 846 & 3\,384 \\
+ & farm + horizon & isotropic & 5.9 & 5.0 km apart & 179 & 804 & 3\,216 \\
+ & farm & isotropic & 5.9 & 6.0 km apart & 160 & 718 & 2\,872 \\
+ & farm + horizon & isotropic & 5.9 & 6.0 km apart & 156 & 700 & 2\,800 \\
 \midrule
-NREL 2020ATB 5.5 MW (tip 208 m) & free & array & 1\,035 & row major order & -- & 2\,653 & 14\,592 \\
- & free & array & 1\,035 & random order & -- & 2\,292 & 12\,606 \\
- & free & bregilab & 875 & row major order & -- & 3\,156 & 17\,358 \\
- & free & bregilab & 875 & random order & -- & 2\,722 & 14\,971 \\
- & farm & array & 1\,035 & 4 km apart & 265 & 1\,205 & 6\,628 \\
- & farm & array & 1\,035 & 5 km apart & 201 & 937 & 5\,154 \\
- & farm & array & 1\,035 & 6 km apart & 168 & 784 & 4\,312 \\
- & farm & bregilab & 875 & 4 km apart & 307 & 1\,653 & 9\,092 \\
- & farm & bregilab & 875 & 5 km apart & 235 & 1\,304 & 7\,172 \\
- & farm & bregilab & 875 & 6 km apart & 189 & 1\,073 & 5\,902 \\
+NREL 2020ATB 5.5 MW (tip 208 m) & free & observed & 4.3 & row major & -- & 3\,678 & 20\,229 \\
+ & grouped & observed & 4.3 & row major & -- & 3\,518 & 19\,349 \\
+ & free & observed & 4.3 & random & -- & 3\,135 & 17\,242 \\
+ & free & crosswind & 5.0 & row major & -- & 3\,156 & 17\,358 \\
+ & grouped & crosswind & 5.0 & row major & -- & 2\,990 & 16\,445 \\
+ & free & crosswind & 5.0 & random & -- & 2\,722 & 14\,971 \\
+ & free & isotropic & 5.9 & row major & -- & 2\,653 & 14\,592 \\
+ & grouped & isotropic & 5.9 & row major & -- & 2\,473 & 13\,602 \\
+ & free & isotropic & 5.9 & random & -- & 2\,292 & 12\,606 \\
+ & farm & observed & 4.3 & 2.6 km apart & 402 & 1\,838 & 10\,109 \\
+ & farm + horizon & observed & 4.3 & 2.6 km apart & 302 & 1\,391 & 7\,650 \\
+ & farm & observed & 4.3 & 4.0 km apart & 272 & 1\,262 & 6\,941 \\
+ & farm + horizon & observed & 4.3 & 4.0 km apart & 238 & 1\,106 & 6\,083 \\
+ & farm & observed & 4.3 & 5.0 km apart & 209 & 977 & 5\,374 \\
+ & farm + horizon & observed & 4.3 & 5.0 km apart & 203 & 953 & 5\,242 \\
+ & farm & observed & 4.3 & 6.0 km apart & 175 & 833 & 4\,582 \\
+ & farm + horizon & observed & 4.3 & 6.0 km apart & 171 & 817 & 4\,494 \\
+ & farm & crosswind & 5.0 & 2.6 km apart & 343 & 1\,489 & 8\,190 \\
+ & farm + horizon & crosswind & 5.0 & 2.6 km apart & 264 & 1\,153 & 6\,342 \\
+ & farm & crosswind & 5.0 & 4.0 km apart & 233 & 1\,021 & 5\,616 \\
+ & farm + horizon & crosswind & 5.0 & 4.0 km apart & 206 & 908 & 4\,994 \\
+ & farm & crosswind & 5.0 & 5.0 km apart & 186 & 825 & 4\,538 \\
+ & farm + horizon & crosswind & 5.0 & 5.0 km apart & 176 & 787 & 4\,328 \\
+ & farm & crosswind & 5.0 & 6.0 km apart & 154 & 691 & 3\,800 \\
+ & farm + horizon & crosswind & 5.0 & 6.0 km apart & 151 & 678 & 3\,729 \\
+ & farm & isotropic & 5.9 & 2.6 km apart & 272 & 1\,129 & 6\,210 \\
+ & farm + horizon & isotropic & 5.9 & 2.6 km apart & 213 & 886 & 4\,873 \\
+ & farm & isotropic & 5.9 & 4.0 km apart & 193 & 804 & 4\,422 \\
+ & farm + horizon & isotropic & 5.9 & 4.0 km apart & 173 & 721 & 3\,966 \\
+ & farm & isotropic & 5.9 & 5.0 km apart & 164 & 686 & 3\,773 \\
+ & farm + horizon & isotropic & 5.9 & 5.0 km apart & 157 & 658 & 3\,619 \\
+ & farm & isotropic & 5.9 & 6.0 km apart & 132 & 555 & 3\,052 \\
+ & farm + horizon & isotropic & 5.9 & 6.0 km apart & 132 & 555 & 3\,052 \\
 \bottomrule
 \end{tabular}

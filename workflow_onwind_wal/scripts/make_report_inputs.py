@@ -137,23 +137,43 @@ if __name__ == "__main__":
 
     # Placement, the headline figure.
     macro("PlaceModel", tex_escape(pl["model"]))
-    macro("PlaceInterfarm", num(pl["interfarm_distance_m"] / 1000, 0))
+    macro("PlaceInterfarm", num(pl["interfarm_distance_m"] / 1000, 1))
+    macro("PlaceRadius", num(pl["farm_radius_m"]))
+    macro("PlaceMinTurbines", num(pl["min_turbines"]))
+    macro("PlaceAzimuth", num(pl["min_free_azimuth_deg"]))
+    macro("PlaceHorizonRadius", num(pl["horizon_radius_m"] / 1000, 0))
     macro("PlaceFarms", num(pl["n_farms"]))
     macro("PlacePerFarm", num(pl["turbines_per_farm"], 1))
+    macro("PlaceRotorD", num(pl["min_distance_rotor_diameters"], 1))
+    macro("NoHorizonPnom", num(pl["no_horizon_p_nom_max_mw"]))
+    macro("NoHorizonFarms", num(pl["no_horizon_n_farms"]))
+    macro("HorizonCostPct", num(pl["horizon_cost_pct"], 0))
+    macro("HorizonRefused", num(pl["farms_refused_by_horizon"]))
     macro("FreePnom", num(pl["free_p_nom_max_mw"]))
     macro("FreePnomGW", num(pl["free_p_nom_max_mw"] / 1000, 1))
     macro("FreeTurbines", num(pl["free_n_turbines"]))
     macro("FreeDensity", num(pl["free_density_mw_km2"], 1))
     macro("FreeOrderSpread", num(pl["free_order_sensitivity_pct"], 0))
+    macro("FreeIsolatedPct", num(pl["free_isolated_pct"], 0))
     macro("FarmShareOfFree", num(pl["farm_share_of_free_pct"], 0))
+    IFD = {"2600": "TwoSix", "4000": "Four", "5000": "Five", "6000": "Six"}
     for d, v in pl["by_interfarm"].items():
-        tag = {"4000": "Four", "5000": "Five", "6000": "Six"}.get(d, d)
+        tag = IFD.get(d, d)
         macro(f"Ifd{tag}MW", num(v["p_nom_max_mw"]))
         macro(f"Ifd{tag}Farms", num(v["n_farms"]))
         macro(f"Ifd{tag}Turbines", num(v["n_turbines"]))
+        macro(f"Ifd{tag}NoHorizon", num(v["no_horizon_mw"]))
     ifd_mw = [v["p_nom_max_mw"] for v in pl["by_interfarm"].values()]
     macro("IfdLow", num(min(ifd_mw)))
     macro("IfdHigh", num(max(ifd_mw)))
+    SPC = {"observed": "Obs", "crosswind": "Cross", "isotropic": "Iso"}
+    for k, v in pl["by_spacing"].items():
+        tag = SPC.get(k, k)
+        macro(f"Sp{tag}D", num(v["rotor_diameters"], 1))
+        macro(f"Sp{tag}Free", num(v["free_mw"]))
+        macro(f"Sp{tag}MW", num(v["p_nom_max_mw"]))
+    macro("LegacyLow", num(headline["legacy_policy_mw"][0]))
+    macro("LegacyHigh", num(headline["legacy_policy_mw"][1]))
     macro("PlaceSpacing", num(pl["min_distance_m"]))
     macro("PlaceTurbines", num(pl["n_turbines"]))
     macro("PlacePnom", num(pl["p_nom_max_mw"]))
@@ -228,6 +248,24 @@ if __name__ == "__main__":
         macro("FleetFarmsFour", num(fm["n_farms_ge_4"]))
         macro("FleetLargestFarm", num(fm["largest_farm"]))
         macro("FleetFarmLink", num(fm["link_distance_m"] / 1000, 1))
+        macro("FleetInBigFarms", num(fm["share_in_farms_ge_4_pct"], 0))
+        P = {"p5": "PFive", "p10": "PTen", "p25": "PTwentyFive",
+             "p50": "PFifty", "p75": "PSeventyFive", "p90": "PNinety"}
+        for key, tag in [("machine_nn_m", "MachineNN"), ("farm_radius_m", "FarmRad"),
+                         ("farm_nn_m", "FarmNN")]:
+            for q, qt in P.items():
+                macro(f"Fleet{tag}{qt}", num(fm[key][q]))
+        macro("FleetFarmNNBelowFour", num(fm["farm_nn_below_4km_pct"], 0))
+    oh = fleet.get("open_horizon")
+    if oh:
+        macro("HorizonSettlements", num(oh["n_settlements"]))
+        macro("HorizonAffected", num(oh["n_with_a_turbine_within_radius"]))
+        macro("HorizonAffectedPct", num(oh["share_affected_pct"], 0))
+        macro("HorizonFailing", num(oh["n_failing"]))
+        macro("HorizonFailingPct", num(oh["failing_pct_of_affected"], 1))
+        macro("HorizonArcPOne", num(oh["largest_free_arc_deg"]["p1"]))
+        macro("HorizonArcPFive", num(oh["largest_free_arc_deg"]["p5"]))
+        macro("HorizonArcPFifty", num(oh["largest_free_arc_deg"]["p50"]))
 
     # Cost of the late-added constraint families.
     macro("ServBase", num(serv["base_area_km2"]))
@@ -265,11 +303,9 @@ if __name__ == "__main__":
     macro("BregFlhGross", num(breg["flh_gross_h"]))
     macro("BregDensity", num(breg["implied_density_mw_km2"], 2))
     macro("BregArea", num(breg["implied_area_km2"]))
-    macro("BregOursVOneTwelve", num(breg["ours_v112_array_mw"]))
     macro("BregOursVOneTwelveSpacing", num(breg["ours_v112_bregilab_spacing_mw"]))
     macro("BregOursArea", num(breg["our_v112_eligible_area_km2"]))
     macro("BregStepTurbine", num(breg["step_turbine_class"], 2))
-    macro("BregStepSpacing", num(breg["step_spacing"], 2))
     macro("BregStepConstraints", num(breg["step_constraint_set"], 2))
     macro("BregRatio", num(breg["total_ratio"], 2))
     macro("BregVsCentral", num(breg["vs_central"], 1))
@@ -415,19 +451,14 @@ if __name__ == "__main__":
     for r in placement.itertuples():
         if last is not None and r.turbine != last:
             rows.append(MIDRULE)
-        detail = (
-            f"{r.interfarm_distance_m / 1000:.0f} km apart"
-            if r.model == "farm"
-            else tex_escape(r.order.replace("_", " ")) + " order"
-        )
         rows.append(
             [
                 tex_escape(r.turbine_label) if r.turbine != last else "",
-                tex_escape(r.model),
+                tex_escape(r.model.replace("+", " + ")),
                 tex_escape(r.spacing_case),
-                num(r.min_distance_m),
-                detail,
-                num(r.n_farms) if r.model == "farm" else "--",
+                num(r.min_distance_rotor_diameters, 1),
+                tex_escape(str(r.variant).replace("_", " ")),
+                num(r.n_farms) if r.model.startswith("farm") else "--",
                 num(r.n_turbines),
                 num(r.p_nom_max_mw),
             ]
@@ -440,7 +471,7 @@ if __name__ == "__main__":
                 "turbine",
                 "model",
                 "spacing",
-                r"$d$ [\si{\metre}]",
+                r"$d/D$",
                 "variant",
                 "farms",
                 "machines",
@@ -532,21 +563,15 @@ if __name__ == "__main__":
         [
             "this study, free allocation",
             f"{headline['reference_turbine_label']}, "
-            f"{pl['min_distance_m']:.0f} m between machines",
+            f"{pl['min_distance_rotor_diameters']:.0f} D between machines",
             num(breg["ours_reference_mw"]),
             "",
         ],
         [
             r"$\times$ turbine class",
             "V112 instead: smaller setbacks, more eligible land",
-            num(breg["ours_v112_array_mw"]),
-            num(breg["step_turbine_class"], 2),
-        ],
-        [
-            r"$\times$ spacing convention",
-            r"5 D isotropic instead of $\sqrt{5\times7}\,D$",
             num(breg["ours_v112_bregilab_spacing_mw"]),
-            num(breg["step_spacing"], 2),
+            num(breg["step_turbine_class"], 2),
         ],
         [
             r"$\times$ constraint set",
@@ -562,8 +587,8 @@ if __name__ == "__main__":
             num(breg["total_ratio"], 2),
         ],
         [
-            "this study, farm allocation",
-            "the same land under the framework's grouping rules",
+            "this study, farm allocation + open horizon",
+            "the same land under the framework's own landscape criterion",
             num(breg["ours_farm_mw"]),
             num(breg["ours_farm_mw"] / breg["total_mw"], 2),
         ],

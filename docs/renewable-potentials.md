@@ -87,10 +87,12 @@ overrides are Wallonia's, where PNEC-PACE / EDORA data is better than the raster
 > bear on this section directly:
 >
 > 1. For the **administrative Walloon Region** the credible gross technical
->    potential is **2.5–6.9 GW, central 4.1 GW**. 6 500 MW lies inside that
->    range, at its optimistic end — reachable at the permissive end of the
->    framework's 4–6 km inter-farm distance and with little allowance for the
->    two constraint families that have no public geometry.
+>    potential is **3.2–5.7 GW, central 4.4 GW**. 6 500 MW is above the gross
+>    reference case (5 712 MW) and is reachable only by dropping the landscape
+>    criterion the 2013 framework states — 130° of open horizon within 4 km of
+>    each village, which the standing fleet observes almost without exception —
+>    and then allowing nothing for the two constraint families that have no
+>    public geometry.
 > 2. 6 500 MW is a *deployment* expectation assembled from a project pipeline,
 >    not a land potential. That the two land in the same place is a coincidence
 >    of construction, not a confirmation.

@@ -96,24 +96,94 @@ reference_density: "derived"
 # equivalent of the 5D x 7D array, sqrt(5 x 7) D = 5.92 D.
 # ---------------------------------------------------------------------------
 placement:
-  bregilab_spacing_rotor_diameters: 5
-  reference_case: "array"
-  reference_model: "farm"
-  # The two structural rules of the Walloon framework that a bare
-  # minimum-distance allocation violates.  `interfarm_distance_m` is the lower
-  # end of the 4-6 km indicative inter-distance between wind farms of the cadre
-  # de référence, i.e. the permissive end; `min_turbines` is the definition of a
-  # wind farm since 24 January 2024 (lowered from five); `radius_m` is the
-  # half-span of one farm, set so that farms cannot overlap at the inter-farm
-  # distance.
+  # ------------------------------------------------------------------
+  # Minimum distance between machines, in rotor diameters.
+  #
+  # `crosswind` (5 D) is the reference.  It is the *nearest-neighbour* distance
+  # of the 5D x 7D array the capacity-density convention is built on: in that
+  # array the closest pair is 5 D apart, not sqrt(5x7) D.  Converting an
+  # area-per-turbine into an isotropic minimum separation forbids exactly the
+  # pairs the convention itself contains, and it assumes a two-dimensional
+  # array — whereas Walloon wind farms are predominantly strings along a road
+  # or a field boundary, where no downwind row exists and the 7 D never binds.
+  # 5 D is also the rule the VITO Dynamic Energy Atlas uses.
+  #
+  # `observed` (4.3 D) is the median nearest-neighbour distance of the 652
+  # machines standing in Wallonia, at the ~100 m rotor typical of that fleet
+  # (median 427 m; p25 362 m; p10 306 m).
+  # `isotropic` (sqrt(5x7) = 5.92 D) is the area-equivalent, retained as the
+  # conservative end.
+  # The physical floor is about 3 D: below that, wake-induced turbulence takes
+  # a machine outside the IEC 61400-1 standard load case.
+  # ------------------------------------------------------------------
+  spacings_rotor_diameters:
+    observed: 4.3
+    crosswind: 5
+    isotropic: 5.916        # sqrt(5 x 7)
+  reference_case: "crosswind"
+  # The reference is the farm model with the open-horizon criterion: the
+  # geometry calibrated on the standing fleet, and the landscape rule the 2013
+  # framework actually states rather than the indicative distance it also
+  # mentions.
+  reference_model: "farm+horizon"
+  # Single-linkage distance used to test whether the free allocation is a
+  # scatter of isolated machines.  It is not: at this link the carpet chains
+  # into a handful of very large groups, which is the point.
+  group_link_m: 2600
+  # ------------------------------------------------------------------
+  # The farm level.
+  #
+  # `radius_m` and the reference `interfarm_distance_m` are calibrated on the
+  # 652 machines standing in Wallonia, not taken from a rule.  Grouped by
+  # single linkage at 1.5 km they form 134 farms whose radius has median 815 m,
+  # p75 1 309 m and p90 1 561 m, and whose centre-to-centre nearest-neighbour
+  # distance has p5 1.91 km, p10 2.34 km, p25 3.00 km and median 4.56 km.
+  # A radius of 1 300 m (the observed p75) with farms not allowed to overlap
+  # gives an inter-farm distance of 2 600 m, which sits inside the observed
+  # p10-p25 band: the model forbids no configuration Wallonia has actually
+  # permitted.
+  #
+  # `min_turbines: 4` is *not* applied as a legal rule.  The 2024 framework
+  # defines a parc éolien as at least four machines, but with explicit
+  # reductions for repowering, for extensions of an existing park, and for
+  # machines above 3.2 MW — which the reference class is.  It is applied
+  # because it describes how Walloon wind is actually built: 86 % of the
+  # standing machines are in groups of four or more.
+  #
+  # The 4-6 km values are a *2013-legacy policy* sensitivity, not the
+  # reference.  See `landscape` below.
+  # ------------------------------------------------------------------
   farm:
-    interfarm_distance_m: [4000, 5000, 6000]
-    # The midpoint of the framework's own indicative band is the neutral
-    # reading; 4 km is its permissive end and 6 km its restrictive one, and both
-    # are reported.
-    reference_interfarm_distance_m: 5000
-    radius_m: 1800
+    interfarm_distance_m: [2600, 4000, 5000, 6000]
+    reference_interfarm_distance_m: 2600
+    radius_m: 1300
     min_turbines: 4
+
+  # ------------------------------------------------------------------
+  # The landscape criterion, as the 2013 cadre de référence actually states it:
+  #
+  #   "Sauf lorsque les éoliennes sont implantées le long des autoroutes, une
+  #    référence indicative à une inter-distance minimale de 4 km à 6 km, en
+  #    fonction des résultats de l'étude d'incidence sera prise en
+  #    considération. Un azimut (ou un angle horizontal) minimal sans éoliennes
+  #    doit être préservé pour chaque village ; celui-ci sera d'au moins 130°,
+  #    sur une distance de 4 km. Un examen de l'encerclement sera réalisé sur
+  #    une distance de 9 km dans le cadre de l'EIE."
+  #
+  # Three things follow.  The 4-6 km inter-distance is *indicative*, is subject
+  # to the impact assessment, and does not apply along motorways — which is
+  # where the Walloon zoning rule concentrates the eligible land in the first
+  # place.  The operative criterion is the open horizon: at least 130 degrees
+  # of each village's horizon, within 4 km, free of turbines.  And the 2024
+  # framework, which replaced the 2013 one on 25 April 2024, does not carry the
+  # inter-distance at all.
+  #
+  # The open-horizon test is therefore implemented directly, and the 4-6 km
+  # inter-distance is kept only as a labelled legacy sensitivity.
+  # ------------------------------------------------------------------
+  landscape:
+    min_free_azimuth_deg: 130
+    horizon_radius_m: 4000
 
 # ---------------------------------------------------------------------------
 # Source datasets (Walloon open data, CC-BY 4.0, ESRI-REST services of
@@ -311,6 +381,15 @@ sources:
 # ---------------------------------------------------------------------------
 slope:
   threshold_pct: 7
+
+# ---------------------------------------------------------------------------
+# Settlements, for the open-horizon criterion (see placement.landscape).  A
+# "village" is a contiguous block of plan-de-secteur habitat zoning above this
+# area; smaller blocks are hamlets or ribbon development and are already
+# protected by the 400 m dwelling setback.
+# ---------------------------------------------------------------------------
+settlements:
+  min_area_ha: 10
 
 # ---------------------------------------------------------------------------
 # Plan de secteur zoning

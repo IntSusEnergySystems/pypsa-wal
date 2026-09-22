@@ -170,6 +170,7 @@ rule build_exclusion_layers:
         plan_de_secteur=config["plan_de_secteur"],
         setbacks=config["setbacks"],
         forest_split=config["forest_split"],
+        settlements=config["settlements"],
         aviation=config["aviation"],
         radar_installations=config["radar_installations"],
         turbine=lambda w: config["turbines"][w.turbine],
@@ -182,6 +183,7 @@ rule build_exclusion_layers:
         layers=f"{RES}/exclusions_{{turbine}}.gpkg",
         layer_dir=directory(f"{RES}/exclusions_{{turbine}}"),
         dwelling_raster=f"{RES}/dwelling_setback_{{turbine}}.tif",
+        settlements=f"{RES}/settlements_{{turbine}}.gpkg",
         stats=f"{RES}/exclusions_{{turbine}}.json",
         areas=f"{OUT}/tables/exclusion_areas_{{turbine}}.csv",
     log:
@@ -378,6 +380,7 @@ rule validate_fleet:
     input:
         points=f"{DATA}/osm_wind_turbines.gpkg",
         regions=f"{RES}/regions.gpkg",
+        settlements=f"{RES}/settlements_{{turbine}}.gpkg",
         layer_dir=f"{RES}/exclusions_{{turbine}}",
         dwelling_raster=f"{RES}/dwelling_setback_{{turbine}}.tif",
         slope_raster=f"{DATA}/slope_ge7.tif",
@@ -419,6 +422,7 @@ rule place_turbines:
         config=config,
     input:
         raster=f"{OUT}/eligible_land_{{turbine}}.tif",
+        settlements=f"{RES}/settlements_{{turbine}}.gpkg",
     output:
         table=f"{OUT}/tables/placement_{{turbine}}.csv",
         points=f"{OUT}/placement_{{turbine}}.gpkg",

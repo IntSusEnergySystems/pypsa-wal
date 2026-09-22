@@ -281,7 +281,26 @@ if __name__ == "__main__":
     rule = sb_cfg["habitat_zone"][sb_cfg["habitat_zone"]["default"]]
     habitat_distance = evaluate(rule, H, D)
     logger.info("habitat-zone setback (%s): %.0f m", sb_cfg["habitat_zone"]["default"], habitat_distance)
-    habitat_setback = buffered(pick(pds_cfg["habitat_zones"]), habitat_distance, crs)
+    habitat_zones = pick(pds_cfg["habitat_zones"])
+    habitat_setback = buffered(habitat_zones, habitat_distance, crs)
+
+    # Settlements, for the open-horizon criterion of the 2013 cadre de
+    # référence: "un azimut minimal sans éoliennes doit être préservé pour
+    # chaque village; celui-ci sera d'au moins 130°, sur une distance de 4 km".
+    # A "village" is taken to be a contiguous block of plan-de-secteur habitat
+    # zoning above `min_area_ha`; below that the block is a hamlet or a ribbon
+    # and is already protected by the dwelling setback.
+    settle = (
+        gpd.GeoDataFrame(geometry=[_union(habitat_zones.geometry.values)], crs=crs)
+        .explode(index_parts=False)
+        .reset_index(drop=True)
+    )
+    min_area = float(snakemake.params.settlements["min_area_ha"]) * 1e4
+    settle = settle[settle.area >= min_area].copy()
+    settle["area_ha"] = settle.area / 1e4
+    settle["geometry"] = settle.geometry.centroid
+    logger.info("%d settlements above %.0f ha", len(settle), min_area / 1e4)
+    settle.to_file(snakemake.output.settlements, driver="GPKG", layer="settlements")
 
     dwelling_distance = evaluate(sb_cfg["scattered_dwellings"], H, D)
     addr = read(src["address_points"], crs)

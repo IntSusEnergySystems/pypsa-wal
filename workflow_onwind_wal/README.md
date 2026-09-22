@@ -54,7 +54,7 @@ snakemake -c4 all --rerun-triggers mtime
 | run the `atlite` eligibility analysis | `build_availability` | `resources/availability_*.nc` |
 | area → capacity, capacity factor, FLH | `build_potential` | `results/potential/*.csv` |
 | rasterise the reference constraint set at 100 m | `build_eligible_raster` | `results/eligible_land_<turbine>.tif` |
-| **place machines and farms on that raster** | `place_turbines` | `results/tables/placement_*.csv`, `results/placement_*.gpkg` |
+| **place machines and farms on that raster**, under the wake, grouping and open-horizon rules | `place_turbines` | `results/tables/placement_*.csv`, `results/placement_*.gpkg` |
 | test the constraint set against the standing fleet | `validate_fleet` | `results/tables/fleet_validation_*.json` |
 | cost of each late-added constraint family | `servitude_costs` | `results/tables/servitude_costs_*.json` |
 | tables, figures, LaTeX macros | `collect_results`, `plot_*`, `make_report_inputs` | `results/`, `../docs/.../generated/` |
@@ -78,8 +78,12 @@ the Python:
 - `radar_installations:` — the three reconstructed protection circles, with the
   coordinate and the basis for each radius.
 - `scenarios:` — the constraint ladder, each step adding layers to the previous.
-- `placement:` — the minimum inter-turbine distance, and the farm model's
-  inter-farm distance band and minimum farm size.
+- `placement:` — the three siting rules and their calibration: the minimum
+  inter-turbine distance in rotor diameters, the farm radius and separation
+  (both taken from the standing fleet), the minimum farm size, and the
+  open-horizon criterion of the 2013 cadre de référence. The comment above each
+  block carries the measurement or the legal text it comes from.
+- `settlements:` — what counts as a "village" for the open-horizon test.
 - `residual_allowance:` — the documented allowance for the two constraint
   families that have no public geometry, with its bracket.
 - `turbines:` — the three classes, matching the "150 m / 180 m / 210 m"
@@ -103,6 +107,18 @@ recorded in `config.yaml` on 22 September 2026.
 
 Everything in the Walloon method is now either geometry or a documented
 allowance; there are no unquantified gaps.
+
+### Siting rules
+
+| rule | value | basis |
+|---|---|---|
+| distance between machines | 5 D | nearest-neighbour distance of a 5D×7D array; BREGILAB's rule; the standing fleet sits at 4.3 D; physical floor ≈ 3 D |
+| machines per farm | ≥ 4 | 86 % of the standing fleet is in groups that size |
+| farm radius / separation | 1 300 m / 2 600 m | observed p75 farm radius, and twice it; inside the fleet's p10–p25 separation band |
+| landscape | 130° of open horizon within 4 km of each village | 2013 cadre de référence, verbatim; only 6 of 880 affected villages breach it today |
+| *2013 4–6 km inter-farm distance* | **not applied** | indicative, subordinate to the impact assessment, exempt along motorways, and absent from the 2024 framework — reported as a legacy sensitivity |
+
+### Constraint families
 
 | family | treatment |
 |---|---|

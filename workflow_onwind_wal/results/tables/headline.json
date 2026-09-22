@@ -188,7 +188,49 @@
       "turbines_per_farm": 4.9,
       "n_farms_ge_4": 72,
       "turbines_in_farms_ge_4": 563,
-      "largest_farm": 27
+      "share_in_farms_ge_4_pct": 86.0,
+      "largest_farm": 27,
+      "machine_nn_m": {
+        "p5": 278.0,
+        "p10": 306.4,
+        "p25": 361.5,
+        "p50": 426.8,
+        "p75": 517.4,
+        "p90": 689.6
+      },
+      "farm_radius_m": {
+        "p5": 179.0,
+        "p10": 227.9,
+        "p25": 478.3,
+        "p50": 814.9,
+        "p75": 1308.5,
+        "p90": 1561.2
+      },
+      "farm_nn_m": {
+        "p5": 1912.5,
+        "p10": 2341.6,
+        "p25": 2996.4,
+        "p50": 4557.6,
+        "p75": 7716.2,
+        "p90": 10107.0
+      },
+      "farm_nn_below_4km_pct": 43.0
+    },
+    "open_horizon": {
+      "min_free_azimuth_deg": 130.0,
+      "horizon_radius_m": 4000.0,
+      "n_settlements": 2261,
+      "n_with_a_turbine_within_radius": 880,
+      "share_affected_pct": 39.0,
+      "largest_free_arc_deg": {
+        "p1": 152.0,
+        "p5": 180.0,
+        "p10": 204.0,
+        "p25": 288.0,
+        "p50": 334.0
+      },
+      "n_failing": 6,
+      "failing_pct_of_affected": 0.7
     }
   },
   "fragmentation": {
@@ -204,64 +246,100 @@
     "share_ge_4_turbines_pct": 3.2
   },
   "placement": {
-    "model": "farm",
-    "case": "array",
-    "min_distance_m": 887.4,
-    "interfarm_distance_m": 5000.0,
-    "n_farms": 240,
-    "turbines_per_farm": 5.6,
-    "n_turbines": 1337,
-    "p_nom_max_mw": 5348.0,
-    "effective_density_mw_km2": 9.381,
-    "land_per_turbine_km2": 0.4264,
-    "energy_twh": 17.456,
-    "free_p_nom_max_mw": 13084.0,
-    "free_n_turbines": 3271,
-    "free_density_mw_km2": 22.951,
-    "free_order_sensitivity_pct": 13.8,
-    "farm_share_of_free_pct": 41.0,
-    "vs_area_density_pct": 87.7,
+    "model": "farm+horizon",
+    "case": "crosswind",
+    "min_distance_m": 750.0,
+    "min_distance_rotor_diameters": 5.0,
+    "interfarm_distance_m": 2600.0,
+    "farm_radius_m": 1300.0,
+    "min_turbines": 4,
+    "min_free_azimuth_deg": 130.0,
+    "horizon_radius_m": 4000.0,
+    "n_farms": 307,
+    "turbines_per_farm": 4.7,
+    "n_turbines": 1428,
+    "p_nom_max_mw": 5712.0,
+    "effective_density_mw_km2": 10.02,
+    "land_per_turbine_km2": 0.3992,
+    "energy_twh": 18.644,
+    "farms_refused_by_horizon": 3622,
+    "horizon_cost_pct": 26.0,
+    "no_horizon_p_nom_max_mw": 7752.0,
+    "no_horizon_n_farms": 423,
+    "free_p_nom_max_mw": 15236.0,
+    "free_n_turbines": 3809,
+    "free_density_mw_km2": 26.726,
+    "free_order_sensitivity_pct": 14.6,
+    "free_isolated_pct": 3.9,
+    "farm_share_of_free_pct": 37.0,
+    "vs_area_density_pct": 100.5,
     "by_interfarm": {
+      "2600": {
+        "n_farms": 307,
+        "n_turbines": 1428,
+        "p_nom_max_mw": 5712.0,
+        "no_horizon_mw": 7752.0
+      },
       "4000": {
-        "n_farms": 320,
-        "n_turbines": 1734,
-        "p_nom_max_mw": 6936.0
+        "n_farms": 245,
+        "n_turbines": 1149,
+        "p_nom_max_mw": 4596.0,
+        "no_horizon_mw": 5256.0
       },
       "5000": {
-        "n_farms": 240,
-        "n_turbines": 1337,
-        "p_nom_max_mw": 5348.0
+        "n_farms": 204,
+        "n_turbines": 968,
+        "p_nom_max_mw": 3872.0,
+        "no_horizon_mw": 4020.0
       },
       "6000": {
-        "n_farms": 192,
-        "n_turbines": 1110,
-        "p_nom_max_mw": 4440.0
+        "n_farms": 171,
+        "n_turbines": 820,
+        "p_nom_max_mw": 3280.0,
+        "no_horizon_mw": 3352.0
+      }
+    },
+    "by_spacing": {
+      "observed": {
+        "rotor_diameters": 4.3,
+        "free_mw": 17100.0,
+        "p_nom_max_mw": 7012.0
+      },
+      "crosswind": {
+        "rotor_diameters": 5.0,
+        "free_mw": 15236.0,
+        "p_nom_max_mw": 5712.0
+      },
+      "isotropic": {
+        "rotor_diameters": 5.916,
+        "free_mw": 13084.0,
+        "p_nom_max_mw": 4760.0
       }
     },
     "by_turbine": {
       "T136_V112": {
-        "p_nom_max_mw": 6060.0,
-        "n_turbines": 2020,
-        "effective_density_mw_km2": 9.75,
+        "p_nom_max_mw": 7770.0,
+        "n_turbines": 2590,
+        "effective_density_mw_km2": 12.501,
         "eligible_area_km2": 621.54
       },
       "T185_NREL4": {
-        "p_nom_max_mw": 5348.0,
-        "n_turbines": 1337,
-        "effective_density_mw_km2": 9.381,
+        "p_nom_max_mw": 5712.0,
+        "n_turbines": 1428,
+        "effective_density_mw_km2": 10.02,
         "eligible_area_km2": 570.08
       },
       "T208_NREL55": {
-        "p_nom_max_mw": 5154.0,
-        "n_turbines": 937,
-        "effective_density_mw_km2": 9.49,
+        "p_nom_max_mw": 6342.0,
+        "n_turbines": 1153,
+        "effective_density_mw_km2": 11.678,
         "eligible_area_km2": 543.03
       }
     }
   },
   "placement_range_mw": [
-    5154.0,
-    6060.0
+    5712.0,
+    7770.0
   ],
   "residual": {
     "components": {
@@ -278,37 +356,41 @@
     },
     "central": {
       "survival": 0.765,
-      "p_nom_max_mw": 4091,
-      "energy_twh": 13.35
+      "p_nom_max_mw": 4370,
+      "energy_twh": 14.26
     },
     "low": {
       "survival": 1.0,
-      "p_nom_max_mw": 5348,
-      "energy_twh": 17.46
+      "p_nom_max_mw": 5712,
+      "energy_twh": 18.64
     },
     "high": {
       "survival": 0.56,
-      "p_nom_max_mw": 2995,
-      "energy_twh": 9.78
+      "p_nom_max_mw": 3199,
+      "energy_twh": 10.44
     },
     "p_nom_max_range_mw": [
-      2995,
-      5348
+      3199,
+      5712
     ]
   },
   "credible_range_mw": [
-    2486,
-    6936
+    3199,
+    5712
   ],
-  "credible_central_mw": 4091,
+  "credible_central_mw": 4370,
+  "legacy_policy_mw": [
+    2509,
+    3516
+  ],
   "density_check": {
     "germany_kw_km2": 178.0,
     "germany_turbines_per_1000km2": 80.3,
     "wallonia_today_kw_km2": 90.0,
-    "wallonia_central_kw_km2": 242.0,
-    "wallonia_high_kw_km2": 410.0,
-    "central_vs_germany": 1.36,
-    "high_vs_germany": 2.31,
+    "wallonia_central_kw_km2": 258.0,
+    "wallonia_high_kw_km2": 338.0,
+    "central_vs_germany": 1.45,
+    "high_vs_germany": 1.9,
     "today_vs_germany": 0.51
   },
   "zoning_only_km2": 8520.8,
@@ -335,16 +417,15 @@
     "flh_gross_h": 2298.0,
     "implied_density_mw_km2": 10.52,
     "implied_area_km2": 1083.0,
-    "ours_reference_mw": 13084.0,
-    "ours_v112_array_mw": 13599.0,
+    "ours_reference_mw": 15236.0,
     "ours_v112_bregilab_spacing_mw": 16404.0,
-    "step_turbine_class": 1.039,
-    "step_spacing": 1.206,
+    "step_turbine_class": 1.077,
     "step_constraint_set": 0.695,
-    "total_ratio": 0.871,
-    "vs_central": 2.79,
-    "vs_farm": 2.13,
+    "total_ratio": 0.748,
+    "vs_central": 2.61,
+    "vs_farm": 2.0,
     "our_v112_eligible_area_km2": 621.54,
-    "ours_farm_mw": 5348.0
+    "ours_farm_mw": 5712.0,
+    "ours_free_mw": 15236.0
   }
 }

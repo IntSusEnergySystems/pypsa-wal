@@ -41,6 +41,13 @@ from scipy.spatial import cKDTree
 
 logger = logging.getLogger(__name__)
 
+# The placement model's own implementation of the criterion, so that the test
+# below validates the code that is actually used and not a second copy of it.
+exec(  # noqa: S102 - our own module, executed to avoid a package layout
+    (Path(__file__).parent / "place_turbines.py").read_text().split("if __name__ ==")[0],
+    globals(),
+)
+
 RASTER_LAYERS = {"dwelling_setback": "dwelling_raster", "slope": "slope_raster"}
 
 
@@ -164,14 +171,78 @@ if __name__ == "__main__":
         adj = coo_matrix((n, n))
     n_farms, labels = connected_components(adj, directed=False)
     sizes = np.bincount(labels)
+    centres = np.array([xy[labels == i].mean(axis=0) for i in range(n_farms)])
+    span = np.array(
+        [
+            np.linalg.norm(xy[labels == i] - centres[i], axis=1).max()
+            if (labels == i).sum() > 1
+            else 0.0
+            for i in range(n_farms)
+        ]
+    )
+    ctree = cKDTree(centres)
+    fdist = ctree.query(centres, k=2)[0][:, 1]
+    mdist = tree.query(xy, k=2)[0][:, 1]
+
+    def pct(a, qs=(5, 10, 25, 50, 75, 90)):
+        return {f"p{q}": round(float(np.percentile(a, q)), 1) for q in qs}
+
     out["farms"] = {
         "link_distance_m": link,
         "n_farms": int(n_farms),
         "turbines_per_farm": round(float(n / n_farms), 1),
         "n_farms_ge_4": int((sizes >= 4).sum()),
         "turbines_in_farms_ge_4": int(sizes[sizes >= 4].sum()),
+        "share_in_farms_ge_4_pct": round(100 * float(sizes[sizes >= 4].sum()) / n, 0),
         "largest_farm": int(sizes.max()),
+        # The three distributions the placement model is calibrated on.
+        "machine_nn_m": pct(mdist),
+        "farm_radius_m": pct(span[sizes >= 2]),
+        "farm_nn_m": pct(fdist),
+        "farm_nn_below_4km_pct": round(100 * float((fdist < 4000).mean()), 0),
     }
     logger.info("standing fleet groups into %s", json.dumps(out["farms"]))
+
+    # ------------------------------------------------------------------
+    # Does the standing fleet respect the open-horizon criterion?
+    #
+    # The 2013 cadre de référence asks that at least 130 degrees of each
+    # village's horizon, within 4 km, stay free of turbines.  If the machines
+    # that exist already broke that rule, the rule would not be one, and the
+    # implementation used in the placement model would be wrong.
+    # ------------------------------------------------------------------
+    lcfg = cfg["placement"]["landscape"]
+    settle = gpd.read_file(snakemake.input.settlements, layer="settlements").to_crs(crs)
+    sxy = np.c_[settle.geometry.x, settle.geometry.y]
+    horizon = OpenHorizon(
+        sxy,
+        float(cfg["turbines"][snakemake.wildcards.turbine]["rotor_diameter"]),
+        float(lcfg["horizon_radius_m"]),
+        float(lcfg["min_free_azimuth_deg"]),
+    )
+    gaps = np.array(
+        [
+            np.rad2deg(horizon._largest_gap(horizon._arcs_for(v, xy[:, 0], xy[:, 1])))
+            for v in range(len(sxy))
+        ]
+    )
+    affected = gaps < 359.9
+    thr = float(lcfg["min_free_azimuth_deg"])
+    out["open_horizon"] = {
+        "min_free_azimuth_deg": thr,
+        "horizon_radius_m": float(lcfg["horizon_radius_m"]),
+        "n_settlements": int(len(sxy)),
+        "n_with_a_turbine_within_radius": int(affected.sum()),
+        "share_affected_pct": round(100 * float(affected.mean()), 0),
+        "largest_free_arc_deg": {
+            f"p{q}": round(float(np.percentile(gaps[affected], q)), 0)
+            for q in (1, 5, 10, 25, 50)
+        },
+        "n_failing": int((gaps[affected] < thr).sum()),
+        "failing_pct_of_affected": round(
+            100 * float((gaps[affected] < thr).mean()), 1
+        ),
+    }
+    logger.info("open horizon vs the standing fleet: %s", json.dumps(out["open_horizon"]))
 
     Path(snakemake.output.table).write_text(json.dumps(out, indent=2))

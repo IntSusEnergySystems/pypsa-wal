@@ -111,6 +111,48 @@
     "turbines_per_farm": 4.9,
     "n_farms_ge_4": 72,
     "turbines_in_farms_ge_4": 563,
-    "largest_farm": 27
+    "share_in_farms_ge_4_pct": 86.0,
+    "largest_farm": 27,
+    "machine_nn_m": {
+      "p5": 278.0,
+      "p10": 306.4,
+      "p25": 361.5,
+      "p50": 426.8,
+      "p75": 517.4,
+      "p90": 689.6
+    },
+    "farm_radius_m": {
+      "p5": 179.0,
+      "p10": 227.9,
+      "p25": 478.3,
+      "p50": 814.9,
+      "p75": 1308.5,
+      "p90": 1561.2
+    },
+    "farm_nn_m": {
+      "p5": 1912.5,
+      "p10": 2341.6,
+      "p25": 2996.4,
+      "p50": 4557.6,
+      "p75": 7716.2,
+      "p90": 10107.0
+    },
+    "farm_nn_below_4km_pct": 43.0
+  },
+  "open_horizon": {
+    "min_free_azimuth_deg": 130.0,
+    "horizon_radius_m": 4000.0,
+    "n_settlements": 2261,
+    "n_with_a_turbine_within_radius": 880,
+    "share_affected_pct": 39.0,
+    "largest_free_arc_deg": {
+      "p1": 152.0,
+      "p5": 180.0,
+      "p10": 204.0,
+      "p25": 288.0,
+      "p50": 334.0
+    },
+    "n_failing": 6,
+    "failing_pct_of_affected": 0.7
   }
 }

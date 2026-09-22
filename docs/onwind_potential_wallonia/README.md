@@ -25,10 +25,12 @@ report states the difference and its consequences.
 | | Wallonia (administrative) |
 |---|---:|
 | eligible land, all implemented constraints | 561 km² (3.3 %) |
-| free allocation (no grouping rule) — *upper bound* | 13 084 MW |
-| farm allocation, 4 / 5 / 6 km between farms | 6 936 / 5 348 / 4 440 MW |
-| **central estimate** (5 km + residual allowance) | **4 091 MW** |
-| credible range | 2 486 – 6 936 MW |
+| free allocation at 5 D between machines — *land and wake bound* | 15 236 MW |
+| + grouping into farms | 7 752 MW |
+| + open horizon, 130° within 4 km of each village — *gross reference* | 5 712 MW |
+| **central estimate** (+ residual allowance) | **4 370 MW** |
+| credible range | 3 199 – 5 712 MW |
+| *if the repealed 2013 4–6 km inter-distance were applied as a rule* | 2 509 – 3 516 MW |
 | PyPSA-Eur default land analysis (area × 3 MW/km²) | 19 079 MW |
 | BREGILAB / VITO Dynamic Energy Atlas, gross | 11 400 MW |
 | cap in the model today | 6 500 MW |
@@ -39,18 +41,43 @@ report states the difference and its consequences.
 An earlier version of this study concluded **2–4.5 GW**. That reading does not
 survive: it rested on screening the eligible raster by patch size, a cut-off
 with no legal or engineering basis. Capacity now comes from **placing machines
-and wind farms** on the raster under the framework's own rules — the method
-BREGILAB uses, plus the Walloon grouping and inter-distance criteria it lacks.
-The 6 500 MW cap sits *inside* the credible range rather than far above it.
-§6.6 of the report retracts the earlier figure in full.
+and wind farms** on the raster — the method BREGILAB uses, plus the Walloon
+landscape criterion it lacks. §6.6 of the report retracts the earlier figure in
+full.
+
+Three siting rules decide the answer, and together they matter more than the
+whole constraint ladder below the setbacks (§2.4):
+
+| rule | value | basis |
+|---|---|---|
+| distance between machines | 5 D (750 m) | nearest-neighbour distance of a 5D×7D array; BREGILAB's rule; the fleet sits at 4.3 D |
+| machines per farm | ≥ 4 | 86 % of the standing fleet is in groups that size |
+| landscape | 130° of open horizon within 4 km of each village | the 2013 cadre de référence, verbatim |
+
+The 4–6 km inter-farm distance the earlier version used as its reference is
+**not** applied: the 2013 text calls it *indicative*, subordinates it to the
+impact assessment, exempts turbines sited along motorways — which is where the
+zoning rule concentrates the eligible land — and the 2024 framework that
+replaced it does not carry it at all. It is reported as a labelled legacy
+sensitivity.
 
 ## Calibration
 
-The constraint set is tested against the **652 turbines standing in Wallonia**
-(OpenStreetMap). No layer has an avoidance ratio above 0.77 — every constraint
-is one Walloon wind development demonstrably avoids. Two candidate constraints
-failed the test and were dropped. The farm model predicts 5.6 machines per farm
-against the 4.9 of the real fleet, and 240 farms against 134.
+Everything is tested against the **652 turbines standing in Wallonia**
+(OpenStreetMap).
+
+- **Constraint set.** No layer has an avoidance ratio (share of the fleet ÷
+  share of the Region) above 0.77 — every constraint is one Walloon wind
+  development demonstrably avoids. Two candidate constraints failed and were
+  dropped.
+- **Siting geometry.** The machine spacing, farm radius and farm separation are
+  taken from the fleet's own distributions, not from a rule: 427 m median
+  between machines, 1 309 m p75 farm radius, 2 342 m p10 between farms.
+- **Landscape rule.** Of 2 261 settlements, 880 have a turbine within 4 km and
+  only **6 of them** fall below the 130° open-horizon threshold — the criterion
+  is observed in practice, and the implementation reproduces that.
+- The farm model then predicts 4.7 machines per farm against the fleet's 4.9,
+  and 307 farms against 134.
 
 ## Files
 
