@@ -9,3 +9,4 @@ results/figures/
 results/potential/
 results/profiles/
 results/*.tif
+results/*.gpkg

@@ -1,9 +1,11 @@
 # Walloon onshore-wind land-eligibility workflow
 
 A **stand-alone** Snakemake workflow that computes the technical potential for
-onshore wind in Wallonia from the Walloon Region's own regulatory cartography,
-using the same `atlite` land-eligibility machinery PyPSA-Eur uses for every
-other node.
+onshore wind in **the administrative Walloon Region** from the Region's own
+regulatory cartography, using the same `atlite` land-eligibility machinery
+PyPSA-Eur uses for every other node — and then places individual machines and
+wind farms on the surviving land rather than multiplying it by a capacity
+density.
 
 It exists because the Walloon onshore-wind cap in PyPSA-Wal
 (`potential:BEWAL:onwind:p_nom_max`, 6 500 MW) is an expert judgement from the
@@ -16,6 +18,11 @@ The report is [`docs/onwind_potential_wallonia/`](../docs/onwind_potential_wallo
 > (`resources/regions_onshore_base_s_adm.geojson`, `resources/nuts3_shapes.geojson`)
 > and the `atlite` cutout, and writes only inside this directory and into
 > `docs/onwind_potential_wallonia/`. No model input is modified.
+
+> **Scope is the administrative Region.** The model's `BEWAL` node is a
+> different polygon (89.6 % of the Region; western Hainaut falls on the Flemish
+> side of the Voronoi partition) and is deliberately not analysed here. The
+> region shapes are still read so the report can state the difference.
 
 ## Running
 
@@ -39,11 +46,17 @@ snakemake -c4 all --rerun-triggers mtime
 
 | stage | rule | output |
 |---|---|---|
-| retrieve 19 Walloon reference datasets | `retrieve_wallonia_layer` | `data/*.gpkg` + `.meta.json` provenance |
-| build the administrative and model regions | `build_regions` | `resources/regions.gpkg` |
+| retrieve 24 Walloon reference datasets | `retrieve_wallonia_layer` | `data/*.gpkg` + `.meta.json` provenance |
+| decode the Region's slope-class map into a ≥ 7 % mask | `retrieve_slope_raster` | `data/slope_ge7.tif` |
+| fetch the standing Walloon fleet from OpenStreetMap | `retrieve_osm_turbines` | `data/osm_wind_turbines.gpkg` |
+| build the region polygons | `build_regions` | `resources/regions.gpkg` |
 | translate the siting rules into geometry | `build_exclusion_layers` | `resources/exclusions_<turbine>/` |
 | run the `atlite` eligibility analysis | `build_availability` | `resources/availability_*.nc` |
 | area → capacity, capacity factor, FLH | `build_potential` | `results/potential/*.csv` |
+| rasterise the reference constraint set at 100 m | `build_eligible_raster` | `results/eligible_land_<turbine>.tif` |
+| **place machines and farms on that raster** | `place_turbines` | `results/tables/placement_*.csv`, `results/placement_*.gpkg` |
+| test the constraint set against the standing fleet | `validate_fleet` | `results/tables/fleet_validation_*.json` |
+| cost of each late-added constraint family | `servitude_costs` | `results/tables/servitude_costs_*.json` |
 | tables, figures, LaTeX macros | `collect_results`, `plot_*`, `make_report_inputs` | `results/`, `../docs/.../generated/` |
 
 ## Reviewing the constraint set
@@ -58,9 +71,21 @@ the Python:
 - `setbacks:` — distances, as formulas in `H` (tip height) and `D` (rotor
   diameter). `habitat_zone.default` switches between the 2013 and 2024
   *cadre de référence*.
+- `aviation:` — which classes of the DGTA obstacle-evaluation map are treated as
+  exclusions. The choice is calibrated against the standing fleet, and the
+  measurement that settles it is in the comment above the block.
+- `slope:` — the 7 % threshold of the 2013 Walloon methodology.
+- `radar_installations:` — the three reconstructed protection circles, with the
+  coordinate and the basis for each radius.
 - `scenarios:` — the constraint ladder, each step adding layers to the previous.
+- `placement:` — the minimum inter-turbine distance, and the farm model's
+  inter-farm distance band and minimum farm size.
+- `residual_allowance:` — the documented allowance for the two constraint
+  families that have no public geometry, with its bracket.
 - `turbines:` — the three classes, matching the "150 m / 180 m / 210 m"
   scenarios of the 2022 SPW/Gembloux favourable-zone update.
+- `bregilab:` — the published VITO Dynamic Energy Atlas figures the study
+  reconciles against.
 
 Changing a rule is a config edit; Snakemake re-derives only what depends on it.
 
@@ -74,9 +99,20 @@ recorded in `config.yaml` on 22 September 2026.
 
 `data/`, `resources/` and `results/*/` are gitignored — they are reproducible.
 
-## Known gaps
+## What is represented, and what is an allowance
 
-Aviation and defence radar exclusions, classified sites, priority
-ornithological zones and the 7 % slope criterion of the 2013 Walloon map are
-**not** implemented: the geometries are not public. They all reduce the
-potential. See §7 of the report.
+Everything in the Walloon method is now either geometry or a documented
+allowance; there are no unquantified gaps.
+
+| family | treatment |
+|---|---|
+| aeronautical servitudes | geometry — DGTA obstacle map, inner rings only (calibrated) |
+| slope ≥ 7 % | geometry — ERRUISSOL 10 m grid, decoded from the Region's map service |
+| classified sites, UNESCO buffers | geometry — `BC_PAT`, `PAT_MND_UNESCO` |
+| weather radar, radio astronomy, Bertem SSR | reconstructed circles at published coordinates |
+| priority ornithological zones (DEMNA) | allowance, 10 % (bracket 0–20 %) — layer not public |
+| partial constraints at 25 % success | allowance, 15 % (bracket 0–30 %) |
+| azimuth of open horizon per village | not represented — needs a site-level model |
+| broad-leaved / coniferous split | CORINE 250 m; CARTOFOR unpublished, WALOUS not bulk-retrievable |
+
+See §3.5, §6.4 and §8 of the report.

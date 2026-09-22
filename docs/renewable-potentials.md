@@ -74,20 +74,34 @@ target — which is what a technical potential should look like. The only local
 overrides are Wallonia's, where PNEC-PACE / EDORA data is better than the raster:
 `BEWAL onwind 6 500`, `BEWAL solar 13 000`, `BEWAL solar rooftop 46 000` MW.
 
-> **The `BEWAL onwind 6 500` override is now under review** (22 Sep 2026).
+> **The `BEWAL onwind 6 500` override has now been checked against a full
+> land-and-siting calculation** (22 Sep 2026).
 > [`workflow_onwind_wal/`](../workflow_onwind_wal/) recomputes the Walloon
-> onshore-wind land potential against the Region's own regulatory cartography —
-> plan de secteur, *cadre de référence éolien* 2024, Natura 2000, reserves,
-> landscape perimeters, natural hazards — using the same atlite machinery
-> PyPSA-Eur uses elsewhere. Report:
-> [`docs/onwind_potential_wallonia/`](onwind_potential_wallonia/). Two findings
-> bear on this section directly: (i) 6 500 MW is a *deployment* expectation
-> assembled from a project pipeline, not a land potential, and the two answer
-> different questions; (ii) the model's `BEWAL` region covers only **89.6 %**
-> of Wallonia — 2 191 km² of western Hainaut is inside `BEVLG` — so every
-> land-based Walloon limit in this document is stated on a region that is not
-> the Walloon Region. **No input has been changed**; the decision is pending the
-> missing aviation/defence radar layers.
+> onshore-wind potential against the Region's own regulatory cartography — plan
+> de secteur, *cadre de référence éolien* 2024, Natura 2000, reserves, landscape
+> perimeters, natural hazards, the DGTA aeronautical obstacle map, the LiDAR
+> slope grid and the classified-site registers — using the same atlite machinery
+> PyPSA-Eur uses elsewhere, and then **places individual machines and wind
+> farms** on the surviving land. Report:
+> [`docs/onwind_potential_wallonia/`](onwind_potential_wallonia/). Four findings
+> bear on this section directly:
+>
+> 1. For the **administrative Walloon Region** the credible gross technical
+>    potential is **2.5–6.9 GW, central 4.1 GW**. 6 500 MW lies inside that
+>    range, at its optimistic end — reachable at the permissive end of the
+>    framework's 4–6 km inter-farm distance and with little allowance for the
+>    two constraint families that have no public geometry.
+> 2. 6 500 MW is a *deployment* expectation assembled from a project pipeline,
+>    not a land potential. That the two land in the same place is a coincidence
+>    of construction, not a confirmation.
+> 3. The model's `BEWAL` region covers only **89.6 %** of Wallonia — 2 191 km²
+>    of western Hainaut is inside `BEVLG` — so every land-based Walloon limit in
+>    this document is stated on a region that is not the Walloon Region.
+> 4. An earlier reading of the same study said 2–4.5 GW. It rested on a
+>    patch-size screen with no legal basis and is retracted in §6.6 of the
+>    report.
+>
+> **No input has been changed.**
 
 ## 3. Growth rate: 2 × the IRENA annual record
 

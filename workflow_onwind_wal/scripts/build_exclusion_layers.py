@@ -23,6 +23,13 @@ GeoPackage so that any of them can be inspected in QGIS:
 ``nature`` / ``landscape`` / ``risk``
     Protected-area, landscape and natural-hazard layers.
 
+``aviation`` / ``heritage`` / ``radar``
+    The aeronautical servitudes of the DGTA obstacle-evaluation map, the
+    classified sites and their protection perimeters, and a reconstruction of
+    the radar and radio-astronomy perimeters that have no published geometry.
+    The slope criterion of the same group is a raster and is built separately
+    by ``retrieve_slope_raster.py``.
+
 Everything is computed in the equal-area CRS of the workflow (EPSG:3035).
 Buffer widths that depend on the machine are evaluated from ``H`` (total tip
 height = hub height + rotor radius) and ``D`` (rotor diameter).
@@ -329,6 +336,47 @@ if __name__ == "__main__":
     risk = union_of(["flood", "karst", "landslide", "steep_slopes", "water_capture"])
 
     # ------------------------------------------------------------------
+    # 3b. Aeronautical servitudes, classified sites, radar perimeters
+    # ------------------------------------------------------------------
+    av_cfg = snakemake.params.aviation
+    aoem = read(src["aviation_obstacles"], crs)
+    keep = aoem[aoem["HAUTEURS"].isin(av_cfg["exclude_heights"])]
+    logger.info(
+        "aviation: %d of %d AOEM polygons in classes %s",
+        len(keep),
+        len(aoem),
+        av_cfg["exclude_heights"],
+    )
+    aviation = dissolve(keep)
+
+    heritage = union_of(
+        [
+            "heritage_sites",
+            "heritage_ensembles",
+            "heritage_protection",
+            "heritage_unesco",
+        ]
+    )
+
+    # Circles around the installations whose protection perimeter is real but
+    # unpublished.  Coordinates are WGS84 in the config; the buffer is applied
+    # in the equal-area working CRS.
+    radar_cfg = snakemake.params.radar_installations or []
+    if radar_cfg:
+        pts = gpd.GeoSeries(
+            gpd.points_from_xy(
+                [float(r["lon"]) for r in radar_cfg],
+                [float(r["lat"]) for r in radar_cfg],
+            ),
+            crs=4326,
+        ).to_crs(crs)
+        radar = _union([p.buffer(float(r["radius_m"])) for p, r in zip(pts, radar_cfg)])
+        for r in radar_cfg:
+            logger.info("radar surrogate: %s, %.0f m", r["name"], float(r["radius_m"]))
+    else:
+        radar = None
+
+    # ------------------------------------------------------------------
     # 4. Write
     # ------------------------------------------------------------------
     # Two copies of every layer: one multi-layer GeoPackage for inspection in
@@ -351,6 +399,9 @@ if __name__ == "__main__":
         ("nature", nature),
         ("landscape", landscape),
         ("risk", risk),
+        ("aviation", aviation),
+        ("heritage", heritage),
+        ("radar", radar),
     ]:
         g = clip(geom, boundary)
         if g is None:

@@ -27,7 +27,9 @@ OUT = "results"
 SCENARIOS = list(config["scenarios"])
 TURBINES = list(config["turbines"])
 TURBINES = [t for t in TURBINES if isinstance(config["turbines"][t], dict)]
-REGIONS = ["admin", "model"]
+# Only the administrative Walloon Region is analysed.  The model's BEWAL node
+# is a different polygon; see docs/onwind_potential_wallonia section 3.
+REGIONS = ["admin"]
 
 # S0 reproduces PyPSA-Eur and is turbine-independent for the land side, but the
 # capacity factor still depends on the machine, so it is run for every class.
@@ -51,6 +53,11 @@ WALLOON_SOURCES = [
     "flood",
     "water_capture",
     "address_points",
+    "aviation_obstacles",
+    "heritage_sites",
+    "heritage_ensembles",
+    "heritage_protection",
+    "heritage_unesco",
 ]
 
 
@@ -67,17 +74,19 @@ rule all:
         f"{OUT}/tables/exclusion_waterfall.csv",
         f"{OUT}/tables/sensitivity.csv",
         f"{OUT}/tables/comparison.csv",
+        expand(f"{OUT}/tables/placement_{{turbine}}.csv", turbine=TURBINES),
         f"{OUT}/figures/map_scenarios.png",
         f"{OUT}/figures/map_reference.png",
         f"{OUT}/figures/map_eligible.png",
         f"{OUT}/figures/waterfall.png",
         f"{OUT}/figures/sensitivity.png",
-        f"{OUT}/figures/region_mismatch.png",
 
 
 rule download:
     input:
         expand(f"{DATA}/{{source}}.gpkg", source=WALLOON_SOURCES),
+        f"{DATA}/slope_ge7.tif",
+        f"{DATA}/osm_wind_turbines.gpkg",
 
 
 rule report:
@@ -106,6 +115,25 @@ rule retrieve_wallonia_layer:
     retries: 2
     script:
         "scripts/retrieve_wallonia_layer.py"
+
+
+rule retrieve_slope_raster:
+    message:
+        "Rendering the Walloon slope-class map into a >= {params.threshold_pct} % mask"
+    params:
+        crs=config["atlite"]["crs"],
+        out_res=config["atlite"]["excluder_resolution"],
+        threshold_pct=config["slope"]["threshold_pct"],
+    input:
+        regions=f"{RES}/regions.gpkg",
+    output:
+        raster=f"{DATA}/slope_ge7.tif",
+        meta=f"{DATA}/slope_ge7.meta.json",
+    log:
+        "logs/retrieve_slope_raster.log",
+    retries: 2
+    script:
+        "scripts/retrieve_slope_raster.py"
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +170,8 @@ rule build_exclusion_layers:
         plan_de_secteur=config["plan_de_secteur"],
         setbacks=config["setbacks"],
         forest_split=config["forest_split"],
+        aviation=config["aviation"],
+        radar_installations=config["radar_installations"],
         turbine=lambda w: config["turbines"][w.turbine],
     input:
         unpack(
@@ -176,6 +206,7 @@ def availability_input(w):
     else:
         inp["layers"] = f"{RES}/exclusions_{w.turbine}"
         inp["dwelling_raster"] = f"{RES}/dwelling_setback_{w.turbine}.tif"
+        inp["slope_raster"] = f"{DATA}/slope_ge7.tif"
     return inp
 
 
@@ -248,12 +279,22 @@ rule collect_results:
         ),
         exclusion_stats=expand(f"{RES}/exclusions_{{turbine}}.json", turbine=TURBINES),
         region_stats=f"{RES}/region_stats.json",
-        fragmentation=f"{OUT}/tables/fragmentation.json",
+        fragmentation=(
+            f"{OUT}/tables/fragmentation_" + config["reference_turbine"] + ".json"
+        ),
+        placement=expand(f"{OUT}/tables/placement_{{turbine}}.csv", turbine=TURBINES),
+        servitudes=(
+            f"{OUT}/tables/servitude_costs_" + config["reference_turbine"] + ".json"
+        ),
+        fleet=(
+            f"{OUT}/tables/fleet_validation_" + config["reference_turbine"] + ".json"
+        ),
     output:
         summary=f"{OUT}/tables/potential_summary.csv",
         waterfall=f"{OUT}/tables/exclusion_waterfall.csv",
         sensitivity=f"{OUT}/tables/sensitivity.csv",
         comparison=f"{OUT}/tables/comparison.csv",
+        placement=f"{OUT}/tables/placement.csv",
         headline=f"{OUT}/tables/headline.json",
     log:
         "logs/collect_results.log",
@@ -268,7 +309,6 @@ rule plot_maps:
         config=config,
     input:
         regions=f"{RES}/regions.gpkg",
-        mismatch=f"{RES}/region_mismatch.gpkg",
         layers=lambda w: f"{RES}/exclusions_{config['reference_turbine']}.gpkg",
         availability=expand(
             f"{RES}/availability_{{scenario}}_{{turbine}}_admin.nc",
@@ -278,7 +318,6 @@ rule plot_maps:
     output:
         scenarios=f"{OUT}/figures/map_scenarios.png",
         reference=f"{OUT}/figures/map_reference.png",
-        mismatch=f"{OUT}/figures/region_mismatch.png",
     log:
         "logs/plot_maps.log",
     resources:
@@ -287,20 +326,122 @@ rule plot_maps:
         "scripts/plot_maps.py"
 
 
-rule plot_eligible_map:
+rule build_eligible_raster:
     message:
-        "Plotting the final eligibility raster at {params.res} m"
+        "Rasterising the reference constraint set at {params.res} m for {wildcards.turbine}"
     params:
         config=config,
         res=config["atlite"]["excluder_resolution"],
     input:
         regions=f"{RES}/regions.gpkg",
-        layer_dir=f"{RES}/exclusions_{config['reference_turbine']}",
-        dwelling_raster=f"{RES}/dwelling_setback_{config['reference_turbine']}.tif",
+        layer_dir=f"{RES}/exclusions_{{turbine}}",
+        dwelling_raster=f"{RES}/dwelling_setback_{{turbine}}.tif",
+        slope_raster=f"{DATA}/slope_ge7.tif",
+    output:
+        raster=f"{OUT}/eligible_land_{{turbine}}.tif",
+        fragmentation=f"{OUT}/tables/fragmentation_{{turbine}}.json",
+    log:
+        "logs/build_eligible_raster_{turbine}.log",
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/build_eligible_raster.py"
+
+
+rule retrieve_osm_turbines:
+    message:
+        "Retrieving the standing Walloon wind fleet from OpenStreetMap"
+    params:
+        crs=config["atlite"]["crs"],
+    input:
+        regions=f"{RES}/regions.gpkg",
+    output:
+        points=f"{DATA}/osm_wind_turbines.gpkg",
+        meta=f"{DATA}/osm_wind_turbines.meta.json",
+    log:
+        "logs/retrieve_osm_turbines.log",
+    retries: 2
+    script:
+        "scripts/retrieve_osm_turbines.py"
+
+
+rule validate_fleet:
+    message:
+        "Testing the constraint set against the standing fleet"
+    params:
+        config=config,
+        # Two machines belong to the same farm if they are within this distance.
+        # A real Walloon farm is a string of turbines at just above the array
+        # spacing, so 1.5 km is comfortably above one link and well below the
+        # inter-farm distance.
+        farm_link_m=1500,
+    input:
+        points=f"{DATA}/osm_wind_turbines.gpkg",
+        regions=f"{RES}/regions.gpkg",
+        layer_dir=f"{RES}/exclusions_{{turbine}}",
+        dwelling_raster=f"{RES}/dwelling_setback_{{turbine}}.tif",
+        slope_raster=f"{DATA}/slope_ge7.tif",
+    output:
+        table=f"{OUT}/tables/fleet_validation_{{turbine}}.json",
+    log:
+        "logs/validate_fleet_{turbine}.log",
+    resources:
+        mem_mb=8000,
+    script:
+        "scripts/validate_fleet.py"
+
+
+rule servitude_costs:
+    message:
+        "Marginal cost of each late-added constraint family ({wildcards.turbine})"
+    params:
+        config=config,
+        base_scenario="S5_risk",
+    input:
+        regions=f"{RES}/regions.gpkg",
+        layer_dir=f"{RES}/exclusions_{{turbine}}",
+        dwelling_raster=f"{RES}/dwelling_setback_{{turbine}}.tif",
+        slope_raster=f"{DATA}/slope_ge7.tif",
+    output:
+        table=f"{OUT}/tables/servitude_costs_{{turbine}}.json",
+    log:
+        "logs/servitude_costs_{turbine}.log",
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/servitude_costs.py"
+
+
+rule place_turbines:
+    message:
+        "Allocating machines on the eligible raster for {wildcards.turbine}"
+    params:
+        config=config,
+    input:
+        raster=f"{OUT}/eligible_land_{{turbine}}.tif",
+    output:
+        table=f"{OUT}/tables/placement_{{turbine}}.csv",
+        points=f"{OUT}/placement_{{turbine}}.gpkg",
+    log:
+        "logs/place_turbines_{turbine}.log",
+    resources:
+        mem_mb=8000,
+    script:
+        "scripts/place_turbines.py"
+
+
+rule plot_eligible_map:
+    message:
+        "Plotting the final eligibility raster"
+    params:
+        config=config,
+    input:
+        regions=f"{RES}/regions.gpkg",
+        raster=f"{OUT}/eligible_land_{config['reference_turbine']}.tif",
+        fragmentation=f"{OUT}/tables/fragmentation_{config['reference_turbine']}.json",
+        placement=f"{OUT}/tables/placement_{config['reference_turbine']}.csv",
     output:
         figure=f"{OUT}/figures/map_eligible.png",
-        raster=f"{OUT}/eligible_land.tif",
-        fragmentation=f"{OUT}/tables/fragmentation.json",
     log:
         "logs/plot_eligible_map.log",
     resources:
@@ -342,6 +483,7 @@ rule make_report_inputs:
         waterfall=f"{OUT}/tables/exclusion_waterfall.csv",
         sensitivity=f"{OUT}/tables/sensitivity.csv",
         comparison=f"{OUT}/tables/comparison.csv",
+        placement=f"{OUT}/tables/placement.csv",
         exclusion_stats=expand(f"{RES}/exclusions_{{turbine}}.json", turbine=TURBINES),
         source_meta=expand(f"{DATA}/{{source}}.meta.json", source=WALLOON_SOURCES),
     output:
@@ -349,6 +491,10 @@ rule make_report_inputs:
         waterfall_tex=f"{DOCDIR}/generated/table_waterfall.tex",
         sensitivity_tex=f"{DOCDIR}/generated/table_sensitivity.tex",
         comparison_tex=f"{DOCDIR}/generated/table_comparison.tex",
+        fleet_tex=f"{DOCDIR}/generated/table_fleet.tex",
+        placement_tex=f"{DOCDIR}/generated/table_placement.tex",
+        servitudes_tex=f"{DOCDIR}/generated/table_servitudes.tex",
+        bregilab_tex=f"{DOCDIR}/generated/table_bregilab.tex",
         full_tex=f"{DOCDIR}/generated/table_full.tex",
         sources_tex=f"{DOCDIR}/generated/table_sources.tex",
     log:
@@ -367,6 +513,10 @@ rule build_report:
             f"{DOCDIR}/generated/table_waterfall.tex",
             f"{DOCDIR}/generated/table_sensitivity.tex",
             f"{DOCDIR}/generated/table_comparison.tex",
+            f"{DOCDIR}/generated/table_fleet.tex",
+            f"{DOCDIR}/generated/table_placement.tex",
+            f"{DOCDIR}/generated/table_servitudes.tex",
+            f"{DOCDIR}/generated/table_bregilab.tex",
             f"{DOCDIR}/generated/table_full.tex",
             f"{DOCDIR}/generated/table_sources.tex",
         ],
@@ -376,7 +526,6 @@ rule build_report:
             f"{OUT}/figures/map_eligible.png",
             f"{OUT}/figures/waterfall.png",
             f"{OUT}/figures/sensitivity.png",
-            f"{OUT}/figures/region_mismatch.png",
         ],
     output:
         f"{DOCDIR}/onwind_potential_wallonia.pdf",

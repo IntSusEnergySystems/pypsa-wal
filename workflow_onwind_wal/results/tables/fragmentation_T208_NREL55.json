@@ -1,0 +1,12 @@
+{
+  "turbine": "T208_NREL55",
+  "n_patches": 5228,
+  "footprint_km2": 1.072,
+  "median_patch_km2": 0.02,
+  "area_km2": 543.0,
+  "area_in_patches_ge_1_turbine_km2": 151.9,
+  "area_in_patches_ge_4_turbines_km2": 0.0,
+  "largest_patch_km2": 3.8,
+  "share_ge_1_turbine_pct": 28.0,
+  "share_ge_4_turbines_pct": 0.0
+}

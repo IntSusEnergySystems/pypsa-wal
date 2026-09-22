@@ -27,11 +27,17 @@ from pathlib import Path
 
 import atlite
 import geopandas as gpd
-import numpy as np
 import xarray as xr
 from atlite.gis import ExclusionContainer
 
 logger = logging.getLogger(__name__)
+
+
+# Layers carried as rasters rather than vectors: the scattered-dwelling setback
+# (buffering 1.5 M address points as vectors is intractable; an exact distance
+# transform on a 50 m grid is equivalent at this resolution) and the slope
+# criterion (a grid by nature).
+RASTER_LAYERS = {"dwelling_setback": "dwelling_raster", "slope": "slope_raster"}
 
 
 def build_excluder(scenario, params, layers_path, crs, res):
@@ -57,12 +63,9 @@ def build_excluder(scenario, params, layers_path, crs, res):
 
     used = []
     for name in scenario["layers"]:
-        # The scattered-dwelling setback is carried as a raster: buffering
-        # 1.5 M address points as vectors is intractable, and an exact distance
-        # transform on a 50 m grid is equivalent at this resolution.
-        if name == "dwelling_setback":
+        if name in RASTER_LAYERS:
             excluder.add_raster(
-                params["dwelling_raster"], codes=[1], crs=crs, nodata=255
+                params[RASTER_LAYERS[name]], codes=[1], crs=crs, nodata=255
             )
             used.append(name)
             continue
@@ -106,6 +109,7 @@ if __name__ == "__main__":
             "corine": snakemake.input.get("corine"),
             "natura": snakemake.input.get("natura"),
             "dwelling_raster": snakemake.input.get("dwelling_raster"),
+            "slope_raster": snakemake.input.get("slope_raster"),
         },
         snakemake.input.get("layers"),
         crs,

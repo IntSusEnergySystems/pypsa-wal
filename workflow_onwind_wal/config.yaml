@@ -86,6 +86,36 @@ capacity_densities:
 reference_density: "derived"
 
 # ---------------------------------------------------------------------------
+# Turbine placement
+#
+# The headline capacity of this study comes from placing machines on the
+# eligible raster under a minimum inter-turbine distance, not from multiplying
+# area by a density.  `bregilab_spacing_rotor_diameters` is the rule of the
+# VITO Dynamic Energy Atlas (5 D), carried so that the two studies can be
+# compared on identical ground; the reference spacing is the isotropic
+# equivalent of the 5D x 7D array, sqrt(5 x 7) D = 5.92 D.
+# ---------------------------------------------------------------------------
+placement:
+  bregilab_spacing_rotor_diameters: 5
+  reference_case: "array"
+  reference_model: "farm"
+  # The two structural rules of the Walloon framework that a bare
+  # minimum-distance allocation violates.  `interfarm_distance_m` is the lower
+  # end of the 4-6 km indicative inter-distance between wind farms of the cadre
+  # de référence, i.e. the permissive end; `min_turbines` is the definition of a
+  # wind farm since 24 January 2024 (lowered from five); `radius_m` is the
+  # half-span of one farm, set so that farms cannot overlap at the inter-farm
+  # distance.
+  farm:
+    interfarm_distance_m: [4000, 5000, 6000]
+    # The midpoint of the framework's own indicative band is the neutral
+    # reading; 4 km is its permissive end and 6 km its restrictive one, and both
+    # are reported.
+    reference_interfarm_distance_m: 5000
+    radius_m: 1800
+    min_turbines: 4
+
+# ---------------------------------------------------------------------------
 # Source datasets (Walloon open data, CC-BY 4.0, ESRI-REST services of
 # https://geoservices.wallonie.be).  `count` is the feature count observed on
 # 2026-09-22 and is only used to sanity-check the download.
@@ -213,6 +243,37 @@ sources:
     fields: []
     simplify: 25
     title: "Zones de prévention rapprochée (IIa) des captages"
+  aviation_obstacles:
+    service: "AMENAGEMENT_TERRITOIRE/AOEM"
+    layer: 0
+    fields: ["HAUTEURS"]
+    count: 6435
+    simplify: 25
+    title: "Carte d'évaluation pour les obstacles aéronautiques (DGTA)"
+  heritage_sites:
+    service: "AMENAGEMENT_TERRITOIRE/BC_PAT"
+    layer: 1
+    fields: []
+    count: 1259
+    title: "Biens classés — sites classés"
+  heritage_ensembles:
+    service: "AMENAGEMENT_TERRITOIRE/BC_PAT"
+    layer: 2
+    fields: []
+    count: 53
+    title: "Biens classés — ensembles architecturaux"
+  heritage_protection:
+    service: "AMENAGEMENT_TERRITOIRE/BC_PAT"
+    layer: 4
+    fields: []
+    count: 367
+    title: "Biens classés — zones de protection"
+  heritage_unesco:
+    service: "AMENAGEMENT_TERRITOIRE/PAT_MND_UNESCO"
+    layer: 1
+    fields: []
+    count: 24
+    title: "Patrimoine mondial UNESCO — zones tampon"
   address_points:
     service: "DONNEES_BASE/ICAR_ADR_PT"
     layer: 1
@@ -236,6 +297,20 @@ sources:
     layer: 2
     fields: []
     title: "Tissu urbanisé — ouvert"
+
+# ---------------------------------------------------------------------------
+# Slope
+#
+# The 2013 Walloon favourable-zone methodology treats slopes above 7 % as
+# technically incompatible with the crane pad and access track of a large
+# machine.  The Region publishes the slope grid (ERRUISSOL, 10 m DTM) only as a
+# visualisation service; scripts/retrieve_slope_raster.py renders it and decodes
+# the class palette.  A 100 m cell is excluded when the majority of its 25 m
+# samples are at or above the threshold, i.e. when most of the hectare is too
+# steep.
+# ---------------------------------------------------------------------------
+slope:
+  threshold_pct: 7
 
 # ---------------------------------------------------------------------------
 # Plan de secteur zoning
@@ -300,6 +375,68 @@ forest_split:
   broadleaved_codes: [23, 25]
 
 # ---------------------------------------------------------------------------
+# Aeronautical servitudes
+#
+# "Carte d'évaluation pour les obstacles aéronautiques" (AOEM) gives, for every
+# point of Wallonia, the height above which the Direction générale Transport
+# Aérien must be consulted.  The classes form an exact partition of the
+# territory and are nested rings around the aerodromes: 0 m on the runway
+# surfaces, then 15, 35 and 50 m outwards.  Two of the six classes — 25 m and
+# 60 m — are the territory-wide background (one polygon of 8 045 km2 and one of
+# 1 556 km2 respectively) and express the national notification rule rather than
+# an aerodrome servitude.
+#
+# Which of the four aerodrome classes is actually a no-go is settled against the
+# standing fleet rather than by reading the map (scripts/validate_fleet.py).  Of
+# the 652 turbines standing in Wallonia:
+#
+#     class   share of the Region   share of the fleet   avoidance ratio
+#       0 m           3.3 %                0.5 %              0.14
+#      15 m           4.2 %                1.2 %              0.29
+#      35 m           2.9 %                5.5 %              1.88
+#      50 m           8.5 %               13.6 %              1.60
+#
+# The 0 m and 15 m rings are strongly avoided; the 35 m and 50 m rings carry
+# *more* turbines per square kilometre than Wallonia as a whole, so they are a
+# consultation duty and not a siting constraint.  `exclude_heights` therefore
+# keeps only the two inner rings; `consultation_heights` records the other two
+# so the choice is visible.  The two background classes are the national
+# notification rule — treating them as exclusions would remove the whole Region.
+# ---------------------------------------------------------------------------
+aviation:
+  exclude_heights: [0, 15]
+  background_heights: [25, 60]
+  consultation_heights: [35, 50]
+
+# ---------------------------------------------------------------------------
+# Radar and scientific installations
+#
+# skeyes and Defence do not publish radar-constraint geometry, and the AOEM map
+# covers obstacle-limitation surfaces, not radar interference.  The three
+# installations whose protection perimeters fall inside Wallonia and are not
+# already covered by an aerodrome ring are reconstructed here as circles around
+# their published coordinates, with the generic separation distances of the
+# operator concerned.  This is an approximation and is reported as such; it is
+# replaced the day SPW Énergie supplies the official layers.
+# ---------------------------------------------------------------------------
+radar_installations:
+  - name: "Wideumont weather radar (RMI)"
+    lat: 49.9139
+    lon: 5.5044
+    radius_m: 5000
+    basis: "WMO/OPERA guidance: no wind turbine within 5 km of a C-band weather radar"
+  - name: "Humain radio-astronomy station (Royal Observatory)"
+    lat: 50.1919
+    lon: 5.2553
+    radius_m: 3000
+    basis: "radio-quiet perimeter of the station"
+  - name: "Bertem primary/secondary surveillance radar (skeyes)"
+    lat: 50.8608
+    lon: 4.6069
+    radius_m: 10000
+    basis: "secondary-radar exclusion radius of the order of 10 km; the site is in Flanders and only the southern part of the circle reaches Walloon Brabant"
+
+# ---------------------------------------------------------------------------
 # Setbacks.  `formula` entries are evaluated with H = total tip height and
 # D = rotor diameter of the turbine class under study.
 # ---------------------------------------------------------------------------
@@ -312,8 +449,11 @@ setbacks:
   motorway: 50                      # m  (+ the blade-length rule below)
   road: "D / 2"                     # 1.5 x blade length ~ 0.75 D; see report §4.4
   road_multiplier: 1.5              # applied to the blade length (D/2)
+  # The plan-de-secteur rail layer does not separate high-speed from ordinary
+  # track, so the high-speed rule (190 m) is applied to the whole network.  The
+  # ordinary-track rule (50 m) is recorded for reference and is not used.
   railway: 190
-  railway_high_speed: 140
+  railway_ordinary_reference: 50
   hv_line: "1.5 * D"
   waterway: 0                       # no quantified rule in the CDR
 
@@ -355,8 +495,49 @@ scenarios:
     mode: "walloon"
     layers: ["pds_ineligible", "habitat_setback", "dwelling_setback",
              "infrastructure_setback", "nature", "landscape", "risk"]
+  S6_servitudes:
+    title: "+ aeronautical servitudes, slope >= 7 %, classified sites, radar"
+    mode: "walloon"
+    layers: ["pds_ineligible", "habitat_setback", "dwelling_setback",
+             "infrastructure_setback", "nature", "landscape", "risk",
+             "aviation", "slope", "heritage", "radar"]
 
-reference_scenario: "S5_risk"
+reference_scenario: "S6_servitudes"
+
+# ---------------------------------------------------------------------------
+# Residual allowance for the constraint families that still have no geometry
+#
+# Two families of the Walloon method cannot be represented at all from public
+# data, and both reduce the potential:
+#
+#   ornithology  the DEMNA high-priority bird zones are an integral exclusion of
+#                the favourable-zone method and are not published.  They were
+#                built largely from concentrations of sensitive species, which
+#                in Wallonia coincide to a large extent with the Natura 2000
+#                bird SPAs and the wetlands already excluded here; the
+#                incremental area is the non-Natura remainder.  10 % of the
+#                surviving land is taken as the central estimate, bracketed
+#                0-20 %.  This is a judgement, not a measurement.
+#
+#   partial      the method distinguishes integral from *partial* exclusions
+#                (medium-priority bird zones, bat-interest zones, migration
+#                corridors, the principal ecological structure, radar study
+#                zones between 8 and 16 km) and grants turbines falling in them
+#                a 25 % success rate.  Their combined footprint is unknown; the
+#                central estimate assumes they cover a fifth of the surviving
+#                land, so the expected loss is 0.20 x 0.75 = 15 %.
+#
+# The two are applied multiplicatively to the land that survives S6.
+# ---------------------------------------------------------------------------
+residual_allowance:
+  ornithology:
+    central: 0.10
+    low: 0.00
+    high: 0.20
+  partial_constraints:
+    central: 0.15
+    low: 0.00
+    high: 0.30
 
 # ---------------------------------------------------------------------------
 # Benchmarks quoted in the report
@@ -373,3 +554,39 @@ benchmarks:
   # workflow end to end; see docs/renewable-potentials.md section 10.1.
   model_profile_flh_2013: 2425
   model_profile_flh_2010: 2302
+  # External anchor for the plausibility of the result: the onshore fleet
+  # Germany has actually built.  63.55 GW in 28 717 machines at the end of 2024
+  # (Deutsche WindGuard, "Status of Onshore Wind Energy Development in Germany,
+  # Year 2024"), on 357 600 km2.
+  germany_onshore_gw: 63.55
+  germany_onshore_turbines: 28717
+  germany_area_km2: 357600
+
+# ---------------------------------------------------------------------------
+# BREGILAB / VITO Dynamic Energy Atlas, the other published bottom-up estimate
+# of the Walloon onshore-wind potential.
+#
+# Clymans W., Meyvis L., Poelmans L., Schils R., Vingerhoets R., Van Lipzig N.,
+# Meyers J. (2022), "BREGILAB WP3 RES Generation: Wind & PV deployment evolution
+# and availability factor", VITO/EnergyVille for FPS Economy, Table 22 and
+# section 5.4.1.
+#
+# Table 22 reports the Walloon onshore figures as 1.01 GW current and 10.39 GW
+# additional potential; the 11.4 GW quoted in the running text is their sum,
+# i.e. a *gross* potential on the same convention as this study's p_nom_max.
+# ---------------------------------------------------------------------------
+bregilab:
+  reference: >-
+    Clymans et al. (2022), BREGILAB WP3, VITO/EnergyVille, Table 22
+  weather_year: 2017
+  turbine: "Vestas V112, 3.3 MW, hub 94 m, rotor 112 m"
+  p_nom_mw: 3.3
+  rotor_diameter_m: 112
+  min_spacing_m: 560
+  performance_ratio: 0.69
+  wallonia_current_gw: 1.01
+  wallonia_additional_gw: 10.39
+  wallonia_total_gw: 11.40
+  wallonia_current_gwh: 1744
+  wallonia_additional_gwh: 16456
+  wallonia_potential_availability_factor: 0.181

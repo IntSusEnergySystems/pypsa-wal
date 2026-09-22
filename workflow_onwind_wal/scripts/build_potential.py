@@ -20,13 +20,11 @@ capacity-weighted mean of the cell profiles.  Full-load hours follow from the
 annual mean of that profile.
 """
 
-import json
 import logging
 from pathlib import Path
 
 import atlite
 import geopandas as gpd
-import numpy as np
 import pandas as pd
 import xarray as xr
 

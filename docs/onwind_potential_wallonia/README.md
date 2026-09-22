@@ -1,7 +1,7 @@
 # The technical potential for onshore wind in Wallonia
 
 **[onwind_potential_wallonia.pdf](onwind_potential_wallonia.pdf)** — land-eligibility
-analysis of Walloon onshore wind against the Region's own regulatory
+and siting analysis of Walloon onshore wind against the Region's own regulatory
 cartography, and what it implies for `potential:BEWAL:onwind:p_nom_max`.
 
 Produced by [`workflow_onwind_wal/`](../../workflow_onwind_wal/):
@@ -13,20 +13,44 @@ cd workflow_onwind_wal && snakemake -c4 report
 **No PyPSA-Wal input has been modified.** This is the evidence base for that
 decision, not the decision.
 
+## Scope
+
+The **administrative Walloon Region** (16 905 km²), not the model's `BEWAL`
+node. The node covers 89.6 % of the Region — western Hainaut falls on the
+Flemish side of the Voronoi partition — and is out of scope here; §1.4 of the
+report states the difference and its consequences.
+
 ## Headline
 
-| | Wallonia (administrative) | BEWAL node |
-|---|---:|---:|
-| eligible land, all constraints | 870 km² (5.1 %) | 813 km² (5.4 %) |
-| installable capacity, reference case | 4 417 MW | 4 127 MW |
-| range across turbine classes and spacings | 2 489 – 7 560 MW | 2 327 – 7 059 MW |
-| after the developability screen | 2 066 MW | — |
-| PyPSA-Eur default land analysis | 19 079 MW | 18 270 MW |
-| cap in the model today | — | 6 500 MW |
+| | Wallonia (administrative) |
+|---|---:|
+| eligible land, all implemented constraints | 561 km² (3.3 %) |
+| free allocation (no grouping rule) — *upper bound* | 13 084 MW |
+| farm allocation, 4 / 5 / 6 km between farms | 6 936 / 5 348 / 4 440 MW |
+| **central estimate** (5 km + residual allowance) | **4 091 MW** |
+| credible range | 2 486 – 6 936 MW |
+| PyPSA-Eur default land analysis (area × 3 MW/km²) | 19 079 MW |
+| BREGILAB / VITO Dynamic Energy Atlas, gross | 11 400 MW |
+| cap in the model today | 6 500 MW |
+| standing fleet, end 2024 | 1 528 MW |
 
-Two independent methods converge: the developability-screened figure
-(2 066 MW) and the Region's own 2022 site-by-site simulation
-(457 turbines ≈ 2 559 MW) agree within 20 %.
+## What changed, and why it matters
+
+An earlier version of this study concluded **2–4.5 GW**. That reading does not
+survive: it rested on screening the eligible raster by patch size, a cut-off
+with no legal or engineering basis. Capacity now comes from **placing machines
+and wind farms** on the raster under the framework's own rules — the method
+BREGILAB uses, plus the Walloon grouping and inter-distance criteria it lacks.
+The 6 500 MW cap sits *inside* the credible range rather than far above it.
+§6.6 of the report retracts the earlier figure in full.
+
+## Calibration
+
+The constraint set is tested against the **652 turbines standing in Wallonia**
+(OpenStreetMap). No layer has an avoidance ratio above 0.77 — every constraint
+is one Walloon wind development demonstrably avoids. Two candidate constraints
+failed the test and were dropped. The farm model predicts 5.6 machines per farm
+against the 4.9 of the real fleet, and 240 farms against 134.
 
 ## Files
 
@@ -38,16 +62,11 @@ Two independent methods converge: the developability-screened figure
 
 Do not edit `generated/` or `figures/` by hand — re-run the workflow.
 
-## Validation
+## What is an allowance rather than geometry
 
-Reproducing PyPSA-Eur's own constraint set with PyPSA-Eur's own turbine on the
-model's own region returns 2 442 full-load hours against the 2 425 h of the
-profile PyPSA-Wal actually carries (+0.7 %). The plumbing is right; the
-differences that follow come from the constraint set.
-
-## What is missing
-
-Aviation and defence radar exclusions, classified sites, priority ornithological
-zones and the 7 % slope criterion are not implemented — the geometries are not
-public. All four reduce the potential. §7 of the report lists them in order of
-expected impact, with the action needed to close each.
+Aeronautical servitudes, the 7 % slope criterion, classified sites and the
+radar perimeters are now implemented from data. Two families remain
+unrepresentable and carry a documented, bracketed allowance: the DEMNA
+priority-bird zones (10 %, 0–20 %) and the method's *partial* constraints
+(15 %, 0–30 %). The azimuth-of-open-horizon test needs a site-level model and
+is not represented at all. All of them reduce the potential. See §8.

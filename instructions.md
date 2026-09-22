@@ -1846,7 +1846,7 @@ S3_ENV=prod ./cluster/nic5.sh upload
 ├── envs/environment.yaml          # Conda env `pypsa-eur`
 ├── rules/                         # Snakemake rule definitions (incl. pypsa2html.smk, publish_html.smk)
 ├── scripts/                       # Python scripts (incl. walloon_scripts/)
-├── workflow_onwind_wal/           # STAND-ALONE: Walloon onshore-wind land eligibility
+├── workflow_onwind_wal/           # STAND-ALONE: Walloon onshore-wind land eligibility + siting
 │                                  #   (own Snakefile + config; reads only regions + cutout,
 │                                  #   writes nothing into the model — see its README.md)
 ├── data/                          # Static inputs + walloon/ overrides

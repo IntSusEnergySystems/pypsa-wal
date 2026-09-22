@@ -7,8 +7,6 @@ Maps for the report.
                     each cutout cell that survives the exclusions
 ``map_reference``   the reference scenario at full raster resolution: the
                     eligible envelope drawn against the constraint layers
-``region_mismatch`` the administrative Walloon Region against the model's BEWAL
-                    node, with the difference highlighted
 """
 
 import logging
@@ -19,7 +17,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 mpl.use("Agg")
@@ -76,7 +73,6 @@ if __name__ == "__main__":
 
     regions = gpd.read_file(snakemake.input.regions, layer="regions")
     admin = regions[regions["name"] == "admin"]
-    model = regions[regions["name"] == "model"]
 
     # ------------------------------------------------------------------
     # 1. Scenario ladder
@@ -151,12 +147,6 @@ if __name__ == "__main__":
         handles.append(Patch(facecolor=color, alpha=alpha, label=label))
 
     frame(ax, admin.to_crs(crs))
-    model.to_crs(crs).boundary.plot(
-        ax=ax, color="crimson", linewidth=1.0, linestyle="--"
-    )
-    handles.append(
-        Line2D([], [], color="crimson", linestyle="--", label="PyPSA-Wal BEWAL node")
-    )
     ax.legend(handles=handles, loc="lower left", frameon=False, fontsize=7)
     ax.set_title(
         "Walloon onshore wind: admissible zoning and the protection layers "
@@ -165,39 +155,4 @@ if __name__ == "__main__":
     fig.savefig(snakemake.output.reference)
     plt.close(fig)
 
-    # ------------------------------------------------------------------
-    # 3. Region mismatch
-    # ------------------------------------------------------------------
-    mismatch = gpd.read_file(snakemake.input.mismatch, layer="mismatch")
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    admin.to_crs(crs).plot(ax=ax, color="#d0ebff", edgecolor="0.3", linewidth=0.6)
-    model.to_crs(crs).plot(ax=ax, color="#b2f2bb", alpha=0.7, edgecolor="none")
-    miss = mismatch[mismatch["name"] == "walloon_not_in_model"]
-    if not miss.empty:
-        miss.plot(ax=ax, color="#ff6b6b", alpha=0.8, edgecolor="none")
-        area = float(miss.to_crs(crs).area.sum() / 1e6)
-    else:
-        area = 0.0
-    ax.set_axis_off()
-    ax.set_aspect("equal")
-    ax.legend(
-        handles=[
-            Patch(facecolor="#b2f2bb", label="Wallonia, inside the BEWAL node"),
-            Patch(
-                facecolor="#ff6b6b",
-                label=f"Wallonia, assigned to BEVLG ({area:,.0f} km$^2$)".replace(
-                    ",", " "
-                ),
-            ),
-        ],
-        loc="lower left",
-        frameon=False,
-        fontsize=8,
-    )
-    ax.set_title(
-        "The model's BEWAL node does not cover the whole Walloon Region:\n"
-        "western Hainaut falls on the Flemish side of the Voronoi partition"
-    )
-    fig.savefig(snakemake.output.mismatch)
-    plt.close(fig)
     logger.info("figures written")

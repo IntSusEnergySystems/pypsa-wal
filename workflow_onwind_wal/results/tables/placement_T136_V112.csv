@@ -1,0 +1,11 @@
+turbine,turbine_label,model,spacing_case,min_distance_m,interfarm_distance_m,order,eligible_area_km2,n_farms,turbines_per_farm,n_turbines,p_nom_max_mw,effective_density_mw_km2,land_per_turbine_km2
+T136_V112,V112 / 3.0 MW (tip 136 m),free,array,662.6,,row_major,621.54,,,4533,13599.0,21.88,0.1371
+T136_V112,V112 / 3.0 MW (tip 136 m),free,array,662.6,,random,621.54,,,3912,11736.0,18.882,0.1589
+T136_V112,V112 / 3.0 MW (tip 136 m),free,bregilab,560.0,,row_major,621.54,,,5468,16404.0,26.393,0.1137
+T136_V112,V112 / 3.0 MW (tip 136 m),free,bregilab,560.0,,random,621.54,,,4639,13917.0,22.391,0.134
+T136_V112,V112 / 3.0 MW (tip 136 m),farm,array,662.6,4000.0,land_score,621.54,369.0,7.1,2615,7845.0,12.622,0.2377
+T136_V112,V112 / 3.0 MW (tip 136 m),farm,array,662.6,5000.0,land_score,621.54,275.0,7.3,2020,6060.0,9.75,0.3077
+T136_V112,V112 / 3.0 MW (tip 136 m),farm,array,662.6,6000.0,land_score,621.54,213.0,7.7,1650,4950.0,7.964,0.3767
+T136_V112,V112 / 3.0 MW (tip 136 m),farm,bregilab,560.0,4000.0,land_score,621.54,384.0,8.5,3263,9789.0,15.75,0.1905
+T136_V112,V112 / 3.0 MW (tip 136 m),farm,bregilab,560.0,5000.0,land_score,621.54,283.0,8.9,2511,7533.0,12.12,0.2475
+T136_V112,V112 / 3.0 MW (tip 136 m),farm,bregilab,560.0,6000.0,land_score,621.54,220.0,9.4,2078,6234.0,10.03,0.2991
