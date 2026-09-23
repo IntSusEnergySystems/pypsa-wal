@@ -30,20 +30,13 @@ report states the difference and its consequences.
 | + open horizon, 130° within 4 km of each village — *gross reference* | 5 712 MW |
 | **central estimate** (+ residual allowance) | **4 370 MW** |
 | credible range | 3 199 – 5 712 MW |
-| *if the repealed 2013 4–6 km inter-distance were applied as a rule* | 2 509 – 3 516 MW |
+| *if the 2013 indicative 4–6 km inter-distance were applied as a rule* | 2 509 – 3 516 MW |
 | PyPSA-Eur default land analysis (area × 3 MW/km²) | 19 079 MW |
 | BREGILAB / VITO Dynamic Energy Atlas, gross | 11 400 MW |
 | cap in the model today | 6 500 MW |
 | standing fleet, end 2024 | 1 528 MW |
 
-## What changed, and why it matters
-
-An earlier version of this study concluded **2–4.5 GW**. That reading does not
-survive: it rested on screening the eligible raster by patch size, a cut-off
-with no legal or engineering basis. Capacity now comes from **placing machines
-and wind farms** on the raster — the method BREGILAB uses, plus the Walloon
-landscape criterion it lacks. §6.6 of the report retracts the earlier figure in
-full.
+## Siting rules
 
 Three siting rules decide the answer, and together they matter more than the
 whole constraint ladder below the setbacks (§2.4):
@@ -54,8 +47,7 @@ whole constraint ladder below the setbacks (§2.4):
 | machines per farm | ≥ 4 | 86 % of the standing fleet is in groups that size |
 | landscape | 130° of open horizon within 4 km of each village | the 2013 cadre de référence, verbatim |
 
-The 4–6 km inter-farm distance the earlier version used as its reference is
-**not** applied: the 2013 text calls it *indicative*, subordinates it to the
+The 4–6 km inter-farm distance is **not** applied: the 2013 text calls it *indicative*, subordinates it to the
 impact assessment, exempts turbines sited along motorways — which is where the
 zoning rule concentrates the eligible land — and the 2024 framework that
 replaced it does not carry it at all. It is reported as a labelled legacy
@@ -68,8 +60,7 @@ Everything is tested against the **652 turbines standing in Wallonia**
 
 - **Constraint set.** No layer has an avoidance ratio (share of the fleet ÷
   share of the Region) above 0.77 — every constraint is one Walloon wind
-  development demonstrably avoids. Two candidate constraints failed and were
-  dropped.
+  development demonstrably avoids.
 - **Siting geometry.** The machine spacing, farm radius and farm separation are
   taken from the fleet's own distributions, not from a rule: 427 m median
   between machines, 1 309 m p75 farm radius, 2 342 m p10 between farms.

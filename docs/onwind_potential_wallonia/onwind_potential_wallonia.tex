@@ -89,7 +89,7 @@ families that still have no public geometry gives a credible technical potential
 of \textbf{\CredibleLowGW{}--\CredibleHighGW{}~GW}, central estimate
 \CredibleCentralGW{}~GW.
 
-Five results matter more than the headline number.
+Four results matter more than the headline number.
 
 \textbf{The binding constraint is settlement, then landscape --- not nature and
 not the wind.} The setbacks from habitat zones and from scattered dwellings
@@ -102,18 +102,11 @@ together cost more than the entire constraint ladder below the setbacks.
 \textbf{Every constraint in the set is one the standing fleet avoids.} Measured
 against the \FleetN{} turbines built in Wallonia, no layer in the reference
 constraint set has an avoidance ratio above \FleetMaxRatio{} --- turbines are
-systematically less common inside every one of them than the Region average.
-Two candidate constraints failed that test and were dropped
+systematically less common inside every one of them than the Region average
 (§\ref{sec:calibration}).
 
-\textbf{The previous \SI{2}{}--\SI{4.5}{\giga\watt} reading of this study does
-not survive.} It came from screening the eligible land by patch size, a cut-off
-with no legal or engineering basis. Replacing the screen with an explicit
-allocation raises the figure substantially; the \CapToday{}~MW cap sits inside
-the credible range rather than far above it.
-
 \textbf{BREGILAB's \BregTotalGW{}~GW is the same quantity as this study's
-land-and-wake bound, not as its answer.} This study now uses BREGILAB's own
+land-and-wake bound, not as its answer.} This study uses BREGILAB's own
 spacing rule, so only the machine separates the two free allocations
 ($\times\BregStepTurbine$): on their V112 this study's land gives
 \BregOursVOneTwelveSpacing{}~MW, so their constraint set is in fact
@@ -346,8 +339,7 @@ case & basis & $d/D$ & free allocation [\si{\mega\watt}] \\
 \end{tabular}
 \end{table}
 
-\textbf{The reference is \SpCrossD{}\,$D$, and the isotropic reading it replaces
-was an error.} Converting an area-per-turbine into an isotropic \emph{minimum
+\textbf{The reference is \SpCrossD{}\,$D$.} Converting an area-per-turbine into an isotropic \emph{minimum
 separation} forbids exactly the pairs the convention it comes from contains: in
 a $5D\times7D$ array the closest two machines are $5D$ apart, not
 $\sqrt{35}\,D$. It also assumes a two-dimensional array, whereas Walloon wind
@@ -393,8 +385,7 @@ celui-ci sera d'au moins 130°, sur une distance de 4~km. Un examen de
 l'encerclement sera réalisé sur une distance de 9~km dans le cadre de l'EIE.
 \end{quote}
 
-Four things in that sentence matter, and an earlier version of this study
-respected none of them.
+Four things in that sentence matter.
 
 \begin{enumerate}
   \item The \SI{4}{}--\SI{6}{\kilo\metre} figure is a \emph{référence
@@ -424,14 +415,14 @@ any village's largest turbine-free arc below \PlaceAzimuth{}°. Farms are still
 required not to overlap, at \PlaceInterfarm{}~km between centres, which is the
 geometry of the standing fleet and not a rule (§\ref{sec:calibration}).
 
-The \SI{4}{}--\SI{6}{\kilo\metre} inter-distance is kept, labelled as a
-\textbf{2013-legacy policy sensitivity}: what the answer would be if a repealed
-indicative reference were applied as a binding minimum.
+The \SI{4}{}--\SI{6}{\kilo\metre} inter-distance is reported only as a
+policy sensitivity: what the answer would be if that indicative reference were
+applied as a binding minimum.
 
 \finding{Of the three rules, the third is the expensive one. Machines grouped
 into farms but with no landscape criterion give \NoHorizonPnom{}~MW; the
 open-horizon test refuses \HorizonRefused{} candidate farms and brings that to
-\PlacePnom{}~MW, \HorizonCostPct{}\,\% less. Applying the repealed
+\PlacePnom{}~MW, \HorizonCostPct{}\,\% less. Applying the indicative
 \SI{4}{}--\SI{6}{\kilo\metre} inter-distance on top would take it to
 \IfdSixMW{}--\IfdFourMW{}~MW. An onshore-wind potential quoted without saying
 which landscape rule it carries cannot be compared with anything.}
@@ -750,90 +741,13 @@ turbine at all; the classified sites contain one. The constraint set is
 therefore not an arbitrary collection of polygons --- every element of it is one
 that Walloon wind development demonstrably avoids.}
 
-The test also removed two candidate constraints that had looked defensible on
-the map:
-
-\begin{itemize}
-  \item The \textbf{35~m and 50~m aeronautical rings} were in the constraint set
-    of an earlier version of this workflow. They cover \SI{2.9}{\percent} and
-    \SI{8.5}{\percent} of the Region but carry \SI{5.5}{\percent} and
-    \SI{13.6}{\percent} of the standing fleet --- avoidance ratios of
-    \num{1.88} and \num{1.60}. They are outer consultation rings that happen to
-    sit on the open, windy plateaus where wind farms go. Excluding them cost
-    \SI{89}{\square\kilo\metre} of eligible land for no legal reason, and they
-    were dropped.
-  \item The \textbf{runoff component of the flood hazard} holds 5.2~million
-    polygons and maps a thin-sheet phenomenon that does not preclude a
-    foundation. The overflow extent at the extreme return period is used
-    instead.
-\end{itemize}
-
-\subsection{The geometry the placement model is calibrated on}
-\label{sec:fleetgeometry}
-
-The same \FleetN{} machines fix the parameters of the placement model, which is
-why none of them is taken from a rule. Grouped by single linkage at
-\FleetFarmLink{}~km they form \FleetFarms{} wind farms.
-
-\begin{table}[htbp]\centering\small
-\caption{The spatial geometry of Walloon wind as it stands, and what the
-placement model takes from it.}
-\label{tab:fleetgeom}
-\begin{tabular}{lrrrrl}
-\toprule
- & p5 & p25 & median & p90 & model \\
-\midrule
-distance between neighbouring machines [\si{\metre}]
-  & \FleetMachineNNPFive{} & \FleetMachineNNPTwentyFive{}
-  & \FleetMachineNNPFifty{} & \FleetMachineNNPNinety{}
-  & \PlaceSpacing{} (\PlaceRotorD{}\,$D$) \\
-farm radius [\si{\metre}]
-  & \FleetFarmRadPFive{} & \FleetFarmRadPTwentyFive{}
-  & \FleetFarmRadPFifty{} & \FleetFarmRadPNinety{}
-  & \PlaceRadius{} \\
-distance between neighbouring farms [\si{\metre}]
-  & \FleetFarmNNPFive{} & \FleetFarmNNPTwentyFive{}
-  & \FleetFarmNNPFifty{} & \FleetFarmNNPNinety{}
-  & \PlaceInterfarm{}~km \\
-machines per farm & \multicolumn{4}{c}{\FleetPerFarm{} on average, largest
-  \FleetLargestFarm{}} & \PlacePerFarm{} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\finding{The farm radius is set at the observed p75 and the separation between
-farm centres at twice that, \PlaceInterfarm{}~km, which sits inside the observed
-p10--p25 band: the model forbids no farm geometry that Wallonia has actually
-permitted. A \SI{4}{\kilo\metre} floor would forbid a great deal of it ---
-\FleetFarmNNBelowFour{}\,\% of the standing farms have a neighbour closer than
-that. The indicative figure of the 2013 framework is therefore not a description
-of Walloon practice either, which is a second reason not to make it the
-reference.}
-
-\subsection{The open-horizon criterion, tested on the fleet}
-\label{sec:horizoncheck}
-
-The landscape rule of §\ref{sec:placement} is the most consequential single
-assumption in this study, so it is worth knowing whether the machines that exist
-respect it. Of \HorizonSettlements{} settlements, \HorizonAffected{}
-(\HorizonAffectedPct{}\,\%) have at least one standing turbine within
-\PlaceHorizonRadius{}~km. Among those, the largest turbine-free arc has a median
-of \HorizonArcPFifty{}°, a 5th percentile of \HorizonArcPFive{}° and a 1st
-percentile of \HorizonArcPOne{}°.
-
-\finding{\HorizonFailing{} of the \HorizonAffected{} affected villages ---
-\HorizonFailingPct{}\,\% --- fall below the \PlaceAzimuth{}° threshold. The
-criterion is not an invention of this report: Walloon wind development observes
-it almost without exception, and the implementation used in the placement model
-reproduces that. A test that flagged a third of the existing fleet would have
-been measuring something else.}
-
-\caveat{The test is applied forward and greedily: farms are considered in
-decreasing order of surrounding eligible land and refused if they would close a
-village's horizon, and the standing fleet is not seeded into it, because this is
-a gross potential in which the hypothetical fleet replaces the existing one. A
-better ordering would fit more machines, so the figure is a lower bound given
-the criterion.}
+The same test settles two choices. The \textbf{35~m and 50~m aeronautical
+rings} cover \SI{2.9}{\percent} and \SI{8.5}{\percent} of the Region but carry
+\SI{5.5}{\percent} and \SI{13.6}{\percent} of the standing fleet (ratios
+\num{1.88} and \num{1.60}); they are consultation rings, not exclusions, and
+are not applied. The \textbf{runoff component of the flood hazard} maps a
+thin-sheet phenomenon that does not preclude a foundation; the overflow extent
+at the extreme return period is used instead.
 
 \caveat{Only \FleetRefPct{}\,\% of the standing fleet survives the full
 constraint set --- \FleetRefN{} of \FleetN{} machines. That is not a defect of
@@ -879,7 +793,7 @@ reference turbine class.}
 \input{generated/table_waterfall}
 \end{table}
 
-\subsection{What the late-added families cost}
+\subsection{What the servitude families cost}
 
 Table~\ref{tab:servitudes} isolates the four families of
 §\ref{sec:newlayers} and the heritage registers, each measured on its own
@@ -895,8 +809,7 @@ administrative Walloon Region, reference turbine class. \texttt{S5} leaves
 \input{generated/table_servitudes}
 \end{table}
 
-\finding{The two families that an earlier version of this study could not
-implement are together worth \ServCombinedPct{}\,\% of the surviving land. The
+\finding{The four servitude families are together worth \ServCombinedPct{}\,\% of the surviving land. The
 \SI{7}{\percent} slope criterion alone removes \ServSlopeRemoved{}~\si{\square
 \kilo\metre} (\ServSlopePct{}\,\%) and the aeronautical servitudes
 \ServAviationRemoved{}~\si{\square\kilo\metre} (\ServAviationPct{}\,\%);
@@ -965,9 +878,9 @@ free allocation, \PlaceSpacing{}~m between machines
   \textbf{(reference)}
   & \PlaceFarms{} & \PlaceTurbines{} & \PlacePnom{} \\
 \midrule
-\emph{2013-legacy policy:} farms \SI{4}{\kilo\metre} apart, with open horizon
+\emph{policy sensitivity:} farms \SI{4}{\kilo\metre} apart, with open horizon
   & \IfdFourFarms{} & \IfdFourTurbines{} & \IfdFourMW{} \\
-\emph{2013-legacy policy:} farms \SI{6}{\kilo\metre} apart, with open horizon
+\emph{policy sensitivity:} farms \SI{6}{\kilo\metre} apart, with open horizon
   & \IfdSixFarms{} & \IfdSixTurbines{} & \IfdSixMW{} \\
 \bottomrule
 \end{tabular}
@@ -1059,47 +972,11 @@ administrative Walloon Region is
 \textbf{\CredibleLowGW{}--\CredibleHighGW{}~GW}, central estimate
 \CredibleCentralGW{}~GW, on the reference turbine class and the 2024 regulatory
 framework. The range is the residual-allowance bracket of §\ref{sec:residual}
-applied to the reference case; it is not statistical. Applying the repealed
+applied to the reference case; it is not statistical. Applying the indicative
 \SI{4}{}--\SI{6}{\kilo\metre} inter-distance of the 2013 framework as a binding
 rule instead would give \LegacyLow{}--\LegacyHigh{}~MW, and choosing a machine
 spacing of \SpObsD{}\,$D$ or \SpIsoD{}\,$D$ instead of \SpCrossD{}\,$D$ would
 move the gross reference between \SpObsMW{} and \SpIsoMW{}~MW.}
-
-\subsection{An earlier reading of this study said 2--4.5~GW. It was wrong}
-\label{sec:retraction}
-
-A previous version of this analysis concluded that the credible technical
-potential was \SI{2}{}--\SI{4.5}{\giga\watt}. That conclusion rested on
-screening the eligible raster by patch size --- keeping only patches large
-enough to hold one cell of a $5D\times7D$ array, which gave
-\DevOneKm{}~\si{\square\kilo\metre} and \DevOneMW{}~MW --- and on the observation
-that this figure sat within 20\,\% of the \SI{2559}{\mega\watt} implied by the
-457 potential turbines of the Region's 2022 site-by-site simulation.
-
-Three things are wrong with it.
-
-\begin{enumerate}
-  \item \textbf{The screen has no legal or engineering basis.} A turbine does
-    not need its whole array footprint inside one eligible polygon; it needs a
-    mast position that satisfies the setbacks and a platform of order one
-    hectare. Requiring \Footprint{}~\si{\square\kilo\metre} of contiguous
-    eligible land per machine discards land that a machine can plainly occupy.
-  \item \textbf{The agreement with the 2022 study was a coincidence of two
-    errors.} The patch screen understates the land, and the comparison was made
-    against a figure that counts only \emph{new} turbines, excludes the standing
-    fleet's footprint and applies a full permitting screen this study does not.
-    Two numbers can agree while measuring different things.
-  \item \textbf{The constraint set has since changed in both directions.} The
-    slope and aeronautical families were added, which removes
-    \ServCombinedPct{}\,\% of the land; two aeronautical rings were removed after
-    the fleet calibration, which adds some back.
-\end{enumerate}
-
-\finding{The result of replacing the patch screen with an explicit allocation is
-that the \CapToday{}~MW cap sits \emph{inside} the credible range rather than far
-above it. The honest statement is no longer ``the cap is too high'' but ``the cap
-is at the optimistic end of a range whose width is set by a landscape rule the
-framework states only as indicative''.}
 
 \subsection{Full-load hours and energy}
 
@@ -1219,9 +1096,8 @@ and is the constraint-set difference.}
     class, so more land survives: \BregOursArea{}~\si{\square\kilo\metre}
     against \AdminEligible{}, and at a fixed $5D$ the smaller rotor also packs
     tighter. The two effects compound, which is why the turbine class is not a
-    detail when comparing two potentials. \emph{This is now the only convention
-    difference:} following the review of §\ref{sec:placement} this study uses
-    BREGILAB's own $5D$ spacing rule, so the spacing factor is one.
+    detail when comparing two potentials. It is the only convention
+    difference: both studies use a $5D$ spacing rule.
   \item[Constraint set, $\times\BregStepConstraints$.] What is left. It is
     \emph{below} one: with BREGILAB's machine and BREGILAB's spacing, this
     study's eligible land carries \BregOursVOneTwelveSpacing{}~MW against their
@@ -1259,8 +1135,7 @@ the answer of this study more than any new data layer did:
 \begin{enumerate}
   \item \textbf{Allocating machines instead of multiplying area by a density.}
     This is BREGILAB's method and it is better than an area calculation on
-    fragmented land. It made the previous patch-size screen unnecessary, and it
-    is what §\ref{sec:retraction} retracts on.
+    fragmented land, and it removes the need for any patch-size screen.
   \item \textbf{Graded rather than binary constraints.} BREGILAB's weighting of
     consultation zones is the idea behind this study's separate treatment of the
     aeronautical rings and behind the residual allowance for partial
@@ -1302,10 +1177,8 @@ Three differences are structural:
 
 Adding the standing fleet back to its 457 turbines gives of order
 \SI{4}{\giga\watt} on a comparable gross basis, against this study's
-\CredibleCentralGW{}~GW central estimate. The two are now in the same place for
-understandable reasons, and neither supports the \SI{2}{}--\SI{4.5}{\giga\watt}
-reading of §\ref{sec:retraction}, which compared a screened area figure with a
-net turbine count.
+\CredibleCentralGW{}~GW central estimate, for the structural reasons listed
+above.
 
 \subsection{The model's own cap}
 
@@ -1471,7 +1344,7 @@ reduce it further.}
 % =====================================================================
 
 \begin{enumerate}
-  \item \textbf{The cap can now be documented rather than cited.}
+  \item \textbf{The cap can be documented rather than cited.}
     \CapToday{}~MW is reachable within this framework: it corresponds to the
     \SI{4}{\kilo\metre} inter-farm distance with a small residual allowance, on
     \AdminEligible{}~\si{\square\kilo\metre} of eligible land carrying
