@@ -7,8 +7,9 @@ Two summary charts, both for the administrative Walloon Region:
 ``sensitivity``  left, installable capacity across turbine classes and capacity
                  densities; right, the capacity ladder that actually produces
                  the study's answer --- area times density, the free
-                 allocation, the farm allocation across the inter-distance
-                 band, and the residual allowance --- against the benchmarks
+                 allocation, parks, the open horizon, the inter-distance
+                 sensitivity and the residual allowance --- against the
+                 benchmarks
 """
 
 import json
@@ -144,18 +145,18 @@ if __name__ == "__main__":
 
     # The ladder that produces the answer.
     ax = axes[1]
-    ifd = pl["by_interfarm"]
+    ids = pl["by_interdistance"]
     steps = [
         ("area $\\times$ density", headline["area_density"]["p_nom_max_mw"], "#adb5bd"),
         ("free allocation", pl["free_p_nom_max_mw"], "#1c7ed6"),
+        (f"parks of {pl['min_turbines']}+", pl["no_horizon_p_nom_max_mw"], "#74c0fc"),
+        ("+ open horizon", pl["p_nom_max_mw"], "#2b8a3e"),
     ]
-    for d in sorted(ifd, key=int):
-        steps.append(
-            (f"farms, {int(d) // 1000} km apart", ifd[d]["p_nom_max_mw"], "#2b8a3e")
-        )
-    steps.append(
-        ("+ residual allowance", resid["central"]["p_nom_max_mw"], "#e8590c")
-    )
+    for d in sorted(ids, key=int):
+        steps.append((f"+ {int(d) // 1000} km apart (sens.)",
+                      ids[d]["p_nom_max_mw"], "#8ce99a"))
+    steps.append(("central estimate", resid["central"]["p_nom_max_mw"],
+                  "#e8590c"))
     labels = [s[0] for s in steps]
     vals = [s[1] for s in steps]
     cols = [s[2] for s in steps]
@@ -206,7 +207,7 @@ if __name__ == "__main__":
         ncol=3,
         frameon=False,
         fontsize=8,
-        bbox_to_anchor=(0.5, -0.09),
+        bbox_to_anchor=(0.5, -0.12),
     )
     fig.savefig(snakemake.output.sensitivity)
     plt.close(fig)

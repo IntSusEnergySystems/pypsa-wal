@@ -1,11 +1,13 @@
 source,basis,capacity_mw,energy_twh
-PyPSA-Wal today (input_parameters_for_models.csv),"PNEC wallon / EDORA, expert judgement",6500.0,21.22
+PyPSA-Wal today (input_parameters_for_models.csv),"PNEC wallon / EDORA, expert judgement",6500.0,21.19
 PyPSA-Eur default land eligibility,"this study, scenario S0, area x 3 MW/km2",19079.0,61.62
-BREGILAB / VITO Dynamic Energy Atlas,"Clymans et al. 2022, V112 at 5 D, gross",11400.0,18.2
-"Walloon constraint set, area x density","this study, S6_servitudes, 5.08 MW/km2",2849.0,9.3
-"Walloon constraint set, free allocation","this study, S6_servitudes, 750 m between machines, no grouping rule",15236.0,49.73
-"Walloon constraint set, farms allocated","this study, S6_servitudes, 3 km between farms, min. 4 machines",5712.0,18.644
-"Walloon constraint set, machines placed, residual allowance","this study, central allowance for the families with no geometry",4370.0,14.26
+BREGILAB / VITO Dynamic Energy Atlas,"Clymans et al. 2022, V112 at 5 D, free allocation, gross",11400.0,18.2
+BREGILAB's rules on this study's data,"this study, emulation of the WTN scenario, V112 at 5 D",25087.0,
+"Walloon constraint set, area x density","this study, S6_servitudes, 5.08 MW/km2",2136.0,6.96
+"Walloon constraint set, free allocation","this study, S6_servitudes, 750 m between machines, no grouping rule",11460.0,37.36
+"Walloon constraint set, parks of 4 or more","this study, S6_servitudes, no landscape rule",8648.0,28.19
+"Walloon constraint set, parks and open horizon","this study, S6_servitudes, gross reference",6480.0,21.125
+"Walloon constraint set, machines placed, residual allowance","this study, central allowance for the families with no geometry",4957.0,16.16
 "SPW/Gembloux favourable-zone update 2022, '180 m' case","site-by-site simulation, additional potential only",,3.96
 "Installed fleet, end 2024",EDORA / Renouvelle,1528.0,
 PNEC / PACE 2030 onshore-wind target,Walloon Government,,6.2

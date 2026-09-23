@@ -1,0 +1,16 @@
+case,group,label,eligible_area_km2,free_mw,n_turbines,n_parks,p_nom_max_mw,delta_mw,delta_pct
+reference,reference,reference (2024 framework as applied),418.0,11460,1620,168,6480,0,0.0
+interdistance_4km,policy,"inter-distance 4 km between parks (short views), motorways exempt",418.0,11460,1359,131,5436,-1044,-16.1
+interdistance_6km,policy,"inter-distance 6 km between parks (long views), motorways exempt",418.0,11460,1084,95,4336,-2144,-33.1
+no_horizon,policy,no open-horizon rule,418.0,11460,2162,198,8648,2168,33.5
+parks_min1,policy,no minimum park size (2024 exception above 3.2 MW),418.0,11460,2029,464,8116,1636,25.2
+no_corridor,policy,"no agricultural corridor (derogation, CoDT D.IV.11)",667.3,16728,2269,196,9076,2596,40.1
+habitat_cdr2013,policy,"2013 habitat setback, 4 x tip height",279.3,8256,1165,140,4660,-1820,-28.1
+no_adesa,judgement,ADESA perimeters not excluded,479.6,12984,1814,174,7256,776,12.0
+no_landscape,judgement,no landscape perimeter excluded,506.9,13832,1935,186,7740,1260,19.4
+slope_ge10,judgement,slope criterion at 10 %,486.7,12256,1738,163,6952,472,7.3
+slope_ge15,judgement,slope criterion at 15 %,523.5,12696,1810,169,7240,760,11.7
+no_aviation,judgement,no aeronautical ring excluded,483.9,12656,1820,181,7280,800,12.3
+pic_plan_de_secteur,misreading,every plan-de-secteur road taken as a PIC (a misreading of R.II.21-1),557.2,14728,2117,196,8468,1988,30.7
+all_policy_relaxed,combined,"no agricultural corridor and no minimum park size, open horizon kept",667.3,16728,2666,506,10664,4184,64.6
+all_policy_tightened,combined,6 km inter-distance and the 2013 habitat setback,279.3,8256,788,89,3152,-3328,-51.4

@@ -1,12 +1,12 @@
 {
   "turbine": "T185_NREL4",
-  "n_patches": 5432,
+  "n_patches": 4017,
   "footprint_km2": 0.787,
   "median_patch_km2": 0.02,
-  "area_km2": 570.1,
-  "area_in_patches_ge_1_turbine_km2": 210.6,
-  "area_in_patches_ge_4_turbines_km2": 18.3,
-  "largest_patch_km2": 3.9,
-  "share_ge_1_turbine_pct": 36.9,
-  "share_ge_4_turbines_pct": 3.2
+  "area_km2": 418.0,
+  "area_in_patches_ge_1_turbine_km2": 135.0,
+  "area_in_patches_ge_4_turbines_km2": 6.6,
+  "largest_patch_km2": 3.3,
+  "share_ge_1_turbine_pct": 32.3,
+  "share_ge_4_turbines_pct": 1.6
 }

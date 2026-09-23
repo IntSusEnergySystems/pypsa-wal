@@ -10,12 +10,13 @@ exactly the object the capacity is derived from.
 import json
 import logging
 
+# rasterio before geopandas: see retrieve_slope_raster.py.
+import rasterio
 import geopandas as gpd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import rasterio
 from matplotlib.patches import Patch
 from rasterio.plot import plotting_extent
 
@@ -51,10 +52,6 @@ if __name__ == "__main__":
     ref = placement[
         (placement["spacing_case"] == cfg["placement"]["reference_case"])
         & (placement["model"] == cfg["placement"]["reference_model"])
-        & (
-            placement["interfarm_distance_m"]
-            == float(cfg["placement"]["farm"]["reference_interfarm_distance_m"])
-        )
     ].iloc[0]
     eligible_km2 = frag["area_km2"]
 
@@ -86,11 +83,11 @@ if __name__ == "__main__":
                 facecolor="none",
                 edgecolor="none",
                 label=(
-                    f"{frag['n_patches']:,} patches, median "
+                    f"{frag['n_patches']:,} patches; median "
                     f"{frag['median_patch_km2'] * 100:.0f} ha; the allocation "
                     f"model fits {int(ref['n_turbines']):,} machines in "
-                    f"{int(ref['n_farms']):,} farms ({ref['p_nom_max_mw']:,.0f} MW)"
-                ).replace(",", " "),
+                    f"{int(ref['n_parks']):,} parks ({ref['p_nom_max_mw']:,.0f} MW)"
+                ).replace(",", " ").replace(";", ",", 1),
             ),
         ],
         loc="lower left",

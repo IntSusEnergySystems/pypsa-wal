@@ -20,9 +20,10 @@ import json
 import logging
 from pathlib import Path
 
+# rasterio before geopandas: see retrieve_slope_raster.py.
+import rasterio
 import geopandas as gpd
 import numpy as np
-import rasterio
 from atlite.gis import ExclusionContainer, shape_availability
 from scipy.ndimage import label
 

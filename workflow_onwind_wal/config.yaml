@@ -90,10 +90,8 @@ reference_density: "derived"
 #
 # The headline capacity of this study comes from placing machines on the
 # eligible raster under a minimum inter-turbine distance, not from multiplying
-# area by a density.  `bregilab_spacing_rotor_diameters` is the rule of the
-# VITO Dynamic Energy Atlas (5 D), carried so that the two studies can be
-# compared on identical ground; the reference spacing is the isotropic
-# equivalent of the 5D x 7D array, sqrt(5 x 7) D = 5.92 D.
+# area by a density.  The spacing rule is the one the VITO Dynamic Energy Atlas
+# (BREGILAB) uses, 5 D, so the two studies can be compared on identical ground.
 # ---------------------------------------------------------------------------
 placement:
   # ------------------------------------------------------------------
@@ -121,69 +119,55 @@ placement:
     crosswind: 5
     isotropic: 5.916        # sqrt(5 x 7)
   reference_case: "crosswind"
-  # The reference is the farm model with the open-horizon criterion: the
-  # geometry calibrated on the standing fleet, and the landscape rule the 2013
-  # framework actually states rather than the indicative distance it also
-  # mentions.
-  reference_model: "farm+horizon"
-  # Single-linkage distance used to test whether the free allocation is a
-  # scatter of isolated machines.  It is not: at this link the carpet chains
-  # into a handful of very large groups, which is the point.
-  group_link_m: 2600
   # ------------------------------------------------------------------
-  # The farm level.
+  # The park level.
   #
-  # `radius_m` and the reference `interfarm_distance_m` are calibrated on the
-  # 652 machines standing in Wallonia, not taken from a rule.  Grouped by
-  # single linkage at 1.5 km they form 134 farms whose radius has median 815 m,
-  # p75 1 309 m and p90 1 561 m, and whose centre-to-centre nearest-neighbour
-  # distance has p5 1.91 km, p10 2.34 km, p25 3.00 km and median 4.56 km.
-  # A radius of 1 300 m (the observed p75) with farms not allowed to overlap
-  # gives an inter-farm distance of 2 600 m, which sits inside the observed
-  # p10-p25 band: the model forbids no configuration Wallonia has actually
-  # permitted.
+  # Parks are grown machine by machine from the best-endowed seed cells, under
+  # explicit rules only: 5 D between any two machines (of any park), machines
+  # within `link_m` of a park machine belong to that park -- the single-linkage
+  # distance used to group the 652 standing machines into 134 farms -- and a
+  # park is kept only if it reaches `min_turbines`.  There is no farm radius
+  # and no centre-to-centre separation: those are geometry, not rules, and a
+  # model built on non-overlapping discs sterilises the land between the discs.
   #
-  # `min_turbines: 4` is *not* applied as a legal rule.  The 2024 framework
-  # defines a parc éolien as at least four machines, but with explicit
-  # reductions for repowering, for extensions of an existing park, and for
-  # machines above 3.2 MW — which the reference class is.  It is applied
-  # because it describes how Walloon wind is actually built: 86 % of the
-  # standing machines are in groups of four or more.
-  #
-  # The 4-6 km values are a *2013-legacy policy* sensitivity, not the
-  # reference.  See `landscape` below.
+  # `min_turbines: 4` is the 2024 framework's definition of a parc éolien
+  # (§3.1), which it allows to be reduced for repowering, for extensions and
+  # for machines above 3.2 MW -- the reference class is one.  It is applied
+  # because it describes how Walloon wind is actually built (86 % of the
+  # standing machines are in groups of four or more); `min_turbines: 1` is
+  # carried as a sensitivity.
   # ------------------------------------------------------------------
-  farm:
-    interfarm_distance_m: [2600, 4000, 5000, 6000]
-    reference_interfarm_distance_m: 2600
-    radius_m: 1300
+  park:
+    link_m: 1500
     min_turbines: 4
+    seed_radius_m: 1300      # seeds are ranked by eligible land within this box
+  reference_model: "parks+horizon"
 
   # ------------------------------------------------------------------
-  # The landscape criterion, as the 2013 cadre de référence actually states it:
+  # The landscape criteria, as the framework in force states them (Cadre de
+  # référence éolien, circulaire du 25 janvier 2024, §3.4 §3):
   #
-  #   "Sauf lorsque les éoliennes sont implantées le long des autoroutes, une
-  #    référence indicative à une inter-distance minimale de 4 km à 6 km, en
-  #    fonction des résultats de l'étude d'incidence sera prise en
-  #    considération. Un azimut (ou un angle horizontal) minimal sans éoliennes
-  #    doit être préservé pour chaque village ; celui-ci sera d'au moins 130°,
-  #    sur une distance de 4 km. Un examen de l'encerclement sera réalisé sur
-  #    une distance de 9 km dans le cadre de l'EIE."
+  #   "Pour éviter les situations d'encerclement des villages, un angle
+  #    horizontal de 130° sans éoliennes est préservé sur une distance de 4
+  #    kilomètres.  Sauf lorsque les éoliennes sont implantées le long des
+  #    autoroutes, une interdistance minimale de 4 km (en zone de paysage à
+  #    vues courtes) à 6 km (en zone de paysage à vues longues) est recommandée
+  #    et peut être réduite selon la situation paysagère locale."
   #
-  # Three things follow.  The 4-6 km inter-distance is *indicative*, is subject
-  # to the impact assessment, and does not apply along motorways — which is
-  # where the Walloon zoning rule concentrates the eligible land in the first
-  # place.  The operative criterion is the open horizon: at least 130 degrees
-  # of each village's horizon, within 4 km, free of turbines.  And the 2024
-  # framework, which replaced the 2013 one on 25 April 2024, does not carry the
-  # inter-distance at all.
-  #
-  # The open-horizon test is therefore implemented directly, and the 4-6 km
-  # inter-distance is kept only as a labelled legacy sensitivity.
+  # Both rules are in the 2024 text, as they were in the 2013 one.  The open
+  # horizon is stated as a result ("est préservé") and the standing fleet
+  # respects it: it is in the reference.  The inter-distance is a
+  # recommendation that "peut être réduite", it does not apply along
+  # motorways, and 53 % of the standing farms have a neighbour closer than
+  # 4 km: it is carried as a sensitivity, measured the way the Region measures
+  # it -- between the nearest masts of two parks -- and waived between two
+  # machines that both stand within `motorway_exemption_m` of a motorway.
   # ------------------------------------------------------------------
   landscape:
     min_free_azimuth_deg: 130
     horizon_radius_m: 4000
+    interdistance_m: [4000, 6000]
+    motorway_exemption_m: 1000
 
 # ---------------------------------------------------------------------------
 # Source datasets (Walloon open data, CC-BY 4.0, ESRI-REST services of
@@ -279,7 +263,10 @@ sources:
   karst:
     service: "AMENAGEMENT_TERRITOIRE/CONTR_KARST"
     layer: 0
-    fields: []
+    # NATURE is the constraint level (faible / modérée / forte); only "forte"
+    # is an exclusion, see `risk.karst_levels`.
+    fields: ["NATURE"]
+    count: 449
     simplify: 25
     title: "Zones de contraintes karstiques"
   landslide:
@@ -381,6 +368,11 @@ sources:
 # ---------------------------------------------------------------------------
 slope:
   threshold_pct: 7
+  # Further masks written for the sensitivity analysis.  All three fall on a
+  # class boundary of the published grid (1/3/5/7/10/15 %).  Not a rule of the
+  # Cadre or of the CoDT: a technical criterion of the favourable-zone
+  # methodology, which the standing fleet does respect (see validate_fleet).
+  sensitivity_thresholds_pct: [10, 15]
 
 # ---------------------------------------------------------------------------
 # Settlements, for the open-horizon criterion (see placement.landscape).  A
@@ -400,25 +392,54 @@ settlements:
 # integral exclusion.  We reproduce that logic explicitly.
 # ---------------------------------------------------------------------------
 plan_de_secteur:
+  # Every label below must exist, spelt exactly as in the DESCRIPTION field of
+  # PDS/22: build_exclusion_layers.py refuses a label that matches no zone, so a
+  # spelling variant cannot silently drop a zone again.
+  #
   # Zones in which a wind turbine is admissible without further restriction.
   eligible_unconditional:
     - "Activité économique mixte"
     - "Activité économique industrielle"
-    - "Activité économique spécifique Agro-Economique"
-    - "Activité économique spécifique Grande Distribution"
-    - "Activité économique spécifique Risque majeur"
+    - "Activité éco. spécifique agro-économique"
+    - "Activité eco. spécifique grande distribution"
     - "Aménagement communal concerté à caractère économique"
     - "Centre d'enfouissement technique"
-    - "Centre d'enfouissement technique désaffecté"
-    - "Dépendances d'extraction"
+    - "Dépendance d'extraction"
     - "Loisirs"
     - "Services publics et équipements communautaires"
+  # The zones d'activité économique of CoDT art. D.II.28 (mixte, industrielle,
+  # spécifique, ZACC à caractère économique, dépendances d'extraction).  Their
+  # boundary anchors the agricultural corridor (R.II.36-2), and the addresses
+  # inside them are not dwellings in the sense of the 400 m rule (Cadre 2024
+  # §3.2 §2 2° exempts even the operators' housing there).
+  economic_activity_zones:
+    - "Activité économique mixte"
+    - "Activité économique industrielle"
+    - "Activité éco. spécifique agro-économique"
+    - "Activité eco. spécifique grande distribution"
+    - "Aménagement communal concerté à caractère économique"
+    - "Dépendance d'extraction"
   # Agricultural land: admissible only within `agri_max_distance_to_pic` of the
-  # main communication infrastructure (PIC, CoDT art. R.II.21-1) or of an
-  # economic-activity zone.
+  # axis of a main communication infrastructure (PIC) or of the limit of an
+  # economic-activity zone (CoDT art. R.II.36-2).  This is the rule for a permit
+  # *in conformity* with the plan de secteur; a wind farm, as an act of public
+  # interest (D.IV.22 al. 1 7° k), can also be permitted in derogation of it
+  # (D.IV.11, D.IV.13).  `agri_corridor: false` is that derogation route and is
+  # carried as a sensitivity.
   eligible_conditional_agriculture:
     - "Agricole"
   agri_max_distance_to_pic: 1500    # m
+  agri_corridor: true
+  # What a PIC is (CoDT art. R.II.21-1): "les autoroutes et les routes de
+  # liaisons régionales à deux fois deux bandes de circulation", the railway
+  # lines except purely touristic ones, and the navigable waterways.  The
+  # plan-de-secteur road layer is not that network: besides 729 km of
+  # motorways it carries 5 393 km of "routes de liaison", most of them two-lane
+  # roads.  `codt` builds the road part from the plan-de-secteur motorways and
+  # the OSM dual carriageways (motorway, trunk, and primary/secondary with
+  # oneway=yes and a limit of 70 km/h or more); `plan_de_secteur` takes every
+  # plan-de-secteur road and is kept only to measure what that error was worth.
+  pic_roads: "codt"
   # Forest: broad-leaved stands are an integral exclusion; coniferous stands
   # are admissible within `conifer_max_distance_to_pic` of a PIC.  The
   # broad-leaved / coniferous split is not in the plan de secteur, so it is
@@ -426,24 +447,18 @@ plan_de_secteur:
   eligible_conditional_forest:
     - "Forestière"
   conifer_max_distance_to_pic: 750  # m
-  # Residential zones: setback applies (see `setbacks.habitat_zone`).
+  # Residential zones: setback applies (see `setbacks.habitat_zone`).  The 2024
+  # rule targets ZACC "affectée à l'habitat"; the plan de secteur does not say
+  # which ZACC have been, so all of them are buffered (conservative, worth
+  # 7 km2).  There is no separate "habitat vert" class in PDS/22.
   habitat_zones:
     - "Habitat"
     - "Habitat à caractère rural"
-    - "Habitat vert"
     - "Aménagement communal concerté"
-  # Integral exclusions from the plan de secteur itself.
-  excluded:
-    - "Agricole"                    # everything outside the 1.5 km corridor
-    - "Forestière"                  # everything outside the conifer corridor
-    - "Espaces verts"
-    - "Naturelle"
-    - "Parc"
-    - "Eau"
-    - "Extraction à destination agricole"
-    - "Extraction à destination forestière"
-    - "Extraction à destination espaces verts"
-    - "Extraction à destination zone naturelle"
+    - "Enjeu communal"
+  # For the record: everything not admitted above is excluded, among it
+  # Forestière outside the conifer corridor, Espaces verts, Naturelle, Parc,
+  # Plan d'eau and the extraction zones with a future green destination.
 
 # Broad-leaved vs coniferous split inside plan-de-secteur forest zones.
 # CORINE grid codes: 23 = broad-leaved, 24 = coniferous, 25 = mixed.
@@ -524,17 +539,31 @@ setbacks:
     cdr2013: "4 * H"                # Cadre de référence 2013
     cdr2024: "500 + H / 2"          # Cadre de référence 2024, in force 25/04/2024
     default: "cdr2024"
-  scattered_dwellings: 400          # m, from every ICAR address point
-  motorway: 50                      # m  (+ the blade-length rule below)
-  road: "D / 2"                     # 1.5 x blade length ~ 0.75 D; see report §4.4
-  road_multiplier: 1.5              # applied to the blade length (D/2)
-  # The plan-de-secteur rail layer does not separate high-speed from ordinary
-  # track, so the high-speed rule (190 m) is applied to the whole network.  The
-  # ordinary-track rule (50 m) is recorded for reference and is not used.
-  railway: 190
-  railway_ordinary_reference: 50
+  # 400 m "par rapport à toute habitation, à l'exception des logements
+  # d'exploitants situés en zone d'activité économique" (Cadre 2024 §3.2 §2).
+  # The ICAR address points stand in for dwellings; those inside a zone
+  # d'activité économique are businesses or exempt operators' housing and are
+  # dropped.  Elsewhere every address is kept, which still counts barns,
+  # shops and schools as dwellings (conservative).
+  scattered_dwellings: 400
+  scattered_dwellings_exempt_zones: "economic_activity_zones"
+  # Infrastructure distances.  These are the exclusion distances of the 2013
+  # framework; the 2024 one turns them into consultation distances (§4), so
+  # they are kept as the safety distances an operator will ask for.
+  road: "D / 2"                     # blade length ...
+  road_multiplier: 1.5              # ... times 1.5
+  railway: 50                       # ordinary track (Infrabel)
+  railway_high_speed: 190           # high-speed lines, from OSM highspeed=yes
   hv_line: "1.5 * D"
   waterway: 0                       # no quantified rule in the CDR
+
+# ---------------------------------------------------------------------------
+# Natural hazards.  The karst constraint map has three levels; only "forte"
+# is an exclusion, "modérée" and "faible" call for a geotechnical study, which
+# a turbine foundation gets anyway.
+# ---------------------------------------------------------------------------
+risk:
+  karst_levels: ["contrainte forte"]
 
 # ---------------------------------------------------------------------------
 # Scenario ladder.  Each scenario adds the layers of the previous one.
@@ -669,3 +698,102 @@ bregilab:
   wallonia_current_gwh: 1744
   wallonia_additional_gwh: 16456
   wallonia_potential_availability_factor: 0.181
+  hub_height_m: 94
+  # Emulation of the WTN scenario for Wallonia (BREGILAB Tables 20-21) on this
+  # study's data, so that their number can be reproduced -- or not -- from
+  # their own rules, and bridged to this study's one change at a time.
+  # Layers they list that have no open equivalent (skeyes and Defence red
+  # zones, SEVESO, gas pipelines, cadastral residential parcels) cannot be
+  # emulated; the AOEM no-go rings stand in for the aviation red zones.
+  emulation:
+    habitat_zone: "4 * H"             # 2013 rule, 600 m for their 150 m machine
+    scattered_dwellings: 400
+    road: "1.5 * D / 2"               # 84 m, their negative advice limit
+    railway: "D / 2"                  # 56 m
+    railway_high_speed: 190
+    waterway: "D / 2"
+    hv_line: "1.5 * D"
+    existing_turbines: "5 * D"        # 560 m around the standing fleet
+    pic_roads: "plan_de_secteur"      # "road, rail and waterway network", 1.5 km
+    nuclear_radius_m: 2000
+    nuclear_sites:
+      - {name: "Tihange nuclear power station", lat: 50.5347, lon: 5.2728}
+      - {name: "IRE Fleurus", lat: 50.4633, lon: 4.5347}
+
+# ---------------------------------------------------------------------------
+# OpenStreetMap infrastructure the Walloon open data does not carry: the dual
+# carriageways that make up the road part of the CoDT's PIC network, and the
+# high-speed railway lines (for the 190 m rail distance).  Retrieved once from
+# Overpass by scripts/retrieve_osm_infrastructure.py.
+# ---------------------------------------------------------------------------
+osm_infrastructure:
+  dual_carriageway_min_speed_kmh: 70   # excludes urban one-way streets
+
+# ---------------------------------------------------------------------------
+# Sensitivity analysis.  Every case is the reference with one change, so the
+# difference to the reference is the price of that one choice.  `land` swaps
+# an exclusion layer for a variant built by build_exclusion_layers.py (null
+# drops it); `placement` overrides a placement parameter.
+#
+# `policy` cases are rules that a government could change or that a permit can
+# depart from: the Cadre is "une circulaire du gouvernement à valeur
+# indicative" (§1.4) and the plan de secteur admits derogations for wind farms
+# (CoDT D.IV.11).  `judgement` cases are modelling choices of this study.
+# ---------------------------------------------------------------------------
+sensitivity:
+  cases:
+    interdistance_4km:
+      group: policy
+      label: "inter-distance 4 km between parks (short views), motorways exempt"
+      placement: {interdistance_m: 4000}
+    interdistance_6km:
+      group: policy
+      label: "inter-distance 6 km between parks (long views), motorways exempt"
+      placement: {interdistance_m: 6000}
+    no_horizon:
+      group: policy
+      label: "no open-horizon rule"
+      placement: {horizon: false}
+    parks_min1:
+      group: policy
+      label: "no minimum park size (2024 exception above 3.2 MW)"
+      placement: {min_turbines: 1}
+    no_corridor:
+      group: policy
+      label: "no agricultural corridor (derogation, CoDT D.IV.11)"
+      land: {pds_ineligible: pds_ineligible_nocorridor}
+    habitat_cdr2013:
+      group: policy
+      label: "2013 habitat setback, 4 x tip height"
+      land: {habitat_setback: habitat_setback_cdr2013}
+    no_adesa:
+      group: judgement
+      label: "ADESA perimeters not excluded"
+      land: {landscape: landscape_pds}
+    no_landscape:
+      group: judgement
+      label: "no landscape perimeter excluded"
+      land: {landscape: null}
+    slope_ge10:
+      group: judgement
+      label: "slope criterion at 10 %"
+      land: {slope: slope_ge10}
+    slope_ge15:
+      group: judgement
+      label: "slope criterion at 15 %"
+      land: {slope: slope_ge15}
+    no_aviation:
+      group: judgement
+      label: "no aeronautical ring excluded"
+      land: {aviation: null}
+    pic_plan_de_secteur:
+      group: misreading
+      label: "every plan-de-secteur road taken as a PIC (a misreading of R.II.21-1)"
+      land: {pds_ineligible: pds_ineligible_psroads}
+  combined:
+    all_policy_relaxed:
+      label: "no agricultural corridor and no minimum park size, open horizon kept"
+      cases: [no_corridor, parks_min1]
+    all_policy_tightened:
+      label: "6 km inter-distance and the 2013 habitat setback"
+      cases: [interdistance_6km, habitat_cdr2013]

@@ -75,33 +75,40 @@ overrides are Wallonia's, where PNEC-PACE / EDORA data is better than the raster
 `BEWAL onwind 6 500`, `BEWAL solar 13 000`, `BEWAL solar rooftop 46 000` MW.
 
 > **The `BEWAL onwind 6 500` override has now been checked against a full
-> land-and-siting calculation** (22 Sep 2026).
+> land-and-siting calculation** (22 Sep 2026, revised 23 Sep 2026).
 > [`workflow_onwind_wal/`](../workflow_onwind_wal/) recomputes the Walloon
 > onshore-wind potential against the Region's own regulatory cartography — plan
 > de secteur, *cadre de référence éolien* 2024, Natura 2000, reserves, landscape
 > perimeters, natural hazards, the DGTA aeronautical obstacle map, the LiDAR
 > slope grid and the classified-site registers — using the same atlite machinery
-> PyPSA-Eur uses elsewhere, and then **places individual machines and wind
-> farms** on the surviving land. Report:
-> [`docs/onwind_potential_wallonia/`](onwind_potential_wallonia/). Four findings
+> PyPSA-Eur uses elsewhere, and then **places individual machines and parks** on
+> the surviving land under the Cadre's park and open-horizon rules. Report:
+> [`docs/onwind_potential_wallonia/`](onwind_potential_wallonia/). Five findings
 > bear on this section directly:
 >
 > 1. For the **administrative Walloon Region** the credible gross technical
->    potential is **3.2–5.7 GW, central 4.4 GW**. 6 500 MW is above the gross
->    reference case (5 712 MW) and is reachable only by dropping the landscape
->    criterion the 2013 framework states — 130° of open horizon within 4 km of
->    each village, which the standing fleet observes almost without exception —
->    and then allowing nothing for the two constraint families that have no
->    public geometry.
-> 2. 6 500 MW is a *deployment* expectation assembled from a project pipeline,
+>    potential is **3.6–6.5 GW, central 5.0 GW** (NREL 4 MW, 5 D, parks of four,
+>    130° of open horizon within 4 km of each village, the CoDT's agricultural
+>    corridor). 6 500 MW is, to within a percent, the gross reference case
+>    (6 480 MW): reachable only if none of the unmapped constraint families
+>    (priority bird zones, partial constraints) binds.
+> 2. The answer is decided by policy rules, each priced in §7 of the report:
+>    the derogation route for agricultural land away from the main
+>    infrastructure network is worth +40 %, dropping the minimum park size
+>    +25 %; the 4–6 km inter-distance the 2024 Cadre *recommends* would cost
+>    16–33 % if applied as a rule, the 2013 habitat setback 28 %.
+> 3. 6 500 MW is a *deployment* expectation assembled from a project pipeline,
 >    not a land potential. That the two land in the same place is a coincidence
 >    of construction, not a confirmation.
-> 3. The model's `BEWAL` region covers only **89.6 %** of Wallonia — 2 191 km²
+> 4. The model's `BEWAL` region covers only **89.6 %** of Wallonia — 2 191 km²
 >    of western Hainaut is inside `BEVLG` — so every land-based Walloon limit in
 >    this document is stated on a region that is not the Walloon Region.
-> 4. An earlier reading of the same study said 2–4.5 GW. It rested on a
->    patch-size screen with no legal basis and is retracted in §6.6 of the
->    report.
+> 5. Earlier readings of the same study — 2–4.5 GW, then 3.2–5.7 GW (central
+>    4.4 GW) — are superseded. The first rested on a patch-size screen with no
+>    legal basis; the second on a farm-disc geometry that acted as a hidden 6 km
+>    inter-distance, on an agricultural corridor drawn along every
+>    plan-de-secteur road instead of the CoDT's PIC network, and on the claim
+>    that the 2024 Cadre had dropped the inter-distance, which it has not.
 >
 > **No input has been changed.**
 

@@ -1,30 +1,30 @@
 {
   "turbine": "T185_NREL4",
   "base_scenario": "S5_risk",
-  "base_area_km2": 882.8,
+  "base_area_km2": 620.7,
   "families": {
     "aviation": {
-      "area_after_km2": 769.8,
-      "removed_km2": 113.0,
-      "removed_pct": 12.8
+      "area_after_km2": 550.0,
+      "removed_km2": 70.8,
+      "removed_pct": 11.4
     },
     "slope": {
-      "area_after_km2": 686.0,
-      "removed_km2": 196.8,
-      "removed_pct": 22.3
+      "area_after_km2": 493.1,
+      "removed_km2": 127.6,
+      "removed_pct": 20.6
     },
     "heritage": {
-      "area_after_km2": 878.7,
-      "removed_km2": 4.1,
-      "removed_pct": 0.5
+      "area_after_km2": 618.4,
+      "removed_km2": 2.4,
+      "removed_pct": 0.4
     },
     "radar": {
-      "area_after_km2": 874.3,
-      "removed_km2": 8.4,
-      "removed_pct": 1.0
+      "area_after_km2": 612.0,
+      "removed_km2": 8.7,
+      "removed_pct": 1.4
     }
   },
-  "combined_area_km2": 570.1,
-  "combined_removed_km2": 312.7,
-  "combined_removed_pct": 35.4
+  "combined_area_km2": 418.0,
+  "combined_removed_km2": 202.8,
+  "combined_removed_pct": 32.7
 }

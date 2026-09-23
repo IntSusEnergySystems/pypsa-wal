@@ -1,77 +1,62 @@
 # SPDX-FileCopyrightText: Contributors to PyPSA-Wal
 # SPDX-License-Identifier: MIT
 """
-Test the constraint set against the turbines that are actually standing.
+Test the constraint set and the siting rules against the turbines that are
+actually standing.
 
 A land-eligibility study is a claim about where a machine may be built.  The
 cheapest way to find out whether the claim is calibrated is to point it at the
-machines that exist: if the constraint set says most of the standing fleet is
-illegal, the constraint set is too strict, and the potential it produces is too
-low.
+machines that exist.  Four things are measured.
 
-Three things are measured:
+Avoidance ratios.  For each exclusion layer, the share of the standing fleet
+inside it divided by the share of the land it covers.  A ratio well below one
+says developers and the permitting authority treat the layer as a constraint; a
+ratio near one says they do not, whatever it is called.  The ratio is reported
+twice: against the whole Region, and *conditionally* -- counting only the land
+and the machines that pass every other layer of the set.  The conditional ratio
+is the one that tests the layer: steep slopes, for instance, are mostly in
+forest that the zoning already excludes, so the whole-Region ratio of a slope
+layer mostly measures the forest.  The two size-dependent setbacks are left
+out of the conditions, because most standing machines are smaller than the
+reference class.
 
-  * which rung of the scenario ladder first excludes each standing turbine,
-  * which individual constraint layers cover its position, and
-  * for each layer, the **avoidance ratio**: the share of standing turbines
-    inside the layer divided by the share of the Region the layer covers.  A
-    ratio well below one says that developers and the permitting authority
-    treat the constraint as real; a ratio at or above one says that they do
-    not, whatever the layer is called.
+Farm geometry.  The fleet grouped into farms by single linkage, and the
+distances between farms measured the way the Region measures its
+inter-distance -- between the nearest masts of two farms -- with the share of
+farms that stand along a motorway, where the inter-distance does not apply.
 
-None of it is a pass/fail test.  Walloon wind development began under the 2002 and
-2013 frameworks and much of the fleet predates the rules applied here; the
-landscape perimeters and several of the hazard layers are *partial* constraints
-in permitting practice, which an area calculation must treat as binary.  The
-numbers therefore bound how conservative the constraint set is, and say which
-rule does the bounding.
+Dwellings.  Which addresses lie within 400 m of a standing machine, by zone.
+
+Open horizon.  Whether the fleet respects the 130° rule of the Cadre, using the
+placement model's own implementation.
 """
 
 import json
 import logging
+import sys
 from pathlib import Path
 
+# rasterio before geopandas: see retrieve_slope_raster.py.
+import rasterio
 import geopandas as gpd
 import numpy as np
-import rasterio
-from rasterio.features import geometry_mask
+from atlite.gis import ExclusionContainer, shape_availability
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
+from shapely.ops import unary_union
+
+sys.path.insert(0, str(Path(__file__).parent))
+from placement_lib import Horizon  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# The placement model's own implementation of the criterion, so that the test
-# below validates the code that is actually used and not a second copy of it.
-exec(  # noqa: S102 - our own module, executed to avoid a package layout
-    (Path(__file__).parent / "place_turbines.py").read_text().split("if __name__ ==")[0],
-    globals(),
-)
-
 RASTER_LAYERS = {"dwelling_setback": "dwelling_raster", "slope": "slope_raster"}
+SIZE_DEPENDENT = {"habitat_setback", "dwelling_setback"}
 
 
-def raster_hits(path, points, codes=(1,)):
-    with rasterio.open(path) as src:
-        vals = np.array(
-            [v[0] for v in src.sample([(p.x, p.y) for p in points.geometry])]
-        )
-    return np.isin(vals, codes)
-
-
-def raster_land_share(path, shape, codes=(1,)):
-    """Share of `shape` covered by the raster's coded cells."""
-    with rasterio.open(path) as src:
-        window = rasterio.windows.from_bounds(*shape.bounds, transform=src.transform)
-        window = window.round_offsets().round_lengths()
-        data = src.read(1, window=window)
-        transform = src.window_transform(window)
-    inside = geometry_mask(
-        [shape], out_shape=data.shape, transform=transform, invert=True
-    )
-    if not inside.any():
-        return 0.0
-    return float(np.isin(data[inside], codes).mean())
+def pct(a, qs=(5, 10, 25, 50, 75, 90)):
+    return {f"p{q}": round(float(np.percentile(a, q)), 1) for q in qs}
 
 
 if __name__ == "__main__":
@@ -86,146 +71,156 @@ if __name__ == "__main__":
 
     cfg = snakemake.params.config
     crs = cfg["atlite"]["crs"]
+    res = float(cfg["atlite"]["excluder_resolution"])
     scenarios = cfg["scenarios"]
     ladder = [s for s in scenarios if scenarios[s]["mode"] == "walloon"]
+    ref_layers = list(scenarios[cfg["reference_scenario"]]["layers"])
+    layer_dir = Path(snakemake.input.layer_dir)
 
     fleet = gpd.read_file(snakemake.input.points, layer="data").to_crs(crs)
     n = len(fleet)
-    logger.info("%d standing turbines", n)
-
-    regions = gpd.read_file(snakemake.input.regions, layer="regions").to_crs(crs)
-    admin = regions[regions["name"] == "admin"].geometry.union_all()
-    region_area = admin.area
-
-    layer_dir = Path(snakemake.input.layer_dir)
-    covered = {}
-    land_share = {}
-    for name in scenarios[cfg["reference_scenario"]]["layers"]:
-        if name in RASTER_LAYERS:
-            path = snakemake.input[RASTER_LAYERS[name]]
-            covered[name] = raster_hits(path, fleet)
-            land_share[name] = raster_land_share(path, admin)
-        else:
-            path = layer_dir / f"{name}.gpkg"
-            if not path.exists():
-                continue
-            geom = gpd.read_file(path).to_crs(crs).union_all()
-            covered[name] = fleet.within(geom).values
-            land_share[name] = float(geom.intersection(admin).area / region_area)
-        logger.info(
-            "%-24s covers %5.1f %% of the Region and %4d of %d standing turbines "
-            "(%.1f %%), avoidance ratio %.2f",
-            name,
-            100 * land_share[name],
-            covered[name].sum(),
-            n,
-            100 * covered[name].mean(),
-            covered[name].mean() / land_share[name] if land_share[name] else float("nan"),
-        )
-
-    out = {
-        "n_turbines": n,
-        "by_layer": {
-            k: {
-                "n": int(v.sum()),
-                "pct": round(100 * float(v.mean()), 1),
-                "land_pct": round(100 * land_share[k], 1),
-                "avoidance_ratio": (
-                    round(float(v.mean()) / land_share[k], 2) if land_share[k] else None
-                ),
-            }
-            for k, v in covered.items()
-        },
-        "by_scenario": {},
-    }
-    for s in ladder:
-        hit = np.zeros(n, dtype=bool)
-        for name in scenarios[s]["layers"]:
-            if name in covered:
-                hit |= covered[name]
-        out["by_scenario"][s] = {
-            "excluded": int(hit.sum()),
-            "surviving": int(n - hit.sum()),
-            "surviving_pct": round(100 * float(1 - hit.mean()), 1),
-        }
-        logger.info("%s: %d of %d standing turbines survive", s, n - hit.sum(), n)
-
-    # The layers that, on their own, account for most of the exclusions.
-    ranked = sorted(out["by_layer"].items(), key=lambda kv: -kv[1]["n"])
-    out["dominant_layers"] = [k for k, _ in ranked[:3]]
-
-    # How the standing fleet is itself grouped.  Single-linkage clustering at
-    # `farm_link_m` turns the turbine positions into wind farms, which is the
-    # only way to compare the farm-allocation model with reality: it predicts a
-    # number of farms and a number of machines in each, and Wallonia already has
-    # both.
-    link = float(snakemake.params.farm_link_m)
     xy = np.c_[fleet.geometry.x, fleet.geometry.y]
+    logger.info("%d standing turbines", n)
+    regions = gpd.read_file(snakemake.input.regions, layer="regions").to_crs(crs)
+    admin = regions[regions["name"] == "admin"]
+
+    # ------------------------------------------------------------------
+    # 1. Avoidance ratios, on the exclusion raster itself
+    # ------------------------------------------------------------------
+    def burn(name):
+        ex = ExclusionContainer(crs=crs, res=res)
+        if name in RASTER_LAYERS:
+            ex.add_raster(snakemake.input[RASTER_LAYERS[name]], codes=[1], crs=crs, nodata=255)
+        else:
+            ex.add_geometry(str(layer_dir / f"{name}.gpkg"))
+        avail, t = shape_availability(admin.geometry, ex)
+        return ~avail.astype(bool), t
+
+    extra = ["pds_ineligible_psroads", "pds_ineligible_nocorridor", "landscape_pds",
+             "landscape_adesa"]
+    masks = {}
+    transform = None
+    for name in ref_layers + extra:
+        masks[name], transform = burn(name)
+    region = shape_availability(admin.geometry, ExclusionContainer(crs=crs, res=res))[0].astype(bool)
+    r = ((xy[:, 1] - transform.f) / transform.e).astype(int)
+    c = ((xy[:, 0] - transform.c) / transform.a).astype(int)
+    hit = {k: v[r, c] for k, v in masks.items()}
+
+    def union(names):
+        m = np.zeros_like(region)
+        for k in names:
+            m |= masks[k]
+        return m
+
+    by_layer = {}
+    for name in ref_layers + ["landscape_pds", "landscape_adesa"]:
+        land = float((masks[name] & region).sum() / region.sum())
+        share = float(hit[name].mean())
+        others = [k for k in ref_layers if k != name and k not in SIZE_DEPENDENT
+                  and not (name.startswith("landscape") and k == "landscape")]
+        ok_land = region & ~union(others)
+        ok_fleet = ~np.any([hit[k] for k in others], axis=0)
+        c_land = float((masks[name] & ok_land).sum() / ok_land.sum())
+        c_share = float(hit[name][ok_fleet].mean()) if ok_fleet.any() else float("nan")
+        by_layer[name] = {
+            "n": int(hit[name].sum()),
+            "pct": round(100 * share, 1),
+            "land_pct": round(100 * land, 1),
+            "avoidance_ratio": round(share / land, 2) if land else None,
+            "conditional_land_pct": round(100 * c_land, 1),
+            "conditional_fleet_pct": round(100 * c_share, 1),
+            "conditional_n": int(ok_fleet.sum()),
+            "conditional_ratio": round(c_share / c_land, 2) if c_land else None,
+        }
+        logger.info("%-22s %s", name, by_layer[name])
+
+    out = {"n_turbines": n, "by_layer": by_layer, "by_scenario": {}}
+    for s in ladder:
+        h = np.any([hit[k] for k in scenarios[s]["layers"]], axis=0)
+        out["by_scenario"][s] = {"excluded": int(h.sum()), "surviving": int(n - h.sum()),
+                                 "surviving_pct": round(100 * float(1 - h.mean()), 1)}
+    out["zoning"] = {
+        k: round(100 * float(1 - hit[k].mean()), 1)
+        for k in ("pds_ineligible", "pds_ineligible_psroads", "pds_ineligible_nocorridor")
+    }
+    logger.info("share of the fleet admitted by the zoning: %s", out["zoning"])
+
+    # ------------------------------------------------------------------
+    # 2. Farm geometry
+    # ------------------------------------------------------------------
+    link = float(snakemake.params.farm_link_m)
     tree = cKDTree(xy)
     pairs = tree.query_pairs(link, output_type="ndarray")
-    if len(pairs):
-        adj = coo_matrix(
-            (np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])), shape=(n, n)
-        )
-    else:
-        adj = coo_matrix((n, n))
+    adj = (coo_matrix((np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])), shape=(n, n))
+           if len(pairs) else coo_matrix((n, n)))
     n_farms, labels = connected_components(adj, directed=False)
     sizes = np.bincount(labels)
     centres = np.array([xy[labels == i].mean(axis=0) for i in range(n_farms)])
-    span = np.array(
-        [
-            np.linalg.norm(xy[labels == i] - centres[i], axis=1).max()
-            if (labels == i).sum() > 1
-            else 0.0
-            for i in range(n_farms)
-        ]
-    )
-    ctree = cKDTree(centres)
-    fdist = ctree.query(centres, k=2)[0][:, 1]
+    span = np.array([np.linalg.norm(xy[labels == i] - centres[i], axis=1).max()
+                     if (labels == i).sum() > 1 else 0.0 for i in range(n_farms)])
+    edge = np.array([cKDTree(xy[labels != i]).query(xy[labels == i])[0].min()
+                     for i in range(n_farms)])
+    roads = gpd.read_file(snakemake.input.dual_carriageways, layer="data").to_crs(crs)
+    motorways = unary_union(roads[roads["highway"] == "motorway"].geometry.values)
+    d_mw = np.array([motorways.distance(p) for p in fleet.geometry])
+    exempt_m = float(cfg["placement"]["landscape"]["motorway_exemption_m"])
+    mw_farm = np.array([(d_mw[labels == i] <= exempt_m).all() for i in range(n_farms)])
     mdist = tree.query(xy, k=2)[0][:, 1]
-
-    def pct(a, qs=(5, 10, 25, 50, 75, 90)):
-        return {f"p{q}": round(float(np.percentile(a, q)), 1) for q in qs}
-
     out["farms"] = {
         "link_distance_m": link,
         "n_farms": int(n_farms),
         "turbines_per_farm": round(float(n / n_farms), 1),
         "n_farms_ge_4": int((sizes >= 4).sum()),
-        "turbines_in_farms_ge_4": int(sizes[sizes >= 4].sum()),
         "share_in_farms_ge_4_pct": round(100 * float(sizes[sizes >= 4].sum()) / n, 0),
         "largest_farm": int(sizes.max()),
-        # The three distributions the placement model is calibrated on.
         "machine_nn_m": pct(mdist),
         "farm_radius_m": pct(span[sizes >= 2]),
-        "farm_nn_m": pct(fdist),
-        "farm_nn_below_4km_pct": round(100 * float((fdist < 4000).mean()), 0),
+        "farm_edge_nn_m": pct(edge),
+        "farms_edge_below_4km_pct": round(100 * float((edge < 4000).mean()), 0),
+        "farms_edge_below_6km_pct": round(100 * float((edge < 6000).mean()), 0),
+        "farms_along_motorway": int(mw_farm.sum()),
+        "farms_not_along_motorway_edge_below_4km_pct": round(
+            100 * float((edge[~mw_farm] < 4000).mean()), 0),
+        "turbines_within_1km_of_motorway_pct": round(100 * float((d_mw <= 1000).mean()), 0),
+        "turbines_within_1500m_of_motorway_pct": round(100 * float((d_mw <= 1500).mean()), 0),
     }
     logger.info("standing fleet groups into %s", json.dumps(out["farms"]))
 
     # ------------------------------------------------------------------
-    # Does the standing fleet respect the open-horizon criterion?
-    #
-    # The 2013 cadre de référence asks that at least 130 degrees of each
-    # village's horizon, within 4 km, stay free of turbines.  If the machines
-    # that exist already broke that rule, the rule would not be one, and the
-    # implementation used in the placement model would be wrong.
+    # 3. Which addresses are within 400 m of a standing machine
+    # ------------------------------------------------------------------
+    addr = gpd.read_file(snakemake.input.address_points, layer="data").to_crs(crs)
+    dd, ii = cKDTree(np.c_[addr.geometry.x, addr.geometry.y]).query(xy)
+    near = addr.iloc[ii[dd <= 400]].copy()
+    zones = gpd.read_file(snakemake.input.pds_zones, layer="data").to_crs(crs)
+    bad = ~zones.geometry.is_valid
+    zones.loc[bad, "geometry"] = zones.loc[bad, "geometry"].make_valid()
+    j = gpd.sjoin(near, zones[["DESCRIPTION", "geometry"]], predicate="within", how="left")
+    j = j[~j.index.duplicated()]
+    zae = set(cfg["plan_de_secteur"]["economic_activity_zones"])
+    out["addresses"] = {
+        "turbines_within_400m_of_an_address": int((dd <= 400).sum()),
+        "of_which_nearest_address_in_zae": int(j["DESCRIPTION"].isin(zae).sum()),
+        "of_which_in_agricultural_zone": int((j["DESCRIPTION"] == "Agricole").sum()),
+        "by_zone": j["DESCRIPTION"].fillna("none").value_counts().to_dict(),
+    }
+    logger.info("addresses within 400 m: %s", out["addresses"])
+
+    # ------------------------------------------------------------------
+    # 4. Open horizon
     # ------------------------------------------------------------------
     lcfg = cfg["placement"]["landscape"]
     settle = gpd.read_file(snakemake.input.settlements, layer="settlements").to_crs(crs)
     sxy = np.c_[settle.geometry.x, settle.geometry.y]
-    horizon = OpenHorizon(
-        sxy,
-        float(cfg["turbines"][snakemake.wildcards.turbine]["rotor_diameter"]),
-        float(lcfg["horizon_radius_m"]),
-        float(lcfg["min_free_azimuth_deg"]),
-    )
-    gaps = np.array(
-        [
-            np.rad2deg(horizon._largest_gap(horizon._arcs_for(v, xy[:, 0], xy[:, 1])))
-            for v in range(len(sxy))
-        ]
-    )
+    horizon = Horizon(sxy, float(cfg["turbines"][snakemake.wildcards.turbine]["rotor_diameter"]),
+                      float(lcfg["horizon_radius_m"]), float(lcfg["min_free_azimuth_deg"]))
+    gaps = []
+    for v in range(len(sxy)):
+        arcs = [a for x, y in xy[np.hypot(*(xy - sxy[v]).T) <= horizon.radius]
+                for a in horizon.arc(v, x, y)]
+        gaps.append(np.rad2deg(horizon.largest_gap(arcs)))
+    gaps = np.array(gaps)
     affected = gaps < 359.9
     thr = float(lcfg["min_free_azimuth_deg"])
     out["open_horizon"] = {
@@ -234,14 +229,10 @@ if __name__ == "__main__":
         "n_settlements": int(len(sxy)),
         "n_with_a_turbine_within_radius": int(affected.sum()),
         "share_affected_pct": round(100 * float(affected.mean()), 0),
-        "largest_free_arc_deg": {
-            f"p{q}": round(float(np.percentile(gaps[affected], q)), 0)
-            for q in (1, 5, 10, 25, 50)
-        },
+        "largest_free_arc_deg": {f"p{q}": round(float(np.percentile(gaps[affected], q)), 0)
+                                 for q in (1, 5, 10, 25, 50)},
         "n_failing": int((gaps[affected] < thr).sum()),
-        "failing_pct_of_affected": round(
-            100 * float((gaps[affected] < thr).mean()), 1
-        ),
+        "failing_pct_of_affected": round(100 * float((gaps[affected] < thr).mean()), 1),
     }
     logger.info("open horizon vs the standing fleet: %s", json.dumps(out["open_horizon"]))
 

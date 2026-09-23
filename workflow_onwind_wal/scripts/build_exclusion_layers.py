@@ -11,14 +11,22 @@ GeoPackage so that any of them can be inspected in QGIS:
     turbine may stand.  This is a *positive-list* construction, exactly as in
     the 2013 Walloon favourable-zone map and its 2022 update: agricultural land
     counts only within 1.5 km of the main communication infrastructure (PIC) or
-    of an economic-activity zone, coniferous forest only within 750 m of a PIC,
-    and broad-leaved forest not at all.
+    of a zone d'activité économique (CoDT R.II.36-2), coniferous forest only
+    within 750 m of a PIC (R.II.37-2), and broad-leaved forest not at all.  The
+    PIC is the network of CoDT R.II.21-1 -- motorways and 2x2 regional roads,
+    railways, waterways -- not every road of the plan de secteur.  Two variants
+    are written for the sensitivity analysis: ``pds_ineligible_nocorridor``
+    (agricultural land admitted everywhere, the derogation route of D.IV.11) and
+    ``pds_ineligible_psroads`` (every plan-de-secteur road taken as a PIC).
 
 ``habitat_setback`` / ``dwelling_setback`` / ``infrastructure_setback``
     Buffers whose width follows the Cadre de référence éolien.  The habitat-zone
     setback is configurable between the 2013 rule (4 x total height) and the
     2024 rule (500 m + half the total height), which is the one in force since
-    25 April 2024.
+    25 April 2024; the other rule is written as ``habitat_setback_<rule>``.  The
+    400 m dwelling setback is drawn around the ICAR address points outside the
+    zones d'activité économique, whose addresses are businesses or the
+    operators' housing the 2024 rule exempts.
 
 ``nature`` / ``landscape`` / ``risk``
     Protected-area, landscape and natural-hazard layers.
@@ -39,10 +47,12 @@ import json
 import logging
 from pathlib import Path
 
+# rasterio before geopandas: in this environment the reverse import order makes
+# the first deflate-compressed GeoTIFF write abort ("double free or corruption").
+import rasterio
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import rasterio
 from rasterio.features import shapes as rio_shapes
 from rasterio.transform import from_origin
 from scipy.ndimage import distance_transform_edt
@@ -233,47 +243,77 @@ if __name__ == "__main__":
     zones = read(src["pds_zones"], crs)
     zones["DESCRIPTION"] = zones["DESCRIPTION"].astype(str).str.strip()
 
+    # Every configured label must name a zone that exists: a spelling variant
+    # ("Dépendances" for "Dépendance d'extraction") once dropped 148 km2 of
+    # zoning without a word.
+    known = set(zones["DESCRIPTION"])
+    for key in ("eligible_unconditional", "economic_activity_zones",
+                "eligible_conditional_agriculture", "eligible_conditional_forest",
+                "habitat_zones"):
+        unknown = sorted(set(pds_cfg[key]) - known)
+        if unknown:
+            raise ValueError(
+                f"plan_de_secteur.{key}: no zone is labelled {unknown}; "
+                f"the labels present are {sorted(known)}"
+            )
+
     def pick(labels):
         return zones[zones["DESCRIPTION"].isin(labels)]
 
-    # PIC = main communication infrastructure (CoDT art. R.II.21-1): motorways
-    # and regional link roads, railways, navigable waterways.
-    pic_parts = []
-    for key in ("pds_roads", "pds_rail", "pds_waterways"):
-        g = read(src[key], crs)
-        if not g.empty:
-            pic_parts.append(unary_union(g.geometry.values))
-    pic = _union(pic_parts)
+    # PIC = principales infrastructures de communication, CoDT art. R.II.21-1:
+    # "les autoroutes et les routes de liaisons régionales à deux fois deux
+    # bandes de circulation", the railway lines, the navigable waterways.
+    roads_pds = read(src["pds_roads"], crs)
+    rail = read(src["pds_rail"], crs)
+    waterways = read(src["pds_waterways"], crs)
+    dual = read(src["osm_dual_carriageways"], crs, repair=False)
+    motorways_pds = roads_pds[roads_pds["DESCRIPTION"] == "Autoroute existante"]
+    rail_ww = [g for g in (dissolve(rail), dissolve(waterways)) if g is not None]
+    pic_codt = _union(list(motorways_pds.geometry.values) + list(dual.geometry.values) + rail_ww)
+    pic_psroads = _union(list(roads_pds.geometry.values) + rail_ww)
+    pic = pic_codt if pds_cfg["pic_roads"] == "codt" else pic_psroads
+    logger.info(
+        "PIC roads (%s): %.0f km of plan-de-secteur motorway, %.0f km of OSM "
+        "dual carriageway (both carriageways counted); every plan-de-secteur "
+        "road would be %.0f km",
+        pds_cfg["pic_roads"],
+        motorways_pds.length.sum() / 1e3,
+        dual.length.sum() / 1e3,
+        roads_pds.length.sum() / 1e3,
+    )
 
     econ = pick(pds_cfg["eligible_unconditional"])
     econ_geom = dissolve(econ)
-
-    agri = pick(pds_cfg["eligible_conditional_agriculture"])
-    agri_corridor = _union(
-        [pic.buffer(pds_cfg["agri_max_distance_to_pic"])]
-        + ([econ_geom.buffer(pds_cfg["agri_max_distance_to_pic"])] if econ_geom else [])
-    )
-    agri_eligible = dissolve(agri)
-    if agri_eligible is not None:
-        agri_eligible = agri_eligible.intersection(agri_corridor)
-
+    zae_geom = dissolve(pick(pds_cfg["economic_activity_zones"]))
+    agri_geom = dissolve(pick(pds_cfg["eligible_conditional_agriculture"]))
     forest = pick(pds_cfg["eligible_conditional_forest"])
-    forest_eligible = None
+    conif = None
     if not forest.empty:
         conif = conifer_mask(
             forest, forest_cfg["corine"], forest_cfg["coniferous_codes"], crs
         )
-        if conif is not None:
-            forest_eligible = (
-                dissolve(forest)
-                .intersection(conif)
-                .intersection(pic.buffer(pds_cfg["conifer_max_distance_to_pic"]))
-            )
+    forest_geom = dissolve(forest)
+    reach = pds_cfg["agri_max_distance_to_pic"]
 
-    eligible = _union(
-        [g for g in (econ_geom, agri_eligible, forest_eligible) if g is not None]
-    )
+    def envelope(pic_net, corridor=True):
+        """The plan-de-secteur zones a mast may stand in, for one PIC network."""
+        agri = agri_geom
+        if agri is not None and corridor:
+            anchors = [pic_net.buffer(reach)] + ([zae_geom.buffer(reach)] if zae_geom else [])
+            agri = agri.intersection(_union(anchors))
+        forest_ok = None
+        if forest_geom is not None and conif is not None:
+            forest_ok = forest_geom.intersection(conif).intersection(
+                pic_net.buffer(pds_cfg["conifer_max_distance_to_pic"])
+            )
+        return _union([g for g in (econ_geom, agri, forest_ok) if g is not None])
+
+    eligible = envelope(pic, corridor=pds_cfg.get("agri_corridor", True))
     pds_ineligible = boundary.difference(eligible)
+    pds_variants = {
+        "pds_ineligible_nocorridor": boundary.difference(envelope(pic, corridor=False)),
+        "pds_ineligible_psroads": boundary.difference(envelope(pic_psroads)),
+    }
 
     # ------------------------------------------------------------------
     # 2. Setbacks
@@ -282,7 +322,15 @@ if __name__ == "__main__":
     habitat_distance = evaluate(rule, H, D)
     logger.info("habitat-zone setback (%s): %.0f m", sb_cfg["habitat_zone"]["default"], habitat_distance)
     habitat_zones = pick(pds_cfg["habitat_zones"])
-    habitat_setback = buffered(habitat_zones, habitat_distance, crs)
+    habitat_union = _union(habitat_zones.geometry.values)
+    habitat_setback = habitat_union.buffer(habitat_distance)
+    habitat_variants = {}
+    for name, expr in sb_cfg["habitat_zone"].items():
+        if name in ("default", sb_cfg["habitat_zone"]["default"]):
+            continue
+        d = evaluate(expr, H, D)
+        habitat_variants[f"habitat_setback_{name}"] = habitat_union.buffer(d)
+        logger.info("habitat-zone setback variant %s: %.0f m", name, d)
 
     # Settlements, for the open-horizon criterion of the 2013 cadre de
     # référence: "un azimut minimal sans éoliennes doit être préservé pour
@@ -291,7 +339,7 @@ if __name__ == "__main__":
     # zoning above `min_area_ha`; below that the block is a hamlet or a ribbon
     # and is already protected by the dwelling setback.
     settle = (
-        gpd.GeoDataFrame(geometry=[_union(habitat_zones.geometry.values)], crs=crs)
+        gpd.GeoDataFrame(geometry=[habitat_union], crs=crs)
         .explode(index_parts=False)
         .reset_index(drop=True)
     )
@@ -304,27 +352,44 @@ if __name__ == "__main__":
 
     dwelling_distance = evaluate(sb_cfg["scattered_dwellings"], H, D)
     addr = read(src["address_points"], crs)
-    logger.info("%d address points, %.0f m setback", len(addr), dwelling_distance)
+    n_addr = len(addr)
+    exempt_key = sb_cfg.get("scattered_dwellings_exempt_zones")
+    n_exempt = 0
+    if exempt_key and zae_geom is not None:
+        inside = gpd.sjoin(
+            addr, gpd.GeoDataFrame(geometry=[zae_geom], crs=crs), predicate="within"
+        ).index
+        n_exempt = len(inside)
+        addr = addr.drop(index=inside)
+    logger.info(
+        "%d address points, %d of them inside a zone d'activité économique and "
+        "exempt; %.0f m setback around the other %d",
+        n_addr, n_exempt, dwelling_distance, len(addr),
+    )
     dwelling_share = dwelling_setback_raster(
         addr, dwelling_distance, boundary, crs, snakemake.output.dwelling_raster
     )
 
-    infra_parts = []
     road_distance = evaluate(sb_cfg["road"], H, D) * sb_cfg["road_multiplier"]
-    for key, dist in (
-        ("pds_roads", road_distance),
-        ("pds_rail", evaluate(sb_cfg["railway"], H, D)),
-        ("pds_hv_lines", evaluate(sb_cfg["hv_line"], H, D)),
-    ):
-        g = buffered(read(src[key], crs), dist, crs)
-        if g is not None:
-            infra_parts.append(g)
+    rail_distance = evaluate(sb_cfg["railway"], H, D)
+    hsl_distance = evaluate(sb_cfg["railway_high_speed"], H, D)
+    hv_distance = evaluate(sb_cfg["hv_line"], H, D)
+    hsl = read(src["osm_high_speed_rail"], crs, repair=False)
+    infra_parts = [
+        g
+        for g in (
+            buffered(roads_pds, road_distance, crs),
+            buffered(rail, rail_distance, crs),
+            buffered(hsl, hsl_distance, crs),
+            buffered(read(src["pds_hv_lines"], crs), hv_distance, crs),
+        )
+        if g is not None
+    ]
     infrastructure_setback = _union(infra_parts)
     logger.info(
-        "infrastructure setbacks: road %.0f m, rail %.0f m, HV %.0f m",
-        road_distance,
-        evaluate(sb_cfg["railway"], H, D),
-        evaluate(sb_cfg["hv_line"], H, D),
+        "infrastructure setbacks: road %.0f m, rail %.0f m (high-speed %.0f m on "
+        "%.0f km of track), HV %.0f m",
+        road_distance, rail_distance, hsl_distance, hsl.length.sum() / 1e3, hv_distance,
     )
 
     # ------------------------------------------------------------------
@@ -351,8 +416,17 @@ if __name__ == "__main__":
             "caves",
         ]
     )
-    landscape = union_of(["pds_landscape", "adesa_landscape"])
-    risk = union_of(["flood", "karst", "landslide", "steep_slopes", "water_capture"])
+    landscape_pds = union_of(["pds_landscape"])
+    landscape_adesa = union_of(["adesa_landscape"])
+    landscape = _union([g for g in (landscape_pds, landscape_adesa) if g is not None])
+    karst = read(src["karst"], crs)
+    levels = snakemake.params.risk["karst_levels"]
+    kept = karst[karst["NATURE"].isin(levels)]
+    logger.info("karst: %d of %d polygons at levels %s", len(kept), len(karst), levels)
+    risk = _union(
+        [g for g in [dissolve(kept)] if g is not None]
+        + [g for g in [union_of(["flood", "landslide", "steep_slopes", "water_capture"])] if g is not None]
+    )
 
     # ------------------------------------------------------------------
     # 3b. Aeronautical servitudes, classified sites, radar perimeters
@@ -417,10 +491,14 @@ if __name__ == "__main__":
         ("infrastructure_setback", infrastructure_setback),
         ("nature", nature),
         ("landscape", landscape),
+        ("landscape_pds", landscape_pds),
+        ("landscape_adesa", landscape_adesa),
         ("risk", risk),
         ("aviation", aviation),
         ("heritage", heritage),
         ("radar", radar),
+        *pds_variants.items(),
+        *habitat_variants.items(),
     ]:
         g = clip(geom, boundary)
         if g is None:
@@ -442,9 +520,19 @@ if __name__ == "__main__":
         "habitat_setback_rule": sb_cfg["habitat_zone"]["default"],
         "habitat_setback_m": round(habitat_distance, 1),
         "dwelling_setback_m": round(dwelling_distance, 1),
+        "address_points": n_addr,
+        "address_points_exempt_in_zae": n_exempt,
         "road_setback_m": round(road_distance, 1),
-        "railway_setback_m": round(evaluate(sb_cfg["railway"], H, D), 1),
-        "hv_line_setback_m": round(evaluate(sb_cfg["hv_line"], H, D), 1),
+        "railway_setback_m": round(rail_distance, 1),
+        "railway_high_speed_setback_m": round(hsl_distance, 1),
+        "high_speed_track_km": round(float(hsl.length.sum() / 1e3), 1),
+        "hv_line_setback_m": round(hv_distance, 1),
+        "pic_roads": pds_cfg["pic_roads"],
+        "pic_motorway_km": round(float(motorways_pds.length.sum() / 1e3), 1),
+        "pic_dual_carriageway_km": round(float(dual.length.sum() / 1e3), 1),
+        "pds_road_km": round(float(roads_pds.length.sum() / 1e3), 1),
+        "karst_polygons_kept": int(len(kept)),
+        "karst_polygons_total": int(len(karst)),
         "region_area_km2": round(boundary.area / 1e6, 1),
         "layer_areas_km2": areas,
     }

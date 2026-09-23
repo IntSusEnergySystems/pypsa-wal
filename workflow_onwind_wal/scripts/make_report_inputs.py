@@ -33,7 +33,14 @@ def tex_escape(s):
         ("^", r"\textasciicircum{}"),
     ]:
         s = s.replace(a, b)
-    return s
+    return s.replace(">=", r"$\geq$")
+
+
+def signed(x, digits=0):
+    """A signed number, with a typographic minus."""
+    if x > 0:
+        return "+" + num(x, digits)
+    return r"$-$" + num(-x, digits) if x < 0 else num(0, digits)
 
 
 def num(x, digits=0):
@@ -137,53 +144,60 @@ if __name__ == "__main__":
 
     # Placement, the headline figure.
     macro("PlaceModel", tex_escape(pl["model"]))
-    macro("PlaceInterfarm", num(pl["interfarm_distance_m"] / 1000, 1))
-    macro("PlaceRadius", num(pl["farm_radius_m"]))
+    macro("PlaceLink", num(pl["link_m"] / 1000, 1))
     macro("PlaceMinTurbines", num(pl["min_turbines"]))
     macro("PlaceAzimuth", num(pl["min_free_azimuth_deg"]))
     macro("PlaceHorizonRadius", num(pl["horizon_radius_m"] / 1000, 0))
-    macro("PlaceFarms", num(pl["n_farms"]))
-    macro("PlacePerFarm", num(pl["turbines_per_farm"], 1))
+    macro("MotorwayExempt", num(pl["motorway_exemption_m"] / 1000, 0))
+    macro("PlaceParks", num(pl["n_parks"]))
+    macro("PlacePerPark", num(pl["turbines_per_park"], 1))
+    macro("PlaceMedianPark", num(pl["median_park_size"], 0))
+    macro("PlaceLargestPark", num(pl["largest_park"]))
     macro("PlaceRotorD", num(pl["min_distance_rotor_diameters"], 1))
+    macro("PlaceRefused", num(pl["refused_by_horizon"]))
+    macro("PlaceCheckSpacing", num(pl["check_min_spacing_m"]))
+    macro("PlaceCheckArc", num(pl["check_worst_free_arc_deg"], 1))
     macro("NoHorizonPnom", num(pl["no_horizon_p_nom_max_mw"]))
-    macro("NoHorizonFarms", num(pl["no_horizon_n_farms"]))
+    macro("NoHorizonParks", num(pl["no_horizon_n_parks"]))
+    macro("NoHorizonTurbines", num(pl["no_horizon_n_turbines"]))
     macro("HorizonCostPct", num(pl["horizon_cost_pct"], 0))
-    macro("HorizonRefused", num(pl["farms_refused_by_horizon"]))
+    macro("ParksCostPct", num(pl["parks_cost_pct"], 0))
+    macro("ParksOnePnom", num(pl["parks1_p_nom_max_mw"]))
+    macro("ParksOneParks", num(pl["parks1_n_parks"]))
     macro("FreePnom", num(pl["free_p_nom_max_mw"]))
     macro("FreePnomGW", num(pl["free_p_nom_max_mw"] / 1000, 1))
     macro("FreeTurbines", num(pl["free_n_turbines"]))
     macro("FreeDensity", num(pl["free_density_mw_km2"], 1))
     macro("FreeOrderSpread", num(pl["free_order_sensitivity_pct"], 0))
-    macro("FreeIsolatedPct", num(pl["free_isolated_pct"], 0))
-    macro("FarmShareOfFree", num(pl["farm_share_of_free_pct"], 0))
-    IFD = {"2600": "TwoSix", "4000": "Four", "5000": "Five", "6000": "Six"}
-    for d, v in pl["by_interfarm"].items():
-        tag = IFD.get(d, d)
-        macro(f"Ifd{tag}MW", num(v["p_nom_max_mw"]))
-        macro(f"Ifd{tag}Farms", num(v["n_farms"]))
-        macro(f"Ifd{tag}Turbines", num(v["n_turbines"]))
-        macro(f"Ifd{tag}NoHorizon", num(v["no_horizon_mw"]))
-    ifd_mw = [v["p_nom_max_mw"] for v in pl["by_interfarm"].values()]
-    macro("IfdLow", num(min(ifd_mw)))
-    macro("IfdHigh", num(max(ifd_mw)))
+    macro("ShareOfFree", num(pl["share_of_free_pct"], 0))
+    macro("FreeOverRef", num(pl["free_p_nom_max_mw"] / pl["p_nom_max_mw"], 2))
+    ID = {"4000": "Four", "6000": "Six"}
+    for d, v in pl["by_interdistance"].items():
+        tag = ID.get(d, d)
+        macro(f"Id{tag}MW", num(v["p_nom_max_mw"]))
+        macro(f"Id{tag}Parks", num(v["n_parks"]))
+        macro(f"Id{tag}Turbines", num(v["n_turbines"]))
     SPC = {"observed": "Obs", "crosswind": "Cross", "isotropic": "Iso"}
     for k, v in pl["by_spacing"].items():
         tag = SPC.get(k, k)
         macro(f"Sp{tag}D", num(v["rotor_diameters"], 1))
         macro(f"Sp{tag}Free", num(v["free_mw"]))
         macro(f"Sp{tag}MW", num(v["p_nom_max_mw"]))
-    macro("LegacyLow", num(headline["legacy_policy_mw"][0]))
-    macro("LegacyHigh", num(headline["legacy_policy_mw"][1]))
+    macro("InterdistLow", num(headline["interdistance_policy_mw"][0]))
+    macro("InterdistHigh", num(headline["interdistance_policy_mw"][1]))
     macro("PlaceSpacing", num(pl["min_distance_m"]))
     macro("PlaceTurbines", num(pl["n_turbines"]))
     macro("PlacePnom", num(pl["p_nom_max_mw"]))
-    macro("PlacePnomGW", num(pl["p_nom_max_mw"] / 1000, 2))
+    macro("PlacePnomGW", num(pl["p_nom_max_mw"] / 1000, 1))
     macro("PlaceDensity", num(pl["effective_density_mw_km2"], 2))
-    macro("PlaceLand", num(100 * pl["land_per_turbine_km2"], 0))   # hectares
     macro("PlaceEnergy", num(pl["energy_twh"], 2))
     macro("PlaceVsDensity", num(abs(pl["vs_area_density_pct"]), 0))
     macro("PlaceRangeLow", num(headline["placement_range_mw"][0]))
     macro("PlaceRangeHigh", num(headline["placement_range_mw"][1]))
+    TN = {"T136_V112": "VOneTwelve", "T185_NREL4": "NRELFour", "T208_NREL55": "NRELFive"}
+    for t, v in pl["by_turbine"].items():
+        macro(f"Place{TN.get(t, t)}", num(v["p_nom_max_mw"]))
+        macro(f"Free{TN.get(t, t)}", num(v["free_mw"]))
 
     # Residual allowance.
     macro("ResSurvival", num(100 * resid["central"]["survival"], 0))
@@ -214,26 +228,27 @@ if __name__ == "__main__":
 
     # Calibration against the standing fleet.
     macro("FleetN", num(fleet["n_turbines"]))
-    for name, key in [
-        ("Nature", "nature"),
-        ("Slope", "slope"),
-        ("Aviation", "aviation"),
-        ("Habitat", "habitat_setback"),
-        ("Dwelling", "dwelling_setback"),
-        ("Risk", "risk"),
-        ("Infra", "infrastructure_setback"),
-    ]:
+    LAY = {"nature": "Nature", "slope": "Slope", "aviation": "Aviation",
+           "habitat_setback": "Habitat", "dwelling_setback": "Dwelling", "risk": "Risk",
+           "infrastructure_setback": "Infra", "pds_ineligible": "Zoning",
+           "landscape": "Landscape", "landscape_pds": "LandscapePds",
+           "landscape_adesa": "LandscapeAdesa", "heritage": "Heritage", "radar": "Radar"}
+    for key, name in LAY.items():
         v = fleet["by_layer"].get(key)
         if v:
             macro(f"Fleet{name}Ratio", num(v["avoidance_ratio"], 2))
             macro(f"Fleet{name}Pct", num(v["pct"], 1))
-    ratios = [
-        v["avoidance_ratio"]
-        for v in fleet["by_layer"].values()
-        if v["avoidance_ratio"] is not None
-    ]
+            macro(f"Fleet{name}Cond", num(v["conditional_ratio"], 2))
+            macro(f"Fleet{name}CondPct", num(v["conditional_fleet_pct"], 1))
+            macro(f"Fleet{name}CondLand", num(v["conditional_land_pct"], 1))
+    ref_keys = cfg["scenarios"][ref_scenario]["layers"]
+    ratios = [fleet["by_layer"][k]["avoidance_ratio"] for k in ref_keys
+              if fleet["by_layer"][k]["avoidance_ratio"] is not None]
+    cond = [fleet["by_layer"][k]["conditional_ratio"] for k in ref_keys
+            if fleet["by_layer"][k]["conditional_ratio"] is not None
+            and k not in ("habitat_setback", "dwelling_setback")]
     macro("FleetMaxRatio", num(max(ratios), 2))
-    # LaTeX macro names cannot contain digits, so S1..S6 become words.
+    macro("FleetMaxCond", num(max(cond), 2))
     DIGITS = {"1": "One", "2": "Two", "3": "Three", "4": "Four", "5": "Five",
               "6": "Six", "7": "Seven", "8": "Eight", "9": "Nine", "0": "Zero"}
     for sname, v in fleet["by_scenario"].items():
@@ -241,21 +256,33 @@ if __name__ == "__main__":
         macro(f"Fleet{tag}Pct", num(v["surviving_pct"], 0))
     macro("FleetRefPct", num(fleet["by_scenario"][ref_scenario]["surviving_pct"], 0))
     macro("FleetRefN", num(fleet["by_scenario"][ref_scenario]["surviving"]))
-    fm = fleet.get("farms")
-    if fm:
-        macro("FleetFarms", num(fm["n_farms"]))
-        macro("FleetPerFarm", num(fm["turbines_per_farm"], 1))
-        macro("FleetFarmsFour", num(fm["n_farms_ge_4"]))
-        macro("FleetLargestFarm", num(fm["largest_farm"]))
-        macro("FleetFarmLink", num(fm["link_distance_m"] / 1000, 1))
-        macro("FleetInBigFarms", num(fm["share_in_farms_ge_4_pct"], 0))
-        P = {"p5": "PFive", "p10": "PTen", "p25": "PTwentyFive",
-             "p50": "PFifty", "p75": "PSeventyFive", "p90": "PNinety"}
-        for key, tag in [("machine_nn_m", "MachineNN"), ("farm_radius_m", "FarmRad"),
-                         ("farm_nn_m", "FarmNN")]:
-            for q, qt in P.items():
-                macro(f"Fleet{tag}{qt}", num(fm[key][q]))
-        macro("FleetFarmNNBelowFour", num(fm["farm_nn_below_4km_pct"], 0))
+    z = fleet["zoning"]
+    macro("FleetZoningCodt", num(z["pds_ineligible"], 0))
+    macro("FleetZoningPsroads", num(z["pds_ineligible_psroads"], 0))
+    macro("FleetZoningNocorridor", num(z["pds_ineligible_nocorridor"], 0))
+    fm = fleet["farms"]
+    macro("FleetFarms", num(fm["n_farms"]))
+    macro("FleetPerFarm", num(fm["turbines_per_farm"], 1))
+    macro("FleetFarmsFour", num(fm["n_farms_ge_4"]))
+    macro("FleetLargestFarm", num(fm["largest_farm"]))
+    macro("FleetFarmLink", num(fm["link_distance_m"] / 1000, 1))
+    macro("FleetInBigFarms", num(fm["share_in_farms_ge_4_pct"], 0))
+    P = {"p5": "PFive", "p10": "PTen", "p25": "PTwentyFive",
+         "p50": "PFifty", "p75": "PSeventyFive", "p90": "PNinety"}
+    for key, tag in [("machine_nn_m", "MachineNN"), ("farm_radius_m", "FarmRad"),
+                     ("farm_edge_nn_m", "FarmEdge")]:
+        for q, qt in P.items():
+            macro(f"Fleet{tag}{qt}", num(fm[key][q]))
+    macro("FleetEdgeBelowFour", num(fm["farms_edge_below_4km_pct"], 0))
+    macro("FleetEdgeBelowSix", num(fm["farms_edge_below_6km_pct"], 0))
+    macro("FleetMwFarms", num(fm["farms_along_motorway"]))
+    macro("FleetNonMwEdgeBelowFour", num(fm["farms_not_along_motorway_edge_below_4km_pct"], 0))
+    macro("FleetNearMotorway", num(fm["turbines_within_1km_of_motorway_pct"], 0))
+    macro("FleetNearMotorwayWide", num(fm["turbines_within_1500m_of_motorway_pct"], 0))
+    addr = fleet["addresses"]
+    macro("FleetAddrN", num(addr["turbines_within_400m_of_an_address"]))
+    macro("FleetAddrZae", num(addr["of_which_nearest_address_in_zae"]))
+    macro("FleetAddrAgri", num(addr["of_which_in_agricultural_zone"]))
     oh = fleet.get("open_horizon")
     if oh:
         macro("HorizonSettlements", num(oh["n_settlements"]))
@@ -266,6 +293,24 @@ if __name__ == "__main__":
         macro("HorizonArcPOne", num(oh["largest_free_arc_deg"]["p1"]))
         macro("HorizonArcPFive", num(oh["largest_free_arc_deg"]["p5"]))
         macro("HorizonArcPFifty", num(oh["largest_free_arc_deg"]["p50"]))
+
+    # Sensitivity cases.
+    SENS = {"interdistance_4km": "IdFour", "interdistance_6km": "IdSix",
+            "no_horizon": "NoHorizon", "parks_min1": "ParksOne",
+            "no_corridor": "NoCorridor", "habitat_cdr2013": "HabitatOld",
+            "no_adesa": "NoAdesa", "no_landscape": "NoLandscape",
+            "slope_ge10": "SlopeTen", "slope_ge15": "SlopeFifteen",
+            "no_aviation": "NoAviation", "pic_plan_de_secteur": "PicPds",
+            "all_policy_relaxed": "Relaxed", "all_policy_tightened": "Tightened",
+            "reference": "Reference"}
+    for case, v in headline["sensitivity"].items():
+        tag = SENS.get(case)
+        if tag is None:
+            continue
+        macro(f"Sens{tag}MW", num(v["p_nom_max_mw"]))
+        macro(f"Sens{tag}Pct", signed(v["delta_pct"], 0) if case != "reference" else "0")
+        macro(f"Sens{tag}Area", num(v["eligible_area_km2"]))
+        macro(f"Sens{tag}Free", num(v["free_mw"]))
 
     # Cost of the late-added constraint families.
     macro("ServBase", num(serv["base_area_km2"]))
@@ -301,23 +346,35 @@ if __name__ == "__main__":
     macro("BregEnergy", num(breg["energy_twh"], 1))
     macro("BregFlh", num(breg["flh_h"]))
     macro("BregFlhGross", num(breg["flh_gross_h"]))
-    macro("BregDensity", num(breg["implied_density_mw_km2"], 2))
-    macro("BregArea", num(breg["implied_area_km2"]))
-    macro("BregOursVOneTwelveSpacing", num(breg["ours_v112_bregilab_spacing_mw"]))
-    macro("BregOursArea", num(breg["our_v112_eligible_area_km2"]))
-    macro("BregStepTurbine", num(breg["step_turbine_class"], 2))
-    macro("BregStepConstraints", num(breg["step_constraint_set"], 2))
-    macro("BregRatio", num(breg["total_ratio"], 2))
-    macro("BregVsCentral", num(breg["vs_central"], 1))
-    macro("BregVsFarm", num(breg["vs_farm"], 1))
     macro("BregPerf", num(cfg["bregilab"]["performance_ratio"], 2))
+    emu = breg["emulation"]
+    macro("BregEmuArea", num(emu["eligible_km2"]))
+    macro("BregEmuMW", num(emu["with_fleet_mw"]))
+    macro("BregEmuGW", num(emu["with_fleet_mw"] / 1000, 1))
+    macro("BregEmuGrossMW", num(emu["gross_free_mw"]))
+    macro("BregReportedShare", num(100 * emu["reported_share_of_emulation"], 0))
+    macro("BregBridgeEndMW", num(breg["bridge"][-1]["p_nom_max_mw"]))
+    macro("BregBridgeEndArea", num(breg["bridge"][-1]["eligible_km2"]))
+    macro("BregVsFree", num(breg["vs_free"], 2))
+    macro("BregVsReference", num(breg["vs_reference"], 1))
+    macro("BregVsCentral", num(breg["vs_central"], 1))
 
     ex = exclusion_stats.get(ref_t, {})
     macro("HabitatSetback", num(ex.get("habitat_setback_m"), 0))
     macro("HabitatRule", tex_escape(str(ex.get("habitat_setback_rule", ""))))
     macro("DwellingSetback", num(ex.get("dwelling_setback_m"), 0))
     macro("RoadSetback", num(ex.get("road_setback_m"), 0))
+    macro("RailSetback", num(ex.get("railway_setback_m"), 0))
+    macro("HslSetback", num(ex.get("railway_high_speed_setback_m"), 0))
+    macro("HslKm", num(ex.get("high_speed_track_km"), 0))
     macro("HvSetback", num(ex.get("hv_line_setback_m"), 0))
+    macro("AddrPoints", num(ex.get("address_points")))
+    macro("AddrExempt", num(ex.get("address_points_exempt_in_zae")))
+    macro("PicMotorwayKm", num(ex.get("pic_motorway_km")))
+    macro("PicDualKm", num(ex.get("pic_dual_carriageway_km")))
+    macro("PdsRoadKm", num(ex.get("pds_road_km")))
+    macro("KarstKept", num(ex.get("karst_polygons_kept")))
+    macro("KarstTotal", num(ex.get("karst_polygons_total")))
     macro("TipHeight", num(ex.get("tip_height_m"), 0))
     macro("RotorDiameter", num(ex.get("rotor_diameter_m"), 0))
     exv = exclusion_stats.get("T136_V112", {})
@@ -350,7 +407,7 @@ if __name__ == "__main__":
     if not ref_flh.empty:
         macro("VOneTwelveFlh", num(ref_flh.iloc[0]["flh_h"]))
 
-    macro("CapRatio", num(bench["model_p_nom_max_mw"] / max(pl["p_nom_max_mw"], 1), 1))
+    macro("CapRatio", num(bench["model_p_nom_max_mw"] / max(pl["p_nom_max_mw"], 1), 2))
     macro(
         "CapRatioCentral",
         num(bench["model_p_nom_max_mw"] / max(resid["central"]["p_nom_max_mw"], 1), 1),
@@ -446,19 +503,27 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------
     # Placement table
     # ------------------------------------------------------------------
+    MODEL_LABEL = {
+        "free": "free",
+        "parks": "parks",
+        "parks+horizon": "parks + horizon",
+        "parks1+horizon": r"parks $\geq 1$ + horizon",
+    }
     rows = []
     last = None
     for r in placement.itertuples():
         if last is not None and r.turbine != last:
             rows.append(MIDRULE)
+        label = MODEL_LABEL.get(r.model, tex_escape(r.model.replace("+", " + ")))
+        variant = tex_escape(str(r.variant).replace("_", " ")) if r.model == "free" else ""
         rows.append(
             [
                 tex_escape(r.turbine_label) if r.turbine != last else "",
-                tex_escape(r.model.replace("+", " + ")),
+                label,
                 tex_escape(r.spacing_case),
                 num(r.min_distance_rotor_diameters, 1),
-                tex_escape(str(r.variant).replace("_", " ")),
-                num(r.n_farms) if r.model.startswith("farm") else "--",
+                variant,
+                num(r.n_parks) if r.model != "free" else "--",
                 num(r.n_turbines),
                 num(r.p_nom_max_mw),
             ]
@@ -467,16 +532,8 @@ if __name__ == "__main__":
     Path(snakemake.output.placement_tex).write_text(
         tabular(
             rows,
-            [
-                "turbine",
-                "model",
-                "spacing",
-                r"$d/D$",
-                "variant",
-                "farms",
-                "machines",
-                r"$P$ [\si{\mega\watt}]",
-            ],
+            ["turbine", "model", "spacing", r"$d/D$", "order", "parks", "machines",
+             r"$P$ [\si{\mega\watt}]"],
             "lllrlrrr",
         )
     )
@@ -532,72 +589,95 @@ if __name__ == "__main__":
         "heritage": "classified sites and protection zones",
         "radar": "radar and radio astronomy",
     }
-    rows = [
-        [
-            LAYER_LABELS.get(k, tex_escape(k)),
-            num(v["land_pct"], 1),
-            num(v["pct"], 1),
-            num(v["avoidance_ratio"], 2),
-        ]
-        for k, v in sorted(
-            fleet["by_layer"].items(), key=lambda kv: kv[1]["avoidance_ratio"] or 0
+    LAYER_LABELS["landscape_pds"] = r"\quad of which plan-de-secteur PIP"
+    LAYER_LABELS["landscape_adesa"] = r"\quad of which ADESA inventory"
+    order = [k for k in cfg["scenarios"][ref_scenario]["layers"]]
+    order.insert(order.index("landscape") + 1, "landscape_pds")
+    order.insert(order.index("landscape_pds") + 1, "landscape_adesa")
+    rows = []
+    for k in order:
+        v = fleet["by_layer"][k]
+        size_dep = k in ("habitat_setback", "dwelling_setback")
+        rows.append(
+            [
+                LAYER_LABELS.get(k, tex_escape(k)),
+                num(v["land_pct"], 1),
+                num(v["pct"], 1),
+                num(v["avoidance_ratio"], 2),
+                "--" if size_dep else num(v["conditional_land_pct"], 1),
+                "--" if size_dep else num(v["conditional_fleet_pct"], 1),
+                "--" if size_dep else num(v["conditional_ratio"], 2),
+            ]
         )
-    ]
     Path(snakemake.output.fleet_tex).write_text(
         tabular(
             rows,
             [
                 "constraint layer",
-                r"of the Region [\%]",
-                r"of the fleet [\%]",
+                r"Region [\%]",
+                r"fleet [\%]",
                 "ratio",
+                r"land$^*$ [\%]",
+                r"fleet$^*$ [\%]",
+                r"ratio$^*$",
             ],
-            "p{0.40\linewidth}rrr",
+            r"p{0.34\linewidth}rrrrrr",
         )
     )
 
     # ------------------------------------------------------------------
-    # BREGILAB reconciliation table
+    # BREGILAB bridge table
     # ------------------------------------------------------------------
-    rows = [
-        [
-            "this study, free allocation",
-            f"{headline['reference_turbine_label']}, "
-            f"{pl['min_distance_rotor_diameters']:.0f} D between machines",
-            num(breg["ours_reference_mw"]),
-            "",
-        ],
-        [
-            r"$\times$ turbine class",
-            "V112 instead: smaller setbacks, more eligible land",
-            num(breg["ours_v112_bregilab_spacing_mw"]),
-            num(breg["step_turbine_class"], 2),
-        ],
-        [
-            r"$\times$ constraint set",
-            "the residual: everything else",
-            num(breg["total_mw"]),
-            num(breg["step_constraint_set"], 2),
-        ],
-        MIDRULE,
-        [
-            "BREGILAB, Wallonia onshore, gross",
-            tex_escape(cfg["bregilab"]["reference"]),
-            num(breg["total_mw"]),
-            num(breg["total_ratio"], 2),
-        ],
-        [
-            "this study, farm allocation + open horizon",
-            "the same land under the framework's own landscape criterion",
-            num(breg["ours_farm_mw"]),
-            num(breg["ours_farm_mw"] / breg["total_mw"], 2),
-        ],
-    ]
+    rows = [[r"\multicolumn{3}{l}{\emph{V112, 3.3 MW, 560 m apart, free allocation}}"]]
+    for i, st in enumerate(breg["bridge"]):
+        rows.append([tex_escape(st["step"]), num(st["eligible_km2"]), num(st["p_nom_max_mw"])])
+    rows.append(MIDRULE)
+    rows.append([r"\multicolumn{3}{l}{\emph{reference machine, this study's rules}}"])
+    rows.append([f"{tex_escape(headline['reference_turbine_label'])}, "
+                 f"{pl['min_distance_rotor_diameters']:.0f} D, free allocation",
+                 num(ad["eligible_area_km2"]), num(breg["ours_free_mw"])])
+    rows.append([f"+ parks of {pl['min_turbines']} or more",
+                 "", num(breg["ours_parks_mw"])])
+    rows.append([f"+ open horizon, {pl['min_free_azimuth_deg']:.0f}° within "
+                 f"{pl['horizon_radius_m'] / 1000:.0f} km \\textbf{{(gross reference)}}",
+                 "", num(breg["ours_reference_mw"])])
+    rows.append([r"$\times$ residual allowance (central estimate)", "",
+                 num(resid["central"]["p_nom_max_mw"])])
+    rows.append(MIDRULE)
+    rows.append(["BREGILAB, as published (Table 22)", "", num(breg["total_mw"])])
     Path(snakemake.output.bregilab_tex).write_text(
         tabular(
             rows,
-            ["step", "what changes", r"$P$ [\si{\mega\watt}]", "factor"],
-            "p{0.24\\linewidth}p{0.40\\linewidth}rr",
+            ["step", r"area [\si{\square\kilo\metre}]", r"$P$ [\si{\mega\watt}]"],
+            r"p{0.66\linewidth}rr",
+        )
+    )
+
+    # ------------------------------------------------------------------
+    # Sensitivity cases table
+    # ------------------------------------------------------------------
+    GROUP = {"reference": "", "policy": "policy", "judgement": "judgement",
+             "misreading": "misreading", "combined": "combined"}
+    rows, last = [], None
+    for case, v in headline["sensitivity"].items():
+        if last is not None and v["group"] != last:
+            rows.append(MIDRULE)
+        rows.append(
+            [
+                tex_escape(v["label"]),
+                GROUP.get(v["group"], v["group"]),
+                num(v["eligible_area_km2"]),
+                num(v["p_nom_max_mw"]),
+                "--" if case == "reference" else signed(v["delta_pct"], 0) + r"\,\%",
+            ]
+        )
+        last = v["group"]
+    Path(snakemake.output.sensitivity_cases_tex).write_text(
+        tabular(
+            rows,
+            ["change from the reference", "kind", r"area [\si{\square\kilo\metre}]",
+             r"$P$ [\si{\mega\watt}]", r"$\Delta$"],
+            r"p{0.50\linewidth}lrrr",
         )
     )
 

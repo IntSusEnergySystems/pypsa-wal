@@ -2,115 +2,178 @@
   "n_turbines": 652,
   "by_layer": {
     "pds_ineligible": {
-      "n": 62,
-      "pct": 9.5,
-      "land_pct": 49.3,
-      "avoidance_ratio": 0.19
+      "n": 135,
+      "pct": 20.7,
+      "land_pct": 62.9,
+      "avoidance_ratio": 0.33,
+      "conditional_land_pct": 53.1,
+      "conditional_fleet_pct": 20.2,
+      "conditional_n": 491,
+      "conditional_ratio": 0.38
     },
     "habitat_setback": {
-      "n": 148,
-      "pct": 22.7,
+      "n": 152,
+      "pct": 23.3,
       "land_pct": 62.0,
-      "avoidance_ratio": 0.37
+      "avoidance_ratio": 0.38,
+      "conditional_land_pct": 71.6,
+      "conditional_fleet_pct": 22.2,
+      "conditional_n": 392,
+      "conditional_ratio": 0.31
     },
     "dwelling_setback": {
-      "n": 130,
-      "pct": 19.9,
-      "land_pct": 63.0,
-      "avoidance_ratio": 0.32
+      "n": 80,
+      "pct": 12.3,
+      "land_pct": 62.1,
+      "avoidance_ratio": 0.2,
+      "conditional_land_pct": 69.4,
+      "conditional_fleet_pct": 9.7,
+      "conditional_n": 392,
+      "conditional_ratio": 0.14
     },
     "infrastructure_setback": {
-      "n": 82,
-      "pct": 12.6,
-      "land_pct": 16.3,
-      "avoidance_ratio": 0.77
+      "n": 75,
+      "pct": 11.5,
+      "land_pct": 13.9,
+      "avoidance_ratio": 0.83,
+      "conditional_land_pct": 19.7,
+      "conditional_fleet_pct": 12.1,
+      "conditional_n": 446,
+      "conditional_ratio": 0.61
     },
     "nature": {
-      "n": 0,
-      "pct": 0.0,
-      "land_pct": 13.2,
-      "avoidance_ratio": 0.0
+      "n": 1,
+      "pct": 0.2,
+      "land_pct": 13.3,
+      "avoidance_ratio": 0.01,
+      "conditional_land_pct": 3.8,
+      "conditional_fleet_pct": 0.0,
+      "conditional_n": 392,
+      "conditional_ratio": 0.0
     },
     "landscape": {
-      "n": 38,
-      "pct": 5.8,
+      "n": 36,
+      "pct": 5.5,
       "land_pct": 31.8,
-      "avoidance_ratio": 0.18
+      "avoidance_ratio": 0.17,
+      "conditional_land_pct": 19.1,
+      "conditional_fleet_pct": 4.4,
+      "conditional_n": 410,
+      "conditional_ratio": 0.23
     },
     "risk": {
-      "n": 64,
-      "pct": 9.8,
-      "land_pct": 12.7,
-      "avoidance_ratio": 0.77
+      "n": 23,
+      "pct": 3.5,
+      "land_pct": 10.9,
+      "avoidance_ratio": 0.32,
+      "conditional_land_pct": 9.1,
+      "conditional_fleet_pct": 4.6,
+      "conditional_n": 411,
+      "conditional_ratio": 0.51
     },
     "aviation": {
-      "n": 11,
-      "pct": 1.7,
+      "n": 10,
+      "pct": 1.5,
       "land_pct": 7.5,
-      "avoidance_ratio": 0.23
+      "avoidance_ratio": 0.2,
+      "conditional_land_pct": 12.1,
+      "conditional_fleet_pct": 1.5,
+      "conditional_n": 398,
+      "conditional_ratio": 0.12
     },
     "slope": {
       "n": 36,
       "pct": 5.5,
       "land_pct": 37.5,
-      "avoidance_ratio": 0.15
+      "avoidance_ratio": 0.15,
+      "conditional_land_pct": 24.6,
+      "conditional_fleet_pct": 3.7,
+      "conditional_n": 407,
+      "conditional_ratio": 0.15
     },
     "heritage": {
       "n": 1,
       "pct": 0.2,
       "land_pct": 1.9,
-      "avoidance_ratio": 0.08
+      "avoidance_ratio": 0.08,
+      "conditional_land_pct": 0.5,
+      "conditional_fleet_pct": 0.0,
+      "conditional_n": 392,
+      "conditional_ratio": 0.0
     },
     "radar": {
       "n": 0,
       "pct": 0.0,
       "land_pct": 0.7,
-      "avoidance_ratio": 0.0
+      "avoidance_ratio": 0.0,
+      "conditional_land_pct": 0.8,
+      "conditional_fleet_pct": 0.0,
+      "conditional_n": 392,
+      "conditional_ratio": 0.0
+    },
+    "landscape_pds": {
+      "n": 5,
+      "pct": 0.8,
+      "land_pct": 18.7,
+      "avoidance_ratio": 0.04,
+      "conditional_land_pct": 5.7,
+      "conditional_fleet_pct": 0.2,
+      "conditional_n": 410,
+      "conditional_ratio": 0.04
+    },
+    "landscape_adesa": {
+      "n": 33,
+      "pct": 5.1,
+      "land_pct": 21.1,
+      "avoidance_ratio": 0.24,
+      "conditional_land_pct": 16.6,
+      "conditional_fleet_pct": 4.1,
+      "conditional_n": 410,
+      "conditional_ratio": 0.25
     }
   },
   "by_scenario": {
     "S1_zoning": {
-      "excluded": 62,
-      "surviving": 590,
-      "surviving_pct": 90.5
+      "excluded": 135,
+      "surviving": 517,
+      "surviving_pct": 79.3
     },
     "S2_setbacks": {
-      "excluded": 289,
-      "surviving": 363,
-      "surviving_pct": 55.7
+      "excluded": 327,
+      "surviving": 325,
+      "surviving_pct": 49.8
     },
     "S3_nature": {
-      "excluded": 289,
-      "surviving": 363,
-      "surviving_pct": 55.7
+      "excluded": 327,
+      "surviving": 325,
+      "surviving_pct": 49.8
     },
     "S4_landscape": {
-      "excluded": 307,
-      "surviving": 345,
-      "surviving_pct": 52.9
+      "excluded": 340,
+      "surviving": 312,
+      "surviving_pct": 47.9
     },
     "S5_risk": {
-      "excluded": 338,
-      "surviving": 314,
-      "surviving_pct": 48.2
+      "excluded": 351,
+      "surviving": 301,
+      "surviving_pct": 46.2
     },
     "S6_servitudes": {
-      "excluded": 355,
-      "surviving": 297,
-      "surviving_pct": 45.6
+      "excluded": 365,
+      "surviving": 287,
+      "surviving_pct": 44.0
     }
   },
-  "dominant_layers": [
-    "habitat_setback",
-    "dwelling_setback",
-    "infrastructure_setback"
-  ],
+  "zoning": {
+    "pds_ineligible": 79.3,
+    "pds_ineligible_psroads": 85.6,
+    "pds_ineligible_nocorridor": 96.0
+  },
   "farms": {
     "link_distance_m": 1500.0,
     "n_farms": 134,
     "turbines_per_farm": 4.9,
     "n_farms_ge_4": 72,
-    "turbines_in_farms_ge_4": 563,
     "share_in_farms_ge_4_pct": 86.0,
     "largest_farm": 27,
     "machine_nn_m": {
@@ -129,15 +192,38 @@
       "p75": 1308.5,
       "p90": 1561.2
     },
-    "farm_nn_m": {
-      "p5": 1912.5,
-      "p10": 2341.6,
-      "p25": 2996.4,
-      "p50": 4557.6,
-      "p75": 7716.2,
-      "p90": 10107.0
+    "farm_edge_nn_m": {
+      "p5": 1553.6,
+      "p10": 1584.5,
+      "p25": 2041.9,
+      "p50": 3798.2,
+      "p75": 6680.3,
+      "p90": 9091.4
     },
-    "farm_nn_below_4km_pct": 43.0
+    "farms_edge_below_4km_pct": 53.0,
+    "farms_edge_below_6km_pct": 69.0,
+    "farms_along_motorway": 47,
+    "farms_not_along_motorway_edge_below_4km_pct": 39.0,
+    "turbines_within_1km_of_motorway_pct": 34.0,
+    "turbines_within_1500m_of_motorway_pct": 37.0
+  },
+  "addresses": {
+    "turbines_within_400m_of_an_address": 134,
+    "of_which_nearest_address_in_zae": 65,
+    "of_which_in_agricultural_zone": 36,
+    "by_zone": {
+      "Activit\u00e9 \u00e9conomique industrielle": 37,
+      "Agricole": 36,
+      "Activit\u00e9 \u00e9conomique mixte": 21,
+      "Habitat \u00e0 caract\u00e8re rural": 10,
+      "Am\u00e9nagement communal concert\u00e9 \u00e0 caract\u00e8re \u00e9conomique": 6,
+      "Services publics et \u00e9quipements communautaires": 3,
+      "Espaces verts": 2,
+      "Loisirs": 1,
+      "D\u00e9pendance d'extraction": 1,
+      "Habitat": 1,
+      "Foresti\u00e8re": 1
+    }
   },
   "open_horizon": {
     "min_free_azimuth_deg": 130.0,

@@ -154,20 +154,17 @@ if __name__ == "__main__":
             raise RuntimeError(f"missing case {scenario}/{turbine}/{density}")
         return sel.iloc[0]
 
-    ref_ifd = float(cfg["placement"]["farm"]["reference_interfarm_distance_m"])
     ref_model = cfg["placement"]["reference_model"]
 
-    def place(turbine, case=ref_place, model=None, variant=None, interfarm=None):
+    def place(turbine, case=ref_place, model=None, variant="row_major"):
         model = ref_model if model is None else model
         sel = placement[
             (placement["turbine"] == turbine)
             & (placement["spacing_case"] == case)
             & (placement["model"] == model)
         ]
-        if model.startswith("farm"):
-            sel = sel[sel["interfarm_distance_m"] == (interfarm or ref_ifd)]
-        else:
-            sel = sel[sel["variant"] == (variant or "row_major")]
+        if model == "free":
+            sel = sel[sel["variant"] == variant]
         if sel.empty:
             raise RuntimeError(f"missing placement {turbine}/{case}/{model}")
         return sel.iloc[0]
@@ -216,35 +213,44 @@ if __name__ == "__main__":
     # Placement: the headline capacity
     # ------------------------------------------------------------------
     p = place(ref_turbine)
-    no_h = place(ref_turbine, model="farm")
+    no_h = place(ref_turbine, model="parks")
     free = place(ref_turbine, model="free")
     free_rand = place(ref_turbine, model="free", variant="random")
-    grouped = place(ref_turbine, model="grouped")
-    interfarm_values = sorted(placement["interfarm_distance_m"].dropna().unique())
+    parks1 = place(ref_turbine, model="parks1+horizon")
+    lcfg = cfg["placement"]["landscape"]
     spacings = cfg["placement"]["spacings_rotor_diameters"]
     headline["placement"] = {
         "model": ref_model,
         "case": ref_place,
         "min_distance_m": float(p["min_distance_m"]),
         "min_distance_rotor_diameters": float(p["min_distance_rotor_diameters"]),
-        "interfarm_distance_m": ref_ifd,
-        "farm_radius_m": float(cfg["placement"]["farm"]["radius_m"]),
-        "min_turbines": int(cfg["placement"]["farm"]["min_turbines"]),
-        "min_free_azimuth_deg": float(cfg["placement"]["landscape"]["min_free_azimuth_deg"]),
-        "horizon_radius_m": float(cfg["placement"]["landscape"]["horizon_radius_m"]),
-        "n_farms": int(p["n_farms"]),
-        "turbines_per_farm": float(p["turbines_per_farm"]),
+        "link_m": float(cfg["placement"]["park"]["link_m"]),
+        "min_turbines": int(cfg["placement"]["park"]["min_turbines"]),
+        "min_free_azimuth_deg": float(lcfg["min_free_azimuth_deg"]),
+        "horizon_radius_m": float(lcfg["horizon_radius_m"]),
+        "motorway_exemption_m": float(lcfg["motorway_exemption_m"]),
+        "n_parks": int(p["n_parks"]),
+        "turbines_per_park": float(p["turbines_per_park"]),
+        "median_park_size": float(p["median_park_size"]),
+        "largest_park": int(p["largest_park"]),
         "n_turbines": int(p["n_turbines"]),
         "p_nom_max_mw": float(p["p_nom_max_mw"]),
         "effective_density_mw_km2": float(p["effective_density_mw_km2"]),
-        "land_per_turbine_km2": float(p["land_per_turbine_km2"]),
         "energy_twh": round(float(p["p_nom_max_mw"]) * ref_flh / 1e6, 3),
-        "farms_refused_by_horizon": int(p["farms_refused_by_horizon"]),
+        "refused_by_horizon": int(p["refused_by_horizon"]),
+        "check_min_spacing_m": float(p["check_min_spacing_m"]),
+        "check_worst_free_arc_deg": float(p["check_worst_free_arc_deg"]),
         "horizon_cost_pct": round(
             100 * (1 - float(p["p_nom_max_mw"]) / float(no_h["p_nom_max_mw"])), 0
         ),
         "no_horizon_p_nom_max_mw": float(no_h["p_nom_max_mw"]),
-        "no_horizon_n_farms": int(no_h["n_farms"]),
+        "no_horizon_n_parks": int(no_h["n_parks"]),
+        "no_horizon_n_turbines": int(no_h["n_turbines"]),
+        "parks_cost_pct": round(
+            100 * (1 - float(no_h["p_nom_max_mw"]) / float(free["p_nom_max_mw"])), 0
+        ),
+        "parks1_p_nom_max_mw": float(parks1["p_nom_max_mw"]),
+        "parks1_n_parks": int(parks1["n_parks"]),
         "free_p_nom_max_mw": float(free["p_nom_max_mw"]),
         "free_n_turbines": int(free["n_turbines"]),
         "free_density_mw_km2": float(free["effective_density_mw_km2"]),
@@ -254,25 +260,19 @@ if __name__ == "__main__":
             / float(free["p_nom_max_mw"]),
             1,
         ),
-        "free_isolated_pct": round(
-            100 * (1 - float(grouped["n_turbines"]) / float(free["n_turbines"])), 1
-        ),
-        "farm_share_of_free_pct": round(
+        "share_of_free_pct": round(
             100 * float(p["p_nom_max_mw"]) / float(free["p_nom_max_mw"]), 0
         ),
         "vs_area_density_pct": round(
             100 * float(p["p_nom_max_mw"]) / float(ref["p_nom_max_mw"]) - 100, 1
         ),
-        "by_interfarm": {
+        "by_interdistance": {
             str(int(d)): {
-                "n_farms": int(place(ref_turbine, interfarm=d)["n_farms"]),
-                "n_turbines": int(place(ref_turbine, interfarm=d)["n_turbines"]),
-                "p_nom_max_mw": float(place(ref_turbine, interfarm=d)["p_nom_max_mw"]),
-                "no_horizon_mw": float(
-                    place(ref_turbine, model="farm", interfarm=d)["p_nom_max_mw"]
-                ),
+                "n_parks": int(place(ref_turbine, model=f"parks+horizon+{int(d) // 1000}km")["n_parks"]),
+                "n_turbines": int(place(ref_turbine, model=f"parks+horizon+{int(d) // 1000}km")["n_turbines"]),
+                "p_nom_max_mw": float(place(ref_turbine, model=f"parks+horizon+{int(d) // 1000}km")["p_nom_max_mw"]),
             }
-            for d in interfarm_values
+            for d in lcfg["interdistance_m"]
         },
         "by_spacing": {
             k: {
@@ -288,6 +288,7 @@ if __name__ == "__main__":
                 "n_turbines": int(place(t)["n_turbines"]),
                 "effective_density_mw_km2": float(place(t)["effective_density_mw_km2"]),
                 "eligible_area_km2": float(place(t)["eligible_area_km2"]),
+                "free_mw": float(place(t, model="free")["p_nom_max_mw"]),
             }
             for t in turbines
         },
@@ -322,16 +323,16 @@ if __name__ == "__main__":
     ]
     headline["residual"] = residual
 
-    # Credible range.  The reference case is the practice-calibrated farm
-    # geometry with the open-horizon criterion; the range is the residual
-    # allowance bracket applied to it.  The 2013 indicative inter-distance is a
-    # *policy* choice rather than an uncertainty about the land, so it is
-    # reported separately rather than compounded into the headline range.
+    # Credible range.  The reference case is the park model with the
+    # open-horizon rule; the range is the residual-allowance bracket applied to
+    # it.  The inter-distance the Cadre recommends is a *policy* choice rather
+    # than an uncertainty about the land, so it is reported separately rather
+    # than compounded into the headline range.
     headline["credible_range_mw"] = list(residual["p_nom_max_range_mw"])
     headline["credible_central_mw"] = residual["central"]["p_nom_max_mw"]
-    by_ifd = headline["placement"]["by_interfarm"]
-    legacy = [v["p_nom_max_mw"] for d, v in by_ifd.items() if float(d) >= 4000]
-    headline["legacy_policy_mw"] = [
+    by_id = headline["placement"]["by_interdistance"]
+    legacy = [v["p_nom_max_mw"] for v in by_id.values()]
+    headline["interdistance_policy_mw"] = [
         round(min(legacy) * residual["central"]["survival"]),
         round(max(legacy) * residual["central"]["survival"]),
     ]
@@ -404,21 +405,16 @@ if __name__ == "__main__":
     }
 
     # ------------------------------------------------------------------
-    # BREGILAB reconciliation
-    #
-    # This study now uses BREGILAB's own spacing rule (5 D), so the bridge from
-    # its free allocation to theirs has only two steps, both exact:
-    #   turbine class   smaller machine -> smaller setbacks -> more eligible land
-    #   constraint set  everything that is left
-    # The third factor, the one that separates their headline from this study's
-    # answer, is not in the bridge at all: they report the free allocation and
-    # this study reports the farm allocation with the landscape criterion.
+    # Sensitivity: every choice priced one at a time
     # ------------------------------------------------------------------
-    v112 = cfg.get("bregilab_turbine", "T136_V112")
-    ours_ref = float(free["p_nom_max_mw"])
-    ours_v112_breg = float(place(v112, case="crosswind", model="free")["p_nom_max_mw"])
-    breg_total = float(breg["wallonia_total_gw"]) * 1000.0
+    headline["sensitivity"] = json.loads(Path(snakemake.input.sensitivity).read_text())
 
+    # ------------------------------------------------------------------
+    # BREGILAB: their number reproduced from their own rules on this study's
+    # data, then bridged to this study's answer one change at a time.
+    # ------------------------------------------------------------------
+    emu = json.loads(Path(snakemake.input.bregilab).read_text())
+    breg_total = float(breg["wallonia_total_gw"]) * 1000.0
     headline["bregilab"] = {
         "reference": breg["reference"],
         "total_mw": breg_total,
@@ -427,33 +423,20 @@ if __name__ == "__main__":
         "energy_twh": round(
             (breg["wallonia_current_gwh"] + breg["wallonia_additional_gwh"]) / 1000.0, 2
         ),
-        "flh_h": round(
-            float(breg["wallonia_potential_availability_factor"]) * 8760, 0
-        ),
+        "flh_h": round(float(breg["wallonia_potential_availability_factor"]) * 8760, 0),
         "flh_gross_h": round(
-            float(breg["wallonia_potential_availability_factor"])
-            * 8760
+            float(breg["wallonia_potential_availability_factor"]) * 8760
             / float(breg["performance_ratio"]),
             0,
         ),
-        "implied_density_mw_km2": round(
-            float(breg["p_nom_mw"]) / (float(breg["min_spacing_m"]) / 1000.0) ** 2, 2
-        ),
-        "implied_area_km2": round(
-            breg_total
-            / (float(breg["p_nom_mw"]) / (float(breg["min_spacing_m"]) / 1000.0) ** 2),
-            0,
-        ),
-        "ours_reference_mw": ours_ref,
-        "ours_v112_bregilab_spacing_mw": ours_v112_breg,
-        "step_turbine_class": round(ours_v112_breg / ours_ref, 3),
-        "step_constraint_set": round(breg_total / ours_v112_breg, 3),
-        "total_ratio": round(breg_total / ours_ref, 3),
-        "vs_central": round(breg_total / max(residual["central"]["p_nom_max_mw"], 1), 2),
-        "vs_farm": round(breg_total / max(float(p["p_nom_max_mw"]), 1), 2),
-        "our_v112_eligible_area_km2": float(place(v112, model="free")["eligible_area_km2"]),
-        "ours_farm_mw": float(p["p_nom_max_mw"]),
+        "emulation": emu["emulation"],
+        "bridge": emu["bridge"],
         "ours_free_mw": float(free["p_nom_max_mw"]),
+        "ours_parks_mw": float(no_h["p_nom_max_mw"]),
+        "ours_reference_mw": float(p["p_nom_max_mw"]),
+        "vs_free": round(breg_total / float(free["p_nom_max_mw"]), 2),
+        "vs_reference": round(breg_total / float(p["p_nom_max_mw"]), 2),
+        "vs_central": round(breg_total / max(residual["central"]["p_nom_max_mw"], 1), 2),
     }
 
     Path(snakemake.output.headline).write_text(json.dumps(headline, indent=2))
@@ -480,9 +463,15 @@ if __name__ == "__main__":
             },
             {
                 "source": "BREGILAB / VITO Dynamic Energy Atlas",
-                "basis": "Clymans et al. 2022, V112 at 5 D, gross",
+                "basis": "Clymans et al. 2022, V112 at 5 D, free allocation, gross",
                 "capacity_mw": round(breg_total),
                 "energy_twh": headline["bregilab"]["energy_twh"],
+            },
+            {
+                "source": "BREGILAB's rules on this study's data",
+                "basis": "this study, emulation of the WTN scenario, V112 at 5 D",
+                "capacity_mw": round(emu["emulation"]["with_fleet_mw"]),
+                "energy_twh": None,
             },
             {
                 "source": "Walloon constraint set, area x density",
@@ -500,9 +489,14 @@ if __name__ == "__main__":
                 "energy_twh": round(float(free["p_nom_max_mw"]) * ref_flh / 1e6, 2),
             },
             {
-                "source": "Walloon constraint set, farms allocated",
-                "basis": f"this study, {ref_scenario}, "
-                f"{ref_ifd / 1000:.0f} km between farms, min. 4 machines",
+                "source": "Walloon constraint set, parks of 4 or more",
+                "basis": f"this study, {ref_scenario}, no landscape rule",
+                "capacity_mw": round(float(no_h["p_nom_max_mw"])),
+                "energy_twh": round(float(no_h["p_nom_max_mw"]) * ref_flh / 1e6, 2),
+            },
+            {
+                "source": "Walloon constraint set, parks and open horizon",
+                "basis": f"this study, {ref_scenario}, gross reference",
                 "capacity_mw": round(float(p["p_nom_max_mw"])),
                 "energy_twh": headline["placement"]["energy_twh"],
             },

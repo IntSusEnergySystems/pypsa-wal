@@ -15,7 +15,9 @@ recovers the class grid losslessly.
 
 The classes are ``0-1``, ``1-3``, ``3-5``, ``5-7``, ``7-10``, ``10-15`` and
 ``> 15`` per cent, so the 7 % threshold of the Walloon rule falls exactly on a
-class boundary and no interpolation is involved.
+class boundary and no interpolation is involved.  The per-class sample counts
+are kept, so the 10 % and 15 % masks of the sensitivity analysis come out of
+the same decode.
 
 Sampling.  The source is 10 m; a turbine needs a platform of order one hectare.
 The raster is therefore rendered at ``SAMPLE_RES`` (25 m) and a 100 m cell is
@@ -29,9 +31,11 @@ import logging
 from io import BytesIO
 from pathlib import Path
 
+# rasterio before geopandas: in this environment the reverse import order makes
+# the first deflate-compressed GeoTIFF write abort ("double free or corruption").
+import rasterio
 import geopandas as gpd
 import numpy as np
-import rasterio
 import requests
 from PIL import Image
 from rasterio.transform import from_origin
@@ -83,18 +87,35 @@ def export_tile(session, minx, miny, maxx, maxy, width, height, crs):
     raise RuntimeError(f"export failed: {last}")
 
 
+# Lower bound of each class, in palette order: a threshold is exact only if it
+# is one of these.
+CLASS_FLOOR = [0.0, 1.0, 3.0, 5.0, 7.0, 10.0, 15.0]
+
+
 def classify(rgb):
-    """RGB tile -> (steep, valid) boolean arrays at the sampling resolution."""
-    steep = np.zeros(rgb.shape[:2], dtype=bool)
-    valid = np.zeros(rgb.shape[:2], dtype=bool)
-    flat = rgb.reshape(-1, 3)
-    key = (flat[:, 0].astype(np.int32) << 16) | (flat[:, 1].astype(np.int32) << 8) | flat[:, 2]
-    for (r, g, b), mid in PALETTE.items():
-        m = key == ((r << 16) | (g << 8) | b)
-        valid |= m.reshape(steep.shape)
-        if mid >= 7.0:
-            steep |= m.reshape(steep.shape)
-    return steep, valid
+    """RGB tile -> class index per sample (-1 where no class colour)."""
+    cls = np.full(rgb.shape[:2], -1, dtype=np.int8)
+    key = (rgb[..., 0].astype(np.int32) << 16) | (rgb[..., 1].astype(np.int32) << 8) | rgb[..., 2]
+    for k, (r, g, b) in enumerate(PALETTE):
+        cls[key == ((r << 16) | (g << 8) | b)] = k
+    return cls
+
+
+def write_mask(path, mask, transform, crs):
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=mask.shape[0],
+        width=mask.shape[1],
+        count=1,
+        dtype="uint8",
+        crs=f"EPSG:{crs}",
+        transform=transform,
+        compress="deflate",
+        nodata=255,
+    ) as dst:
+        dst.write(mask, 1)
 
 
 if __name__ == "__main__":
@@ -110,8 +131,10 @@ if __name__ == "__main__":
     crs = int(snakemake.params.crs)
     out_res = int(snakemake.params.out_res)
     threshold = float(snakemake.params.threshold_pct)
-    if threshold != 7.0:
-        raise ValueError("only the 7 % class boundary is exact in this palette")
+    extra = [float(t) for t in snakemake.params.sensitivity_thresholds_pct]
+    for t in [threshold] + extra:
+        if t not in CLASS_FLOOR[1:]:
+            raise ValueError(f"{t} % is not a class boundary of the published grid")
 
     factor = out_res // SAMPLE_RES
     if out_res % SAMPLE_RES:
@@ -130,8 +153,8 @@ if __name__ == "__main__":
     height = int((maxy - miny) / out_res)
     logger.info("output grid %d x %d at %d m", width, height, out_res)
 
-    steep_count = np.zeros((height, width), dtype=np.int16)
-    valid_count = np.zeros((height, width), dtype=np.int16)
+    # Samples of each slope class per output cell.
+    counts = np.zeros((len(PALETTE), height, width), dtype=np.int16)
 
     tile_m = TILE_PX * SAMPLE_RES
     session = requests.Session()
@@ -147,42 +170,40 @@ if __name__ == "__main__":
             if w <= 0 or h <= 0:
                 continue
             rgb = export_tile(session, x0, y0, x1, y1, w, h, crs)
-            steep, valid = classify(rgb)
+            cls = classify(rgb)
             # Aggregate the 25 m samples into the 100 m output cells.
-            sh, sw = steep.shape[0] // factor, steep.shape[1] // factor
-            steep = steep[: sh * factor, : sw * factor].reshape(sh, factor, sw, factor)
-            valid = valid[: sh * factor, : sw * factor].reshape(sh, factor, sw, factor)
+            sh, sw = cls.shape[0] // factor, cls.shape[1] // factor
+            cls = cls[: sh * factor, : sw * factor].reshape(sh, factor, sw, factor)
             r0 = int(round((maxy - y1) / out_res))
             c0 = int(round((x0 - minx) / out_res))
-            steep_count[r0 : r0 + sh, c0 : c0 + sw] += steep.sum(axis=(1, 3)).astype(np.int16)
-            valid_count[r0 : r0 + sh, c0 : c0 + sw] += valid.sum(axis=(1, 3)).astype(np.int16)
+            for k in range(len(PALETTE)):
+                counts[k, r0 : r0 + sh, c0 : c0 + sw] += (cls == k).sum(axis=(1, 3)).astype(np.int16)
             n_tiles += 1
             logger.info("tile %d: %d x %d px at (%.0f, %.0f)", n_tiles, w, h, x0, y1)
 
     cells = factor * factor
+    valid_count = counts.sum(axis=0)
     covered = valid_count >= cells // 2
-    mask = ((steep_count > valid_count / 2.0) & covered).astype(np.uint8)
+    transform = from_origin(minx, maxy, out_res, out_res)
+
+    def steep_mask(t):
+        steep = counts[CLASS_FLOOR.index(t):].sum(axis=0)
+        return ((steep > valid_count / 2.0) & covered).astype(np.uint8)
+
+    mask = steep_mask(threshold)
     logger.info(
         "%.1f %% of the covered grid is at or above %.0f %% slope",
         100 * mask.sum() / max(covered.sum(), 1),
         threshold,
     )
-
-    transform = from_origin(minx, maxy, out_res, out_res)
-    with rasterio.open(
-        snakemake.output.raster,
-        "w",
-        driver="GTiff",
-        height=height,
-        width=width,
-        count=1,
-        dtype="uint8",
-        crs=f"EPSG:{crs}",
-        transform=transform,
-        compress="deflate",
-        nodata=255,
-    ) as dst:
-        dst.write(mask, 1)
+    write_mask(snakemake.output.raster, mask, transform, crs)
+    shares = {}
+    for t, path in zip(extra, snakemake.output.sensitivity):
+        m = steep_mask(t)
+        write_mask(path, m, transform, crs)
+        shares[f"{t:g}"] = round(float(m.sum()) / max(int(covered.sum()), 1), 4)
+        logger.info("%.1f %% of the covered grid is at or above %.0f %% slope",
+                    100 * shares[f"{t:g}"], t)
 
     meta = {
         "service": SERVICE,
@@ -195,6 +216,7 @@ if __name__ == "__main__":
         "covered_cells": int(covered.sum()),
         "excluded_cells": int(mask.sum()),
         "excluded_share_of_covered": round(float(mask.sum()) / max(int(covered.sum()), 1), 4),
+        "sensitivity_shares_of_covered": shares,
         "tiles": n_tiles,
         "licence": "CC-BY 4.0, Géoportail de la Wallonie",
     }

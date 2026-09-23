@@ -1,0 +1,8 @@
+step,eligible_km2,p_nom_max_mw
+"BREGILAB's rules (WTN), this study's data",1033.7,25087
++ landscape perimeters (plan de secteur and ADESA),803.7,19932
+"+ flood, landslide and water-capture zones",764.4,19470
++ slope >= 7 %,573.8,16678
++ radar and radio-astronomy perimeters,566.1,16460
++ corridor restricted to the CoDT's PIC network,425.4,12576
++ 2024 habitat setback (500 m + H/2) instead of 4H,452.8,13309

@@ -1,12 +1,12 @@
 {
   "turbine": "T136_V112",
-  "n_patches": 5796,
+  "n_patches": 4349,
   "footprint_km2": 0.439,
   "median_patch_km2": 0.02,
-  "area_km2": 621.5,
-  "area_in_patches_ge_1_turbine_km2": 329.2,
-  "area_in_patches_ge_4_turbines_km2": 121.5,
-  "largest_patch_km2": 5.2,
-  "share_ge_1_turbine_pct": 53.0,
-  "share_ge_4_turbines_pct": 19.5
+  "area_km2": 461.4,
+  "area_in_patches_ge_1_turbine_km2": 233.5,
+  "area_in_patches_ge_4_turbines_km2": 66.3,
+  "largest_patch_km2": 3.5,
+  "share_ge_1_turbine_pct": 50.6,
+  "share_ge_4_turbines_pct": 14.4
 }

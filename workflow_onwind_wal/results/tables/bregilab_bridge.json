@@ -1,0 +1,59 @@
+{
+  "emulation": {
+    "eligible_km2": 1033.7,
+    "gross_free_mw": 25087,
+    "with_fleet_mw": 25087,
+    "not_emulated": [
+      "skeyes and Defence red zones (the AOEM no-go rings stand in)",
+      "SEVESO sites (250 m)",
+      "gas pipelines (25 m)",
+      "cadastral residential parcels (the ICAR address points stand in)",
+      "undeveloped parcels in economic-activity zones"
+    ],
+    "reported_mw": 11400.0,
+    "reported_share_of_emulation": 0.454
+  },
+  "bridge": [
+    {
+      "step": "BREGILAB's rules (WTN), this study's data",
+      "eligible_km2": 1033.7,
+      "p_nom_max_mw": 25087
+    },
+    {
+      "step": "+ landscape perimeters (plan de secteur and ADESA)",
+      "eligible_km2": 803.7,
+      "p_nom_max_mw": 19932
+    },
+    {
+      "step": "+ flood, landslide and water-capture zones",
+      "eligible_km2": 764.4,
+      "p_nom_max_mw": 19470
+    },
+    {
+      "step": "+ slope >= 7 %",
+      "eligible_km2": 573.8,
+      "p_nom_max_mw": 16678
+    },
+    {
+      "step": "+ radar and radio-astronomy perimeters",
+      "eligible_km2": 566.1,
+      "p_nom_max_mw": 16460
+    },
+    {
+      "step": "+ corridor restricted to the CoDT's PIC network",
+      "eligible_km2": 425.4,
+      "p_nom_max_mw": 12576
+    },
+    {
+      "step": "+ 2024 habitat setback (500 m + H/2) instead of 4H",
+      "eligible_km2": 452.8,
+      "p_nom_max_mw": 13309
+    }
+  ],
+  "turbine": {
+    "rotor_diameter_m": 112.0,
+    "tip_height_m": 150.0,
+    "p_nom_mw": 3.3,
+    "spacing_m": 560.0
+  }
+}

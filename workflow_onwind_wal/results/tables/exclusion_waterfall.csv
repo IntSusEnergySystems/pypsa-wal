@@ -1,8 +1,8 @@
 scenario,title,in_ladder,eligible_area_km2,share_of_region_pct,removed_vs_previous_km2
 S0_pypsa_eur,PyPSA-Eur default (CORINE + Natura 2000),False,3756.5,22.22,
-S1_zoning,+ plan de secteur zoning (CoDT),True,8520.8,50.4,8384.6
-S2_setbacks,+ dwellings and infrastructure setbacks (CDR 2024),True,1398.5,8.27,7122.3
-S3_nature,"+ Natura 2000, reserves, wetlands, caves",True,1211.2,7.16,187.3
-S4_landscape,+ landscape protection perimeters (PIP / ADESA),True,923.3,5.46,287.9
-S5_risk,"+ flood, karst, landslide, water-capture protection",True,869.6,5.14,53.7
-S6_servitudes,"+ aeronautical servitudes, slope >= 7 %, classified sites, radar",True,560.9,3.32,308.7
+S1_zoning,+ plan de secteur zoning (CoDT),True,6265.8,37.06,10639.6
+S2_setbacks,+ dwellings and infrastructure setbacks (CDR 2024),True,973.3,5.76,5292.5
+S3_nature,"+ Natura 2000, reserves, wetlands, caves",True,831.1,4.92,142.2
+S4_landscape,+ landscape protection perimeters (PIP / ADESA),True,650.8,3.85,180.3
+S5_risk,"+ flood, karst, landslide, water-capture protection",True,618.2,3.66,32.6
+S6_servitudes,"+ aeronautical servitudes, slope >= 7 %, classified sites, radar",True,420.5,2.49,197.7

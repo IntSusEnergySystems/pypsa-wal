@@ -2,7 +2,7 @@
 
 **[onwind_potential_wallonia.pdf](onwind_potential_wallonia.pdf)** — land-eligibility
 and siting analysis of Walloon onshore wind against the Region's own regulatory
-cartography, and what it implies for `potential:BEWAL:onwind:p_nom_max`.
+instruments, and what it implies for `potential:BEWAL:onwind:p_nom_max`.
 
 Produced by [`workflow_onwind_wal/`](../../workflow_onwind_wal/):
 
@@ -22,53 +22,68 @@ report states the difference and its consequences.
 
 ## Headline
 
+Reference turbine NREL 2020ATB 4 MW (tip 185 m), 5 D between any two machines.
+
 | | Wallonia (administrative) |
 |---|---:|
-| eligible land, all implemented constraints | 561 km² (3.3 %) |
-| free allocation at 5 D between machines — *land and wake bound* | 15 236 MW |
-| + grouping into farms | 7 752 MW |
-| + open horizon, 130° within 4 km of each village — *gross reference* | 5 712 MW |
-| **central estimate** (+ residual allowance) | **4 370 MW** |
-| credible range | 3 199 – 5 712 MW |
-| *if the 2013 indicative 4–6 km inter-distance were applied as a rule* | 2 509 – 3 516 MW |
+| eligible land, all implemented constraints | 420 km² (2.5 %) |
+| free allocation — *land-and-wake bound*, the quantity BREGILAB reports | 11 460 MW |
+| + parks of at least 4 machines | 8 648 MW |
+| + open horizon, 130° within 4 km of each village — **gross reference** | **6 480 MW** |
+| **central estimate** (+ residual allowance for birds and partial constraints) | **4 957 MW** |
+| credible range | 3 629 – 6 480 MW |
+| *if the recommended 4 / 6 km inter-distance were applied as a rule* | 5 436 / 4 336 MW gross |
 | PyPSA-Eur default land analysis (area × 3 MW/km²) | 19 079 MW |
 | BREGILAB / VITO Dynamic Energy Atlas, gross | 11 400 MW |
+| BREGILAB's own rules applied to open data | 25 087 MW |
 | cap in the model today | 6 500 MW |
 | standing fleet, end 2024 | 1 528 MW |
 
-## Siting rules
+## What the answer depends on
 
-Three siting rules decide the answer, and together they matter more than the
-whole constraint ladder below the setbacks (§2.4):
+The Cadre de référence is a circular *à valeur indicative* and the plan de
+secteur admits derogations for wind farms (CoDT D.IV.11), so the rules that shape
+the answer are mostly policy. Each is priced on the gross reference (§7):
 
-| rule | value | basis |
+| one change from the reference | gross MW | Δ |
+|---|---:|---:|
+| no agricultural corridor (derogation route) | 9 076 | +40 % |
+| no open-horizon rule | 8 648 | +34 % |
+| no minimum park size (2024 exception above 3.2 MW) | 8 116 | +25 % |
+| inter-distance 4 km between parks, motorways exempt | 5 436 | −16 % |
+| inter-distance 6 km between parks, motorways exempt | 4 336 | −33 % |
+| 2013 habitat setback (4 × tip height) | 4 660 | −28 % |
+| corridor relaxed and no park minimum, horizon kept | 10 664 | +65 % |
+| 6 km inter-distance and 2013 setback | 3 152 | −51 % |
+
+## The rules, as the texts state them
+
+| rule | reference | basis |
 |---|---|---|
 | distance between machines | 5 D (750 m) | nearest-neighbour distance of a 5D×7D array; BREGILAB's rule; the fleet sits at 4.3 D |
-| machines per farm | ≥ 4 | 86 % of the standing fleet is in groups that size |
-| landscape | 130° of open horizon within 4 km of each village | the 2013 cadre de référence, verbatim |
-
-The 4–6 km inter-farm distance is **not** applied: the 2013 text calls it *indicative*, subordinates it to the
-impact assessment, exempts turbines sited along motorways — which is where the
-zoning rule concentrates the eligible land — and the 2024 framework that
-replaced it does not carry it at all. It is reported as a labelled legacy
-sensitivity.
+| park | ≥ 4 machines, 1.5 km linkage, no radius or centre separation | Cadre 2024 §3.1; the fleet's own farm definition |
+| open horizon | 130° free within 4 km of each village | Cadre 2024 §3.4 §3; 6 of 880 affected villages breach it today |
+| inter-distance | **sensitivity only** | Cadre 2024 §3.4 §3: 4 km (short views) to 6 km (long views) "recommandée et peut être réduite", not along motorways, measured between nearest masts; 53 % of standing farms are closer than 4 km to another |
+| agricultural corridor | 1.5 km from a PIC or a zone d'activité économique | CoDT R.II.36-2; a PIC is a motorway, a 2×2 regional road, a railway or a waterway (R.II.21-1) — not every plan-de-secteur road |
+| setbacks | 500 m + H/2 from habitat zones; 400 m from dwellings outside the economic zones | Cadre 2024 §3.2 §2 |
 
 ## Calibration
 
 Everything is tested against the **652 turbines standing in Wallonia**
 (OpenStreetMap).
 
-- **Constraint set.** No layer has an avoidance ratio (share of the fleet ÷
-  share of the Region) above 0.77 — every constraint is one Walloon wind
-  development demonstrably avoids.
-- **Siting geometry.** The machine spacing, farm radius and farm separation are
-  taken from the fleet's own distributions, not from a rule: 427 m median
-  between machines, 1 309 m p75 farm radius, 2 342 m p10 between farms.
-- **Landscape rule.** Of 2 261 settlements, 880 have a turbine within 4 km and
-  only **6 of them** fall below the 130° open-horizon threshold — the criterion
-  is observed in practice, and the implementation reproduces that.
-- The farm model then predicts 4.7 machines per farm against the fleet's 4.9,
-  and 307 farms against 134.
+- **Constraint set.** Every layer is avoided by the fleet. Conditional on the
+  other layers, the plan-de-secteur landscape perimeters (0.04), the
+  aeronautical rings (0.12), the slope criterion (0.15) and the ADESA inventory
+  (0.25) are strongly avoided; the infrastructure distances least (0.61).
+- **Zoning.** 79 % of the fleet stands where the zoning admits a turbine with
+  the CoDT's PIC network: about one machine in five was permitted by derogation
+  or before the present code.
+- **Farm geometry.** Measured between nearest masts, 53 % of the 134 farms have
+  a neighbour closer than 4 km (39 % of those not along a motorway); only 34 %
+  of the machines stand within 1 km of a motorway.
+- **Layouts.** Every placed layout is checked against its own rules by an
+  independent implementation; the run fails if one is broken.
 
 ## Files
 
@@ -82,9 +97,9 @@ Do not edit `generated/` or `figures/` by hand — re-run the workflow.
 
 ## What is an allowance rather than geometry
 
-Aeronautical servitudes, the 7 % slope criterion, classified sites and the
-radar perimeters are now implemented from data. Two families remain
-unrepresentable and carry a documented, bracketed allowance: the DEMNA
-priority-bird zones (10 %, 0–20 %) and the method's *partial* constraints
-(15 %, 0–30 %). The azimuth-of-open-horizon test needs a site-level model and
-is not represented at all. All of them reduce the potential. See §8.
+Two families remain unrepresentable and carry a documented, bracketed
+allowance: the DEMNA priority-bird zones (10 %, 0–20 %) and the method's
+*partial* constraints (15 %, 0–30 %). The skeyes and Defence red zones are not
+published and are not represented at all; they are the most likely reason
+BREGILAB's published figure is less than half of what its own rules give on open
+data. See §8 and §11.

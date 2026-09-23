@@ -1,34 +1,14 @@
-turbine,turbine_label,model,spacing_case,min_distance_m,min_distance_rotor_diameters,variant,interfarm_distance_m,eligible_area_km2,n_farms,turbines_per_farm,n_turbines,p_nom_max_mw,effective_density_mw_km2,land_per_turbine_km2,farms_refused_by_horizon
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,observed,645.0,4.3,row_major,,570.08,,,4275,17100.0,29.996,0.1334,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),grouped,observed,645.0,4.3,row_major,,570.08,50.0,82.5,4127,16508.0,28.957,0.1381,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,observed,645.0,4.3,random,,570.08,,,3668,14672.0,25.737,0.1554,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,crosswind,750.0,5.0,row_major,,570.08,,,3809,15236.0,26.726,0.1497,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),grouped,crosswind,750.0,5.0,row_major,,570.08,50.0,73.2,3659,14636.0,25.674,0.1558,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,crosswind,750.0,5.0,random,,570.08,,,3251,13004.0,22.811,0.1754,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,isotropic,887.4,5.92,row_major,,570.08,,,3271,13084.0,22.951,0.1743,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),grouped,isotropic,887.4,5.92,row_major,,570.08,50.0,62.4,3121,12484.0,21.899,0.1827,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,isotropic,887.4,5.92,random,,570.08,,,2818,11272.0,19.773,0.2023,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,observed,645.0,4.3,2.6 km apart,2600.0,570.08,466.0,5.1,2379,9516.0,16.692,0.2396,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,observed,645.0,4.3,2.6 km apart,2600.0,570.08,333.0,5.3,1753,7012.0,12.3,0.3252,5048.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,observed,645.0,4.3,4.0 km apart,4000.0,570.08,309.0,5.2,1616,6464.0,11.339,0.3528,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,observed,645.0,4.3,4.0 km apart,4000.0,570.08,263.0,5.3,1396,5584.0,9.795,0.4084,1619.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,observed,645.0,4.3,5.0 km apart,5000.0,570.08,227.0,5.4,1225,4900.0,8.595,0.4654,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,observed,645.0,4.3,5.0 km apart,5000.0,570.08,218.0,5.4,1182,4728.0,8.294,0.4823,499.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,observed,645.0,4.3,6.0 km apart,6000.0,570.08,180.0,5.5,993,3972.0,6.967,0.5741,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,observed,645.0,4.3,6.0 km apart,6000.0,570.08,176.0,5.5,970,3880.0,6.806,0.5877,85.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,crosswind,750.0,5.0,2.6 km apart,2600.0,570.08,423.0,4.6,1938,7752.0,13.598,0.2942,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,crosswind,750.0,5.0,2.6 km apart,2600.0,570.08,307.0,4.7,1428,5712.0,10.02,0.3992,3622.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,crosswind,750.0,5.0,4.0 km apart,4000.0,570.08,282.0,4.7,1314,5256.0,9.22,0.4339,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,crosswind,750.0,5.0,4.0 km apart,4000.0,570.08,245.0,4.7,1149,4596.0,8.062,0.4962,1180.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,crosswind,750.0,5.0,5.0 km apart,5000.0,570.08,213.0,4.7,1005,4020.0,7.052,0.5672,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,crosswind,750.0,5.0,5.0 km apart,5000.0,570.08,204.0,4.7,968,3872.0,6.792,0.5889,267.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,crosswind,750.0,5.0,6.0 km apart,6000.0,570.08,175.0,4.8,838,3352.0,5.88,0.6803,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,crosswind,750.0,5.0,6.0 km apart,6000.0,570.08,171.0,4.8,820,3280.0,5.754,0.6952,23.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,isotropic,887.4,5.92,2.6 km apart,2600.0,570.08,367.0,4.3,1590,6360.0,11.156,0.3585,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,isotropic,887.4,5.92,2.6 km apart,2600.0,570.08,272.0,4.4,1190,4760.0,8.35,0.4791,2357.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,isotropic,887.4,5.92,4.0 km apart,4000.0,570.08,249.0,4.4,1094,4376.0,7.676,0.5211,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,isotropic,887.4,5.92,4.0 km apart,4000.0,570.08,218.0,4.4,963,3852.0,6.757,0.592,818.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,isotropic,887.4,5.92,5.0 km apart,5000.0,570.08,190.0,4.5,846,3384.0,5.936,0.6739,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,isotropic,887.4,5.92,5.0 km apart,5000.0,570.08,179.0,4.5,804,3216.0,5.641,0.7091,198.0
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm,isotropic,887.4,5.92,6.0 km apart,6000.0,570.08,160.0,4.5,718,2872.0,5.038,0.794,
-T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),farm+horizon,isotropic,887.4,5.92,6.0 km apart,6000.0,570.08,156.0,4.5,700,2800.0,4.912,0.8144,10.0
+turbine,turbine_label,model,spacing_case,min_distance_m,min_distance_rotor_diameters,variant,interdistance_m,eligible_area_km2,n_parks,turbines_per_park,median_park_size,largest_park,n_turbines,p_nom_max_mw,effective_density_mw_km2,refused_by_horizon,check_ok,check_min_spacing_m,check_worst_free_arc_deg
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,observed,645.0,4.3,row_major,,417.97,,,,,3213,12852.0,30.749,,,,
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,observed,645.0,4.3,random,,417.97,,,,,2760,11040.0,26.413,,,,
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),parks+horizon,observed,645.0,4.3,,,417.97,185.0,10.1,6.0,55.0,1861,7444.0,17.81,20063.0,True,670.8,130.1
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,crosswind,750.0,5.0,row_major,,417.97,,,,,2865,11460.0,27.418,,,,
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,crosswind,750.0,5.0,random,,417.97,,,,,2458,9832.0,23.523,,,,
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),parks,crosswind,750.0,5.0,,,417.97,198.0,10.9,6.0,75.0,2162,8648.0,20.69,,True,761.6,
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),parks+horizon,crosswind,750.0,5.0,,,417.97,168.0,9.6,6.0,55.0,1620,6480.0,15.504,19739.0,True,761.6,130.1
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),parks+horizon+4km,crosswind,750.0,5.0,,4000.0,417.97,131.0,10.4,6.0,55.0,1359,5436.0,13.006,3170.0,True,761.6,130.1
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),parks+horizon+6km,crosswind,750.0,5.0,,6000.0,417.97,95.0,11.4,7.0,55.0,1084,4336.0,10.374,410.0,True,761.6,130.2
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),parks1+horizon,crosswind,750.0,5.0,,,417.97,464.0,4.4,2.0,55.0,2029,8116.0,19.418,7951.0,True,761.6,130.0
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,isotropic,887.4,5.92,row_major,,417.97,,,,,2478,9912.0,23.715,,,,
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),free,isotropic,887.4,5.92,random,,417.97,,,,,2138,8552.0,20.461,,,,
+T185_NREL4,NREL 2020ATB 4.0 MW (tip 185 m),parks+horizon,isotropic,887.4,5.92,,,417.97,148.0,8.7,6.0,46.0,1281,5124.0,12.259,21860.0,True,894.4,130.0

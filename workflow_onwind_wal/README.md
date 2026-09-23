@@ -49,12 +49,15 @@ snakemake -c4 all --rerun-triggers mtime
 | retrieve 24 Walloon reference datasets | `retrieve_wallonia_layer` | `data/*.gpkg` + `.meta.json` provenance |
 | decode the Region's slope-class map into a ≥ 7 % mask | `retrieve_slope_raster` | `data/slope_ge7.tif` |
 | fetch the standing Walloon fleet from OpenStreetMap | `retrieve_osm_turbines` | `data/osm_wind_turbines.gpkg` |
+| fetch the dual carriageways (the road part of the CoDT's PIC network) and the high-speed lines from OpenStreetMap | `retrieve_osm_infrastructure` | `data/osm_dual_carriageways.gpkg`, `data/osm_high_speed_rail.gpkg` |
 | build the region polygons | `build_regions` | `resources/regions.gpkg` |
 | translate the siting rules into geometry | `build_exclusion_layers` | `resources/exclusions_<turbine>/` |
 | run the `atlite` eligibility analysis | `build_availability` | `resources/availability_*.nc` |
 | area → capacity, capacity factor, FLH | `build_potential` | `results/potential/*.csv` |
 | rasterise the reference constraint set at 100 m | `build_eligible_raster` | `results/eligible_land_<turbine>.tif` |
-| **place machines and farms on that raster**, under the wake, grouping and open-horizon rules | `place_turbines` | `results/tables/placement_*.csv`, `results/placement_*.gpkg` |
+| **place machines and parks on that raster**, under the wake, park and open-horizon rules, every layout checked against its rules | `place_turbines` | `results/tables/placement_*.csv`, `results/placement_*.gpkg` |
+| price every policy and modelling choice, one at a time | `sensitivity` | `results/tables/sensitivity_cases.csv` |
+| rebuild BREGILAB's potential from its own rules, and bridge to this study | `bregilab_emulation` | `results/tables/bregilab_bridge.csv` |
 | test the constraint set against the standing fleet | `validate_fleet` | `results/tables/fleet_validation_*.json` |
 | cost of each late-added constraint family | `servitude_costs` | `results/tables/servitude_costs_*.json` |
 | tables, figures, LaTeX macros | `collect_results`, `plot_*`, `make_report_inputs` | `results/`, `../docs/.../generated/` |
@@ -74,15 +77,20 @@ the Python:
 - `aviation:` — which classes of the DGTA obstacle-evaluation map are treated as
   exclusions. The choice is calibrated against the standing fleet, and the
   measurement that settles it is in the comment above the block.
-- `slope:` — the 7 % threshold of the 2013 Walloon methodology.
+- `slope:` — the 7 % threshold of the Walloon favourable-zone methodology,
+  and the 10 % and 15 % masks priced in the sensitivity analysis.
 - `radar_installations:` — the three reconstructed protection circles, with the
   coordinate and the basis for each radius.
 - `scenarios:` — the constraint ladder, each step adding layers to the previous.
-- `placement:` — the three siting rules and their calibration: the minimum
-  inter-turbine distance in rotor diameters, the farm radius and separation
-  (both taken from the standing fleet), the minimum farm size, and the
-  open-horizon criterion of the 2013 cadre de référence. The comment above each
-  block carries the measurement or the legal text it comes from.
+- `placement:` — the siting rules: the minimum inter-turbine distance in rotor
+  diameters, the park definition (the fleet's 1.5 km linkage, at least four
+  machines), the open-horizon rule of the Cadre, and the recommended 4–6 km
+  inter-distance, carried as a sensitivity. The comment above each block
+  carries the measurement or the legal text it comes from.
+- `plan_de_secteur:` — also `pic_roads` (what counts as a PIC, CoDT
+  R.II.21-1) and `agri_corridor` (the derogation route when false). Every
+  zone label is checked against the data.
+- `sensitivity:` — the cases priced one at a time against the reference.
 - `settlements:` — what counts as a "village" for the open-horizon test.
 - `residual_allowance:` — the documented allowance for the two constraint
   families that have no public geometry, with its bracket.
@@ -112,11 +120,10 @@ allowance; there are no unquantified gaps.
 
 | rule | value | basis |
 |---|---|---|
-| distance between machines | 5 D | nearest-neighbour distance of a 5D×7D array; BREGILAB's rule; the standing fleet sits at 4.3 D; physical floor ≈ 3 D |
-| machines per farm | ≥ 4 | 86 % of the standing fleet is in groups that size |
-| farm radius / separation | 1 300 m / 2 600 m | observed p75 farm radius, and twice it; inside the fleet's p10–p25 separation band |
-| landscape | 130° of open horizon within 4 km of each village | 2013 cadre de référence, verbatim; only 6 of 880 affected villages breach it today |
-| *2013 4–6 km inter-farm distance* | **not applied** | indicative, subordinate to the impact assessment, exempt along motorways, and absent from the 2024 framework — reported as a legacy sensitivity |
+| distance between machines | 5 D, between any two machines | nearest-neighbour distance of a 5D×7D array; BREGILAB's rule; the standing fleet sits at 4.3 D; physical floor ≈ 3 D |
+| park | machines within 1.5 km belong to one park; ≥ 4 machines | Cadre 2024 §3.1; the fleet's own farm definition; 86 % of the standing fleet is in groups of four or more. No farm radius, no centre separation |
+| landscape | 130° of open horizon within 4 km of each village | Cadre 2024 §3.4 §3, verbatim from 2013; only 6 of 880 affected villages breach it today |
+| *4–6 km inter-distance between parks* | **sensitivity only** | in the 2024 Cadre as a recommendation that "peut être réduite", not along motorways, measured between nearest masts; 53 % of standing farms are closer than 4 km to another |
 
 ### Constraint families
 
@@ -128,7 +135,6 @@ allowance; there are no unquantified gaps.
 | weather radar, radio astronomy, Bertem SSR | reconstructed circles at published coordinates |
 | priority ornithological zones (DEMNA) | allowance, 10 % (bracket 0–20 %) — layer not public |
 | partial constraints at 25 % success | allowance, 15 % (bracket 0–30 %) |
-| azimuth of open horizon per village | not represented — needs a site-level model |
 | broad-leaved / coniferous split | CORINE 250 m; CARTOFOR unpublished, WALOUS not bulk-retrievable |
 
 See §3.5, §6.4 and §8 of the report.

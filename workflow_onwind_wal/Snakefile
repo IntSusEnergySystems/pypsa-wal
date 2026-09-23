@@ -71,6 +71,8 @@ wildcard_constraints:
 rule all:
     input:
         f"{OUT}/tables/potential_summary.csv",
+        f"{OUT}/tables/sensitivity_cases.csv",
+        f"{OUT}/tables/bregilab_bridge.csv",
         f"{OUT}/tables/exclusion_waterfall.csv",
         f"{OUT}/tables/sensitivity.csv",
         f"{OUT}/tables/comparison.csv",
@@ -82,11 +84,20 @@ rule all:
         f"{OUT}/figures/sensitivity.png",
 
 
+SLOPE_EXTRA = [f"{DATA}/slope_ge{int(t)}.tif" for t in config["slope"]["sensitivity_thresholds_pct"]]
+OSM_INFRA = {
+    "dual_carriageways": f"{DATA}/osm_dual_carriageways.gpkg",
+    "high_speed_rail": f"{DATA}/osm_high_speed_rail.gpkg",
+}
+
+
 rule download:
     input:
         expand(f"{DATA}/{{source}}.gpkg", source=WALLOON_SOURCES),
         f"{DATA}/slope_ge7.tif",
+        SLOPE_EXTRA,
         f"{DATA}/osm_wind_turbines.gpkg",
+        OSM_INFRA.values(),
 
 
 rule report:
@@ -124,16 +135,37 @@ rule retrieve_slope_raster:
         crs=config["atlite"]["crs"],
         out_res=config["atlite"]["excluder_resolution"],
         threshold_pct=config["slope"]["threshold_pct"],
+        sensitivity_thresholds_pct=config["slope"]["sensitivity_thresholds_pct"],
     input:
         regions=f"{RES}/regions.gpkg",
     output:
         raster=f"{DATA}/slope_ge7.tif",
+        sensitivity=SLOPE_EXTRA,
         meta=f"{DATA}/slope_ge7.meta.json",
     log:
         "logs/retrieve_slope_raster.log",
     retries: 2
     script:
         "scripts/retrieve_slope_raster.py"
+
+
+rule retrieve_osm_infrastructure:
+    message:
+        "Retrieving dual carriageways and high-speed lines from OpenStreetMap"
+    params:
+        crs=config["atlite"]["crs"],
+        min_speed_kmh=config["osm_infrastructure"]["dual_carriageway_min_speed_kmh"],
+    input:
+        regions=f"{RES}/regions.gpkg",
+    output:
+        roads=OSM_INFRA["dual_carriageways"],
+        hsl=OSM_INFRA["high_speed_rail"],
+        meta=f"{DATA}/osm_infrastructure.meta.json",
+    log:
+        "logs/retrieve_osm_infrastructure.log",
+    retries: 2
+    script:
+        "scripts/retrieve_osm_infrastructure.py"
 
 
 # ---------------------------------------------------------------------------
@@ -173,11 +205,14 @@ rule build_exclusion_layers:
         settlements=config["settlements"],
         aviation=config["aviation"],
         radar_installations=config["radar_installations"],
+        risk=config["risk"],
         turbine=lambda w: config["turbines"][w.turbine],
     input:
         unpack(
             lambda w: {s: f"{DATA}/{s}.gpkg" for s in WALLOON_SOURCES}
         ),
+        osm_dual_carriageways=OSM_INFRA["dual_carriageways"],
+        osm_high_speed_rail=OSM_INFRA["high_speed_rail"],
         regions=f"{RES}/regions.gpkg",
     output:
         layers=f"{RES}/exclusions_{{turbine}}.gpkg",
@@ -291,6 +326,8 @@ rule collect_results:
         fleet=(
             f"{OUT}/tables/fleet_validation_" + config["reference_turbine"] + ".json"
         ),
+        sensitivity=f"{OUT}/tables/sensitivity_cases.json",
+        bregilab=f"{OUT}/tables/bregilab_bridge.json",
     output:
         summary=f"{OUT}/tables/potential_summary.csv",
         waterfall=f"{OUT}/tables/exclusion_waterfall.csv",
@@ -384,6 +421,9 @@ rule validate_fleet:
         layer_dir=f"{RES}/exclusions_{{turbine}}",
         dwelling_raster=f"{RES}/dwelling_setback_{{turbine}}.tif",
         slope_raster=f"{DATA}/slope_ge7.tif",
+        dual_carriageways=OSM_INFRA["dual_carriageways"],
+        address_points=f"{DATA}/address_points.gpkg",
+        pds_zones=f"{DATA}/pds_zones.gpkg",
     output:
         table=f"{OUT}/tables/fleet_validation_{{turbine}}.json",
     log:
@@ -423,6 +463,7 @@ rule place_turbines:
     input:
         raster=f"{OUT}/eligible_land_{{turbine}}.tif",
         settlements=f"{RES}/settlements_{{turbine}}.gpkg",
+        dual_carriageways=OSM_INFRA["dual_carriageways"],
     output:
         table=f"{OUT}/tables/placement_{{turbine}}.csv",
         points=f"{OUT}/placement_{{turbine}}.gpkg",
@@ -432,6 +473,66 @@ rule place_turbines:
         mem_mb=8000,
     script:
         "scripts/place_turbines.py"
+
+
+REF_T = config["reference_turbine"]
+
+
+rule sensitivity:
+    message:
+        "Pricing each choice of the reference case, one at a time"
+    params:
+        config=config,
+    input:
+        regions=f"{RES}/regions.gpkg",
+        raster=f"{OUT}/eligible_land_{REF_T}.tif",
+        layer_dir=f"{RES}/exclusions_{REF_T}",
+        dwelling_raster=f"{RES}/dwelling_setback_{REF_T}.tif",
+        slope_raster=f"{DATA}/slope_ge7.tif",
+        slope_ge10=f"{DATA}/slope_ge10.tif",
+        slope_ge15=f"{DATA}/slope_ge15.tif",
+        settlements=f"{RES}/settlements_{REF_T}.gpkg",
+        dual_carriageways=OSM_INFRA["dual_carriageways"],
+        placement=f"{OUT}/tables/placement_{REF_T}.csv",
+    output:
+        table=f"{OUT}/tables/sensitivity_cases.csv",
+        json=f"{OUT}/tables/sensitivity_cases.json",
+    log:
+        "logs/sensitivity.log",
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/sensitivity.py"
+
+
+rule bregilab_emulation:
+    message:
+        "Reproducing BREGILAB from its own rules and bridging to this study"
+    params:
+        config=config,
+    input:
+        regions=f"{RES}/regions.gpkg",
+        raster=f"{OUT}/eligible_land_{REF_T}.tif",
+        layer_dir=f"{RES}/exclusions_{REF_T}",
+        dwelling_raster=f"{RES}/dwelling_setback_{REF_T}.tif",
+        slope_raster=f"{DATA}/slope_ge7.tif",
+        pds_zones=f"{DATA}/pds_zones.gpkg",
+        pds_roads=f"{DATA}/pds_roads.gpkg",
+        pds_rail=f"{DATA}/pds_rail.gpkg",
+        pds_waterways=f"{DATA}/pds_waterways.gpkg",
+        pds_hv_lines=f"{DATA}/pds_hv_lines.gpkg",
+        osm_high_speed_rail=OSM_INFRA["high_speed_rail"],
+        karst=f"{DATA}/karst.gpkg",
+        fleet=f"{DATA}/osm_wind_turbines.gpkg",
+    output:
+        table=f"{OUT}/tables/bregilab_bridge.csv",
+        json=f"{OUT}/tables/bregilab_bridge.json",
+    log:
+        "logs/bregilab_emulation.log",
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/bregilab_emulation.py"
 
 
 rule plot_eligible_map:
@@ -499,6 +600,7 @@ rule make_report_inputs:
         placement_tex=f"{DOCDIR}/generated/table_placement.tex",
         servitudes_tex=f"{DOCDIR}/generated/table_servitudes.tex",
         bregilab_tex=f"{DOCDIR}/generated/table_bregilab.tex",
+        sensitivity_cases_tex=f"{DOCDIR}/generated/table_sensitivity_cases.tex",
         full_tex=f"{DOCDIR}/generated/table_full.tex",
         sources_tex=f"{DOCDIR}/generated/table_sources.tex",
     log:
@@ -521,6 +623,7 @@ rule build_report:
             f"{DOCDIR}/generated/table_placement.tex",
             f"{DOCDIR}/generated/table_servitudes.tex",
             f"{DOCDIR}/generated/table_bregilab.tex",
+            f"{DOCDIR}/generated/table_sensitivity_cases.tex",
             f"{DOCDIR}/generated/table_full.tex",
             f"{DOCDIR}/generated/table_sources.tex",
         ],
