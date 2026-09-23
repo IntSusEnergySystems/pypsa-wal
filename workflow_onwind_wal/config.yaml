@@ -131,15 +131,25 @@ placement:
   # model built on non-overlapping discs sterilises the land between the discs.
   #
   # `min_turbines: 4` is the 2024 framework's definition of a parc éolien
-  # (§3.1), which it allows to be reduced for repowering, for extensions and
-  # for machines above 3.2 MW -- the reference class is one.  It is applied
-  # because it describes how Walloon wind is actually built (86 % of the
-  # standing machines are in groups of four or more); `min_turbines: 1` is
-  # carried as a sensitivity.
+  # (§3.1): "Un parc est un projet éolien qui prévoit l'implantation de
+  # minimum quatre éoliennes."  The same article lets the number be reduced
+  # (1° repowering, 2° extension of machines in operation, 3° in a zone
+  # d'activité économique above 3.2 MW) and "4° lorsque le projet vise
+  # l'implantation d'une ou plusieurs éoliennes d'une puissance nominale
+  # supérieure à 3,2 MW, pour autant qu'il s'intègre harmonieusement dans le
+  # paysage et ne réduise pas le potentiel éolien de la zone".  The reference
+  # class is 4 MW, the CoDT admits "une ou plusieurs éoliennes" in every zone
+  # it opens to wind, and 42 standing machines are single.
+  #
+  # `small_groups: after` reads 4° literally: parks of at least four are
+  # grown first, then smaller groups, down to one machine, only on the land no
+  # park can use -- so no park is displaced.  `none` (the minimum without its
+  # exceptions, the reference until 23 September 2026) is a sensitivity.
   # ------------------------------------------------------------------
   park:
     link_m: 1500
     min_turbines: 4
+    small_groups: "after"    # "after" (reference) or "none"
     seed_radius_m: 1300      # seeds are ranked by eligible land within this box
   reference_model: "parks+horizon"
 
@@ -754,10 +764,10 @@ sensitivity:
       group: policy
       label: "no open-horizon rule"
       placement: {horizon: false}
-    parks_min1:
+    parks_min4:
       group: policy
-      label: "no minimum park size (2024 exception above 3.2 MW)"
-      placement: {min_turbines: 1}
+      label: "parks of at least four, without the 2024 exception above 3.2 MW"
+      placement: {small_groups: "none"}
     no_corridor:
       group: policy
       label: "no agricultural corridor (derogation, CoDT D.IV.11)"
@@ -786,14 +796,95 @@ sensitivity:
       group: judgement
       label: "no aeronautical ring excluded"
       land: {aviation: null}
+    # The forest zone.  The CoDT admits a mast there only near a PIC and
+    # outside broad-leaved stands (D.II.37 §1 al. 6, R.II.37-2); the Cadre 2024
+    # (§3.2 §1) only asks for coniferous plantations of low biological value.
+    # Six of the ten standing machines in a forest zone are 4-5.5 km from a
+    # PIC, on conifers: the CoDT distance is derogated from in practice.
+    forest_conifers:
+      group: policy
+      label: "every coniferous stand of the forest zone admitted (Cadre 2024 wording, no PIC distance)"
+      land: {pds_ineligible: pds_ineligible_conifers}
+    forest_all:
+      group: policy
+      label: "the whole forest zone admitted, broad-leaved stands included"
+      land: {pds_ineligible: pds_ineligible_forest}
     pic_plan_de_secteur:
       group: misreading
       label: "every plan-de-secteur road taken as a PIC (a misreading of R.II.21-1)"
       land: {pds_ineligible: pds_ineligible_psroads}
   combined:
     all_policy_relaxed:
-      label: "no agricultural corridor and no minimum park size, open horizon kept"
-      cases: [no_corridor, parks_min1]
+      label: "no agricultural corridor and every coniferous stand, open horizon kept"
+      cases: [no_corridor, forest_conifers]
     all_policy_tightened:
-      label: "6 km inter-distance and the 2013 habitat setback"
-      cases: [interdistance_6km, habitat_cdr2013]
+      label: "6 km inter-distance and parks of at least four without exception"
+      cases: [interdistance_6km, parks_min4]
+
+# ---------------------------------------------------------------------------
+# Infographic (docs/onwind_potential_wallonia/infographic_plan.md)
+#
+# The dashboard tells the reference case as a funnel of five families of land
+# constraints followed by the siting rules.  Each family is a union of layers
+# of the exclusion catalogue; a cell is attributed to the *first* family that
+# excludes it.  The union of all families must be the reference layer set
+# exactly, and scripts/infographic_data.py refuses to build otherwise.
+#
+# `derogation` is the layer list of that family under the derogation "Et
+# si… ?" choice (sensitivity case no_corridor).  The forest choice (cases
+# forest_conifers, forest_all) swaps the zoning layers of every family for
+# their forest variant.  The 2013 habitat setback is no longer in force and is
+# priced in the report only.
+# ---------------------------------------------------------------------------
+infographic:
+  families:
+    - key: "villes"
+      layers: ["pds_ineligible_nocorridor"]
+    - key: "axes"
+      # The derogation (CoDT D.IV.11) lifts the corridor: nothing is left of
+      # this family, because the zones outside the agricultural corridor are
+      # already in "villes".
+      layers: ["pds_ineligible"]
+      derogation: []
+    - key: "habitations"
+      layers: ["habitat_setback", "dwelling_setback"]
+    - key: "nature"
+      layers: ["nature", "landscape", "heritage"]
+    - key: "technique"
+      layers: ["infrastructure_setback", "risk", "aviation", "slope", "radar"]
+  # The magnifier: a fixed square at the full 100 m resolution.  `centre` in
+  # EPSG:3035 metres; null lets the script pick the best-scoring candidate
+  # (see results/infographic/data/loupe_candidates.json).
+  loupe:
+    size_km: 12
+    centre: null
+  # Conda environment of scripts/infographic_export.py (envs/infographic.yaml).
+  export_env: "infographic"
+  # Towns labelled on the map (WGS84).
+  cities:
+    - {name: "Tournai", lat: 50.6056, lon: 3.3878}
+    - {name: "Mons", lat: 50.4542, lon: 3.9523}
+    - {name: "Charleroi", lat: 50.4108, lon: 4.4446}
+    - {name: "Namur", lat: 50.4674, lon: 4.8718}
+    - {name: "Liège", lat: 50.6326, lon: 5.5797}
+    - {name: "Arlon", lat: 49.6833, lon: 5.8167, side: "left"}
+  # Which candidate window each card uses (index into
+  # results/infographic/review/vignette_candidates.json), chosen by eye on
+  # 23 September 2026; `centre: [x, y]` (EPSG:3035) overrides a candidate.
+  vignettes:
+    etape1: {candidate: 1}
+    etape3: {candidate: 1}
+    etape5: {candidate: 1}
+    etape6: {candidate: 2}
+    etape8: {candidate: 0}
+    etape8bis: {candidate: 2}
+  # Temporary publication of the dashboard (rule infographic_publish).  The
+  # host is the one of config.walloon.yaml `html_publish`; the root URL is an
+  # Apache index, so the folder shows up next to the published model runs.
+  publish:
+    ssh_host: "negawatt.squoilin.eu"
+    ssh_user: "pypsa"
+    identity_file: "~/.ssh/rsa_nopasswd"
+    remote_dir: "/home/pypsa/public_html"
+    public_url: "https://pypsa.squoilin.eu"
+    folder: "eolien_wallonie_20260923"

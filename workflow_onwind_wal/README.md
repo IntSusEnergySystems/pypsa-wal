@@ -62,6 +62,40 @@ snakemake -c4 all --rerun-triggers mtime
 | cost of each late-added constraint family | `servitude_costs` | `results/tables/servitude_costs_*.json` |
 | tables, figures, LaTeX macros | `collect_results`, `plot_*`, `make_report_inputs` | `results/`, `../docs/.../generated/` |
 
+## Infographic
+
+An interactive dashboard in French (« Où peut-on installer des éoliennes en
+Wallonie ? ») and its social-media exports, built from the same burns and
+placement code as the report — see
+[`infographic_plan.md`](../docs/onwind_potential_wallonia/infographic_plan.md).
+
+```bash
+snakemake -c4 infographic --rerun-triggers mtime          # results/infographic/
+cd results/infographic && python -m http.server 8000      # http://localhost:8000
+snakemake -c1 infographic_export --rerun-triggers mtime   # GIF, MP4, carousel PDF
+snakemake -c1 infographic_publish --rerun-triggers mtime  # pypsa.squoilin.eu
+```
+
+| rule | script | output |
+|---|---|---|
+| `infographic_data` | `scripts/infographic_data.py` | attribution maps (first family of rules that excludes each 100 m cell), the 24 "Et si… ?" states, machine positions, landmarks. **Fails if any state differs from `headline.json` / `sensitivity_cases.json`.** |
+| `infographic_vignettes` | `scripts/infographic_vignettes.py` | the card pictures: SPW summer-2023 orthophotos with the rule drawn from the workflow's layers, or a ground photo from `infographic/photos/` (see its README) |
+| `infographic_page` | — | copies `infographic/` (HTML, CSS, ES modules, `textes.json`) next to the data |
+| `infographic_export` | `scripts/infographic_export.py` | Playwright drives `window.renderState()` → 1600×900 and 1080×1350 GIF/MP4, 1080×1350 PNG/PDF carousel, French alt text |
+| `infographic_publish` | — | rsync to `config.infographic.publish` |
+
+- Every label is in `infographic/textes.json`: proofread it there.
+- The export needs its own environment:
+  `conda env create -f envs/infographic.yaml`. If Playwright's own Chromium
+  is not installed, it uses any cached one under `~/.cache/ms-playwright/`.
+- Card windows are chosen from `results/infographic/review/vignette_candidates.jpg`
+  and fixed in `config.infographic.vignettes`.
+- `--rerun-triggers mtime` does not rerun a rule when only its script changed:
+  add `--forcerun <rule>`.
+- The orthophotos are © SPW under the SPW's conditions for its viewing
+  services, not CC BY. Check them before any public release. The summer-2025
+  campaign covers only the south-east of the Region, hence 2023.
+
 ## Reviewing the constraint set
 
 Everything that decides the answer is in [`config.yaml`](config.yaml), not in

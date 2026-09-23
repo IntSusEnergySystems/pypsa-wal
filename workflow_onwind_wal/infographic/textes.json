@@ -1,0 +1,293 @@
+{
+  "_note": "Tous les libellés de l'infographie. Espaces normales ici : la page pose elle-même les espaces fines insécables (avant : ; % ! ?, dans les guillemets, entre les milliers). Les {accolades} sont remplacées par les chiffres du calcul.",
+
+  "titre": "Où peut-on installer des éoliennes en Wallonie ?",
+  "sous_titre": "Les règles wallonnes, appliquées une à une à tout le territoire",
+  "lien_rapport": "Le rapport complet (PDF)",
+  "lien_methode": "Comment lire cette carte",
+
+  "indicateur": {
+    "place_pour": "place pour",
+    "autorisees": "éoliennes autorisées",
+    "possibles": "éoliennes possibles",
+    "eoliennes": "éoliennes",
+    "si_chaque_hectare": "si chaque hectare était disponible",
+    "empilement": "empilement maximal, avant les règles de parc",
+    "terrain": "{km2} km² · {pct} % de la Région encore disponibles",
+    "fourchette": "entre {lo} et {hi} MW",
+    "scenario_modifie": "Et si… : {n} choix modifié",
+    "scenario_modifies": "Et si… : {n} choix modifiés"
+  },
+
+  "legende": {
+    "titre": "Terrain retiré par",
+    "disponible": "Encore disponible",
+    "note": "Chaque km² est compté dans la première famille de règles qui l'exclut. À cette échelle, le terrain disponible est agrandi pour rester visible ; tous les calculs sont faits sur une grille de 100 m.",
+    "parc_actuel": "Parc actuel ({n} éoliennes)",
+    "eoliennes_modele": "Éoliennes placées par le calcul"
+  },
+
+  "loupe": {
+    "titre": "Loupe : 12 × 12 km au 100 m, comme le calcul",
+    "court": "Loupe 100 m",
+    "horizon": "angle libre de 130° au moins"
+  },
+
+  "survol": {
+    "disponible": "Encore disponible à cette étape",
+    "sera_retire": "retiré plus loin, à l'étape {n} : {famille}",
+    "retire": "Retiré à l'étape {n} : {famille}",
+    "reste": "Reste disponible jusqu'au bout"
+  },
+
+  "familles": {
+    "villes": "Villes, forêts, parcs",
+    "axes": "Près des grands axes",
+    "habitations": "Loin des habitations",
+    "nature": "Nature, paysage, patrimoine",
+    "technique": "Relief et sécurité"
+  },
+
+  "etapes": [
+    {
+      "id": "0",
+      "titre": "La Wallonie",
+      "regle": "{region_km2} km² : aucune règle n'est encore appliquée",
+      "pourquoi": "Le point de départ : toute la Région. Ce chiffre n'est pas un potentiel, il mesure seulement la place qu'occuperaient des éoliennes partout.",
+      "image": "etape0",
+      "alt": "Plateau agricole wallon avec un parc éolien à l'horizon",
+      "picto": "wallonie"
+    },
+    {
+      "id": "1",
+      "famille": "villes",
+      "titre": "Villes, forêts, parcs",
+      "regle": "Le plan de secteur exclut l'habitat, la forêt feuillue, les zones naturelles et les parcs",
+      "regle_foret1": "Le plan de secteur exclut l'habitat, la forêt feuillue, les zones naturelles et les parcs ; tous les résineux sont admis",
+      "regle_foret2": "Le plan de secteur exclut l'habitat, les zones naturelles et les parcs ; toute la forêt est admise",
+      "pourquoi": "Une éolienne n'est admise que dans certaines zones du plan de secteur : activité économique, zone agricole, résineux près d'un grand axe (CoDT).",
+      "image": "etape1",
+      "alt": "Vue aérienne d'une lisière de village, de prairies et de forêt ; les zones exclues sont colorées",
+      "picto": "villes",
+      "et_si": {
+        "foret": [
+          "Tous les résineux admis : la lecture du Cadre 2024, sans la distance de {conifer_m} m à un grand axe que fixe le CoDT.",
+          "Toute la zone forestière admise, feuillus compris : contraire au CoDT et au Cadre 2024, donné comme borne haute."
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "famille": "axes",
+      "titre": "Près des grands axes",
+      "regle": "En zone agricole, seulement à moins de {corridor_km} km d'une autoroute, d'une voie ferrée ou d'un zoning",
+      "pourquoi": "En zone agricole, l'éolienne doit rester près d'une autoroute, d'une route à 2 × 2 voies, d'un rail, d'une voie navigable ou d'un zoning (CoDT, R.II.36-2).",
+      "image": "etape2",
+      "alt": "Vue aérienne d'une autoroute qui traverse des champs, avec la bande de 1,5 km de part et d'autre",
+      "picto": "axes",
+      "et_si": {
+        "derogation": "Dérogation activée : toute la zone agricole est ouverte, même loin des grands axes."
+      }
+    },
+    {
+      "id": "3",
+      "famille": "habitations",
+      "titre": "Loin des habitations",
+      "regle": "{habitat_m} m des zones d'habitat, {dwelling_m} m de toute maison",
+      "pourquoi": "500 m plus la moitié de la hauteur de l'éolienne ({tip_m} m) autour des zones d'habitat, {dwelling_m} m autour de toute habitation (Cadre de référence 2024, §3.2).",
+      "image": "etape3",
+      "alt": "Vue aérienne d'un village et de fermes isolées, entourés des distances de 592 m et de 400 m",
+      "picto": "habitations"
+    },
+    {
+      "id": "4",
+      "famille": "nature",
+      "titre": "Nature, paysage, patrimoine",
+      "regle": "Natura 2000, réserves naturelles, paysages protégés, sites classés",
+      "pourquoi": "Sont exclus les sites Natura 2000, les réserves et zones humides, les périmètres d'intérêt paysager et les sites classés ou proches du patrimoine mondial.",
+      "image": "etape4",
+      "alt": "Vallée boisée des Ardennes avec une rivière et un village",
+      "picto": "nature"
+    },
+    {
+      "id": "5",
+      "famille": "technique",
+      "titre": "Relief et sécurité",
+      "regle": "Pentes fortes, zones inondables ; routes, rails, lignes à haute tension, aérodromes",
+      "pourquoi": "Pentes de 7 % et plus, zones inondables et karstiques, captages ; distances de sécurité aux routes, rails et lignes ; abords des aérodromes et des radars.",
+      "image": "etape5",
+      "alt": "Vue aérienne d'un versant de vallée avec une voie ferrée et une ligne à haute tension",
+      "picto": "technique"
+    },
+    {
+      "id": "6",
+      "titre": "750 m entre éoliennes",
+      "regle": "Cinq diamètres de rotor pour limiter les pertes de sillage : l'empilement maximal",
+      "pourquoi": "Chaque point est une éolienne de {p_nom} MW. À {spacing_m} m les unes des autres et sans autre règle, c'est tout ce que le terrain restant peut porter.",
+      "image": "etape6",
+      "alt": "Vue aérienne de champs avec les éoliennes du calcul et leurs cercles de 750 m",
+      "picto": "espacement"
+    },
+    {
+      "id": "7",
+      "titre": "Des parcs d'au moins 4",
+      "titre_isolees": "Des parcs, éoliennes isolées admises",
+      "regle": "Pas d'éolienne isolée : les machines sont groupées en parcs",
+      "regle_isolees": "Les parcs se forment, mais une éolienne seule reste admise",
+      "pourquoi": "Le Cadre de référence définit un parc comme au moins quatre éoliennes (§3.1). Deux machines à moins de {park_link_km} km appartiennent au même parc.",
+      "image": "etape7",
+      "alt": "Vue aérienne d'un parc de quatre éoliennes, et d'une éolienne isolée barrée",
+      "picto": "parcs",
+      "et_si": {
+        "isolees": "Éoliennes isolées admises : le Cadre permet moins de quatre machines au-delà de 3,2 MW, ce qui est le cas ici."
+      }
+    },
+    {
+      "id": "8",
+      "titre": "Un horizon libre pour chaque village",
+      "regle": "130° de l'horizon de chaque village restent sans éolienne, sur 4 km",
+      "pourquoi": "« Un angle horizontal de 130° sans éoliennes est préservé sur une distance de 4 kilomètres » (Cadre de référence 2024, §3.4).",
+      "image": "etape8",
+      "alt": "Vue aérienne d'un village, du rayon de 4 km et de l'angle libre de 130°",
+      "picto": "horizon"
+    },
+    {
+      "id": "8bis",
+      "titre": "{km} km entre deux parcs",
+      "regle": "Au moins {km} km entre deux parcs, sauf le long des autoroutes",
+      "pourquoi": "Le Cadre (§3.4) recommande 4 km en paysage à vues courtes et 6 km à vues longues ; cette distance « peut être réduite ».",
+      "image": "etape8bis",
+      "alt": "Vue aérienne de deux parcs éoliens séparés de plusieurs kilomètres",
+      "picto": "interdistance",
+      "et_si": {
+        "interdistance": "Distance entre parcs activée : une recommandation du Cadre traitée ici comme une règle stricte."
+      }
+    },
+    {
+      "id": "9",
+      "titre": "Autres impacts",
+      "regle": "Oiseaux, chauves-souris, radars : des contraintes qui ne sont pas cartographiées, environ −{reserve_pct} %",
+      "pourquoi": "Aucune carte publique ne les montre. On déduit donc {orni_pct} % pour les zones prioritaires pour les oiseaux, et {partiel_pct} % pour les zones où un projet ne passe qu'au cas par cas : couloirs de migration, zones à chauves-souris, maillage écologique, abords des radars.",
+      "image": "etape9",
+      "alt": "Milan royal en vol",
+      "picto": "reserve"
+    },
+    {
+      "id": "bilan",
+      "titre": "≈ {gw} GW possibles",
+      "regle": "Entre {lo_gw} et {hi_gw} GW, {fois} le parc actuel ({installe_gw} GW)",
+      "pourquoi": "Le terrain ne décide pas seul : quelques choix politiques font varier ce résultat de plus ou moins 40 %. Essayez « Et si… ? ».",
+      "image": "bilan",
+      "alt": "Plateau agricole wallon au crépuscule, éoliennes à l'horizon",
+      "picto": "bilan"
+    }
+  ],
+
+  "effet": {
+    "depart": "aucune règle : {mw} MW si chaque hectare était disponible",
+    "terrain": "−{km2} km² ({pct} % de ce qui restait)",
+    "terrain_zero": "aucun terrain retiré",
+    "eoliennes_moins": "place pour {n} éoliennes de moins",
+    "apparaissent": "même nombre : les {n} éoliennes apparaissent sur la carte",
+    "moins": "−{n} éoliennes ({pct} %)",
+    "reserve": "Une moyenne, sans dire où : aucun point n'est retiré de la carte",
+    "bilan_parc": "Parc actuel",
+    "bilan_possible": "Possible selon ce calcul"
+  },
+
+  "et_si": {
+    "titre": "Et si… ?",
+    "intro": "Quatre choix politiques changent le résultat bien plus que le terrain. Ils se combinent librement.",
+    "reinitialiser": "Revenir aux règles en vigueur",
+    "aucun_choix": "les règles en vigueur",
+    "agit_etape": "agit à l'étape {n}",
+    "aller": "voir",
+    "effet_titre": "effet sur le résultat",
+    "choix": {
+      "derogation": {
+        "libelle": "Dérogation : autoriser les terres agricoles loin des grands axes",
+        "court": "Dérogation agricole",
+        "en_vigueur": "En vigueur : en zone agricole, à 1,5 km au plus d'un grand axe ou d'un zoning (CoDT, R.II.36-2). Un permis peut y déroger (D.IV.11).",
+        "etape": "2"
+      },
+      "isolees": {
+        "libelle": "Autoriser les grandes éoliennes isolées (plus de 3,2 MW)",
+        "court": "Éoliennes isolées admises",
+        "en_vigueur": "En vigueur : le Cadre 2024 (§3.1) demande au moins 4 éoliennes par parc, mais accepte un parc plus petit, voire une éolienne seule, si chaque machine dépasse 3,2 MW.",
+        "etape": "7"
+      },
+      "interdistance": {
+        "libelle": "Distance minimale entre parcs",
+        "court": "Entre parcs",
+        "options": ["aucune", "4 km", "6 km"],
+        "en_vigueur": "En vigueur : une simple recommandation du Cadre (§3.4), qui « peut être réduite » et ne vaut pas le long des autoroutes.",
+        "etape": "8bis"
+      },
+      "foret": {
+        "libelle": "Éoliennes en zone forestière",
+        "court": "Forêt",
+        "options": ["près d'un grand axe", "tous les résineux", "toute la forêt"],
+        "en_vigueur": "En vigueur : sur résineux seulement, à {conifer_m} m au plus d'un grand axe (CoDT, R.II.37-2). Le Cadre 2024 ne demande que des plantations de résineux pauvres en biodiversité ; les feuillus restent exclus.",
+        "etape": "1"
+      }
+    }
+  },
+
+  "expert": {
+    "titre": "Mode expert : les choix de modélisation",
+    "intro": "Chaque ligne change un seul choix de l'étude, sur la référence de {ref} MW (étape 8, règles en vigueur). Les effets ne s'additionnent pas.",
+    "colonnes": ["choix de modélisation", "MW", "écart"],
+    "lignes": {
+      "no_adesa": "Périmètres ADESA non exclus",
+      "no_landscape": "Aucun périmètre paysager exclu",
+      "slope_ge10": "Seuil de pente à 10 % (au lieu de 7 %)",
+      "slope_ge15": "Seuil de pente à 15 %",
+      "no_aviation": "Aucun anneau aéronautique exclu",
+      "pic_plan_de_secteur": "Toutes les routes du plan de secteur comme grands axes (lecture erronée du CoDT, pour mémoire)",
+      "T136_V112": "Éolienne de 3 MW, 136 m (au lieu de 4 MW, 185 m)",
+      "T208_NREL55": "Éolienne de 5,5 MW, 208 m",
+      "observed": "Espacement du parc actuel : 4,3 diamètres (au lieu de 5)",
+      "isotropic": "Espacement de 5,9 diamètres dans toutes les directions"
+    },
+    "plafond": "Plafond actuel du modèle PyPSA-Wal : {cap} MW, un avis d'experts et non un calcul spatial."
+  },
+
+  "methode": {
+    "titre": "Comment lire cette carte",
+    "paragraphes": [
+      "La carte part de toute la Wallonie. À chaque étape, une famille de règles retire du terrain : il prend la couleur de cette famille, et ce qui reste en vert est encore disponible.",
+      "Jusqu'à l'étape 5, le chiffre est la place maximale : le plus grand nombre d'éoliennes de {p_nom} MW que l'on peut poser à {spacing_m} m les unes des autres sur le terrain restant. Ce n'est pas un potentiel.",
+      "Ensuite, les règles d'implantation groupent les machines en parcs et préservent l'horizon des villages. Chaque placement est vérifié par un contrôle indépendant.",
+      "La dernière étape déduit une réserve pour les autres impacts, qui ne sont pas cartographiés : zones prioritaires pour les oiseaux, couloirs de migration, chauves-souris, abords des radars. Elle ne dit pas où : aucun point n'est retiré.",
+      "Tous les chiffres sortent du même calcul que le rapport, sur une grille de 100 m. Calcul du {date}."
+    ]
+  },
+
+  "commandes": {
+    "precedent": "Étape précédente",
+    "suivant": "Étape suivante",
+    "lecture": "Lecture",
+    "pause": "Pause",
+    "etape": "Étape",
+    "sur": "sur",
+    "bilan": "Bilan",
+    "parc_actuel": "Afficher le parc actuel",
+    "et_si_bouton": "Et si… ?",
+    "fermer": "Fermer"
+  },
+
+  "export": {
+    "titre_accroche": "Il ne reste que {pct} % du territoire wallon pour l'éolien. Voici pourquoi.",
+    "etsi_titre": "Et si… ? Quatre choix politiques",
+    "etsi_sous_titre": "Effet de chaque choix, seul, sur la référence de {ref} MW",
+    "enveloppe_titre": "Selon ces choix : de {lo_gw} à {hi_gw} GW",
+    "enveloppe_texte": "Le plus strict : {lo}. Le plus ouvert : {hi}. Avant la réserve pour les autres impacts."
+  },
+
+  "credits": {
+    "source": "Source : étude PyPSA-Wal, Université de Liège, 2026",
+    "donnees": "Données : Géoportail de la Wallonie (CC BY 4.0), © les contributeurs d'OpenStreetMap (ODbL), orthophotos © SPW",
+    "calcul": "Calcul du {date}",
+    "licence": "Infographie sous licence CC BY 4.0"
+  }
+}

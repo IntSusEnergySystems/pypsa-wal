@@ -97,7 +97,7 @@ if __name__ == "__main__":
         return ~avail.astype(bool), t
 
     extra = ["pds_ineligible_psroads", "pds_ineligible_nocorridor", "landscape_pds",
-             "landscape_adesa"]
+             "landscape_adesa", "pds_ineligible_conifers", "pds_ineligible_forest"]
     masks = {}
     transform = None
     for name in ref_layers + extra:
@@ -142,7 +142,8 @@ if __name__ == "__main__":
                                  "surviving_pct": round(100 * float(1 - h.mean()), 1)}
     out["zoning"] = {
         k: round(100 * float(1 - hit[k].mean()), 1)
-        for k in ("pds_ineligible", "pds_ineligible_psroads", "pds_ineligible_nocorridor")
+        for k in ("pds_ineligible", "pds_ineligible_psroads", "pds_ineligible_nocorridor",
+                  "pds_ineligible_conifers", "pds_ineligible_forest")
     }
     logger.info("share of the fleet admitted by the zoning: %s", out["zoning"])
 
@@ -172,6 +173,10 @@ if __name__ == "__main__":
         "n_farms": int(n_farms),
         "turbines_per_farm": round(float(n / n_farms), 1),
         "n_farms_ge_4": int((sizes >= 4).sum()),
+        "n_farms_by_size": {str(k): int((sizes == k).sum()) for k in (1, 2, 3)},
+        "turbines_in_farms_below_4": int(sizes[sizes < 4].sum()),
+        "share_in_farms_below_4_pct": round(100 * float(sizes[sizes < 4].sum()) / n, 1),
+        "share_single_pct": round(100 * float((sizes == 1).sum()) / n, 1),
         "share_in_farms_ge_4_pct": round(100 * float(sizes[sizes >= 4].sum()) / n, 0),
         "largest_farm": int(sizes.max()),
         "machine_nn_m": pct(mdist),
@@ -186,6 +191,40 @@ if __name__ == "__main__":
         "turbines_within_1500m_of_motorway_pct": round(100 * float((d_mw <= 1500).mean()), 0),
     }
     logger.info("standing fleet groups into %s", json.dumps(out["farms"]))
+
+    # ------------------------------------------------------------------
+    # 2b. Machines standing in a plan-de-secteur forest zone
+    # ------------------------------------------------------------------
+    zones_f = gpd.read_file(snakemake.input.pds_zones, layer="data").to_crs(crs)
+    zones_f = zones_f[zones_f["DESCRIPTION"].astype(str).str.strip() == "Forestière"]
+    zones_f["geometry"] = zones_f.geometry.make_valid()
+    in_forest = fleet.geometry.within(unary_union(zones_f.geometry.values)).to_numpy()
+    fsize = sizes[labels]
+    out["forest"] = {
+        "in_forest_zone": int(in_forest.sum()),
+        "admitted_codt": int((in_forest & ~hit["pds_ineligible"]).sum()),
+        "admitted_conifers": int((in_forest & ~hit["pds_ineligible_conifers"]).sum()),
+        "admitted_forest": int((in_forest & ~hit["pds_ineligible_forest"]).sum()),
+        "farms_with_forest_machines": int(len(set(labels[in_forest]))),
+        "farm_sizes": sorted(int(fsize[i]) for i in set(np.nonzero(in_forest)[0])),
+    }
+    logger.info("fleet in forest zones: %s", out["forest"])
+
+    # Where the machines of groups below four stand.
+    zones_all = gpd.read_file(snakemake.input.pds_zones, layer="data").to_crs(crs)
+    zones_all["geometry"] = zones_all.geometry.make_valid()
+    zj = gpd.sjoin(fleet.reset_index(drop=True), zones_all[["DESCRIPTION", "geometry"]],
+                   predicate="within", how="left")
+    zj = zj[~zj.index.duplicated()]
+    zone = zj["DESCRIPTION"].astype(str).str.strip().to_numpy()
+    small = fsize < 4
+    zae_set = set(cfg["plan_de_secteur"]["economic_activity_zones"])
+    out["farms"]["small_groups_by_zone"] = {
+        "agricultural": int((small & (zone == "Agricole")).sum()),
+        "economic_activity": int((small & np.isin(zone, list(zae_set))).sum()),
+        "other": int((small & (zone != "Agricole") & ~np.isin(zone, list(zae_set))).sum()),
+    }
+    logger.info("machines of groups below four by zone: %s", out["farms"]["small_groups_by_zone"])
 
     # ------------------------------------------------------------------
     # 3. Which addresses are within 400 m of a standing machine

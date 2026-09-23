@@ -34,7 +34,8 @@ from placement_lib import (  # noqa: E402
     Horizon,
     allocate_free,
     check_layout,
-    grow_parks,
+    min_group,
+    place_parks,
     motorway_distance,
     seed_scores,
 )
@@ -110,6 +111,7 @@ if __name__ == "__main__":
         "interdistance_m": 0.0,
         "horizon": True,
         "min_turbines": int(pcfg["park"]["min_turbines"]),
+        "small_groups": pcfg["park"].get("small_groups", "after"),
     }
 
     def run(layers, rules):
@@ -122,11 +124,12 @@ if __name__ == "__main__":
         hz = (Horizon(villages, D, lcfg["horizon_radius_m"], lcfg["min_free_azimuth_deg"])
               if rules["horizon"] else None)
         score = seed_scores(mask, rows, cols, res, float(pcfg["park"]["seed_radius_m"]))
-        idx, pid, _ = grow_parks(xs, ys, score, spacing, link=float(pcfg["park"]["link_m"]),
-                                 n_min=rules["min_turbines"], horizon=hz,
-                                 interdistance=float(rules["interdistance_m"]),
-                                 along_motorway=amw, tree=cKDTree(np.c_[xs, ys]))
-        chk = check_layout(xs[idx], ys[idx], pid, spacing, n_min=rules["min_turbines"],
+        idx, pid, _ = place_parks(xs, ys, score, spacing, link=float(pcfg["park"]["link_m"]),
+                                  n_min=rules["min_turbines"], small_groups=rules["small_groups"],
+                                  horizon=hz, interdistance=float(rules["interdistance_m"]),
+                                  along_motorway=amw, tree=cKDTree(np.c_[xs, ys]))
+        chk = check_layout(xs[idx], ys[idx], pid, spacing,
+                           n_min=min_group(rules["min_turbines"], rules["small_groups"]),
                            villages=villages if rules["horizon"] else None,
                            rotor_diameter=D, radius=lcfg["horizon_radius_m"],
                            min_free_deg=lcfg["min_free_azimuth_deg"],

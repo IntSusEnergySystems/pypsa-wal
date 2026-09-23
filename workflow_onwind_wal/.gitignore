@@ -10,3 +10,6 @@ results/potential/
 results/profiles/
 results/*.tif
 results/*.gpkg
+
+# The infographic is rebuilt from the tables above.
+results/infographic/

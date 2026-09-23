@@ -32,6 +32,11 @@ Machine and park allocation on an eligible raster, shared by
     centre-to-centre separation, so no land is lost in the gaps between discs.
     Growth is nearest-first from the seed, so parks come out compact.
 
+``place_parks``
+    The park rule of the Cadre 2024 (§3.1): parks of at least ``n_min`` first,
+    then, under its exception for machines above 3.2 MW, smaller groups on the
+    land no park can use.
+
 ``check_layout``
     Verifies a layout against the rules it claims to satisfy, independently of
     the code that produced it.
@@ -153,16 +158,25 @@ def seed_scores(mask, rows, cols, res, seed_radius):
 
 
 def grow_parks(xs, ys, score, spacing, link=1500.0, n_min=4, horizon=None,
-               interdistance=0.0, along_motorway=None, tree=None):
+               interdistance=0.0, along_motorway=None, tree=None, preplaced=None):
     """
     Returns (turbine cell indices, park id of each, number of placements the
     open-horizon rule refused).
+
+    ``preplaced`` -- (x, y, along_motorway) arrays of machines already standing
+    (a first pass): they block wake spacing and inter-distance but are not
+    returned.  With the same ``horizon`` object, their arcs are already
+    committed.
     """
     n = len(xs)
     tree = tree if tree is not None else cKDTree(np.c_[xs, ys])
     amw = along_motorway if along_motorway is not None else np.zeros(n, dtype=bool)
     placed = Buckets(spacing)
     others = Buckets(max(interdistance, spacing))
+    if preplaced is not None:
+        for x, y, mw in zip(*preplaced):
+            placed.add(x, y, -1)
+            others.add(x, y, bool(mw))
     considered = np.zeros(n, dtype=bool)
     turbines, parks = [], []
     refused = 0
@@ -171,7 +185,7 @@ def grow_parks(xs, ys, score, spacing, link=1500.0, n_min=4, horizon=None,
     def too_close_to_other_park(x, y, mw):
         if interdistance <= 0:
             return False
-        return any(not (mw and amw[j]) for j in others.near(x, y, interdistance))
+        return any(not (mw and f) for f in others.near(x, y, interdistance))
 
     for s in np.argsort(-score, kind="stable"):
         if considered[s] or score[s] <= 0:
@@ -207,7 +221,7 @@ def grow_parks(xs, ys, score, spacing, link=1500.0, n_min=4, horizon=None,
         if len(members) >= n_min:
             for c in members:
                 placed.add(xs[c], ys[c], c)
-                others.add(xs[c], ys[c], c)
+                others.add(xs[c], ys[c], bool(amw[c]))
             turbines.extend(members)
             parks.extend([pid] * len(members))
             if horizon is not None:
@@ -217,6 +231,42 @@ def grow_parks(xs, ys, score, spacing, link=1500.0, n_min=4, horizon=None,
         else:
             considered[s] = True
     return np.asarray(turbines, dtype=np.int64), np.asarray(parks, dtype=np.int64), refused
+
+
+def place_parks(xs, ys, score, spacing, link=1500.0, n_min=4, small_groups="after", horizon=None,
+                interdistance=0.0, along_motorway=None, tree=None):
+    """
+    The park rule of the Cadre 2024, §3.1: a park is at least ``n_min``
+    machines, and the minimum may be reduced for machines above 3.2 MW "pour
+    autant qu'il [...] ne réduise pas le potentiel éolien de la zone" (4°).
+
+    ``small_groups="after"`` reads that condition literally: parks of at least
+    ``n_min`` are grown first, then groups below ``n_min`` -- down to a single
+    machine -- only on the land no park could use, under the same spacing,
+    horizon (the same ``horizon`` object, so the first pass's arcs stand) and
+    inter-distance.  ``"none"`` is the minimum without its exceptions.
+
+    Returns (turbine cell indices, park id of each, placements the open-horizon
+    rule refused), like ``grow_parks``.
+    """
+    tree = tree if tree is not None else cKDTree(np.c_[xs, ys])
+    kw = dict(link=link, horizon=horizon, interdistance=interdistance,
+              along_motorway=along_motorway, tree=tree)
+    idx, pid, refused = grow_parks(xs, ys, score, spacing, n_min=n_min, **kw)
+    if small_groups == "none":
+        return idx, pid, refused
+    if small_groups != "after":
+        raise ValueError(f"small_groups must be 'after' or 'none', not {small_groups!r}")
+    amw = along_motorway if along_motorway is not None else np.zeros(len(xs), dtype=bool)
+    i2, p2, r2 = grow_parks(xs, ys, score, spacing, n_min=1,
+                            preplaced=(xs[idx], ys[idx], amw[idx]), **kw)
+    offset = int(pid.max()) + 1 if len(pid) else 0
+    return np.r_[idx, i2].astype(np.int64), np.r_[pid, p2 + offset].astype(np.int64), refused + r2
+
+
+def min_group(n_min, small_groups):
+    """The smallest group a layout under this park rule may contain."""
+    return 1 if small_groups == "after" else n_min
 
 
 def largest_free_arc_deg(vx, vy, tx, ty, rotor_radius, radius):

@@ -13,5 +13,9 @@ heritage,320.6
 radar,112.1
 pds_ineligible_nocorridor,8143.7
 pds_ineligible_psroads,9565.6
+pds_ineligible_conifers,10302.0
+pds_ineligible_conifers_nocorridor,7388.0
+pds_ineligible_forest,6273.6
+pds_ineligible_forest_nocorridor,3363.6
 habitat_setback_cdr2013,9969.1
 dwelling_setback_raster_share,0.2649

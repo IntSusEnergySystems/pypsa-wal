@@ -648,3 +648,150 @@ rule build_report:
         latexmk -pdf -interaction=nonstopmode \
             onwind_potential_wallonia.tex > $here/{log} 2>&1
         """
+
+
+# ---------------------------------------------------------------------------
+# Infographic (docs/onwind_potential_wallonia/infographic_plan.md)
+#
+#   snakemake -c4 infographic --rerun-triggers mtime        # the dashboard
+#   snakemake -c4 infographic_export --rerun-triggers mtime # GIF, MP4, PNG, PDF
+#   cd results/infographic && python -m http.server 8000
+# ---------------------------------------------------------------------------
+IG = f"{OUT}/infographic"
+
+
+rule infographic:
+    input:
+        f"{IG}/index.html",
+
+
+IG_SOURCES = sorted(
+    str(p) for p in Path("infographic").rglob("*") if p.is_file() and "photos" not in p.parts
+)
+
+
+rule infographic_page:
+    message:
+        "Assembling the dashboard in {IG}"
+    input:
+        sources=IG_SOURCES,
+        states=f"{IG}/data/states.json",
+        vignettes=f"{IG}/img/vignettes.json",
+        report=f"{DOCDIR}/onwind_potential_wallonia.pdf",
+    output:
+        f"{IG}/index.html",
+    run:
+        import shutil
+
+        for src in input.sources:
+            dst = Path(IG) / Path(src).relative_to("infographic")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+        shutil.copy2(input.report, Path(IG) / "onwind_potential_wallonia.pdf")
+
+
+rule infographic_data:
+    message:
+        "Exporting the maps, states and points the infographic draws"
+    params:
+        config=config,
+    input:
+        regions=f"{RES}/regions.gpkg",
+        raster=f"{OUT}/eligible_land_{REF_T}.tif",
+        layer_dir=f"{RES}/exclusions_{REF_T}",
+        dwelling_raster=f"{RES}/dwelling_setback_{REF_T}.tif",
+        slope_raster=f"{DATA}/slope_ge7.tif",
+        settlements=f"{RES}/settlements_{REF_T}.gpkg",
+        dual_carriageways=OSM_INFRA["dual_carriageways"],
+        pds_roads=f"{DATA}/pds_roads.gpkg",
+        fleet=f"{DATA}/osm_wind_turbines.gpkg",
+        exclusion_stats=f"{RES}/exclusions_{REF_T}.json",
+        headline=f"{OUT}/tables/headline.json",
+        sensitivity=f"{OUT}/tables/sensitivity_cases.json",
+    output:
+        states=f"{IG}/data/states.json",
+        points=f"{IG}/data/points.json",
+        landmarks=f"{IG}/data/landmarks.json",
+        attribution=expand(f"{IG}/data/attribution_{{land}}.png",
+                           land=["ref", "derog", "conif", "derog_conif", "forest", "derog_forest"]),
+    log:
+        "logs/infographic_data.log",
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/infographic_data.py"
+
+
+IG_PICTURES = ["etape0", "etape1", "etape2", "etape3", "etape4", "etape5", "etape6",
+               "etape7", "etape8", "etape8bis", "etape9", "bilan"]
+
+
+rule infographic_vignettes:
+    message:
+        "Drawing the rules on Walloon orthophotos for the infographic cards"
+    params:
+        config=config,
+        cache=f"{RES}/infographic_ortho",
+        photos="infographic/photos",
+        names=IG_PICTURES,
+    input:
+        states=f"{IG}/data/states.json",
+        points=f"{IG}/data/points.json",
+        attribution=f"{IG}/data/attribution_ref.png",
+        pds_zones=f"{DATA}/pds_zones.gpkg",
+        pds_roads=f"{DATA}/pds_roads.gpkg",
+        pds_rail=f"{DATA}/pds_rail.gpkg",
+        pds_hv_lines=f"{DATA}/pds_hv_lines.gpkg",
+        natura2000=f"{DATA}/natura2000.gpkg",
+        address_points=f"{DATA}/address_points.gpkg",
+        fleet=f"{DATA}/osm_wind_turbines.gpkg",
+        settlements=f"{RES}/settlements_{REF_T}.gpkg",
+        slope=f"{DATA}/slope_ge7.tif",
+        layer_dir=f"{RES}/exclusions_{REF_T}",
+        photos=sorted(str(p) for p in Path("infographic/photos").glob("*") if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")),
+    output:
+        done=f"{IG}/img/vignettes.json",
+        candidates=f"{IG}/review/vignette_candidates.json",
+        sheet=f"{IG}/review/vignette_candidates.jpg",
+    log:
+        "logs/infographic_vignettes.log",
+    resources:
+        mem_mb=12000,
+    script:
+        "scripts/infographic_vignettes.py"
+
+
+rule infographic_export:
+    message:
+        "Capturing the dashboard into GIF, MP4 and the PDF carousel"
+    params:
+        env=config["infographic"].get("export_env", "infographic"),
+    input:
+        f"{IG}/index.html",
+    output:
+        f"{IG}/exports/exports.json",
+    log:
+        "logs/infographic_export.log",
+    shell:
+        "conda run --no-capture-output -n {params.env} python scripts/infographic_export.py "
+        "{IG} {IG}/exports > {log} 2>&1"
+
+
+rule infographic_publish:
+    message:
+        "Publishing the dashboard to {params.url}"
+    params:
+        p=config["infographic"]["publish"],
+        url=lambda w: f"{config['infographic']['publish']['public_url']}/{config['infographic']['publish']['folder']}/",
+    input:
+        page=f"{IG}/index.html",
+        exports=f"{IG}/exports/exports.json",
+    output:
+        f"{IG}/published.url",
+    shell:
+        # --delete stays inside the dashboard's own folder; the review sheets
+        # and the raw capture frames are not published.
+        "rsync -a --delete --chmod=D755,F644 --exclude review/ --exclude exports/images/ "
+        "-e 'ssh -i {params.p[identity_file]} -o BatchMode=yes' "
+        "{IG}/ {params.p[ssh_user]}@{params.p[ssh_host]}:{params.p[remote_dir]}/{params.p[folder]}/ "
+        "&& echo {params.url} > {output}"

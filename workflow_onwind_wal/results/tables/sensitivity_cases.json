@@ -143,6 +143,30 @@
     "delta_mw": 800,
     "delta_pct": 12.3
   },
+  "forest_conifers": {
+    "case": "forest_conifers",
+    "group": "policy",
+    "label": "every coniferous stand of the forest zone admitted (Cadre 2024 wording, no PIC distance)",
+    "eligible_area_km2": 615.1,
+    "free_mw": 15344,
+    "n_turbines": 2359,
+    "n_parks": 177,
+    "p_nom_max_mw": 9436,
+    "delta_mw": 2956,
+    "delta_pct": 45.6
+  },
+  "forest_all": {
+    "case": "forest_all",
+    "group": "policy",
+    "label": "the whole forest zone admitted, broad-leaved stands included",
+    "eligible_area_km2": 954.0,
+    "free_mw": 20568,
+    "n_turbines": 3173,
+    "n_parks": 164,
+    "p_nom_max_mw": 12692,
+    "delta_mw": 6212,
+    "delta_pct": 95.9
+  },
   "pic_plan_de_secteur": {
     "case": "pic_plan_de_secteur",
     "group": "misreading",

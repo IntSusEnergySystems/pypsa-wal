@@ -216,7 +216,8 @@ if __name__ == "__main__":
     no_h = place(ref_turbine, model="parks")
     free = place(ref_turbine, model="free")
     free_rand = place(ref_turbine, model="free", variant="random")
-    parks1 = place(ref_turbine, model="parks1+horizon")
+    small = cfg["placement"]["park"].get("small_groups", "after")
+    parks4 = place(ref_turbine, model="parks4+horizon") if small != "none" else p
     lcfg = cfg["placement"]["landscape"]
     spacings = cfg["placement"]["spacings_rotor_diameters"]
     headline["placement"] = {
@@ -226,6 +227,9 @@ if __name__ == "__main__":
         "min_distance_rotor_diameters": float(p["min_distance_rotor_diameters"]),
         "link_m": float(cfg["placement"]["park"]["link_m"]),
         "min_turbines": int(cfg["placement"]["park"]["min_turbines"]),
+        "small_groups": small,
+        "share_in_groups_below_min_pct": float(p["share_in_groups_below_min_pct"]),
+        "share_single_pct": float(p["share_single_pct"]),
         "min_free_azimuth_deg": float(lcfg["min_free_azimuth_deg"]),
         "horizon_radius_m": float(lcfg["horizon_radius_m"]),
         "motorway_exemption_m": float(lcfg["motorway_exemption_m"]),
@@ -249,8 +253,12 @@ if __name__ == "__main__":
         "parks_cost_pct": round(
             100 * (1 - float(no_h["p_nom_max_mw"]) / float(free["p_nom_max_mw"])), 0
         ),
-        "parks1_p_nom_max_mw": float(parks1["p_nom_max_mw"]),
-        "parks1_n_parks": int(parks1["n_parks"]),
+        "parks4_p_nom_max_mw": float(parks4["p_nom_max_mw"]),
+        "parks4_n_parks": int(parks4["n_parks"]),
+        "parks4_n_turbines": int(parks4["n_turbines"]),
+        "small_groups_gain_pct": round(
+            100 * (float(p["p_nom_max_mw"]) / float(parks4["p_nom_max_mw"]) - 1), 0
+        ),
         "free_p_nom_max_mw": float(free["p_nom_max_mw"]),
         "free_n_turbines": int(free["n_turbines"]),
         "free_density_mw_km2": float(free["effective_density_mw_km2"]),

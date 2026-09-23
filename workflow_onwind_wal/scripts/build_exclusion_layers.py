@@ -15,7 +15,9 @@ GeoPackage so that any of them can be inspected in QGIS:
     within 750 m of a PIC (R.II.37-2), and broad-leaved forest not at all.  The
     PIC is the network of CoDT R.II.21-1 -- motorways and 2x2 regional roads,
     railways, waterways -- not every road of the plan de secteur.  Two variants
-    are written for the sensitivity analysis: ``pds_ineligible_nocorridor``
+    are written for the sensitivity analysis (the forest readings
+    ``pds_ineligible_conifers`` and ``pds_ineligible_forest``, with and without
+    the corridor, among them): ``pds_ineligible_nocorridor``
     (agricultural land admitted everywhere, the derogation route of D.IV.11) and
     ``pds_ineligible_psroads`` (every plan-de-secteur road taken as a PIC).
 
@@ -295,17 +297,28 @@ if __name__ == "__main__":
     forest_geom = dissolve(forest)
     reach = pds_cfg["agri_max_distance_to_pic"]
 
-    def envelope(pic_net, corridor=True):
-        """The plan-de-secteur zones a mast may stand in, for one PIC network."""
+    def envelope(pic_net, corridor=True, forest="codt"):
+        """
+        The plan-de-secteur zones a mast may stand in, for one PIC network.
+
+        ``forest`` is the reading of the forest zone: ``codt`` coniferous stands
+        within the conifer distance of a PIC (D.II.37 §1, R.II.37-2);
+        ``conifers`` every coniferous stand, which is the Cadre 2024 wording
+        (§3.2 §1) without the CoDT's distance; ``all`` the whole forest zone.
+        """
         agri = agri_geom
         if agri is not None and corridor:
             anchors = [pic_net.buffer(reach)] + ([zae_geom.buffer(reach)] if zae_geom else [])
             agri = agri.intersection(_union(anchors))
         forest_ok = None
-        if forest_geom is not None and conif is not None:
-            forest_ok = forest_geom.intersection(conif).intersection(
-                pic_net.buffer(pds_cfg["conifer_max_distance_to_pic"])
-            )
+        if forest_geom is not None and forest == "all":
+            forest_ok = forest_geom
+        elif forest_geom is not None and conif is not None:
+            forest_ok = forest_geom.intersection(conif)
+            if forest == "codt":
+                forest_ok = forest_ok.intersection(
+                    pic_net.buffer(pds_cfg["conifer_max_distance_to_pic"])
+                )
         return _union([g for g in (econ_geom, agri, forest_ok) if g is not None])
 
     eligible = envelope(pic, corridor=pds_cfg.get("agri_corridor", True))
@@ -313,6 +326,12 @@ if __name__ == "__main__":
     pds_variants = {
         "pds_ineligible_nocorridor": boundary.difference(envelope(pic, corridor=False)),
         "pds_ineligible_psroads": boundary.difference(envelope(pic_psroads)),
+        "pds_ineligible_conifers": boundary.difference(envelope(pic, forest="conifers")),
+        "pds_ineligible_conifers_nocorridor": boundary.difference(
+            envelope(pic, corridor=False, forest="conifers")),
+        "pds_ineligible_forest": boundary.difference(envelope(pic, forest="all")),
+        "pds_ineligible_forest_nocorridor": boundary.difference(
+            envelope(pic, corridor=False, forest="all")),
     }
 
     # ------------------------------------------------------------------

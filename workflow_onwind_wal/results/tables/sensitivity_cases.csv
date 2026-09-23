@@ -11,6 +11,8 @@ no_landscape,judgement,no landscape perimeter excluded,506.9,13832,1935,186,7740
 slope_ge10,judgement,slope criterion at 10 %,486.7,12256,1738,163,6952,472,7.3
 slope_ge15,judgement,slope criterion at 15 %,523.5,12696,1810,169,7240,760,11.7
 no_aviation,judgement,no aeronautical ring excluded,483.9,12656,1820,181,7280,800,12.3
+forest_conifers,policy,"every coniferous stand of the forest zone admitted (Cadre 2024 wording, no PIC distance)",615.1,15344,2359,177,9436,2956,45.6
+forest_all,policy,"the whole forest zone admitted, broad-leaved stands included",954.0,20568,3173,164,12692,6212,95.9
 pic_plan_de_secteur,misreading,every plan-de-secteur road taken as a PIC (a misreading of R.II.21-1),557.2,14728,2117,196,8468,1988,30.7
 all_policy_relaxed,combined,"no agricultural corridor and no minimum park size, open horizon kept",667.3,16728,2666,506,10664,4184,64.6
 all_policy_tightened,combined,6 km inter-distance and the 2013 habitat setback,279.3,8256,788,89,3152,-3328,-51.4

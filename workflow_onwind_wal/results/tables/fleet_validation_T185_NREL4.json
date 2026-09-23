@@ -167,13 +167,23 @@
   "zoning": {
     "pds_ineligible": 79.3,
     "pds_ineligible_psroads": 85.6,
-    "pds_ineligible_nocorridor": 96.0
+    "pds_ineligible_nocorridor": 96.0,
+    "pds_ineligible_conifers": 80.2,
+    "pds_ineligible_forest": 81.1
   },
   "farms": {
     "link_distance_m": 1500.0,
     "n_farms": 134,
     "turbines_per_farm": 4.9,
     "n_farms_ge_4": 72,
+    "n_farms_by_size": {
+      "1": 42,
+      "2": 13,
+      "3": 7
+    },
+    "turbines_in_farms_below_4": 89,
+    "share_in_farms_below_4_pct": 13.7,
+    "share_single_pct": 6.4,
     "share_in_farms_ge_4_pct": 86.0,
     "largest_farm": 27,
     "machine_nn_m": {
@@ -206,6 +216,25 @@
     "farms_not_along_motorway_edge_below_4km_pct": 39.0,
     "turbines_within_1km_of_motorway_pct": 34.0,
     "turbines_within_1500m_of_motorway_pct": 37.0
+  },
+  "forest": {
+    "in_forest_zone": 10,
+    "admitted_codt": 1,
+    "admitted_conifers": 7,
+    "admitted_forest": 10,
+    "farms_with_forest_machines": 4,
+    "farm_sizes": [
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      7,
+      7,
+      8,
+      12
+    ]
   },
   "addresses": {
     "turbines_within_400m_of_an_address": 134,

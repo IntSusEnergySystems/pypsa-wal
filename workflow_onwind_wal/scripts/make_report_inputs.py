@@ -162,8 +162,12 @@ if __name__ == "__main__":
     macro("NoHorizonTurbines", num(pl["no_horizon_n_turbines"]))
     macro("HorizonCostPct", num(pl["horizon_cost_pct"], 0))
     macro("ParksCostPct", num(pl["parks_cost_pct"], 0))
-    macro("ParksOnePnom", num(pl["parks1_p_nom_max_mw"]))
-    macro("ParksOneParks", num(pl["parks1_n_parks"]))
+    macro("ParksFourPnom", num(pl["parks4_p_nom_max_mw"]))
+    macro("ParksFourParks", num(pl["parks4_n_parks"]))
+    macro("ParksFourTurbines", num(pl["parks4_n_turbines"]))
+    macro("SmallGroupsGainPct", num(pl["small_groups_gain_pct"], 0))
+    macro("PlaceSmallShare", num(pl["share_in_groups_below_min_pct"], 1))
+    macro("PlaceSingleShare", num(pl["share_single_pct"], 1))
     macro("FreePnom", num(pl["free_p_nom_max_mw"]))
     macro("FreePnomGW", num(pl["free_p_nom_max_mw"] / 1000, 1))
     macro("FreeTurbines", num(pl["free_n_turbines"]))
@@ -267,6 +271,26 @@ if __name__ == "__main__":
     macro("FleetLargestFarm", num(fm["largest_farm"]))
     macro("FleetFarmLink", num(fm["link_distance_m"] / 1000, 1))
     macro("FleetInBigFarms", num(fm["share_in_farms_ge_4_pct"], 0))
+    if "n_farms_by_size" in fm:
+        macro("FleetFarmsOne", num(fm["n_farms_by_size"]["1"]))
+        macro("FleetFarmsTwo", num(fm["n_farms_by_size"]["2"]))
+        macro("FleetFarmsThree", num(fm["n_farms_by_size"]["3"]))
+        macro("FleetFarmsSmall", num(sum(fm["n_farms_by_size"].values())))
+        macro("FleetInSmallFarms", num(fm["turbines_in_farms_below_4"]))
+        macro("FleetInSmallFarmsPct", num(fm["share_in_farms_below_4_pct"], 1))
+        macro("FleetSinglePct", num(fm["share_single_pct"], 1))
+        sz = fm.get("small_groups_by_zone", {})
+        if sz:
+            macro("FleetSmallAgri", num(sz["agricultural"]))
+            macro("FleetSmallZae", num(sz["economic_activity"]))
+            macro("FleetSmallOther", num(sz["other"]))
+    fo = fleet.get("forest")
+    if fo:
+        macro("FleetForestN", num(fo["in_forest_zone"]))
+        macro("FleetForestCodt", num(fo["admitted_codt"]))
+        macro("FleetForestConif", num(fo["admitted_conifers"]))
+        macro("FleetForestAll", num(fo["admitted_forest"]))
+        macro("FleetForestFarms", num(fo["farms_with_forest_machines"]))
     P = {"p5": "PFive", "p10": "PTen", "p25": "PTwentyFive",
          "p50": "PFifty", "p75": "PSeventyFive", "p90": "PNinety"}
     for key, tag in [("machine_nn_m", "MachineNN"), ("farm_radius_m", "FarmRad"),
@@ -296,11 +320,12 @@ if __name__ == "__main__":
 
     # Sensitivity cases.
     SENS = {"interdistance_4km": "IdFour", "interdistance_6km": "IdSix",
-            "no_horizon": "NoHorizon", "parks_min1": "ParksOne",
+            "no_horizon": "NoHorizon", "parks_min4": "ParksFour",
             "no_corridor": "NoCorridor", "habitat_cdr2013": "HabitatOld",
             "no_adesa": "NoAdesa", "no_landscape": "NoLandscape",
             "slope_ge10": "SlopeTen", "slope_ge15": "SlopeFifteen",
             "no_aviation": "NoAviation", "pic_plan_de_secteur": "PicPds",
+            "forest_conifers": "ForestConif", "forest_all": "ForestAll",
             "all_policy_relaxed": "Relaxed", "all_policy_tightened": "Tightened",
             "reference": "Reference"}
     for case, v in headline["sensitivity"].items():
@@ -507,7 +532,7 @@ if __name__ == "__main__":
         "free": "free",
         "parks": "parks",
         "parks+horizon": "parks + horizon",
-        "parks1+horizon": r"parks $\geq 1$ + horizon",
+        "parks4+horizon": r"parks $\geq 4$, no exception + horizon",
     }
     rows = []
     last = None
@@ -636,7 +661,7 @@ if __name__ == "__main__":
     rows.append([f"{tex_escape(headline['reference_turbine_label'])}, "
                  f"{pl['min_distance_rotor_diameters']:.0f} D, free allocation",
                  num(ad["eligible_area_km2"]), num(breg["ours_free_mw"])])
-    rows.append([f"+ parks of {pl['min_turbines']} or more",
+    rows.append([f"+ parks of {pl['min_turbines']} or more, smaller groups on the land left",
                  "", num(breg["ours_parks_mw"])])
     rows.append([f"+ open horizon, {pl['min_free_azimuth_deg']:.0f}° within "
                  f"{pl['horizon_radius_m'] / 1000:.0f} km \\textbf{{(gross reference)}}",

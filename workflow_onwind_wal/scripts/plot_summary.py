@@ -149,7 +149,7 @@ if __name__ == "__main__":
     steps = [
         ("area $\\times$ density", headline["area_density"]["p_nom_max_mw"], "#adb5bd"),
         ("free allocation", pl["free_p_nom_max_mw"], "#1c7ed6"),
-        (f"parks of {pl['min_turbines']}+", pl["no_horizon_p_nom_max_mw"], "#74c0fc"),
+        ("parks (§3.1)", pl["no_horizon_p_nom_max_mw"], "#74c0fc"),
         ("+ open horizon", pl["p_nom_max_mw"], "#2b8a3e"),
     ]
     for d in sorted(ids, key=int):
