@@ -5,9 +5,9 @@
     "label": "reference (2024 framework as applied)",
     "eligible_area_km2": 418.0,
     "free_mw": 11460,
-    "n_turbines": 1620,
-    "n_parks": 168,
-    "p_nom_max_mw": 6480,
+    "n_turbines": 2043,
+    "n_parks": 453,
+    "p_nom_max_mw": 8172,
     "delta_mw": 0,
     "delta_pct": 0.0
   },
@@ -17,11 +17,11 @@
     "label": "inter-distance 4 km between parks (short views), motorways exempt",
     "eligible_area_km2": 418.0,
     "free_mw": 11460,
-    "n_turbines": 1359,
-    "n_parks": 131,
-    "p_nom_max_mw": 5436,
-    "delta_mw": -1044,
-    "delta_pct": -16.1
+    "n_turbines": 1579,
+    "n_parks": 284,
+    "p_nom_max_mw": 6316,
+    "delta_mw": -1856,
+    "delta_pct": -22.7
   },
   "interdistance_6km": {
     "case": "interdistance_6km",
@@ -29,11 +29,11 @@
     "label": "inter-distance 6 km between parks (long views), motorways exempt",
     "eligible_area_km2": 418.0,
     "free_mw": 11460,
-    "n_turbines": 1084,
-    "n_parks": 95,
-    "p_nom_max_mw": 4336,
-    "delta_mw": -2144,
-    "delta_pct": -33.1
+    "n_turbines": 1223,
+    "n_parks": 193,
+    "p_nom_max_mw": 4892,
+    "delta_mw": -3280,
+    "delta_pct": -40.1
   },
   "no_horizon": {
     "case": "no_horizon",
@@ -41,23 +41,23 @@
     "label": "no open-horizon rule",
     "eligible_area_km2": 418.0,
     "free_mw": 11460,
-    "n_turbines": 2162,
-    "n_parks": 198,
-    "p_nom_max_mw": 8648,
-    "delta_mw": 2168,
-    "delta_pct": 33.5
+    "n_turbines": 2771,
+    "n_parks": 611,
+    "p_nom_max_mw": 11084,
+    "delta_mw": 2912,
+    "delta_pct": 35.6
   },
-  "parks_min1": {
-    "case": "parks_min1",
+  "parks_min4": {
+    "case": "parks_min4",
     "group": "policy",
-    "label": "no minimum park size (2024 exception above 3.2 MW)",
+    "label": "parks of at least four, without the 2024 exception above 3.2 MW",
     "eligible_area_km2": 418.0,
     "free_mw": 11460,
-    "n_turbines": 2029,
-    "n_parks": 464,
-    "p_nom_max_mw": 8116,
-    "delta_mw": 1636,
-    "delta_pct": 25.2
+    "n_turbines": 1620,
+    "n_parks": 168,
+    "p_nom_max_mw": 6480,
+    "delta_mw": -1692,
+    "delta_pct": -20.7
   },
   "no_corridor": {
     "case": "no_corridor",
@@ -65,11 +65,11 @@
     "label": "no agricultural corridor (derogation, CoDT D.IV.11)",
     "eligible_area_km2": 667.3,
     "free_mw": 16728,
-    "n_turbines": 2269,
-    "n_parks": 196,
-    "p_nom_max_mw": 9076,
-    "delta_mw": 2596,
-    "delta_pct": 40.1
+    "n_turbines": 2693,
+    "n_parks": 486,
+    "p_nom_max_mw": 10772,
+    "delta_mw": 2600,
+    "delta_pct": 31.8
   },
   "habitat_cdr2013": {
     "case": "habitat_cdr2013",
@@ -77,11 +77,11 @@
     "label": "2013 habitat setback, 4 x tip height",
     "eligible_area_km2": 279.3,
     "free_mw": 8256,
-    "n_turbines": 1165,
-    "n_parks": 140,
-    "p_nom_max_mw": 4660,
-    "delta_mw": -1820,
-    "delta_pct": -28.1
+    "n_turbines": 1602,
+    "n_parks": 434,
+    "p_nom_max_mw": 6408,
+    "delta_mw": -1764,
+    "delta_pct": -21.6
   },
   "no_adesa": {
     "case": "no_adesa",
@@ -89,11 +89,11 @@
     "label": "ADESA perimeters not excluded",
     "eligible_area_km2": 479.6,
     "free_mw": 12984,
-    "n_turbines": 1814,
-    "n_parks": 174,
-    "p_nom_max_mw": 7256,
-    "delta_mw": 776,
-    "delta_pct": 12.0
+    "n_turbines": 2248,
+    "n_parks": 468,
+    "p_nom_max_mw": 8992,
+    "delta_mw": 820,
+    "delta_pct": 10.0
   },
   "no_landscape": {
     "case": "no_landscape",
@@ -101,11 +101,11 @@
     "label": "no landscape perimeter excluded",
     "eligible_area_km2": 506.9,
     "free_mw": 13832,
-    "n_turbines": 1935,
-    "n_parks": 186,
-    "p_nom_max_mw": 7740,
-    "delta_mw": 1260,
-    "delta_pct": 19.4
+    "n_turbines": 2339,
+    "n_parks": 468,
+    "p_nom_max_mw": 9356,
+    "delta_mw": 1184,
+    "delta_pct": 14.5
   },
   "slope_ge10": {
     "case": "slope_ge10",
@@ -113,11 +113,11 @@
     "label": "slope criterion at 10 %",
     "eligible_area_km2": 486.7,
     "free_mw": 12256,
-    "n_turbines": 1738,
-    "n_parks": 163,
-    "p_nom_max_mw": 6952,
-    "delta_mw": 472,
-    "delta_pct": 7.3
+    "n_turbines": 2178,
+    "n_parks": 454,
+    "p_nom_max_mw": 8712,
+    "delta_mw": 540,
+    "delta_pct": 6.6
   },
   "slope_ge15": {
     "case": "slope_ge15",
@@ -125,11 +125,11 @@
     "label": "slope criterion at 15 %",
     "eligible_area_km2": 523.5,
     "free_mw": 12696,
-    "n_turbines": 1810,
-    "n_parks": 169,
-    "p_nom_max_mw": 7240,
-    "delta_mw": 760,
-    "delta_pct": 11.7
+    "n_turbines": 2249,
+    "n_parks": 459,
+    "p_nom_max_mw": 8996,
+    "delta_mw": 824,
+    "delta_pct": 10.1
   },
   "no_aviation": {
     "case": "no_aviation",
@@ -137,11 +137,11 @@
     "label": "no aeronautical ring excluded",
     "eligible_area_km2": 483.9,
     "free_mw": 12656,
-    "n_turbines": 1820,
-    "n_parks": 181,
-    "p_nom_max_mw": 7280,
-    "delta_mw": 800,
-    "delta_pct": 12.3
+    "n_turbines": 2245,
+    "n_parks": 468,
+    "p_nom_max_mw": 8980,
+    "delta_mw": 808,
+    "delta_pct": 9.9
   },
   "forest_conifers": {
     "case": "forest_conifers",
@@ -149,11 +149,11 @@
     "label": "every coniferous stand of the forest zone admitted (Cadre 2024 wording, no PIC distance)",
     "eligible_area_km2": 615.1,
     "free_mw": 15344,
-    "n_turbines": 2359,
-    "n_parks": 177,
-    "p_nom_max_mw": 9436,
-    "delta_mw": 2956,
-    "delta_pct": 45.6
+    "n_turbines": 2747,
+    "n_parks": 441,
+    "p_nom_max_mw": 10988,
+    "delta_mw": 2816,
+    "delta_pct": 34.5
   },
   "forest_all": {
     "case": "forest_all",
@@ -161,11 +161,11 @@
     "label": "the whole forest zone admitted, broad-leaved stands included",
     "eligible_area_km2": 954.0,
     "free_mw": 20568,
-    "n_turbines": 3173,
-    "n_parks": 164,
-    "p_nom_max_mw": 12692,
-    "delta_mw": 6212,
-    "delta_pct": 95.9
+    "n_turbines": 3506,
+    "n_parks": 403,
+    "p_nom_max_mw": 14024,
+    "delta_mw": 5852,
+    "delta_pct": 71.6
   },
   "pic_plan_de_secteur": {
     "case": "pic_plan_de_secteur",
@@ -173,34 +173,34 @@
     "label": "every plan-de-secteur road taken as a PIC (a misreading of R.II.21-1)",
     "eligible_area_km2": 557.2,
     "free_mw": 14728,
-    "n_turbines": 2117,
-    "n_parks": 196,
-    "p_nom_max_mw": 8468,
-    "delta_mw": 1988,
-    "delta_pct": 30.7
+    "n_turbines": 2507,
+    "n_parks": 462,
+    "p_nom_max_mw": 10028,
+    "delta_mw": 1856,
+    "delta_pct": 22.7
   },
   "all_policy_relaxed": {
     "case": "all_policy_relaxed",
     "group": "combined",
-    "label": "no agricultural corridor and no minimum park size, open horizon kept",
-    "eligible_area_km2": 667.3,
-    "free_mw": 16728,
-    "n_turbines": 2666,
-    "n_parks": 506,
-    "p_nom_max_mw": 10664,
-    "delta_mw": 4184,
-    "delta_pct": 64.6
+    "label": "no agricultural corridor and every coniferous stand, open horizon kept",
+    "eligible_area_km2": 862.2,
+    "free_mw": 20176,
+    "n_turbines": 3342,
+    "n_parks": 440,
+    "p_nom_max_mw": 13368,
+    "delta_mw": 5196,
+    "delta_pct": 63.6
   },
   "all_policy_tightened": {
     "case": "all_policy_tightened",
     "group": "combined",
-    "label": "6 km inter-distance and the 2013 habitat setback",
-    "eligible_area_km2": 279.3,
-    "free_mw": 8256,
-    "n_turbines": 788,
-    "n_parks": 89,
-    "p_nom_max_mw": 3152,
-    "delta_mw": -3328,
-    "delta_pct": -51.4
+    "label": "6 km inter-distance and parks of at least four without exception",
+    "eligible_area_km2": 418.0,
+    "free_mw": 11460,
+    "n_turbines": 1084,
+    "n_parks": 95,
+    "p_nom_max_mw": 4336,
+    "delta_mw": -3836,
+    "delta_pct": -46.9
   }
 }

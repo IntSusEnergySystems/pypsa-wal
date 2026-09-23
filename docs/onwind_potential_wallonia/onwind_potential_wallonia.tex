@@ -93,8 +93,10 @@ for wind farms, so most of the rules that shape the answer are policy choices
 a permit may depart from. Section~\ref{sec:sensitivity} prices every one of them
 on the reference: admitting agricultural land away from the main infrastructure
 network (the derogation route of CoDT art.~D.IV.11) is worth
-\SensNoCorridorPct{}\,\%, dropping the minimum park size \SensParksOnePct{}\,\%,
-and applying the 2013 habitat setback \SensHabitatOldPct{}\,\%.
+\SensNoCorridorPct{}\,\%, admitting every coniferous stand of the forest zone
+\SensForestConifPct{}\,\%, refusing the exception that allows fewer than four
+machines above \SI{3.2}{\mega\watt} \SensParksFourPct{}\,\%, and applying the
+2013 habitat setback \SensHabitatOldPct{}\,\%.
 
 \textbf{The 4--6~km inter-distance is in the 2024 framework, as a
 recommendation.} It is recommended between parks, ``peut être réduite selon la
@@ -394,15 +396,72 @@ model of farm discs \SI{1.3}{\kilo\metre} in radius and \SI{2.6}{\kilo\metre}
 apart gives about as little as the park model under the strictest reading of the
 inter-distance, 6~km, without any text to justify it.
 
-The minimum of four is itself a policy choice. The same article allows it to be
-reduced for repowering, for an extension of machines in operation, in a zone
-d'activité économique for machines above \SI{3.2}{\mega\watt}, and for any
-machine above \SI{3.2}{\mega\watt} ``pour autant qu'il s'intègre harmonieusement
-dans le paysage et ne réduise pas le potentiel éolien de la zone'' --- which the
-reference class is. It is applied in the reference because it describes how
-Walloon wind is actually built: \FleetInBigFarms{}\,\% of the standing machines
-are in groups of four or more. Without it the reference would be
-\ParksOnePnom{}~MW (§\ref{sec:sensitivity}).
+The minimum of four is the definition of a park, and the same article allows it
+to be reduced: for repowering, for an extension of machines in operation, in a
+zone d'activité économique for machines above \SI{3.2}{\mega\watt}, and ---
+point~4° --- for any machine above \SI{3.2}{\mega\watt} ``pour autant qu'il
+s'intègre harmonieusement dans le paysage et ne réduise pas le potentiel éolien
+de la zone''. The reference class is \SI{4}{\mega\watt}, so point~4° applies to
+it. The reference reads the condition literally. Parks of at least four are
+grown first, and a smaller group, down to one machine, is kept only on land no
+such park can use, so no park is displaced. Refusing the exception and requiring
+four machines everywhere gives \SensParksFourMW{}~MW
+(\SensParksFourPct{}\,\%, §\ref{sec:sensitivity}). Of the machines the reference
+does place, \PlaceSmallShare{}\,\% stand in groups below four and
+\PlaceSingleShare{}\,\% are single.
+
+A binding exclusion of single turbines is not what the texts say, and it is not
+the European norm.
+
+\begin{itemize}
+  \item The 2013 framework stated a priority, not a floor: ``Les parcs se
+    composant d'un minimum de 5 éoliennes seront prioritaires'', and smaller
+    parks ``seront autorisés'' provided they limit \emph{mitage} and do not
+    reduce the zone's potential. The priority, it added, goes to grouping
+    rather than to ``la dispersion d'éoliennes individuelles''.
+  \item Flanders' current circular (OMG/2025/1) allows solitary turbines in
+    built-up land and along large infrastructure. A minimum of three, and in
+    principle \SI{20}{\mega\watt}, applies only in open land. The previous
+    circular had dropped an explicit clustering preference because it would
+    foreclose the remaining potential, and because industrial and roadside
+    sites typically come as applications for one or two machines.
+  \item France conditioned the purchase tariff on at least five machines in
+    2010 (loi n°~2010-788, art.~90) in order to fight \emph{mitage}, and
+    removed that condition in 2013 (loi n°~2013-312). It was a tariff rule, and
+    it lasted less than three years.
+  \item The Netherlands have no national minimum. Zeeland requires at least
+    three turbines outside its designated concentration locations; Friesland
+    restricts new solitary turbines. Measured as two or more machines within
+    \SI{700}{\metre}, 12\,\% of Dutch turbines were solitary in 2023.
+  \item Germany sets no minimum number of turbines. Denmark's guidance sizes
+    the plan area to the group \emph{or the single turbine} proposed. Ireland's
+    2006 guidelines cover single turbines and groups alike. Luxembourg treats a
+    single turbine as a case of its own, subject to the ordinary permit.
+\end{itemize}
+
+Where a binding minimum does exist, it is three rather than four, it usually
+lapses in industrial zones and along infrastructure, and the recent changes
+relax it. The argument for clustering is real --- scattered machines use a zone
+badly, and the Pôle Aménagement du territoire said so in January 2026 when it
+gave an unfavourable opinion on a single turbine at Nivelles Nord
+(AT.26.2.AV), finding that the project would not use the wind potential of the
+zone and that point~4° did not apply. That is the condition the reference
+enforces, by refusing a small group wherever a park of four fits. It is not a
+reason to discard the patches that can hold one or two machines and nothing
+more.
+
+The standing fleet already contains them. Grouped at the same
+\FleetFarmLink{}~km, \FleetFarmsOne{} of the \FleetFarms{} farms are single
+machines, \FleetFarmsTwo{} are pairs and \FleetFarmsThree{} are triples:
+\FleetInSmallFarms{} machines, \FleetInSmallFarmsPct{}\,\% of the fleet, and
+\FleetFarmsSmall{} of the \FleetFarms{} farms. Of those machines,
+\FleetSmallAgri{} stand in an agricultural zone, \FleetSmallZae{} in a zone
+d'activité économique and \FleetSmallOther{} elsewhere. The large singles that
+have been permitted --- the Rossel turbine at Nivelles, the NRB turbine at
+Hauts-Sarts --- stand in business zones, which point~3° of the same article
+opens explicitly. \FleetInBigFarms{}\,\% of the fleet is nevertheless in groups
+of four or more: the exception is the edge of the stock, not a different way of
+building it.
 
 \subsubsection{Rule 3 --- every village keeps an open horizon}
 
@@ -468,7 +527,8 @@ figure overstates the rule, since the text asks for 4~km only where views are
 short and allows both to be reduced; the two cases bracket it.
 
 \finding{The land-and-wake bound is \FreePnom{}~MW. Grouping machines into parks
-of \PlaceMinTurbines{} or more costs \ParksCostPct{}\,\% of it and gives
+--- four or more first, then smaller groups only on the land left --- costs
+\ParksCostPct{}\,\% of it and gives
 \NoHorizonPnom{}~MW; the open-horizon rule costs a further
 \HorizonCostPct{}\,\% and gives the gross reference of \PlacePnom{}~MW in
 \PlaceParks{} parks of \PlacePerPark{} machines on average. The recommended
@@ -755,12 +815,76 @@ Two better sources were identified and neither can be used:
     it cannot be retrieved as a grid. Obtaining it is an administrative step.
 \end{itemize}
 
-\caveat{The stake is bounded. The species split only decides the status of
-plan-de-secteur forest zones lying within \SI{750}{\metre} of a PIC, which is a
-small share of a Region whose eligible land is overwhelmingly agricultural; and
-the direction of the error from using CORINE is not knowable without the better
-data, because a coarse raster both admits broad-leaved cells and rejects
-coniferous ones.}
+\caveat{The stake of the species split, under the CoDT's distance, is bounded.
+It only decides the status of plan-de-secteur forest zones lying within
+\SI{750}{\metre} of a PIC, which is a small share of a Region whose eligible
+land is overwhelmingly agricultural; and the direction of the error from using
+CORINE is not knowable without the better data, because a coarse raster both
+admits broad-leaved cells and rejects coniferous ones. Dropping the distance,
+which the next subsection prices, makes the split load-bearing.}
+
+\subsection{Wind in forest, in Wallonia and elsewhere}\label{sec:forestpractice}
+
+Two Walloon instruments do not say the same thing. The CoDT admits a mast in a
+forest zone only within \SI{750}{\metre} of a PIC, outside a recognised
+conservation site and outside a broad-leaved stand (D.II.37~§1 al.~6,
+R.II.37-2). The 2024 framework, which is indicative, admits turbines ``sur les
+plantations de résineux pauvres en biodiversité'' and does not repeat the
+distance (§3.2~§1). The reference follows the CoDT, because it is the statute
+and because the framework cannot open land the code closes. The framework's
+wording is priced on its own.
+
+It is not a hypothetical. \FleetForestN{} standing machines sit in a
+plan-de-secteur forest zone, in \FleetForestFarms{} farms. \FleetForestCodt{} of
+them stands where the CoDT's distance and the conifer reading both admit a
+mast; \FleetForestConif{} stand on coniferous stands with the distance dropped,
+so most of the forest machines were permitted beyond \SI{750}{\metre} of a PIC.
+\FleetForestAll{} of the \FleetForestN{} fall inside the forest zone once
+broad-leaved stands are admitted too. The practice is a derogation from the
+distance, on conifers, and it is ten machines, not a programme.
+
+Elsewhere the same question is answered more openly, and almost nowhere by a
+ban.
+
+\begin{itemize}
+  \item Germany had \num{2533} turbines and \SI{7406}{\mega\watt} on forest
+    land at the end of 2024, about 9\,\% of the machines and 12\,\% of the
+    onshore capacity (Fachagentur Wind und Solar, 2025). Forest sites are open
+    in Baden-Württemberg, Bavaria, Brandenburg, Hessen, Rhineland-Palatinate
+    and Saarland. North Rhine-Westphalia allows them on calamity areas and in
+    municipalities whose forest cover exceeds 20\,\%. Hamburg, Bremen and
+    Schleswig-Holstein do not. A conversion of forest still needs a permit
+    under §9 of the federal forest act, and nature reserves and national parks
+    stay closed. The turbines stand in commercial forest, not in ancient
+    broad-leaved woodland.
+  \item France has no ban. Clearing woodland needs an authorisation under
+    art.~L.341-3 of the Code forestier, with compensatory planting, and public
+    forest is cleared only with the agreement of the Office national des
+    forêts. Projects in forest are built; they are not the bulk of the stock.
+  \item Scotland presumes against woodland removal (Control of Woodland Removal
+    Policy, 2009) and allows it, with compensatory planting, where it
+    facilitates renewable energy. Commercial conifer plantations are a routine
+    host of wind farms. The guidance that implements the policy is written for
+    wind farms first.
+\end{itemize}
+
+Admitting every coniferous stand of the Walloon forest zone, which is the
+framework's wording without the CoDT's distance, gives \SensForestConifMW{}~MW
+(\SensForestConifPct{}\,\%). Admitting the whole forest zone, broad-leaved
+stands included, gives \SensForestAllMW{}~MW (\SensForestAllPct{}\,\%). The
+first is a genuine disagreement between the two instruments in force, and it is
+the reading closest to the few forest machines that exist; it is large because
+the Ardennes are windy, not because the standing fleet is there. It is a policy
+sensitivity, not the reference. The second is contrary to both instruments. It
+is kept as an upper bound, so that the cost of treating forest as ordinary
+land --- which is what PyPSA-Eur does --- stays visible. It is not a plausible
+rule.
+
+Both readings are on the dashboard, as the three positions of one control: the
+CoDT's distance, every coniferous stand, and the whole forest zone. The middle
+position is worth a control because it moves the answer by
+\SensForestConifPct{}\,\%. The third is worth keeping beside it so that a reader
+can see what ``all forest'' would mean, and can see that it is not the law.
 
 % =====================================================================
 \section{PyPSA-Eur's default constraint set is not applicable in Wallonia}
@@ -1197,7 +1321,7 @@ depart from; \emph{judgement}: a modelling choice of this study;
 \input{generated/table_sensitivity_cases}
 \end{table}
 
-\paragraph{Policy rules.} Four rules decide the answer, and none of them is
+\paragraph{Policy rules.} Five rules decide the answer, and none of them is
 about the land in the physical sense.
 
 \begin{itemize}
@@ -1208,25 +1332,35 @@ about the land in the physical sense.
     (§\ref{sec:calibration}). Admitting agricultural land wherever the other
     rules allow gives \SensNoCorridorMW{}~MW (\SensNoCorridorPct{}\,\%), on
     \SensNoCorridorArea{}~\si{\square\kilo\metre} of eligible land.
-  \item \emph{The minimum park size} of four machines, which the 2024 framework
-    itself relaxes for machines above \SI{3.2}{\mega\watt}: without it,
-    \SensParksOneMW{}~MW (\SensParksOnePct{}\,\%).
+  \item \emph{The forest zone.} The reference follows the CoDT: coniferous
+    stands within \SI{750}{\metre} of a PIC only. The framework's wording,
+    every coniferous stand and no distance, gives \SensForestConifMW{}~MW
+    (\SensForestConifPct{}\,\%); the whole forest zone, broad-leaved stands
+    included, gives \SensForestAllMW{}~MW (\SensForestAllPct{}\,\%). The first
+    is the disagreement between the two instruments; the second is an upper
+    bound (§\ref{sec:forestpractice}).
+  \item \emph{The park minimum.} The reference applies point~4° of §3.1: parks
+    of four first, then smaller groups on the land left. Requiring four
+    machines everywhere, which is the definition without its exception, gives
+    \SensParksFourMW{}~MW (\SensParksFourPct{}\,\%).
   \item \emph{The inter-distance between parks}, recommended and reducible:
     \SensIdFourMW{}~MW at 4~km (\SensIdFourPct{}\,\%) and \SensIdSixMW{}~MW at
     6~km (\SensIdSixPct{}\,\%).
   \item \emph{The habitat setback}: the 2013 rule of four times the tip height
     instead of the 2024 rule gives \SensHabitatOldMW{}~MW
-    (\SensHabitatOldPct{}\,\%).
+    (\SensHabitatOldPct{}\,\%). It is no longer in force. It stays in this
+    table because the published studies that still use it, BREGILAB among them,
+    have to be read against it. It is not a choice on the dashboard.
 \end{itemize}
 
 The open-horizon rule belongs to the same family, but it is stated as a result
 to be preserved and the standing fleet observes it; dropping it would give
-\SensNoHorizonMW{}~MW (\SensNoHorizonPct{}\,\%). Relaxing the corridor and the
-park minimum together, with the open horizon kept, gives \SensRelaxedMW{}~MW;
-tightening the inter-distance to 6~km and the habitat setback to the 2013 rule
-gives \SensTightenedMW{}~MW. \emph{The policy envelope around the gross
-reference is therefore \SensTightenedMW{}--\SensRelaxedMW{}~MW}, wider than the
-residual-allowance bracket and wider than any modelling choice.
+\SensNoHorizonMW{}~MW (\SensNoHorizonPct{}\,\%). Lifting the corridor and
+admitting every coniferous stand, with the open horizon kept, gives
+\SensRelaxedMW{}~MW; tightening the inter-distance to 6~km and requiring four
+machines everywhere gives \SensTightenedMW{}~MW. \emph{The policy envelope
+around the gross reference is therefore \SensTightenedMW{}--\SensRelaxedMW{}~MW},
+wider than the residual-allowance bracket and wider than any modelling choice.
 
 \paragraph{Modelling choices.} Three exclusions are this study's judgement, and
 the fleet supports each of them (§\ref{sec:calibration}): the ADESA landscape
@@ -1242,13 +1376,15 @@ reading BREGILAB appears to share (§\ref{sec:bregilab}) --- would give
 reading of R.II.21-1, which is explicit, and it is not followed.
 
 \finding{The reference is the framework in force as it is applied: the CoDT
-corridor, parks of four, the open horizon, no binding inter-distance. The single
-rule that matters most is the agricultural corridor (\SensNoCorridorPct{}\,\%),
-a planning rule the Region itself derogates from; the 6~km inter-distance
+corridor and its forest distance, parks of four with the exception for machines
+above \SI{3.2}{\mega\watt} on the land a park cannot use, the open horizon, no
+binding inter-distance. The largest movements are the 6~km inter-distance
 (\SensIdSixPct{}\,\%), the open horizon (\SensNoHorizonPct{}\,\% if dropped),
-the 2013 habitat setback (\SensHabitatOldPct{}\,\%) and the minimum park size
-(\SensParksOnePct{}\,\%) each move the answer by a quarter to a third. A
-reader who wants a potential under a different policy should take it from
+every coniferous stand without the CoDT's distance (\SensForestConifPct{}\,\%)
+and the agricultural corridor (\SensNoCorridorPct{}\,\%). The 2013 habitat
+setback (\SensHabitatOldPct{}\,\%) and refusing the park exception
+(\SensParksFourPct{}\,\%) each move it by about a fifth. A reader who
+wants a potential under a different policy should take it from
 Table~\ref{tab:senscases} rather than from the headline.}
 
 % =====================================================================
@@ -1485,9 +1621,10 @@ judgement choices are priced in Table~\ref{tab:senscases}.
     array and the rule VITO uses. \emph{The standing Walloon fleet sits at
     \SpObsD{}\,$D$ (\SpObsMW{}~MW); the area-equivalent $\sqrt{5\times7}\,D$
     would give \SpIsoMW{}~MW.}
-  \item[Parks] grown at the fleet's \PlaceLink{}~km linkage, at least
-    \PlaceMinTurbines{} machines, no radius and no centre separation.
-    \emph{Without the minimum, \ParksOnePnom{}~MW.}
+  \item[Parks] grown at the fleet's \PlaceLink{}~km linkage: at least
+    \PlaceMinTurbines{} machines first, then smaller groups only on the land no
+    such park can use (Cadre 2024, §3.1~4°), no radius and no centre separation.
+    \emph{Without the exception, \SensParksFourMW{}~MW.}
   \item[Open horizon] \PlaceAzimuth{}° free within \PlaceHorizonRadius{}~km of
     every village above \SI{10}{\hectare}, as the Cadre states it and as the
     fleet observes it. \emph{\HorizonCostPct{}\,\% of the parks figure.}
@@ -1628,8 +1765,9 @@ administrative Walloon Region.}
 \begin{table}[htbp]\centering\footnotesize
 \caption{Allocation results for every turbine class and spacing. \emph{free} is
 the minimum-distance allocation alone, in row-major and pseudo-random order;
-\emph{parks} adds the park rule; \emph{horizon} the open-horizon rule; the
-\emph{km} rows add the inter-distance between parks.}
+\emph{parks} adds the park rule, smaller groups included on the land a park of
+four cannot use; \emph{horizon} the open-horizon rule; the \emph{km} rows add
+the inter-distance between parks; one row keeps only parks of four or more.}
 \label{tab:placement}
 \resizebox{\linewidth}{!}{\input{generated/table_placement}}
 \end{table}
@@ -1663,7 +1801,14 @@ wallonne, 21~February~2013, as amended on 11~July~2013; Code du Développement
 Territorial, decretal and regulatory parts, articles D.II.28, D.II.36, D.II.37,
 D.IV.11, D.IV.13, D.IV.22, R.II.21-1, R.II.21-7, R.II.36-2 and R.II.37-2;
 Pôle Environnement, opinion ENV.24.106.AV on a wind project at Chimay-Baileux
-(2024).
+(2024); Pôle Aménagement du territoire, opinion AT.26.2.AV on a single turbine
+at Nivelles Nord (16~January~2026). Comparative instruments cited in
+§\ref{sec:placement} and §\ref{sec:forestpractice}: Flanders, circular
+OMG/2025/1; France, loi n°~2010-788, art.~90, and loi n°~2013-312; Zeeland,
+omgevingsverordening, art.~18.17; Fachagentur Wind und Solar, \emph{Entwicklung
+der Windenergienutzung auf Forstflächen}, 10th ed.\ (2025); Code forestier,
+art.~L.341-3; Scottish Government, \emph{Control of Woodland Removal Policy}
+(2009).
 
 \medskip\noindent
 Bibliographic reference for the comparison of §\ref{sec:bregilab}: Clymans, W.,

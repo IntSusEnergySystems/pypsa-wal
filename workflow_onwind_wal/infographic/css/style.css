@@ -209,11 +209,21 @@ a { color: var(--green-dark); }
 .badge.baisse svg { color: var(--cool); }
 .badge.zero { background: #ECE6DA; color: var(--ink-2); }
 .ch-rule { font-size: 13px; line-height: 1.42; color: var(--ink-2); margin: 6px 0 0 46px; }
-.choice[data-key="interdistance"] .ch-rule { margin-left: 0; }
+.choice[data-key="interdistance"] .ch-rule, .choice[data-key="foret"] .ch-rule { margin-left: 0; }
 .ch-goto { background: none; border: 0; padding: 0; margin-left: 3px; cursor: pointer; font-size: inherit; font-weight: 700; color: var(--green-dark); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
-.segmented { display: flex; gap: 3px; margin-top: 8px; background: #ECE5D8; padding: 3px; border-radius: 9px; }
-.seg { flex: 1; display: inline-flex; justify-content: center; align-items: center; gap: 6px; border: 0; background: transparent; padding: 6px 4px; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; }
-.seg.on { background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .14); font-weight: 800; }
+.options { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.opt { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 6px 10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; font-size: 14.5px; font-weight: 600; line-height: 1.25; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.opt:hover { border-color: #CBC3B3; }
+.opt input { appearance: none; -webkit-appearance: none; flex: none; width: 18px; height: 18px; margin: 0; border: 2px solid #B8AF9E; border-radius: 50%; background: #fff; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.opt input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.opt-label { flex: 1; }
+.opt-label::first-letter { text-transform: uppercase; }
+.opt-ref { flex: none; font-size: 12px; font-weight: 600; color: var(--ink-2); letter-spacing: .02em; }
+.opt.on { font-weight: 800; }
+.warm .opt.on { border-color: var(--warm); box-shadow: inset 0 0 0 1px var(--warm); }
+.cool .opt.on { border-color: var(--cool); box-shadow: inset 0 0 0 1px var(--cool); }
+.warm .opt input:checked { border-color: var(--warm); background: var(--warm); box-shadow: inset 0 0 0 3px #fff; }
+.cool .opt input:checked { border-color: var(--cool); background: var(--cool); box-shadow: inset 0 0 0 3px #fff; }
 .reset { margin-top: 8px; font-size: 14px; background: var(--card); border: 1px solid #CFC6B5; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
 .reset:disabled { opacity: .45; cursor: default; }
 

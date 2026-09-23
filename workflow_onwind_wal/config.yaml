@@ -814,9 +814,12 @@ sensitivity:
       label: "every plan-de-secteur road taken as a PIC (a misreading of R.II.21-1)"
       land: {pds_ineligible: pds_ineligible_psroads}
   combined:
+    # The corridor and the forest reading both replace `pds_ineligible`, so
+    # they cannot be stacked by naming the two cases.  The polygon is the
+    # conifer reading with the agricultural corridor lifted.
     all_policy_relaxed:
       label: "no agricultural corridor and every coniferous stand, open horizon kept"
-      cases: [no_corridor, forest_conifers]
+      land: {pds_ineligible: pds_ineligible_conifers_nocorridor}
     all_policy_tightened:
       label: "6 km inter-distance and parks of at least four without exception"
       cases: [interdistance_6km, parks_min4]
@@ -875,7 +878,7 @@ infographic:
     etape1: {candidate: 1}
     etape3: {candidate: 1}
     etape5: {candidate: 1}
-    etape6: {candidate: 2}
+    etape6: {candidate: 1}
     etape8: {candidate: 0}
     etape8bis: {candidate: 2}
   # Temporary publication of the dashboard (rule infographic_publish).  The

@@ -36,7 +36,7 @@ SIZES = {"paysage": ("landscape", 1600, 900), "portrait": ("portrait", 1080, 135
 # (renderState argument, seconds on screen)
 FUNNEL = (
     [({"view": "titre"}, 3.0)]
-    + [({"etape": str(i)}, 2.2) for i in range(10)]
+    + [({"etape": str(i)}, 2.2) for i in range(9)]
     + [({"etape": "bilan"}, 5.0)]
 )
 ETSI = [
@@ -48,7 +48,7 @@ ETSI = [
     ({"view": "choix", "choix": "foret"}, 3.0),
     ({"view": "enveloppe"}, 5.0),
 ]
-CAROUSEL = [{"view": "titre"}] + [{"etape": str(i)} for i in range(10)] + [{"view": "etsi"}, {"etape": "bilan"}]
+CAROUSEL = [{"view": "titre"}] + [{"etape": str(i)} for i in range(9)] + [{"view": "etsi"}, {"etape": "bilan"}]
 
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -74,6 +74,9 @@ def chromium_path():
 async def capture(url, frames, size, out_dir):
     fmt, w, h = size
     out_dir.mkdir(parents=True, exist_ok=True)
+    # A shorter sequence than last time must not leave old frames behind.
+    for old in out_dir.glob("[0-9][0-9].*"):
+        old.unlink()
     paths = []
     async with async_playwright() as p:
         try:
@@ -136,7 +139,9 @@ def alt_text(root):
     """One French paragraph describing the funnel, for every export."""
     states = json.loads((root / "data" / "states.json").read_text())
     t = json.loads((root / "textes.json").read_text())
-    steps = states["states"]["d0-i0-x0-f0"]["steps"]
+    # d0-i1-x0-f0 is the reference: parks of four, then the §3.1 4° exception
+    # on leftover land.  d0-i0 is the strict "four everywhere" sensitivity.
+    steps = states["states"]["d0-i1-x0-f0"]["steps"]
     meta = states["meta"]
 
     def n(v):
@@ -145,12 +150,14 @@ def alt_text(root):
     parts = [f"Carte de la Wallonie ({n(meta['region_km2'])} km²) où les règles d'implantation des éoliennes "
              f"retirent du terrain étape par étape."]
     for e in t["etapes"]:
-        if e["id"] in ("0", "8bis", "bilan"):
+        if e["id"] in ("0", "7bis", "bilan"):
             continue
-        s = steps[-1] if e["id"] == "9" else steps[int(e["id"])]
+        # Stops 6 and 7 are the states' steps 7 and 8 (step 6 is the free
+        # packing, which the dashboard does not show as a stop).
+        s = steps[-1] if e["id"] == "8" else steps[int(e["id"]) + (e["id"] in "67")]
         if e["id"] in "12345":
             parts.append(f"{e['titre']} : il reste {n(s['area_km2'])} km², place pour {n(s['n'])} éoliennes.")
-        elif e["id"] == "9":
+        elif e["id"] == "8":
             parts.append(f"{e['titre']} : une réserve ramène le résultat à environ {n(s['mw'])} MW, "
                          f"entre {n(s['mw_low'])} et {n(s['mw_high'])} MW.")
         else:

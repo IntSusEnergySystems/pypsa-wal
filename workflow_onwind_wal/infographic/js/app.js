@@ -1,6 +1,6 @@
 // « Où peut-on installer des éoliennes en Wallonie ? » — the dashboard.
 //
-// State lives in the URL (#etape=8&derogation=0&isolees=0&interdistance=0&foret=codt)
+// State lives in the URL (#etape=7&derogation=0&isolees=1&interdistance=0&foret=codt)
 // and every view is a pure function of it, so the export script drives the
 // page through window.renderState() and the GIF is literally the dashboard.
 
@@ -24,7 +24,10 @@ const FAMKEYS = META.families;
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-const DEFAULT = { etape: "0", derogation: 0, isolees: 0, interdistance: 0, foret: 0, parc: 0 };
+// isolees=1 is the reference: the Cadre §3.1 exception for machines above
+// 3.2 MW, applied only on land no park of four can use. The dashboard shows
+// the other position as a switch that bans single turbines.
+const DEFAULT = { etape: "0", derogation: 0, isolees: 1, interdistance: 0, foret: 0, parc: 0 };
 // The three readings of the forest zone, in the URL by name.
 const FORET = ["codt", "resineux", "tout"];
 const state = { ...DEFAULT, view: "etape", choix: null };
@@ -32,7 +35,8 @@ const state = { ...DEFAULT, view: "etape", choix: null };
 function readHash() {
   const h = new URLSearchParams(location.hash.slice(1));
   const s = { ...DEFAULT };
-  if (h.has("etape")) s.etape = h.get("etape");
+  // Links made before steps 6 and 7 were merged (23 Sep 2026).
+  if (h.has("etape")) s.etape = { "8bis": "7bis", 9: "8" }[h.get("etape")] ?? h.get("etape");
   for (const k of ["derogation", "isolees", "parc"]) if (h.has(k)) s[k] = h.get(k) === "1" ? 1 : 0;
   if (h.has("interdistance")) s.interdistance = [0, 4, 6].includes(+h.get("interdistance")) ? +h.get("interdistance") : 0;
   if (h.has("foret")) s.foret = Math.max(0, FORET.indexOf(h.get("foret")));
@@ -52,36 +56,40 @@ function writeHash() {
 const comboKey = (s = state) => `d${s.derogation}-i${s.isolees}-x${s.interdistance}-f${s.foret}`;
 const combo = (s = state) => DATA.states[comboKey(s)];
 
-// The sequence of stops for the current choices: 0..8, [8bis], 9, bilan.
+// The sequence of stops for the current choices: 0..7, [7bis], 8, bilan.
 function sequence(s = state) {
-  const seq = ["0", "1", "2", "3", "4", "5", "6", "7", "8"];
-  if (s.interdistance) seq.push("8bis");
-  return seq.concat(["9", "bilan"]);
+  const seq = ["0", "1", "2", "3", "4", "5", "6", "7"];
+  if (s.interdistance) seq.push("7bis");
+  return seq.concat(["8", "bilan"]);
 }
 
-// Index of a stop in the states' step array.
+// Index of a stop in the states' step array: 0-5 land, 6 the free packing
+// (not a stop: its count is already the one of step 5), 7 parks, 8 horizon,
+// [9 inter-distance], last the residual allowance.
 function stepIndex(id, s = state) {
   const n = combo(s).steps.length;
-  if (id === "9" || id === "bilan") return n - 1;
-  if (id === "8bis") return 9;
+  if (id === "8" || id === "bilan") return n - 1;
+  if (id === "7bis") return 9;
+  if (id === "6" || id === "7") return +id + 1;
   return +id;
 }
 
 const stepData = (id, s = state) => combo(s).steps[stepIndex(id, s)];
 const landStep = (id) => (/^\d$/.test(id) ? Math.min(+id, 5) : 5);
 const grossMW = (s) => combo(s).steps[combo(s).steps.length - 2].mw;
-const nChoices = (s = state) => (s.derogation ? 1 : 0) + (s.isolees ? 1 : 0) + (s.interdistance ? 1 : 0) + (s.foret ? 1 : 0);
+const nChoices = (s = state) => ["derogation", "isolees", "interdistance", "foret"]
+  .reduce((n, k) => n + (s[k] !== DEFAULT[k] ? 1 : 0), 0);
 
 function stepNumberLabel(id) {
   if (id === "bilan") return T.commandes.bilan;
-  if (id === "8bis") return "8 bis";
+  if (id === "7bis") return "7 bis";
   return id;
 }
 
 // Values the text templates can use.
 function values(s = state) {
   const R = META.rules;
-  const last = stepData("9", s);
+  const last = stepData("8", s);
   const res = 1 - META.survival.central;
   return {
     region_km2: int(META.region_km2),
@@ -170,7 +178,7 @@ async function render({ animate = !REDUCED && !EXPORT } = {}) {
 function update(patch, opts) {
   Object.assign(state, patch);
   const seq = sequence();
-  if (!seq.includes(state.etape)) state.etape = state.etape === "8bis" ? "9" : "0";
+  if (!seq.includes(state.etape)) state.etape = state.etape === "7bis" ? "8" : "0";
   rendering = rendering.then(() => render(opts));
   return rendering;
 }
@@ -206,7 +214,7 @@ function renderIndicator(animate) {
   const id = state.etape;
   const sd = stepData(id);
   const I = T.indicateur;
-  const final = id === "9" || id === "bilan";
+  const final = id === "8" || id === "bilan";
   const early = /^[0-5]$/.test(id);
   const label = early ? I.place_pour : final ? I.possibles : I.autorisees;
   const approxMark = final ? "≈ " : "";
@@ -216,7 +224,6 @@ function renderIndicator(animate) {
   }
   let sub = "";
   if (id === "0") sub = I.si_chaque_hectare;
-  else if (id === "6") sub = I.empilement;
   else if (final) sub = tpl(I.fourchette, { lo: approx(sd.mw_low), hi: approx(sd.mw_high) });
   const n = nChoices();
   const tag = n ? `<div class="ind-tag">${tpl(n > 1 ? I.scenario_modifies : I.scenario_modifie, { n })}</div>` : "";
@@ -251,16 +258,21 @@ function effectLines(id) {
       `<p class="effect">${tpl(E.eoliennes_moins, { n: int(prev.n - cur.n) })}</p>`,
     ];
   }
-  if (id === "6") return [`<p class="effect big">${tpl(E.apparaissent, { n: int(cur.n) })}</p>`];
-  if (id === "9") {
+  if (id === "8") {
     return [`<p class="effect big">${tpl(E.reserve, { pct: Math.round(100 * (1 - META.survival.central)) })}</p>`];
   }
   const dn = prev.n - cur.n;
+  if (id === "6") {
+    return [
+      `<p class="effect big">${tpl(E.places, { n: int(cur.n) })}</p>`,
+      `<p class="effect">${tpl(E.regroupement, { n: int(dn), pct: dec((-100 * dn) / prev.n, 0) })}</p>`,
+    ];
+  }
   return [`<p class="effect big">${tpl(E.moins, { n: int(dn), pct: dec((-100 * dn) / prev.n, 0) })}</p>`];
 }
 
 function bilanBars() {
-  const last = stepData("9");
+  const last = stepData("8");
   const max = Math.max(last.mw_high, META.installed_mw) * 1.08;
   const w = (v) => `${(100 * v) / max}%`;
   const E = T.effet;
@@ -278,14 +290,14 @@ function bilanBars() {
 function cardTitle(id) {
   const st = STEP_TEXT[id];
   const v = values();
-  if (id === "7" && state.isolees) return tpl(st.titre_isolees, v);
+  if (id === "6" && !state.isolees) return tpl(st.titre_strict, v);
   return tpl(st.titre, v);
 }
 
 function ruleLine(id) {
   const st = STEP_TEXT[id];
   const v = values();
-  if (id === "7" && state.isolees) return tpl(st.regle_isolees, v);
+  if (id === "6" && !state.isolees) return tpl(st.regle_strict, v);
   if (id === "1" && state.foret) return tpl(st[`regle_foret${state.foret}`], v);
   if (id === "2" && state.derogation) return tpl("Dérogation : toute la zone agricole est admise", v);
   return tpl(st.regle, v);
@@ -298,7 +310,7 @@ function etsiNotes(id) {
   const notes = [];
   if (st.et_si.derogation && state.derogation) notes.push(["hausse", st.et_si.derogation]);
   if (st.et_si.foret && state.foret) notes.push(["hausse", st.et_si.foret[state.foret - 1]]);
-  if (st.et_si.isolees && state.isolees) notes.push(["hausse", st.et_si.isolees]);
+  if (st.et_si.strict && !state.isolees) notes.push(["baisse", st.et_si.strict]);
   if (st.et_si.interdistance && state.interdistance) notes.push(["baisse", st.et_si.interdistance]);
   return notes.map(([k, s]) => `<p class="card-note ${k}">${icon(k, { size: 16 })}<span>${tpl(s, v)}</span></p>`).join("");
 }
@@ -322,7 +334,7 @@ function renderCard() {
   const fam = st.famille ? FAMKEYS.indexOf(st.famille) + 1 : 0;
   const eyebrow = id === "bilan"
     ? T.commandes.bilan
-    : `${T.commandes.etape} ${stepNumberLabel(id)} ${T.commandes.sur} 9`;
+    : `${T.commandes.etape} ${stepNumberLabel(id)} ${T.commandes.sur} 8`;
   const chip = fam
     ? `<span class="fam-chip" style="--c:${FAMILY[fam]}"></span><span class="fam-name">${typo(T.familles[st.famille])}</span>`
     : "";
@@ -358,8 +370,8 @@ function renderTimeline() {
     const fam = st.famille ? FAMKEYS.indexOf(st.famille) + 1 : 0;
     const h = id === "bilan" ? 0 : Math.max(1.5, (100 * sd.mw) / max);
     const cls = i < cur ? "past" : i === cur ? "current" : "future";
-    const val = id === "bilan" ? "" : `${id === "9" ? "≈ " : ""}${id === "9" ? approx(sd.mw) : int(sd.mw)} MW`;
-    const whisker = id === "9"
+    const val = id === "bilan" ? "" : `${id === "8" ? "≈ " : ""}${id === "8" ? approx(sd.mw) : int(sd.mw)} MW`;
+    const whisker = id === "8"
       ? `<span class="tl-whisker" style="bottom:${(100 * sd.mw_low) / max}%;height:${(100 * (sd.mw_high - sd.mw_low)) / max}%"></span>`
       : "";
     const node = id === "bilan"
@@ -447,7 +459,7 @@ function renderLegend() {
   $("legend").innerHTML = `
     <ul class="lg-list">
       <li class="on avail"><span class="sw" style="--c:${GREEN}"></span><span class="lg-name">${typo(T.legende.disponible)}</span>
-        <span class="lg-km">${typo(`${int(stepData(state.etape).area_km2 ?? stepData("8").area_km2)} km²`)}</span></li>
+        <span class="lg-km">${typo(`${int(stepData(state.etape).area_km2 ?? stepData("7").area_km2)} km²`)}</span></li>
       <li class="lg-head">${typo(T.legende.titre)} :</li>
       ${items.join("")}
     </ul>
@@ -496,53 +508,59 @@ function renderEtsi() {
         <button type="button" class="ch-goto" data-etape="${c.etape}">${typo(tpl(T.et_si.agit_etape, { n: stepNumberLabel(c.etape) }))} →</button></p>
     </div>`;
   };
-  const toggle = (key, flag, patchOn, patchOff) => {
-    const on = !!flag;
+  // A switch whose checked position applies patchOn. For "isolees" the switch
+  // reads as a ban: checked means isolees=0.
+  const patches = {};
+  const toggle = (key, on, patchOn, patchOff) => {
+    patches[key] = [patchOn, patchOff];
     const e = on ? effectOf(patchOff) : effectOf(patchOn);
     const rel = on ? e.base / e.alt - 1 : e.rel;
     const kind = rel >= 0 ? "warm" : "cool";
     return row(key, `<label class="ch-head"><input type="checkbox" class="switch" data-key="${key}" ${on ? "checked" : ""}>
-      <span class="ch-label">${typo(C[key].libelle)}</span>${badge(rel)}</label>`, kind, on);
+      <span class="ch-label">${typo(C[key].libelle)}</span>${badge(rel)}</label>`, kind, state[key] !== DEFAULT[key]);
   };
-  const inter = () => {
-    const opts = [0, 4, 6];
-    const base = grossMW({ ...state, interdistance: 0 });
-    const seg = opts.map((o, i) => {
-      const rel = grossMW({ ...state, interdistance: o }) / base - 1;
-      return `<button type="button" class="seg ${state.interdistance === o ? "on" : ""}" data-k="interdistance" data-v="${o}" aria-pressed="${state.interdistance === o}">
-        ${typo(C.interdistance.options[i])}${o ? badge(rel) : ""}</button>`;
+  // One radio row per option; the first option is the rule in force and
+  // carries a tag instead of an effect.
+  const radios = (key, opts, kind) => {
+    const base = grossMW({ ...state, [key]: opts[0] });
+    const items = opts.map((o, i) => {
+      const on = state[key] === o;
+      const rel = grossMW({ ...state, [key]: o }) / base - 1;
+      return `<label class="opt ${on ? "on" : ""}"><input type="radio" name="opt-${key}" data-k="${key}" value="${o}" ${on ? "checked" : ""}>
+        <span class="opt-label">${typo(C[key].options[i])}</span>${i ? badge(rel) : `<span class="opt-ref">${typo(T.et_si.en_vigueur_tag)}</span>`}</label>`;
     }).join("");
-    return row("interdistance", `<div class="ch-head"><span class="ch-label">${typo(C.interdistance.libelle)}</span></div>
-      <div class="segmented" role="group" aria-label="${typo(C.interdistance.libelle)}">${seg}</div>`, "cool", state.interdistance > 0);
-  };
-  const forest = () => {
-    const base = grossMW({ ...state, foret: 0 });
-    const seg = [0, 1, 2].map((o) => {
-      const rel = grossMW({ ...state, foret: o }) / base - 1;
-      return `<button type="button" class="seg ${state.foret === o ? "on" : ""}" data-k="foret" data-v="${o}" aria-pressed="${state.foret === o}">
-        ${typo(C.foret.options[o])}${o ? badge(rel) : ""}</button>`;
-    }).join("");
-    return row("foret", `<div class="ch-head"><span class="ch-label">${typo(C.foret.libelle)}</span></div>
-      <div class="segmented" role="group" aria-label="${typo(C.foret.libelle)}">${seg}</div>`, "warm", state.foret > 0);
+    return row(key, `<div class="ch-head"><span class="ch-label">${typo(C[key].libelle)}</span></div>
+      <div class="options" role="radiogroup" aria-label="${typo(C[key].libelle)}">${items}</div>`, kind, state[key] !== DEFAULT[key]);
   };
   $("etsi-titre").textContent = typo(T.et_si.titre);
   $("etsi-intro").textContent = typo(T.et_si.intro);
   $("etsi-reset").textContent = typo(T.et_si.reinitialiser);
   $("etsi-reset").disabled = nChoices() === 0;
   $("etsi-choix").innerHTML =
-    toggle("derogation", state.derogation, { derogation: 1 }, { derogation: 0 }) +
-    toggle("isolees", state.isolees, { isolees: 1 }, { isolees: 0 }) +
-    inter() +
-    forest();
+    toggle("derogation", !!state.derogation, { derogation: 1 }, { derogation: 0 }) +
+    toggle("isolees", !state.isolees, { isolees: 0 }, { isolees: 1 }) +
+    radios("interdistance", [0, 4, 6], "cool") +
+    radios("foret", [0, 1, 2], "warm");
+  // The list is rebuilt on every update: give focus back to the control used.
+  const refocus = (sel) => $("etsi-choix").querySelector(sel)?.focus();
   for (const inp of $("etsi-choix").querySelectorAll("input.switch")) {
-    inp.onchange = () => update({ [inp.dataset.key]: inp.checked ? 1 : 0 });
+    const [on, off] = patches[inp.dataset.key];
+    inp.onchange = async () => {
+      await update(inp.checked ? on : off);
+      refocus(`input.switch[data-key="${inp.dataset.key}"]`);
+    };
   }
-  for (const b of $("etsi-choix").querySelectorAll(".seg")) b.onclick = () => update({ [b.dataset.k]: +b.dataset.v });
+  for (const inp of $("etsi-choix").querySelectorAll("input[type=radio]")) {
+    inp.onchange = async () => {
+      await update({ [inp.dataset.k]: +inp.value });
+      refocus(`input[name="${inp.name}"]:checked`);
+    };
+  }
   for (const b of $("etsi-choix").querySelectorAll(".ch-goto")) {
     b.onclick = () => {
       const e = b.dataset.etape;
       const patch = { etape: e };
-      if (e === "8bis" && !state.interdistance) patch.interdistance = 4;
+      if (e === "7bis" && !state.interdistance) patch.interdistance = 4;
       update(patch);
       $("map-box").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
       closeDrawer();
@@ -609,7 +627,10 @@ function renderStatic() {
     $("loupe").classList.toggle("big");
     setTimeout(() => map.placeLeader($("loupe")), 320);
   };
-  $("etsi-reset").onclick = () => update({ derogation: 0, isolees: 0, interdistance: 0, foret: 0 });
+  $("etsi-reset").onclick = () => update({
+    derogation: DEFAULT.derogation, isolees: DEFAULT.isolees,
+    interdistance: DEFAULT.interdistance, foret: DEFAULT.foret,
+  });
   $("lien-etsi").onclick = (e) => {
     if (matchMedia("(max-width: 899px)").matches) {
       e.preventDefault();
@@ -686,7 +707,7 @@ function renderExport() {
 
 const CHOICE_PATCH = {
   derogation: { derogation: 1 },
-  isolees: { isolees: 1 },
+  isolees: { isolees: 0 },
   inter4: { interdistance: 4 },
   inter6: { interdistance: 6 },
   resineux: { foret: 1 },
@@ -713,13 +734,13 @@ function etsiSummary() {
   const ref = grossMW(DEFAULT);
   const rows = [
     [C.derogation.court, { derogation: 1 }],
-    [C.isolees.court, { isolees: 1 }],
+    [C.isolees.court, { isolees: 0 }],
     [`${C.interdistance.court} : 4 km`, { interdistance: 4 }],
     [`${C.interdistance.court} : 6 km`, { interdistance: 6 }],
     [`${C.foret.court} : ${C.foret.options[1]}`, { foret: 1 }],
     [`${C.foret.court} : ${C.foret.options[2]}`, { foret: 2 }],
   ].map(([l, p]) => [l, grossMW({ ...DEFAULT, ...p }) / ref - 1]);
-  const span = 0.45;
+  const span = 1.2;
   return `<h2 class="xt-h">${typo(X.etsi_titre)}</h2><p class="xt-sub">${tpl(X.etsi_sous_titre, { ref: int(ref) })}</p>
     <div class="xs">${rows.map(([l, r]) => `<div class="xs-row"><span class="xs-l">${typo(l)}</span>
       <span class="xs-track"><span class="xs-bar ${r >= 0 ? "warm" : "cool"}" style="${r >= 0 ? "left:50%" : "right:50%"};width:${(50 * Math.abs(r)) / span}%"></span></span>
@@ -739,7 +760,7 @@ function describe(key) {
   const [d, i, x, f] = key.split("-").map((p) => +p.slice(1));
   const parts = [];
   if (d) parts.push(C.derogation.court.toLowerCase());
-  if (i) parts.push(C.isolees.court.toLowerCase());
+  if (!i) parts.push(C.isolees.court.toLowerCase());
   if (x) parts.push(`${x} km ${C.interdistance.court.toLowerCase()}`);
   if (f) parts.push(C.foret.options[f]);
   return parts.length ? parts.join(", ") : T.et_si.aucun_choix;
@@ -768,9 +789,12 @@ async function settle() {
 window.renderState = async (opts = {}) => {
   const patch = { ...DEFAULT, view: "etape", choix: null, ...opts };
   if (patch.view === "titre") patch.etape = "0";
-  if (patch.view === "choix") Object.assign(patch, { etape: "8" }, CHOICE_PATCH[patch.choix]);
-  if (patch.view === "choix" && patch.interdistance) patch.etape = "8bis";
-  if (patch.view === "etsi" || patch.view === "enveloppe") patch.etape = "8";
+  if (patch.view === "choix") {
+    Object.assign(patch, { etape: "7" }, CHOICE_PATCH[patch.choix]);
+    const step = { derogation: "2", isolees: "6", resineux: "1", foret: "1", inter4: "7bis", inter6: "7bis" };
+    if (step[patch.choix]) patch.etape = step[patch.choix];
+  }
+  if (patch.view === "etsi" || patch.view === "enveloppe") patch.etape = "7";
   Object.assign(state, patch);
   await render({ animate: false });
   await settle();

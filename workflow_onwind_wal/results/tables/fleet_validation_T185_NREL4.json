@@ -215,7 +215,12 @@
     "farms_along_motorway": 47,
     "farms_not_along_motorway_edge_below_4km_pct": 39.0,
     "turbines_within_1km_of_motorway_pct": 34.0,
-    "turbines_within_1500m_of_motorway_pct": 37.0
+    "turbines_within_1500m_of_motorway_pct": 37.0,
+    "small_groups_by_zone": {
+      "agricultural": 56,
+      "economic_activity": 17,
+      "other": 16
+    }
   },
   "forest": {
     "in_forest_zone": 10,

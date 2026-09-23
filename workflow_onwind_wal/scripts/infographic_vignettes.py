@@ -338,27 +338,9 @@ if __name__ == "__main__":
         * np.minimum(window_sum(fam == 5, h, w) / 0.25, 1) * (window_sum(region, h, w) > 0.99)
     specs["etape5"] = (s, 3000, 2250)
 
-    # 6 and 7. Machines 750 m apart, then parks: where the free allocation is
-    # dense and the park rule visibly drops isolated machines.
-    fx, fy, _ = pts("free_ref")
-    kx, ky, kp = pts("parks_ref_m4")
-    free_g = np.zeros((grid.rows, grid.cols), dtype=np.float32)
-    r_, c_ = decode_points(pts_raw["free_ref"])[:2]
-    free_g[r_, c_] = 1
-    park_g = np.zeros_like(free_g)
-    r_, c_ = decode_points(pts_raw["parks_ref_m4"])[:2]
-    park_g[r_, c_] = 1
-    h, w = cells(4000, 3000)
-    n_free = window_sum(free_g, h, w) * h * w
-    h2, w2 = cells(8000, 6000)
-    n_park = window_sum(park_g, h2, w2) * h2 * w2
-    n_free2 = window_sum(free_g, h2, w2) * h2 * w2
-    s = np.minimum(n_free / 10, 1.5) * np.minimum(n_park / 8, 1) * np.minimum((n_free2 - n_park) / 4, 1) \
-        * (window_sum(region, h2, w2) > 0.99)
-    specs["etape6"] = (s, 4000, 3000)
-    # A park of 4 to 7 machines, compact, with isolated machines of the free
-    # allocation dropped within 3 km of it and no other park crowding the frame.
-    tf = cKDTree(np.c_[fx, fy])
+    # 6. Placer les éoliennes: one park, its machines 750 m apart.
+    kx, ky, kp = pts("parks_ref_after")
+    # A park of 4 to 7 machines, compact, with no other park crowding the frame.
     tkp = cKDTree(np.c_[kx, ky])
     park_cands = []
     for p in np.unique(kp):
@@ -368,16 +350,12 @@ if __name__ == "__main__":
         cx_, cy_ = kx[m].mean(), ky[m].mean()
         if np.hypot(kx[m] - cx_, ky[m] - cy_).max() > 1600:
             continue
-        near_free = tf.query_ball_point([cx_, cy_], 3000)
-        d_park, _ = tkp.query(np.c_[fx[near_free], fy[near_free]])
-        n_drop = int((d_park > 1500).sum())
         others = [j for j in tkp.query_ball_point([cx_, cy_], 3500) if kp[j] != p]
-        if n_drop >= 1:
-            park_cands.append((n_drop - 0.3 * len(others) + 0.5 * m.sum(), int(p), cx_, cy_))
+        park_cands.append((0.5 * m.sum() - 0.3 * len(others), int(p), cx_, cy_))
     park_cands.sort(reverse=True)
 
     # 8. Un horizon libre: a village the rule actually protects.
-    hx, hy, hp = pts("horizon_ref_m4")
+    hx, hy, hp = pts("horizon_ref_after")
     radius = R["horizon_m"]
     rot = meta["turbine"]["rotor_m"] / 2
     tk, th = cKDTree(np.c_[kx, ky]), cKDTree(np.c_[hx, hy])
@@ -394,7 +372,7 @@ if __name__ == "__main__":
     vcand.sort(reverse=True)
 
     # 8 bis. Two parks 4 km apart (nearest masts), neither along a motorway.
-    ix, iy, ip = pts("inter4_ref_m4")
+    ix, iy, ip = pts("inter4_ref_after")
     pairs = []
     tree = cKDTree(np.c_[ix, iy])
     for a, b in tree.query_pairs(4600):
@@ -413,7 +391,7 @@ if __name__ == "__main__":
                     and min(sizes[k[0]], sizes[k[1]]) >= 4), key=lambda t: t[0])
 
     # 0 (fallback when there is no ground photo): the densest standing park.
-    fl = np.zeros_like(free_g)
+    fl = np.zeros((grid.rows, grid.cols), dtype=np.float32)
     for g in fleet.geometry:
         r, c = grid.rc(g.x, g.y)
         if 0 <= r < grid.rows and 0 <= c < grid.cols:
@@ -436,7 +414,7 @@ if __name__ == "__main__":
             {"centre_3035": [float(v) for v in grid.xy(r, c)], "score": round(sc, 3), "size_m": [w_m, h_m]}
             for r, c, sc in best_windows(score, 2 * hh, 2 * ww)
         ]
-    candidates["etape7"] = [{"centre_3035": [float(cx_), float(cy_)], "score": round(sc, 2), "size_m": [7000, 5250],
+    candidates["etape6"] = [{"centre_3035": [float(cx_), float(cy_)], "score": round(sc, 2), "size_m": [5600, 4200],
                              "park": p} for sc, p, cx_, cy_ in park_cands[:3]]
     candidates["etape8"] = [{"centre_3035": [float(vxy[i, 0]), float(vxy[i, 1])], "score": round(sc, 1),
                              "size_m": [11200, 8400], "village": int(i), "arc7": a7, "arc8": a8}
@@ -590,44 +568,38 @@ if __name__ == "__main__":
 
     def draw_etape6(cv, c):
         bb = cv.bbox
-        cv.poly(mask_polys((fam == 0) & region, grid, bb), fc=GREEN, alpha=0.5, ec="#123F1C", lw=1.4, zorder=5)
-        m = (fx > bb[0]) & (fx < bb[2]) & (fy > bb[1]) & (fy < bb[3])
-        for x, y in zip(fx[m], fy[m]):
-            for lw, col in ((5, "white"), (2.2, INK)):
-                cv.ax.add_patch(Circle((x, y), meta["turbine"]["spacing_m"] / 2, fc="none", ec=col, lw=lw,
-                                       linestyle=(0, (4, 3)) if col == INK else "-", zorder=12))
-        cv.turbines(fx[m], fy[m])
-        if m.sum() >= 2:
-            t = cKDTree(np.c_[fx[m], fy[m]])
-            d, j = t.query(np.c_[fx[m], fy[m]], k=2)
-            cen = np.array([(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2])
-            i = int(np.argmin(np.hypot(fx[m] - cen[0], fy[m] - cen[1]) + 5 * np.abs(d[:, 1] - 750)))
-            a = (fx[m][i], fy[m][i])
-            b = (fx[m][j[i, 1]], fy[m][j[i, 1]])
-            cv.arrow(a, b)
-            cv.label((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 140, "750 m", size=36)
-
-    def draw_etape7(cv, c):
-        bb = cv.bbox
+        cv.poly(mask_polys((fam == 0) & region, grid, bb), fc=GREEN, alpha=0.4, ec="#123F1C", lw=1.2, zorder=5)
         m = (kx > bb[0] - 2000) & (kx < bb[2] + 2000) & (ky > bb[1] - 2000) & (ky < bb[3] + 2000)
-        for hpoly in hull_polys(kx[m], ky[m], kp[m], 330):
-            cv.poly(hpoly, fc="white", alpha=0.22, ec="none", zorder=6)
+        # the park outline clears the 750 m circles
+        for hpoly in hull_polys(kx[m], ky[m], kp[m], 600):
+            cv.poly(hpoly, fc="white", alpha=0.16, ec="none", zorder=6)
             gpd.GeoSeries([hpoly.boundary]).plot(ax=cv.ax, color="white", lw=6, zorder=7)
             gpd.GeoSeries([hpoly.boundary]).plot(ax=cv.ax, color=INK, lw=2.6, zorder=8)
+        for x, y in zip(kx[m], ky[m]):
+            for lw, col in ((4, "white"), (1.8, INK)):
+                cv.ax.add_patch(Circle((x, y), meta["turbine"]["spacing_m"] / 2, fc="none", ec=col, lw=lw,
+                                       linestyle=(0, (4, 3)) if col == INK else "-", zorder=10))
         cv.turbines(kx[m], ky[m], r_px=9)
-        t = cKDTree(np.c_[kx, ky])
-        d, _ = t.query(np.c_[fx, fy])
-        drop = (d > 1500) & (fx > bb[0]) & (fx < bb[2]) & (fy > bb[1]) & (fy < bb[3])
-        cv.crosses(fx[drop], fy[drop])
         p = c.get("park")
-        if p is not None:
-            n = int((kp == p).sum())
-            cv.label(kx[kp == p].mean(), ky[kp == p].min() - 650, f"un parc de {n}", size=32)
-        if drop.any():
-            cen = np.array([(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2])
-            idx = np.nonzero(drop)[0]
-            i = idx[np.argmin(np.hypot(fx[idx] - cen[0], fy[idx] - cen[1]))]
-            cv.label(fx[i], fy[i] + 480, "isolée : retirée", size=30)
+        if p is None:
+            return
+        inp = np.nonzero(kp == p)[0]
+        cx_ = kx[inp].mean()
+        cv.place([Point(cx_, ky[inp].min() - 900), Point(cx_, ky[inp].max() + 900)], f"un parc de {len(inp)}", size=32)
+        # the 750 m arrow between the two nearest machines of that park
+        t = cKDTree(np.c_[kx[inp], ky[inp]])
+        d, j = t.query(np.c_[kx[inp], ky[inp]], k=2)
+        i = int(np.argmin(d[:, 1]))
+        a = (kx[inp][i], ky[inp][i])
+        b = (kx[inp][j[i, 1]], ky[inp][j[i, 1]])
+        cv.arrow(a, b)
+        # label beside the arrow, on the side away from the park's centre
+        mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        nx, ny = -(b[1] - a[1]), b[0] - a[0]
+        nn = np.hypot(nx, ny) or 1.0
+        if nx * (mx - kx[inp].mean()) + ny * (my - ky[inp].mean()) < 0:
+            nx, ny = -nx, -ny
+        cv.label(mx + 260 * nx / nn, my + 260 * ny / nn, "750 m", size=30)
 
     def draw_etape8(cv, c):
         bb = cv.bbox
@@ -707,7 +679,7 @@ if __name__ == "__main__":
         pass
 
     drawers = {"etape0": draw_etape0, "etape1": draw_etape1, "etape2": draw_etape2, "etape3": draw_etape3,
-               "etape4": draw_etape4, "etape5": draw_etape5, "etape6": draw_etape6, "etape7": draw_etape7,
+               "etape4": draw_etape4, "etape5": draw_etape5, "etape6": draw_etape6,
                "etape8": draw_etape8, "etape8bis": draw_etape8bis}
 
     # ------------------------------------------------------------------

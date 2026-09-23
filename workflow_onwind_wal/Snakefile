@@ -723,7 +723,7 @@ rule infographic_data:
 
 
 IG_PICTURES = ["etape0", "etape1", "etape2", "etape3", "etape4", "etape5", "etape6",
-               "etape7", "etape8", "etape8bis", "etape9", "bilan"]
+               "etape8", "etape8bis", "etape9", "bilan"]
 
 
 rule infographic_vignettes:

@@ -28,11 +28,11 @@ Reference turbine NREL 2020ATB 4 MW (tip 185 m), 5 D between any two machines.
 |---|---:|
 | eligible land, all implemented constraints | 420 km² (2.5 %) |
 | free allocation — *land-and-wake bound*, the quantity BREGILAB reports | 11 460 MW |
-| + parks of at least 4 machines | 8 648 MW |
-| + open horizon, 130° within 4 km of each village — **gross reference** | **6 480 MW** |
-| **central estimate** (+ residual allowance for birds and partial constraints) | **4 957 MW** |
-| credible range | 3 629 – 6 480 MW |
-| *if the recommended 4 / 6 km inter-distance were applied as a rule* | 5 436 / 4 336 MW gross |
+| + parks of four, then smaller groups only on the land left | 11 084 MW |
+| + open horizon, 130° within 4 km of each village — **gross reference** | **8 172 MW** |
+| **central estimate** (+ residual allowance for birds and partial constraints) | **6 252 MW** |
+| credible range | 4 576 – 8 172 MW |
+| *if the recommended 4 / 6 km inter-distance were applied as a rule* | 6 316 / 4 892 MW gross |
 | PyPSA-Eur default land analysis (area × 3 MW/km²) | 19 079 MW |
 | BREGILAB / VITO Dynamic Energy Atlas, gross | 11 400 MW |
 | BREGILAB's own rules applied to open data | 25 087 MW |
@@ -47,21 +47,23 @@ the answer are mostly policy. Each is priced on the gross reference (§7):
 
 | one change from the reference | gross MW | Δ |
 |---|---:|---:|
-| no agricultural corridor (derogation route) | 9 076 | +40 % |
-| no open-horizon rule | 8 648 | +34 % |
-| no minimum park size (2024 exception above 3.2 MW) | 8 116 | +25 % |
-| inter-distance 4 km between parks, motorways exempt | 5 436 | −16 % |
-| inter-distance 6 km between parks, motorways exempt | 4 336 | −33 % |
-| 2013 habitat setback (4 × tip height) | 4 660 | −28 % |
-| corridor relaxed and no park minimum, horizon kept | 10 664 | +65 % |
-| 6 km inter-distance and 2013 setback | 3 152 | −51 % |
+| no agricultural corridor (derogation route) | 10 772 | +32 % |
+| every coniferous stand, no distance to a main axis | 10 988 | +34 % |
+| the whole forest zone, broad-leaved stands included | 14 024 | +72 % |
+| no open-horizon rule | 11 084 | +36 % |
+| parks of at least four, without the exception above 3.2 MW | 6 480 | −21 % |
+| inter-distance 4 km between parks, motorways exempt | 6 316 | −23 % |
+| inter-distance 6 km between parks, motorways exempt | 4 892 | −40 % |
+| 2013 habitat setback (4 × tip height) | 6 408 | −22 % |
+| corridor lifted and every coniferous stand, horizon kept | 13 368 | +64 % |
+| 6 km inter-distance and parks of four without exception | 4 336 | −47 % |
 
 ## The rules, as the texts state them
 
 | rule | reference | basis |
 |---|---|---|
 | distance between machines | 5 D (750 m) | nearest-neighbour distance of a 5D×7D array; BREGILAB's rule; the fleet sits at 4.3 D |
-| park | ≥ 4 machines, 1.5 km linkage, no radius or centre separation | Cadre 2024 §3.1; the fleet's own farm definition |
+| park | ≥ 4 machines first, then smaller groups only on the land left; 1.5 km linkage; no radius or centre separation | Cadre 2024 §3.1, including the exception above 3.2 MW where it does not reduce the zone's potential |
 | open horizon | 130° free within 4 km of each village | Cadre 2024 §3.4 §3; 6 of 880 affected villages breach it today |
 | inter-distance | **sensitivity only** | Cadre 2024 §3.4 §3: 4 km (short views) to 6 km (long views) "recommandée et peut être réduite", not along motorways, measured between nearest masts; 53 % of standing farms are closer than 4 km to another |
 | agricultural corridor | 1.5 km from a PIC or a zone d'activité économique | CoDT R.II.36-2; a PIC is a motorway, a 2×2 regional road, a railway or a waterway (R.II.21-1) — not every plan-de-secteur road |

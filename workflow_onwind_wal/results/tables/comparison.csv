@@ -5,9 +5,9 @@ BREGILAB / VITO Dynamic Energy Atlas,"Clymans et al. 2022, V112 at 5 D, free all
 BREGILAB's rules on this study's data,"this study, emulation of the WTN scenario, V112 at 5 D",25087.0,
 "Walloon constraint set, area x density","this study, S6_servitudes, 5.08 MW/km2",2136.0,6.96
 "Walloon constraint set, free allocation","this study, S6_servitudes, 750 m between machines, no grouping rule",11460.0,37.36
-"Walloon constraint set, parks of 4 or more","this study, S6_servitudes, no landscape rule",8648.0,28.19
-"Walloon constraint set, parks and open horizon","this study, S6_servitudes, gross reference",6480.0,21.125
-"Walloon constraint set, machines placed, residual allowance","this study, central allowance for the families with no geometry",4957.0,16.16
+"Walloon constraint set, parks of 4 or more","this study, S6_servitudes, no landscape rule",11084.0,36.13
+"Walloon constraint set, parks and open horizon","this study, S6_servitudes, gross reference",8172.0,26.641
+"Walloon constraint set, machines placed, residual allowance","this study, central allowance for the families with no geometry",6252.0,20.38
 "SPW/Gembloux favourable-zone update 2022, '180 m' case","site-by-site simulation, additional potential only",,3.96
 "Installed fleet, end 2024",EDORA / Renouvelle,1528.0,
 PNEC / PACE 2030 onshore-wind target,Walloon Government,,6.2

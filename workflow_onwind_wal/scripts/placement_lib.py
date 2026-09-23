@@ -158,7 +158,8 @@ def seed_scores(mask, rows, cols, res, seed_radius):
 
 
 def grow_parks(xs, ys, score, spacing, link=1500.0, n_min=4, horizon=None,
-               interdistance=0.0, along_motorway=None, tree=None, preplaced=None):
+               interdistance=0.0, along_motorway=None, tree=None, preplaced=None,
+               excluded=None):
     """
     Returns (turbine cell indices, park id of each, number of placements the
     open-horizon rule refused).
@@ -178,6 +179,7 @@ def grow_parks(xs, ys, score, spacing, link=1500.0, n_min=4, horizon=None,
             placed.add(x, y, -1)
             others.add(x, y, bool(mw))
     considered = np.zeros(n, dtype=bool)
+    blocked = np.zeros(n, dtype=bool) if excluded is None else np.asarray(excluded, dtype=bool)
     turbines, parks = [], []
     refused = 0
     pid = 0
@@ -188,7 +190,7 @@ def grow_parks(xs, ys, score, spacing, link=1500.0, n_min=4, horizon=None,
         return any(not (mw and f) for f in others.near(x, y, interdistance))
 
     for s in np.argsort(-score, kind="stable"):
-        if considered[s] or score[s] <= 0:
+        if considered[s] or blocked[s] or score[s] <= 0:
             continue
         x0, y0 = xs[s], ys[s]
         if placed.any_near(x0, y0, spacing) or too_close_to_other_park(x0, y0, amw[s]):
@@ -200,6 +202,8 @@ def grow_parks(xs, ys, score, spacing, link=1500.0, n_min=4, horizon=None,
         seen = {s}
         while heap:
             _, c = heapq.heappop(heap)
+            if blocked[c]:
+                continue
             x, y = xs[c], ys[c]
             if placed.any_near(x, y, spacing) or own.any_near(x, y, spacing):
                 continue
@@ -257,8 +261,15 @@ def place_parks(xs, ys, score, spacing, link=1500.0, n_min=4, small_groups="afte
         return idx, pid, refused
     if small_groups != "after":
         raise ValueError(f"small_groups must be 'after' or 'none', not {small_groups!r}")
+    # Cells within `link` of a park already kept belong to that park.  The
+    # second pass must not open a new group on them: that would split one
+    # park into two and would use land the first pass could have used.
+    excluded = np.zeros(len(xs), dtype=bool)
+    if len(idx):
+        for nbrs in tree.query_ball_point(np.c_[xs[idx], ys[idx]], link):
+            excluded[nbrs] = True
     amw = along_motorway if along_motorway is not None else np.zeros(len(xs), dtype=bool)
-    i2, p2, r2 = grow_parks(xs, ys, score, spacing, n_min=1,
+    i2, p2, r2 = grow_parks(xs, ys, score, spacing, n_min=1, excluded=excluded,
                             preplaced=(xs[idx], ys[idx], amw[idx]), **kw)
     offset = int(pid.max()) + 1 if len(pid) else 0
     return np.r_[idx, i2].astype(np.int64), np.r_[pid, p2 + offset].astype(np.int64), refused + r2

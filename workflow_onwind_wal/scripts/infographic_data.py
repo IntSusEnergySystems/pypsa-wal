@@ -55,8 +55,9 @@ from placement_lib import (  # noqa: E402
     Horizon,
     allocate_free,
     check_layout,
-    grow_parks,
+    min_group,
     motorway_distance,
+    place_parks,
     seed_scores,
 )
 
@@ -268,17 +269,24 @@ if __name__ == "__main__":
         points[f"free_{land}"] = pack(r, c, np.zeros_like(r))
         land_steps[land] = steps
 
-    def place(land, n_min, horizon, interdistance):
+    n_min = int(pcfg["park"]["min_turbines"])
+    # "after" is the reference: parks of four, then smaller groups only on land
+    # no such park can use.  "none" is the minimum without the §3.1 4° exception.
+    groups = ("after", "none")
+
+    def place(land, small_groups, horizon, interdistance):
         mask = attribution[land] == 0
         r, c, xs, ys = cells(mask)
         amw = dmw[r, c] <= float(lcfg["motorway_exemption_m"])
         hz = (Horizon(villages, D, lcfg["horizon_radius_m"], lcfg["min_free_azimuth_deg"])
               if horizon else None)
         score = seed_scores(mask, r, c, res, float(pcfg["park"]["seed_radius_m"]))
-        idx, pid, _ = grow_parks(xs, ys, score, spacing, link=link, n_min=n_min, horizon=hz,
-                                 interdistance=float(interdistance), along_motorway=amw,
-                                 tree=cKDTree(np.c_[xs, ys]))
-        chk = check_layout(xs[idx], ys[idx], pid, spacing, n_min=n_min,
+        idx, pid, _ = place_parks(xs, ys, score, spacing, link=link, n_min=n_min,
+                                  small_groups=small_groups, horizon=hz,
+                                  interdistance=float(interdistance), along_motorway=amw,
+                                  tree=cKDTree(np.c_[xs, ys]))
+        chk = check_layout(xs[idx], ys[idx], pid, spacing,
+                           n_min=min_group(n_min, small_groups),
                            villages=villages if horizon else None, rotor_diameter=D,
                            radius=lcfg["horizon_radius_m"],
                            min_free_deg=lcfg["min_free_azimuth_deg"],
@@ -289,32 +297,33 @@ if __name__ == "__main__":
 
     placed = {}
     for land in LANDS:
-        for n_min in (int(pcfg["park"]["min_turbines"]), 1):
+        for small_groups in groups:
             for rule, (hz, inter) in {"parks": (False, 0), "horizon": (True, 0),
                                       "inter4": (True, 4000), "inter6": (True, 6000)}.items():
-                key = f"{rule}_{land}_m{n_min}"
-                r, c, pid = place(land, n_min, hz, inter)
+                key = f"{rule}_{land}_{small_groups}"
+                r, c, pid = place(land, small_groups, hz, inter)
                 points[key] = pack(r, c, pid)
                 placed[key] = int(len(r))
                 logger.info("%-26s %5d machines, %d parks", key, len(r),
                             int(pid.max() + 1) if len(pid) else 0)
 
     # ------------------------------------------------------------------
-    # The 24 states
+    # The 36 states: derogation x isolated x inter-distance x forest reading
     # ------------------------------------------------------------------
     resid = headline["residual"]
     survival = {k: float(resid[k]["survival"]) for k in ("central", "low", "high")}
-    n_min_ref = int(pcfg["park"]["min_turbines"])
     states = {}
     for derog, isolated, inter, forest in itertools.product((0, 1), (0, 1), (0, 4, 6), range(3)):
         land = next(k for k, v in LANDS.items() if v == (bool(derog), FORESTS[forest]))
-        m = 1 if isolated else n_min_ref
+        # isolated=1 is the reference (the §3.1 4° exception).  isolated=0
+        # keeps only parks of at least four.
+        small_groups = "after" if isolated else "none"
         ls = land_steps[land]
         area = ls[-1]["area_km2"]
         steps = [dict(s, pts=None) for s in ls]
         steps.append(dict(ls[-1], pts=f"free_{land}"))
         for rule in ["parks", "horizon"] + ([f"inter{inter}"] if inter else []):
-            key = f"{rule}_{land}_m{m}"
+            key = f"{rule}_{land}_{small_groups}"
             steps.append({"area_km2": area, "n": placed[key], "mw": round(placed[key] * p_nom),
                           "pts": key})
         last = steps[-1]
@@ -336,7 +345,7 @@ if __name__ == "__main__":
     def st(key, i):
         return states[key]["steps"][i]
 
-    ref = "d0-i0-x0-f0"
+    ref = "d0-i1-x0-f0"
     fails = []
 
     def expect(what, got, want):
@@ -352,13 +361,14 @@ if __name__ == "__main__":
     expect("central MW", st(ref, s9)["mw"], headline["credible_central_mw"])
     expect("range", [st(ref, s9)["mw_low"], st(ref, s9)["mw_high"]], headline["credible_range_mw"])
     for key, case, i in [
-        ("d0-i0-x4-f0", "interdistance_4km", s8 + 1),
-        ("d0-i0-x6-f0", "interdistance_6km", s8 + 1),
-        ("d0-i1-x0-f0", "parks_min1", s8),
-        ("d1-i0-x0-f0", "no_corridor", s8),
-        ("d0-i0-x0-f1", "forest_conifers", s8),
-        ("d0-i0-x0-f2", "forest_all", s8),
-        ("d1-i1-x0-f0", "all_policy_relaxed", s8),
+        ("d0-i1-x4-f0", "interdistance_4km", s8 + 1),
+        ("d0-i1-x6-f0", "interdistance_6km", s8 + 1),
+        ("d0-i0-x0-f0", "parks_min4", s8),
+        ("d1-i1-x0-f0", "no_corridor", s8),
+        ("d0-i1-x0-f1", "forest_conifers", s8),
+        ("d0-i1-x0-f2", "forest_all", s8),
+        ("d1-i1-x0-f1", "all_policy_relaxed", s8),
+        ("d0-i0-x6-f0", "all_policy_tightened", s8 + 1),
     ]:
         expect(f"{case} MW", st(key, i)["mw"], sens[case]["p_nom_max_mw"])
         expect(f"{case} area", st(key, s5)["area_km2"], sens[case]["eligible_area_km2"])
@@ -453,7 +463,7 @@ if __name__ == "__main__":
             "dwelling_m": round(float(cfg["setbacks"]["scattered_dwellings"])),
             "corridor_m": round(float(cfg["plan_de_secteur"]["agri_max_distance_to_pic"])),
             "conifer_m": round(float(cfg["plan_de_secteur"]["conifer_max_distance_to_pic"])),
-            "park_link_m": link, "park_min": n_min_ref,
+            "park_link_m": link, "park_min": n_min,
             "horizon_deg": lcfg["min_free_azimuth_deg"], "horizon_m": lcfg["horizon_radius_m"],
             "motorway_exemption_m": lcfg["motorway_exemption_m"],
         },

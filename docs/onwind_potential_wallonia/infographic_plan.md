@@ -622,6 +622,18 @@ l'étape 3 donne 5 122 éoliennes, au lieu de 5 123.
 - **Disposition** : les étapes forment une frise en haut de la page, et
   « Et si… ? » est placé sous la carte ; les formats d'export gardent la
   disposition du §2.
+- **Éoliennes isolées : l'interrupteur interdit** (au lieu d'autoriser).
+  Désactivé par défaut, il retire l'exception du Cadre (§3.1, 4°) et donne
+  −21 % ; le choix de référence n'apparaît plus comme une option en plus.
+- **Étapes 6 et 7 fusionnées** en « 6 · Placer les éoliennes » (750 m entre
+  machines, regroupées en parcs) : l'ancienne étape 6 ne changeait pas le
+  chiffre, et l'étape 7 portait trois notions pour −3 %. L'entonnoir compte
+  8 étapes (0–8, plus 7 bis) ; `states.json` garde ses 11 pas, l'arrêt 6 lit
+  le pas 7 et l'arrêt 7 le pas 8. Les anciens liens `#etape=9` et `8bis` sont
+  redirigés.
+- **Choix multiples en liste de boutons radio**, une ligne par option avec son
+  effet et l'étiquette « référence » sur la règle retenue, au lieu du contrôle
+  segmenté que les libellés longs faisaient passer sur trois lignes.
 
 **Décisions encore ouvertes (§17) :**
 

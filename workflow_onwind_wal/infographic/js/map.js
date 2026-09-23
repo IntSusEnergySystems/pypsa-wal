@@ -404,23 +404,19 @@ export class Loupe {
     const spacing = this.meta.turbine.spacing_m / this.grid.res_m;
     if (stepId === "6") {
       for (const i of inside) el("circle", { cx: pts.c[i], cy: pts.r[i], r: spacing / 2, class: "spacing" }, this.extra);
-    }
-    if (stepId === "7") {
       const parks = new Map();
       for (const i of inside) {
         if (!parks.has(pts.p[i])) parks.set(pts.p[i], []);
         parks.get(pts.p[i]).push([pts.c[i], pts.r[i]]);
       }
       for (const ps of parks.values()) {
-        if (ps.length < 2) {
-          el("circle", { cx: ps[0][0], cy: ps[0][1], r: 4, class: "park" }, this.extra);
-          continue;
-        }
+        // A single machine already has its spacing circle.
+        if (ps.length < 2) continue;
         const h = hull(ps);
         el("path", { d: "M" + h.map((p) => p.join(",")).join("L") + "Z", class: "park" }, this.extra);
       }
     }
-    if (["8", "8bis", "9", "bilan"].includes(stepId)) {
+    if (["7", "7bis", "8", "bilan"].includes(stepId)) {
       const R = this.meta.rules.horizon_m / this.grid.res_m;
       const arcs = [];
       for (const [vx, vy] of this.villages) {

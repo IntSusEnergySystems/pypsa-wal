@@ -1,18 +1,18 @@
 case,group,label,eligible_area_km2,free_mw,n_turbines,n_parks,p_nom_max_mw,delta_mw,delta_pct
-reference,reference,reference (2024 framework as applied),418.0,11460,1620,168,6480,0,0.0
-interdistance_4km,policy,"inter-distance 4 km between parks (short views), motorways exempt",418.0,11460,1359,131,5436,-1044,-16.1
-interdistance_6km,policy,"inter-distance 6 km between parks (long views), motorways exempt",418.0,11460,1084,95,4336,-2144,-33.1
-no_horizon,policy,no open-horizon rule,418.0,11460,2162,198,8648,2168,33.5
-parks_min1,policy,no minimum park size (2024 exception above 3.2 MW),418.0,11460,2029,464,8116,1636,25.2
-no_corridor,policy,"no agricultural corridor (derogation, CoDT D.IV.11)",667.3,16728,2269,196,9076,2596,40.1
-habitat_cdr2013,policy,"2013 habitat setback, 4 x tip height",279.3,8256,1165,140,4660,-1820,-28.1
-no_adesa,judgement,ADESA perimeters not excluded,479.6,12984,1814,174,7256,776,12.0
-no_landscape,judgement,no landscape perimeter excluded,506.9,13832,1935,186,7740,1260,19.4
-slope_ge10,judgement,slope criterion at 10 %,486.7,12256,1738,163,6952,472,7.3
-slope_ge15,judgement,slope criterion at 15 %,523.5,12696,1810,169,7240,760,11.7
-no_aviation,judgement,no aeronautical ring excluded,483.9,12656,1820,181,7280,800,12.3
-forest_conifers,policy,"every coniferous stand of the forest zone admitted (Cadre 2024 wording, no PIC distance)",615.1,15344,2359,177,9436,2956,45.6
-forest_all,policy,"the whole forest zone admitted, broad-leaved stands included",954.0,20568,3173,164,12692,6212,95.9
-pic_plan_de_secteur,misreading,every plan-de-secteur road taken as a PIC (a misreading of R.II.21-1),557.2,14728,2117,196,8468,1988,30.7
-all_policy_relaxed,combined,"no agricultural corridor and no minimum park size, open horizon kept",667.3,16728,2666,506,10664,4184,64.6
-all_policy_tightened,combined,6 km inter-distance and the 2013 habitat setback,279.3,8256,788,89,3152,-3328,-51.4
+reference,reference,reference (2024 framework as applied),418.0,11460,2043,453,8172,0,0.0
+interdistance_4km,policy,"inter-distance 4 km between parks (short views), motorways exempt",418.0,11460,1579,284,6316,-1856,-22.7
+interdistance_6km,policy,"inter-distance 6 km between parks (long views), motorways exempt",418.0,11460,1223,193,4892,-3280,-40.1
+no_horizon,policy,no open-horizon rule,418.0,11460,2771,611,11084,2912,35.6
+parks_min4,policy,"parks of at least four, without the 2024 exception above 3.2 MW",418.0,11460,1620,168,6480,-1692,-20.7
+no_corridor,policy,"no agricultural corridor (derogation, CoDT D.IV.11)",667.3,16728,2693,486,10772,2600,31.8
+habitat_cdr2013,policy,"2013 habitat setback, 4 x tip height",279.3,8256,1602,434,6408,-1764,-21.6
+no_adesa,judgement,ADESA perimeters not excluded,479.6,12984,2248,468,8992,820,10.0
+no_landscape,judgement,no landscape perimeter excluded,506.9,13832,2339,468,9356,1184,14.5
+slope_ge10,judgement,slope criterion at 10 %,486.7,12256,2178,454,8712,540,6.6
+slope_ge15,judgement,slope criterion at 15 %,523.5,12696,2249,459,8996,824,10.1
+no_aviation,judgement,no aeronautical ring excluded,483.9,12656,2245,468,8980,808,9.9
+forest_conifers,policy,"every coniferous stand of the forest zone admitted (Cadre 2024 wording, no PIC distance)",615.1,15344,2747,441,10988,2816,34.5
+forest_all,policy,"the whole forest zone admitted, broad-leaved stands included",954.0,20568,3506,403,14024,5852,71.6
+pic_plan_de_secteur,misreading,every plan-de-secteur road taken as a PIC (a misreading of R.II.21-1),557.2,14728,2507,462,10028,1856,22.7
+all_policy_relaxed,combined,"no agricultural corridor and every coniferous stand, open horizon kept",862.2,20176,3342,440,13368,5196,63.6
+all_policy_tightened,combined,6 km inter-distance and parks of at least four without exception,418.0,11460,1084,95,4336,-3836,-46.9

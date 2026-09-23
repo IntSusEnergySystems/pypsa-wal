@@ -12,7 +12,6 @@
     "possibles": "éoliennes possibles",
     "eoliennes": "éoliennes",
     "si_chaque_hectare": "si chaque hectare était disponible",
-    "empilement": "empilement maximal, avant les règles de parc",
     "terrain": "{km2} km² · {pct} % de la Région encore disponibles",
     "fourchette": "entre {lo} et {hi} MW",
     "scenario_modifie": "Et si… : {n} choix modifié",
@@ -121,29 +120,20 @@
     },
     {
       "id": "6",
-      "titre": "750 m entre éoliennes",
-      "regle": "Cinq diamètres de rotor pour limiter les pertes de sillage : l'empilement maximal",
-      "pourquoi": "Chaque point est une éolienne de {p_nom} MW. À {spacing_m} m les unes des autres et sans autre règle, c'est tout ce que le terrain restant peut porter.",
+      "titre": "Placer les éoliennes",
+      "titre_strict": "Placer les éoliennes, en parcs d'au moins 4",
+      "regle": "À 750 m l'une de l'autre, regroupées en parcs ; une éolienne seule là où un parc ne tient pas",
+      "regle_strict": "À 750 m l'une de l'autre, en parcs d'au moins 4 ; aucune éolienne seule",
+      "pourquoi": "Une éolienne freine le vent derrière elle : on les écarte de {spacing_m} m, cinq fois le diamètre du rotor. Le Cadre de référence préfère des parcs d'au moins quatre, et admet une éolienne seule là où un parc ne tient pas. Chaque point est une éolienne de {p_nom} MW.",
       "image": "etape6",
-      "alt": "Vue aérienne de champs avec les éoliennes du calcul et leurs cercles de 750 m",
-      "picto": "espacement"
-    },
-    {
-      "id": "7",
-      "titre": "Des parcs d'au moins 4",
-      "titre_isolees": "Des parcs, éoliennes isolées admises",
-      "regle": "Pas d'éolienne isolée : les machines sont groupées en parcs",
-      "regle_isolees": "Les parcs se forment, mais une éolienne seule reste admise",
-      "pourquoi": "Le Cadre de référence définit un parc comme au moins quatre éoliennes (§3.1). Deux machines à moins de {park_link_km} km appartiennent au même parc.",
-      "image": "etape7",
-      "alt": "Vue aérienne d'un parc de quatre éoliennes, et d'une éolienne isolée barrée",
+      "alt": "Vue aérienne d'un parc de quatre éoliennes, avec leurs cercles de 750 m",
       "picto": "parcs",
       "et_si": {
-        "isolees": "Éoliennes isolées admises : le Cadre permet moins de quatre machines au-delà de 3,2 MW, ce qui est le cas ici."
+        "strict": "Éoliennes isolées interdites : parcs d'au moins 4 partout, sans l'exception du Cadre au-delà de 3,2 MW."
       }
     },
     {
-      "id": "8",
+      "id": "7",
       "titre": "Un horizon libre pour chaque village",
       "regle": "130° de l'horizon de chaque village restent sans éolienne, sur 4 km",
       "pourquoi": "« Un angle horizontal de 130° sans éoliennes est préservé sur une distance de 4 kilomètres » (Cadre de référence 2024, §3.4).",
@@ -152,7 +142,7 @@
       "picto": "horizon"
     },
     {
-      "id": "8bis",
+      "id": "7bis",
       "titre": "{km} km entre deux parcs",
       "regle": "Au moins {km} km entre deux parcs, sauf le long des autoroutes",
       "pourquoi": "Le Cadre (§3.4) recommande 4 km en paysage à vues courtes et 6 km à vues longues ; cette distance « peut être réduite ».",
@@ -164,7 +154,7 @@
       }
     },
     {
-      "id": "9",
+      "id": "8",
       "titre": "Autres impacts",
       "regle": "Oiseaux, chauves-souris, radars : des contraintes qui ne sont pas cartographiées, environ −{reserve_pct} %",
       "pourquoi": "Aucune carte publique ne les montre. On déduit donc {orni_pct} % pour les zones prioritaires pour les oiseaux, et {partiel_pct} % pour les zones où un projet ne passe qu'au cas par cas : couloirs de migration, zones à chauves-souris, maillage écologique, abords des radars.",
@@ -188,7 +178,8 @@
     "terrain": "−{km2} km² ({pct} % de ce qui restait)",
     "terrain_zero": "aucun terrain retiré",
     "eoliennes_moins": "place pour {n} éoliennes de moins",
-    "apparaissent": "même nombre : les {n} éoliennes apparaissent sur la carte",
+    "places": "{n} éoliennes sur la carte",
+    "regroupement": "−{n} ({pct} %) pour les regrouper en parcs",
     "moins": "−{n} éoliennes ({pct} %)",
     "reserve": "Une moyenne, sans dire où : aucun point n'est retiré de la carte",
     "bilan_parc": "Parc actuel",
@@ -201,6 +192,7 @@
     "reinitialiser": "Revenir aux règles en vigueur",
     "aucun_choix": "les règles en vigueur",
     "agit_etape": "agit à l'étape {n}",
+    "en_vigueur_tag": "référence",
     "aller": "voir",
     "effet_titre": "effet sur le résultat",
     "choix": {
@@ -211,22 +203,22 @@
         "etape": "2"
       },
       "isolees": {
-        "libelle": "Autoriser les grandes éoliennes isolées (plus de 3,2 MW)",
-        "court": "Éoliennes isolées admises",
-        "en_vigueur": "En vigueur : le Cadre 2024 (§3.1) demande au moins 4 éoliennes par parc, mais accepte un parc plus petit, voire une éolienne seule, si chaque machine dépasse 3,2 MW.",
-        "etape": "7"
+        "libelle": "Interdire les éoliennes isolées",
+        "court": "Éoliennes isolées interdites",
+        "en_vigueur": "En vigueur : le Cadre 2024 admet une éolienne seule au-delà de 3,2 MW (§3.1, 4°), soit toute machine actuelle. Elle ne prend ici que le terrain où un parc de 4 ne tient pas.",
+        "etape": "6"
       },
       "interdistance": {
         "libelle": "Distance minimale entre parcs",
         "court": "Entre parcs",
         "options": ["aucune", "4 km", "6 km"],
         "en_vigueur": "En vigueur : une simple recommandation du Cadre (§3.4), qui « peut être réduite » et ne vaut pas le long des autoroutes.",
-        "etape": "8bis"
+        "etape": "7bis"
       },
       "foret": {
         "libelle": "Éoliennes en zone forestière",
         "court": "Forêt",
-        "options": ["près d'un grand axe", "tous les résineux", "toute la forêt"],
+        "options": ["résineux près d'un grand axe", "tous les résineux", "toute la forêt"],
         "en_vigueur": "En vigueur : sur résineux seulement, à {conifer_m} m au plus d'un grand axe (CoDT, R.II.37-2). Le Cadre 2024 ne demande que des plantations de résineux pauvres en biodiversité ; les feuillus restent exclus.",
         "etape": "1"
       }
@@ -235,7 +227,7 @@
 
   "expert": {
     "titre": "Mode expert : les choix de modélisation",
-    "intro": "Chaque ligne change un seul choix de l'étude, sur la référence de {ref} MW (étape 8, règles en vigueur). Les effets ne s'additionnent pas.",
+    "intro": "Chaque ligne change un seul choix de l'étude, sur la référence de {ref} MW (étape 7, règles en vigueur). Les effets ne s'additionnent pas.",
     "colonnes": ["choix de modélisation", "MW", "écart"],
     "lignes": {
       "no_adesa": "Périmètres ADESA non exclus",

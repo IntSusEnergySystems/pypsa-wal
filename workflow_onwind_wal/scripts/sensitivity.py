@@ -75,6 +75,8 @@ if __name__ == "__main__":
     needed = set(ref_layers)
     for c in cases.values():
         needed |= {v for v in (c.get("land") or {}).values() if v}
+    for c in cfg["sensitivity"].get("combined", {}).values():
+        needed |= {v for v in (c.get("land") or {}).values() if v}
     masks, transform = {}, None
     for name in sorted(needed):
         ex = ExclusionContainer(crs=crs, res=res)
@@ -171,7 +173,14 @@ if __name__ == "__main__":
                          "delta_pct": round(100 * (r["p_nom_max_mw"] / ref["p_nom_max_mw"] - 1), 1)})
         logger.info("%-22s %s", name, rows_out[-1])
     for name, c in cfg["sensitivity"].get("combined", {}).items():
-        r = run(*apply(c["cases"]))
+        if c.get("cases"):
+            layers, rules = apply(c["cases"])
+        else:
+            layers, rules = list(ref_layers), dict(base_rules)
+        for old, new in (c.get("land") or {}).items():
+            layers = [new if l == old else l for l in layers if not (l == old and new is None)]
+        rules.update(c.get("placement") or {})
+        r = run(layers, rules)
         rows_out.append({"case": name, "group": "combined", "label": c["label"], **r,
                          "delta_mw": r["p_nom_max_mw"] - ref["p_nom_max_mw"],
                          "delta_pct": round(100 * (r["p_nom_max_mw"] / ref["p_nom_max_mw"] - 1), 1)})
