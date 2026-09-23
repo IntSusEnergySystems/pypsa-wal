@@ -1,0 +1,5 @@
+type,technology_type,technology_name_fr,technology_name_pypsa,technology_name_times,parameter,year,year_currency,value,units,source,description_complementaire,note_complementaire,data_origin_choice,pypsa_wal_value,pypsa_wal_location,pypsa_wal_target,year_rule,status
+flexibility,,,,,,,,,,,,,PyPSA,,,none:section_header,hold,none
+technology,Carbon Capture,Séquestration du CO₂,carbon sequestration,CO2STG01,VOM,2035.0,2025.0,105.0,EUR/tCO2,,,Placeholder left empty on purpose (2026-07-26). To be further refined — technology not wired or costs not agreed yet.,PyPSA,,,none:placeholder_to_refine,hold,pending
+technology,Carbon Capture,Séquestration du CO₂,carbon sequestration,CO2STG01,VOM,2040.0,2025.0,100.0,EUR/tCO2,,,Placeholder left empty on purpose (2026-07-26). To be further refined — technology not wired or costs not agreed yet.,PyPSA,,,none:placeholder_to_refine,hold,pending
+technology,Carbon Capture,Séquestration du CO₂,carbon sequestration,CO2STG01,VOM,2050.0,2025.0,92.0,EUR/tCO2,,,Placeholder left empty on purpose (2026-07-26). To be further refined — technology not wired or costs not agreed yet.,PyPSA,,,none:placeholder_to_refine,hold,pending
