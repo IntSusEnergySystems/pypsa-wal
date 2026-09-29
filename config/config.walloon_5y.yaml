@@ -115,15 +115,6 @@ co2_budget:
 # `scripts/build_common_parameters.py --config <base> <this file> --write`.
 # Do not hand-edit: run the tool instead.
 budget_national:
-  2025:
-    BEBRU: 0.648
-    BEVLG: 0.648
-    BEWAL: 0.648
-    DE: 0.648
-    FR: 0.648
-    GB: 0.648
-    NL: 0.648
-    LU: 0.648
   2030:
     BEBRU: 0.45
     BEVLG: 0.45

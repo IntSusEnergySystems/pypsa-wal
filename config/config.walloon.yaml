@@ -699,15 +699,6 @@ co2_price_national: false
 # why every national cap was inert after 2025. The literature values are
 # preserved in the CSV row's note.
 budget_national:
-  2025:
-    BEBRU: 0.648
-    BEVLG: 0.648
-    BEWAL: 0.648
-    DE: 0.648
-    FR: 0.648
-    GB: 0.648
-    NL: 0.648
-    LU: 0.648
   2030:
     BEBRU: 0.45
     BEVLG: 0.45

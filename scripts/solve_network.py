@@ -2237,9 +2237,17 @@ def extra_functionality(
         nhours = n.snapshot_weightings.generators.sum()
         nyears = nhours / 8760
         investment_year = int(snakemake.wildcards.planning_horizons[-4:])
-        limit_countries = snakemake.config["budget_national"][investment_year]
-        # add co2 constraint for each country
-        add_co2limit_country(n, limit_countries, nyears)
+        budgets = snakemake.config["budget_national"]
+        limit_countries = budgets.get(investment_year, budgets.get(str(investment_year)))
+        # An explicit blank anchor (no national cap that year) omits the key.
+        # The system-wide co2_budget, applied in prepare_sector_network, still holds.
+        if limit_countries is None:
+            logger.info(
+                "No budget_national entry for %s; national CO2 cap not applied.",
+                investment_year,
+            )
+        else:
+            add_co2limit_country(n, limit_countries, nyears)
 
     if n.config["co2_price_national"]:
         # prepare co2 constraint
