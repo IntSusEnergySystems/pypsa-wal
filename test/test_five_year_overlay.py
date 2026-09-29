@@ -64,7 +64,9 @@ def full_cfg() -> dict:
 def test_base_config_still_ten_year(base_cfg):
     """The shipped config keeps its four horizons — the overlay is opt-in."""
     assert tuple(base_cfg["scenario"]["planning_horizons"]) == H10
-    assert sorted(base_cfg["budget_national"]) == list(H10)
+    # 2025 is an explicit blank anchor in the shared CSV: no national cap that
+    # year. The system-wide co2_budget at 2025 still applies.
+    assert sorted(base_cfg["budget_national"]) == [2030, 2040, 2050]
     assert base_cfg["run"]["prefix"] == "walloon"
 
 

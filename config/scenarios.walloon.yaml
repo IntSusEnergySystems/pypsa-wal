@@ -364,7 +364,7 @@ scen_evflex:
 
 scen_central:
   sector:
-    times_file: data/walloon/scen_central_v01_260911_1109.vd
+    times_file: data/walloon/scen_central_v01_260923_2_2309.vd
     rooftop_floor:
       enable: true
       node: BEWAL

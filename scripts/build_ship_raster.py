@@ -21,6 +21,7 @@ Description
 """
 
 import logging
+import os
 import zipfile
 from pathlib import Path
 
@@ -67,7 +68,17 @@ if __name__ == "__main__":
     x, X, y, Y = determine_cutout_xXyY(snakemake.input.cutout)
 
     with zipfile.ZipFile(snakemake.input.ship_density) as zip_f:
-        resources = Path(snakemake.output[0]).parent
+        # The member is an 8 GB global raster. Extract it off the root disk:
+        # resources/ itself stays a tiny git directory, and only resources/walloon
+        # is the usual mount symlink.
+        mount_tmp = Path("/sylvain/mount/pypsa-wal-data/tmp")
+        if os.environ.get("TMPDIR"):
+            resources = Path(os.environ["TMPDIR"])
+        elif mount_tmp.parent.is_dir():
+            resources = mount_tmp
+        else:
+            resources = Path(snakemake.output[0]).parent
+        resources.mkdir(parents=True, exist_ok=True)
         fn = "shipdensity_global.tif"
         zip_f.extract(fn, resources)
     with rioxarray.open_rasterio(resources / fn) as ship_density:

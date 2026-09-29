@@ -889,16 +889,27 @@ def build_budget_national(
     act = active_rows(df)
     rows = act[act["pypsa_wal_target"] == "config:budget_national"]
     anchors: dict[int, float] = {}
+    # An active row with a year and an empty value is an explicit hole: that
+    # horizon has no national cap. Do not back-fill it from the next anchor
+    # (interp would otherwise pin 2025 to the 2030 fraction).
+    holes: set[int] = set()
     rule = "interp"
     for _, r in rows.iterrows():
-        if pd.isna(r["value"]) or pd.isna(r["year"]):
+        if pd.isna(r["year"]):
             continue
-        anchors[int(r["year"])] = float(r["value"]) / 100.0
+        year = int(r["year"])
         if pd.notna(r.get("year_rule")):
             rule = str(r["year_rule"])
+        if pd.isna(r["value"]):
+            holes.add(year)
+            continue
+        anchors[year] = float(r["value"]) / 100.0
+    expanded = expand_years(rule, anchors, horizons)
+    for year in holes:
+        expanded.pop(year, None)
     return {
         y: {reg: round(frac, 6) for reg in BUDGET_REGIONS}
-        for y, frac in sorted(expand_years(rule, anchors, horizons).items())
+        for y, frac in sorted(expanded.items())
     }
 
 
@@ -1606,7 +1617,14 @@ def check_currency(df: pd.DataFrame, meta: dict) -> list[str]:
     eur_ref = int(meta["EUR_REF"])
     prefix = f"EUR{eur_ref}"
     fails: list[str] = []
-    targeted = df.loc[monetary_mask(df) & df["pypsa_wal_target"].notna()]
+    # `none:` targets are documentation (pending placeholders). They are not
+    # written into any PyPSA file, so a source-currency unit must not block
+    # `--write` of the rows that do flow.
+    targeted = df.loc[
+        monetary_mask(df)
+        & df["pypsa_wal_target"].notna()
+        & ~df["pypsa_wal_target"].astype(str).str.startswith("none:")
+    ]
     for r in targeted.itertuples():
         if not str(r.units).startswith(prefix):
             fails.append(
