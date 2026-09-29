@@ -103,13 +103,20 @@ def add_brownfield(
                 chp_heat[c.df.loc[chp_heat, f"{attr}_nom_opt"] < threshold_chp_heat],
             )
 
-        n_p.remove(
-            c.name,
-            c.df.index[
-                (c.df[f"{attr}_nom_extendable"] & ~c.df.index.isin(chp_heat))
-                & (c.df[f"{attr}_nom_opt"] < capacity_threshold)
-            ],
+        # Drop extendable assets the previous horizon left below the threshold.
+        # Nuclear is exempt: the new-build option is a 0.01 MW seed
+        # (`XX nuclear-2025`) that stays at that size until a later horizon
+        # is allowed to invest. Removing it leaves only the retrofit, whose
+        # p_nom_max is the prolonged plant (~1.03 GW_e), and the 3 GW floor
+        # is then clipped down to that headroom.
+        below = (
+            c.df[f"{attr}_nom_extendable"]
+            & ~c.df.index.isin(chp_heat)
+            & (c.df[f"{attr}_nom_opt"] < capacity_threshold)
         )
+        if c.name == "Link" and "carrier" in c.df.columns:
+            below &= c.df.carrier != "nuclear"
+        n_p.remove(c.name, c.df.index[below])
 
         # copy over assets but fix their capacity
         c.df[f"{attr}_nom"] = c.df[f"{attr}_nom_opt"]

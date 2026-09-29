@@ -187,6 +187,22 @@ def add_existing_renewables(
     df_agg["resource_class"] = df_agg["resource_class"].fillna(0)
 
 
+def _keep_existing_capacity(
+    capacity: pd.Series, generator: str, capacity_threshold: float
+) -> pd.Series:
+    """Drop sub-threshold bins. Keep the nuclear new-build seed.
+
+    ``data/custom_powerplants.csv`` has a 0.01 MW ``New`` nuclear row per node.
+    That row is the investment option ``add_BEWAL_nuclear`` later marks
+    extendable (``p_nom_max`` stays infinite). ``threshold_capacity`` (10 MW)
+    exists to drop numerical dust; applied to this seed it removes the only
+    unbounded nuclear tranche, and the 2050 floor of 3 GW cannot be met.
+    """
+    if generator == "nuclear":
+        return capacity[capacity > 0]
+    return capacity[capacity > capacity_threshold]
+
+
 def add_power_capacities_installed_before_baseyear(
     n: pypsa.Network,
     costs: pd.DataFrame,
@@ -345,7 +361,7 @@ def add_power_capacities_installed_before_baseyear(
         # capacity is the capacity in MW at each node for this
         capacity = df.loc[grouping_year, generator, resource_class]
         capacity = capacity[~capacity.isna()]
-        capacity = capacity[capacity > capacity_threshold]
+        capacity = _keep_existing_capacity(capacity, generator, capacity_threshold)
         suffix = "-ac" if generator == "offwind" else ""
         name_suffix = f" {generator}{suffix}-{grouping_year}"
         asset_i = capacity.index + name_suffix

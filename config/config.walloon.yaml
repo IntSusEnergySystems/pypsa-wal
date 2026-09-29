@@ -275,6 +275,10 @@ existing_capacities:
   # genuine numerical failure. The threshold also filters the base-year
   # existing-capacity bins (add_existing_baseyear), so it must be changed with
   # a full myopic chain re-run from 2025, never mid-chain.
+  # Nuclear is exempt in both places. The 0.01 MW "New" rows in
+  # data/custom_powerplants.csv are the new-build option, not dust: the
+  # 2026-09-24 central run dropped them and 2050 BEWAL nuclear stayed at the
+  # 1.03 GW retrofit instead of the 3 GW floor.
   threshold_capacity: 10
   # Age distribution of the inherited heat-pump stock, overriding the linear
   # 1980-2019 spread that PyPSA-Eur assumes for every heating technology.
