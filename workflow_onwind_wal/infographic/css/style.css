@@ -13,6 +13,7 @@
   --line: #E3DBCB;
   --green: #2B8A3E;
   --green-dark: #1E6A2E;
+  --turbine: #115A28; /* map.js TURBINE */
   --warm: #C4561A;
   --warm-bg: #FCEBDD;
   --cool: #2C6E8F;
@@ -89,8 +90,8 @@ a { color: var(--green-dark); }
 .towns { position: absolute; inset: 0; pointer-events: none; }
 .town { position: absolute; transform: translate(-4px, -50%); font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap;
   text-shadow: 0 0 2px #fff, 0 0 3px #fff, 0 0 4px rgba(255, 255, 255, .9); padding-left: 10px; }
-.town.left { transform: translate(calc(-100% + 4px), -50%); padding: 0 10px 0 0; }
-.town.left::before { left: auto; right: 0; }
+.town.town-left { transform: translate(calc(-100% + 4px), -50%); padding: 0 10px 0 0; }
+.town.town-left::before { left: auto; right: 0; }
 .town::before { content: ""; position: absolute; left: 0; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1.5px #fff; }
 
 .indicator { position: absolute; left: .8%; bottom: 2.5%; max-width: 34%; background: rgba(255, 253, 249, .95); border: 1px solid var(--line); border-radius: 12px; padding: 11px 16px 12px; box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
@@ -110,7 +111,7 @@ a { color: var(--green-dark); }
 .loupe-view svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .loupe figcaption { display: flex; gap: 4px; align-items: flex-start; font-size: 11px; line-height: 1.2; color: var(--ink-2); margin-top: 4px; }
 .loupe figcaption svg { flex: none; margin-top: 1px; }
-.l-turbines circle { fill: var(--ink); stroke: #fff; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.l-turbines circle { fill: var(--turbine); stroke: #fff; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
 .l-villages rect { fill: #fff; stroke: var(--ink); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
 .spacing { fill: rgba(29, 36, 40, .06); stroke: var(--ink); stroke-width: .9; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
 .park { fill: rgba(255, 255, 255, .28); stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
@@ -139,7 +140,7 @@ a { color: var(--green-dark); }
 .lg-pt, .lg-toggle { display: inline-flex; align-items: center; gap: 7px; }
 .lg-toggle { cursor: pointer; }
 .lg-toggle input { margin: 0; accent-color: var(--ink); }
-.lg-pt .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px rgba(0, 0, 0, .12); }
+.lg-pt .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--turbine); box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px rgba(0, 0, 0, .12); }
 .lg-toggle .ring { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink); background: #fff; }
 .map-note { margin: 6px 0 0; font-size: 12px; color: var(--muted); line-height: 1.35; }
 

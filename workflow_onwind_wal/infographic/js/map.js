@@ -9,7 +9,10 @@ export const GREEN = "#2B8A3E";
 // protan/deutan ΔE >= 8.6 between any two, >= 14.5 between green and any family.
 // Muted on purpose: the families are the ground, the surviving land the figure.
 export const FAMILY = [null, "#C4AC8E", "#E9E196", "#A780AD", "#3A70AD", "#513249"];
-const INK = "#1D2428";
+// The placed machines: a darker shade of the surviving land, so that a dense
+// cluster reads as land the machines use, not as a dark hole in it.  Checked
+// with the same validator against GREEN (ΔE 15+) and every family (CVD ≥ 8.4).
+export const TURBINE = "#115A28";
 
 const rgb = (h) => {
   const n = parseInt(h.slice(1), 16);
@@ -120,7 +123,7 @@ export class FunnelMap {
     this.towns.className = "towns";
     for (const t of this.lm.towns) {
       const d = document.createElement("span");
-      d.className = `town${t.side === "left" ? " left" : ""}`;
+      d.className = `town${t.side === "left" ? " town-left" : ""}`;
       d.style.left = `${(100 * t.xy[0]) / cols}%`;
       d.style.top = `${(100 * t.xy[1]) / rows}%`;
       d.textContent = t.name;
@@ -238,8 +241,8 @@ export class FunnelMap {
     if (!pts) return;
     const sx = this.W / this.grid.cols, sy = this.H / this.grid.rows;
     const rad = Math.max(1.5, 1.55 * this.pxScale);
-    const ring = rad + Math.max(0.7, 0.75 * this.pxScale);
-    ctx.fillStyle = "#FFFFFF";
+    const ring = rad + Math.max(0.5, 0.45 * this.pxScale);
+    ctx.fillStyle = "rgba(255, 255, 255, .85)";
     ctx.beginPath();
     for (let i = 0; i < pts.n; i++) {
       const x = pts.c[i] * sx, y = pts.r[i] * sy;
@@ -247,7 +250,7 @@ export class FunnelMap {
       ctx.arc(x, y, ring, 0, 2 * Math.PI);
     }
     ctx.fill();
-    ctx.fillStyle = INK;
+    ctx.fillStyle = TURBINE;
     ctx.beginPath();
     for (let i = 0; i < pts.n; i++) {
       const x = pts.c[i] * sx, y = pts.r[i] * sy;
