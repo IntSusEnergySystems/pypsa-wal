@@ -942,9 +942,12 @@ formulation. The following need formulation changes, mostly with the multi-node 
   distribution efficiency, the boiler factor and the Calibration cost rows reverted.
   §9.1 needs it to separate the 2030–2050 network effects from the nuclear change of
   `bbc9450e`. That is about 4 h on NIC5.
-* **A build-rate limit on foreign nuclear.** With the FR/GB `nuclear-2025` options alive,
-  France adds about 49 GW between 2025 and 2030. This drives the 2030 Belgian price and
-  the ETS1 dual more than any network choice does.
+* **Foreign nuclear — done differently (2026-09-30).** The 49 GW French "rebuild" by 2030
+  was forced by `legacy-unreviewed` floors in the caps file, not chosen. It is replaced by
+  a corridor pinned to the national plans. See
+  [`logs/2026-09-30_cabinet_batch_20260930_2010_1h.md`](logs/2026-09-30_cabinet_batch_20260930_2010_1h.md)
+  §3. The 2030 Belgian price and the ETS1 dual will move with it, so any
+  calibration-only attribution has to be run on the new corridor.
 * **The distribution increment is 17 % low (V2).** Revisit the PV share of the transition
   capex and the diversity factor once the DSOs' split of E1.1 is available.
 
