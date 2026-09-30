@@ -628,11 +628,11 @@ scen_realiste_nobnd30:
       2040: 6.47
       2050: 10.0
 
-# New nuclear delayed by five years (30 Sep batch). The override follows ICEDD's
-# config/scen_RetardNucleaire.csv and the TIMES export, which builds 0.5 GW of
-# large reactor + 0.25 GW of SMR in 2050 (1.795 GW with Tihange 3), i.e. the
-# central 2045 step moved to 2050. The September batch had pinned Wallonia at the
-# 1 GW LTO through 2050 instead; see docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §2.3.
+# New nuclear deferred beyond 2050 (3 Sep definition: only the LTO of the existing
+# fleet remains possible): Wallonia pinned at the 1 GW Tihange 3 LTO through 2050,
+# kept for the 30 Sep batch. ICEDD's 30 Sep TIMES export differs: it builds
+# 0.5 GW large + 0.25 GW SMR in 2050 (1.795 GW in total) — see
+# docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §2.6.
 scen_retardnucleaire:
   sector:
     times_file: data/walloon/scen_sensibilite_retardnucleaire_260929_3009.vd

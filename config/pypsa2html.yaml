@@ -109,7 +109,7 @@ scenarios:
   #   results_dir: results/walloon/scen_realiste_nobnd30
   #   resources_dir: resources/walloon/scen_realiste_nobnd30
   - name: scen_retardnucleaire
-    label: New nuclear delayed by five years
+    label: New nuclear deferred beyond 2050
     results_dir: results/walloon/scen_retardnucleaire
     resources_dir: resources/walloon/scen_retardnucleaire
   - name: scen_noccsccgt

@@ -351,23 +351,24 @@ def test_realiste_override_matches_the_september_one():
     assert a[cols].equals(b[cols])
 
 
-def test_retardnucleaire_follows_icedd_and_times():
-    """ICEDD's scen_RetardNucleaire.csv and the TIMES export: 1.75 GW in 2050.
+def test_retardnucleaire_is_the_lto_only_pin():
+    """New nuclear deferred beyond 2050: Wallonia holds the 1 GW Tihange 3 LTO.
 
-    The September override pinned Wallonia at the 1 GW LTO through 2050, from
-    the brief, and was never reconciled with ICEDD's file (committed 78 min
-    later). TIMES builds 0.5 GW large + 0.25 GW SMR in 2050 in that export —
-    the central 2045 step moved five years — so the floor sits at the cap.
-    The BE parent row is the unchanged Flemish part plus the Walloon one.
+    The definition of 3 Sep ("l'installation de nouvelles capacités nucléaires
+    est désactivée, seule la prolongation du parc existant restant possible"),
+    kept on 2026-09-30. NOTE: ICEDD's 30 Sep TIMES export does NOT follow it —
+    it builds 0.5 GW large + 0.25 GW SMR in 2050 (1.795 GW with Tihange), and
+    ICEDD's config/scen_RetardNucleaire.csv caps 2050 at 1 750 MW. The gap is
+    recorded in the 30 Sep batch log §2.6 and raised with ICEDD. The BE parent
+    row is the unchanged Flemish part plus the Walloon pin.
     """
     path = WAL / "agg_p_nom_minmax_scen_retardnucleaire.csv"
-    assert _agg_cell(path, "BEWAL", "nuclear-all", "2050", "min") == "1750"
-    assert _agg_cell(path, "BEWAL", "nuclear-all", "2050", "max") == "1750"
-    assert _agg_cell(path, "BEWAL", "nuclear-all", "2045", "min") == "1000"
-    assert _agg_cell(path, "BEWAL", "nuclear-all", "2045", "max") == "1030"
-    flemish = {b: float(_agg_cell(CENTRAL_AGG, "BEVLG", "nuclear-all", "2050", b)) for b in ("min", "max")}
-    for bound in ("min", "max"):
-        assert float(_agg_cell(path, "BE", "nuclear-all", "2050", bound)) == flemish[bound] + 1750
+    for year in ("2045", "2050"):
+        assert _agg_cell(path, "BEWAL", "nuclear-all", year, "min") == "1000"
+        assert _agg_cell(path, "BEWAL", "nuclear-all", year, "max") == "1000"
+        for bound in ("min", "max"):
+            flemish = float(_agg_cell(CENTRAL_AGG, "BEVLG", "nuclear-all", year, bound))
+            assert float(_agg_cell(path, "BE", "nuclear-all", year, bound)) == flemish + 1000
 
 
 _KEYS = {

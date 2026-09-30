@@ -43,8 +43,8 @@ DE,nuclear-all,,0,,0,,0,,0,,0,,0,0.01,national-plans-2026-09
 LU,nuclear-all,,0,,0,,0,,0,,0,,0,0.01,national-plans-2026-09
 CZ,onwind,0,1500,0,1500,0,2500,0,3500,0,4500,0,5500,,legacy-unreviewed
 CZ,solar-all,0,10000,0,10000,0,14000,0,18000,0,22000,0,26000,,legacy-unreviewed
-BE,nuclear-all,,,,,2000,2030,2000,2030,2000,2030,4750,4750,0.005,legacy-unreviewed
-BEWAL,nuclear-all,,,,,1000,1030,1000,1030,1000,1030,1750,1750,0.005,legacy-unreviewed
+BE,nuclear-all,,,,,2000,2030,2000,2030,2000,2000,4000,4000,0.005,legacy-unreviewed
+BEWAL,nuclear-all,,,,,1000,1030,1000,1030,1000,1000,1000,1000,0.005,legacy-unreviewed
 BEVLG,nuclear-all,,,,,1000,1000,1000,1000,1000,1000,3000,3000,0.005,siting-policy-2026-09
 BEWAL,CCGT-all,1740,,1740,,1740,,1740,,1740,,1740,,,legacy-unreviewed
 BEWAL,onwind,1560,1560,2248,,,,,,,,,,0.005,PNEC-PACE+EDORA
