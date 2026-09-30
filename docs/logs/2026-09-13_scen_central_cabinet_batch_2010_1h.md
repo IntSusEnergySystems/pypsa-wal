@@ -87,10 +87,11 @@ Headline BEWAL trajectory (from `review_run.py --full`):
 
 ## 8. Publication (Wallonie Explorer / S3)
 
-**Not published.** Post-processing was run with `SKIP_S3_UPLOAD=1 HTML_PUBLISH=0`
-deliberately: review follow-up R1 below is unresolved, and publication is an
-outward-facing step that should be a human decision. Local `csvs/`, `graphs/` and
-`html/pypsa/` are complete. To publish: `RUN_NAME=scen_central ./cluster/nic5.sh publish`.
+Post-processing was run with `SKIP_S3_UPLOAD=1 HTML_PUBLISH=0`. Published
+afterwards with the cabinet batch
+([`2026-09-13_cabinet_batch_all14_2010_1h.md`](2026-09-13_cabinet_batch_all14_2010_1h.md) §17):
+
+https://pypsa.squoilin.eu/scen_central_20260913/
 
 ## 9. Issues encountered and fixes
 

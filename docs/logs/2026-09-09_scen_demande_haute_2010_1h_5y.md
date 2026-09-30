@@ -101,7 +101,7 @@ Effective configs verified identical across horizons apart from
 | Explorer display label | `demande-haute-5y-2010-1h (times-pypsa) - 09/09/2026` (label extends the Sep-7 `demande-haute-2010-1h` with the 5y marker) |
 | Explorer CSVs | 63 in `pypsa/` (7 per horizon-year incl. 2035/2045), 3 in `strategy/` |
 | TIMES vd staged | yes — `explorer/times/scen_central_demande_haute_v01_260907_0709.vd` |
-| HTML report | https://pypsa.squoilin.eu/scen_demande_haute_5y_20260909/ (200, 82 pypsa2html pages + TIMES Sankeys ×6 + indicators) |
+| HTML report (pypsa2html) | https://pypsa.squoilin.eu/archive/scen_demande_haute_5y_20260909/ (82 pypsa2html pages + TIMES Sankeys ×6 + indicators) |
 | Verified in Explorer dropdown | no — not checked from here (same gap as Sep-7) |
 
 ## 9. Issues encountered and fixes

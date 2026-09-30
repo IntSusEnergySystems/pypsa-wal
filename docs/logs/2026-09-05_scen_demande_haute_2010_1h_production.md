@@ -102,7 +102,7 @@ Local result folders:
 
 - Networks: `results/walloon/scen_demande_haute/networks/` (md5-verified against scratch after pull, §9)
 - CSVs / plots: `results/walloon/scen_demande_haute/{csvs,graphs}/` (`costs.csv`, `costs.svg`, `cumulative_costs.csv`)
-- HTML report: `results/walloon/scen_demande_haute/html/index.html` → https://pypsa.squoilin.eu/scen_demande_haute_20260906/
+- HTML report: `results/walloon/scen_demande_haute/html/index.html` → https://pypsa.squoilin.eu/archive/scen_demande_haute_20260906/
 
 ## 8. Publication (Wallonie Explorer / S3)
 
@@ -112,6 +112,7 @@ Local result folders:
 | Scenario folder on S3 | `s3://intervectoriel/test/scenarios/times-pypsa__scen_demande_haute__20260906/` (`pypsa/` + `strategy/` + `times/` all uploaded OK) |
 | Explorer display label | `demande-haute-2010-1h` (`EXPLORER_SCENARIOS` in `cluster/config.sh`) |
 | TIMES vd staged | yes — `explorer/times/scen_central_demande_haute_v2_260903_0309.vd` uploaded |
+| HTML report (pypsa2html) | https://pypsa.squoilin.eu/archive/scen_demande_haute_20260906/ — trade-fix republication: https://pypsa.squoilin.eu/archive/scen_demande_haute_20260907/ |
 | Verified in Explorer dropdown | **no** — test-env listing not checked; owner to confirm |
 | **Addendum 2026-09-07 (pypsa2html trade fix).** The published Sankey showed 17.2 TWh of 2050 electricity imports against the 10 TWh item-6a cap — a report artefact, not a solve defect (pypsa2html `725333c` plugged the node residual instead of measuring cross-border branches; fixed upstream in `5793e1a`, verified by its `test_electricity_trade.py`). Pulled pypsa2html to `5793e1a`, rebuilt `html/pypsa` + hub via `--forcerun`, re-published to the same public folder, re-synced S3 (new date-stamped prefixes `20260907_walloon_scen_demande_haute` and `times-pypsa__demande-haute-2010-1h__20260907`). Rendered 2050 imports now read exactly 10.000 TWh (direct `import_export_series` check on the network agrees: import 10.000, export 2.382). Side effect of the fix, now visible: the electricity node is short ~9 TWh in 2050 (taxonomy hole, upstream question — see the fix commit message). | | |
 

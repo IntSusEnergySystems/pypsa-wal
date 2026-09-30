@@ -962,7 +962,10 @@ nothing to poll.
 it as `docs/logs/YYYY-MM-DD_<scenario>_<tags>.md` — goal, parameters, timings,
 cluster queue, memory, issues/fixes, S3/Explorer publication (§1–10), and the
 critical review of the results (§11, see
-[`docs/run-review-checklist.md`](docs/run-review-checklist.md)). See
+[`docs/run-review-checklist.md`](docs/run-review-checklist.md)). Section 8
+records the public pypsa2html URL,
+`https://pypsa.squoilin.eu/<scenario>_<YYYYMMDD>/`, for every scenario whose
+`html/` was published; a batch lists one URL per scenario. See
 [`docs/logs/`](docs/logs/) for examples;
 [`2026-08-18_scen_demande_haute_2010_1h.md`](docs/logs/2026-08-18_scen_demande_haute_2010_1h.md)
 is the first log with §11 filled in.
@@ -1361,7 +1364,10 @@ https://pypsa.squoilin.eu/<scenario>_<YYYYMMDD>/
 Since 1 Sept 2026 `pypsa.squoilin.eu` is a **dedicated vhost**
 (`add-pypsa-vhost.sh`) with DocumentRoot `/home/pypsa/public_html`; the root
 URL lists every published run. Each run folder opens the pypsa-wal hub
-(`index.html`) with links to `pypsa/` and `times/`. 
+(`index.html`) with links to `pypsa/` and `times/`. Write that URL into
+section 8 of the solve log
+([`docs/logs/_TEMPLATE_solve_log.md`](docs/logs/_TEMPLATE_solve_log.md)). A
+batch run lists one URL per published scenario. 
 
 
 If the key cannot log in, the Snakemake rule writes

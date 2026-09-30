@@ -42,7 +42,7 @@ item 9 on (B3/B4). Follows the killed rooftop attempt on vd v1
 | Data retrieval / network build (prepare) | local | 30 steps, full rebuild from the new vd; split applied (983.1 + 786.9 = 1 770 MW rooftop) |
 | LP solve | NIC5 **`hmem`** (16 cpus/task, 100 GB) | orchestrator pid 3646416, zero queue wait; 2025 job 11116832, 2030 11117043, 2040 11117446, 2050 11117809 |
 | Post-processing (CSVs, plots) | local | `nic5.sh postprocess` 08:05–08:2x, 11/11 steps |
-| HTML report (pypsa2html) | local | via postprocess → `https://pypsa.squoilin.eu/scen_demande_haute_20260905/` (200) |
+| HTML report (pypsa2html) | local | via postprocess → https://pypsa.squoilin.eu/archive/scen_demande_haute_20260905/ |
 | Explorer CSV extraction (ClimAct) | local | `nic5.sh extract` 08:26 (49 pypsa + 3 strategy + vd); stale v1 `.vd` removed from `explorer/times/` before upload |
 
 ## 5. Timings
@@ -94,6 +94,7 @@ vd v1 → v2 deltas (same extractor): rooftop share 71.36/85.81 → **70.83/80.1
 | Explorer display label | `demande-haute-2010-1h` |
 | Explorer CSVs | extracted 08:26 from this run's networks |
 | TIMES vd staged | `scen_central_demande_haute_v2_260903_0309.vd` |
+| HTML report (pypsa2html) | https://pypsa.squoilin.eu/archive/scen_demande_haute_20260905/ |
 | Verified in Explorer dropdown | not yet (test env; verify before promoting) |
 
 ## 9. Issues encountered and fixes

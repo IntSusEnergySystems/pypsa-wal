@@ -101,7 +101,7 @@ Local result folders:
 | Explorer CSVs | 49 pypsa + 3 strategy |
 | TIMES vd staged | `scen_central_demande_haute_v1_260828_2808.vd` |
 | Verified in Explorer dropdown | open [explorer.test](https://explorer.test.wallonie.climact.com/) and pick `demande-haute-2010-1h` dated 30/08/2026 |
-| Public HTML | https://pypsa.squoilin.eu/intervec/scen_demande_haute_20260830/ |
+| HTML report (pypsa2html) | https://pypsa.squoilin.eu/archive/scen_demande_haute_20260830/ |
 
 ## 9. Issues encountered and fixes
 
@@ -570,7 +570,7 @@ required at 1h on this model.
    consistency on that carrier.
 7. ~~HTML / ClimAct / S3 if this vintage is to be published.~~ **Done** —
    Explorer folder `times-pypsa__demande-haute-2010-1h__20260830`; HTML at
-   https://pypsa.squoilin.eu/intervec/scen_demande_haute_20260830/.
+   https://pypsa.squoilin.eu/archive/scen_demande_haute_20260830/.
 8. DE 2030 onwind 115 GW collapsed corridor — already documented in
    [`renewable-potentials.md`](../renewable-potentials.md) §7; decide
    whether the 2030 European price signal is acceptable.

@@ -60,7 +60,7 @@ hmem node).
 | Solve 2025 / 2030 / 2040 / 2050 | 2025 **~3.2 h** wall (job 11107857, Optimal). 2030: four inf attempts (14 s each, §9), then relaunch solve **11111832** Optimal in **1 h 34 min** (13:45:42 → 15:20:07, `batch`). 2040 `add_brownfield` 52 s; solve **11113578** pending 15:23 → 17:25 on `batch` (~2 h queue loss, Priority) → cancelled, **11114388** on `hmem` 17:31 → 18:01 **infeasible** (79 barrier it, item 9); **11114459** on `hmem` from 18:17 (item 9 off). 2050 follows |
 | Pull results | 2 pulls failed rsync verification (see §9 — rsync **delta** path; `--whole-file` fixed); 1.34 GB networks + full tree clean by 22:30 |
 | Post-processing + plots | `nic5.sh postprocess` 22:30–22:40 (touch, CSVs, plots, sankey, pypsa2html, S3) |
-| pypsa2html report | in postprocess; published → `https://pypsa.squoilin.eu/scen_demande_haute_20260903/` (first rsync went to the legacy `/intervec/` path, which the server has 301'd away since the dedicated `pypsa` vhost of 1 Sept — republished to `/home/pypsa/public_html`; `html_publish` config fixed) |
+| pypsa2html report | in postprocess; published → https://pypsa.squoilin.eu/archive/scen_demande_haute_20260903/ (first rsync went to the legacy `/intervec/` path, which the server has 301'd away since the dedicated `pypsa` vhost of 1 Sept — republished to `/home/pypsa/public_html`; `html_publish` config fixed) |
 | ClimAct extraction | 22:52 (re-run; extractor restored — see §9); `nic5.sh upload` 22:55 |
 
 Previous production 1h (30 Aug, hmem, 100 GB): ~8.6 h including a 2030 numerical
@@ -99,6 +99,7 @@ Local result folders:
 | Explorer display label | `demande-haute-2010-1h` |
 | Explorer CSVs | 49 pypsa + 3 strategy + `.vd`, extracted 22:52 from this run's networks |
 | TIMES vd staged | `scen_central_demande_haute_v1_260828_2808.vd` |
+| HTML report (pypsa2html) | https://pypsa.squoilin.eu/archive/scen_demande_haute_20260903/ |
 | Verified in Explorer dropdown | not yet (test env; verify before promoting) |
 
 ## 9. Issues encountered and fixes

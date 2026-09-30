@@ -105,6 +105,7 @@ Local result folders:
 | Explorer display label | `<label> (<type>) - DD/MM/YYYY` |
 | Explorer CSVs | 49 in `pypsa/`, 3 in `strategy/` (verify with `aws s3 ls … \| wc -l`) |
 | TIMES vd staged | yes/no — `explorer/times/<file>.vd` |
+| HTML report (pypsa2html) | `https://pypsa.squoilin.eu/<scenario>_<YYYYMMDD>/` — the hub (`index.html`, with `pypsa/` underneath). One URL per published scenario in a batch. `n/a` if `html/` was not published |
 | Verified in Explorer dropdown | yes/no (+ "Clear cache" needed?) |
 
 ## 9. Issues encountered and fixes

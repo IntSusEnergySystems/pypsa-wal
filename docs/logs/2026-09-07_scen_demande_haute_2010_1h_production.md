@@ -108,7 +108,7 @@ Effective configs verified identical across horizons apart from
 | Scenario folder on S3 | `s3://intervectoriel/test/scenarios/times-pypsa__demande-haute-2010-1h__20260908/` |
 | Explorer CSVs | 49 in `pypsa/`, 3 in `strategy/` (re-extracted from corrected raw) |
 | TIMES vd staged | yes — only `scen_central_demande_haute_v01_260907_0709.vd` (stale `v2_260903` removed locally and from S3) |
-| HTML report | https://pypsa.squoilin.eu/scen_demande_haute_20260908/ (rebuilt 03:47 with pypsa2html `2c40825`, 95 pages, same folder overwritten) |
+| HTML report (pypsa2html) | https://pypsa.squoilin.eu/archive/scen_demande_haute_20260908/ (rebuilt 03:47 with pypsa2html `2c40825`, 95 pages, same folder overwritten) |
 | Verified in Explorer dropdown | no — not checked from here |
 
 ## 9. Issues encountered and fixes

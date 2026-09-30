@@ -1355,10 +1355,24 @@ deliberately afterwards, for the **seven non-sweep scenarios only** (§1.4):
 `scen_realiste_nets`, `scen_retardnucleaire`, `scen_central_2013`, with
 `scen_realiste_nobnd30` joining once its 2050 lands.
 
+HTML report (pypsa2html), one hub per published scenario:
+
+| Scenario | URL |
+|---|---|
+| `scen_central` | https://pypsa.squoilin.eu/scen_central_20260913/ |
+| `scen_taxshift` | https://pypsa.squoilin.eu/scen_taxshift_20260913/ |
+| `scen_taxshift_plus` | https://pypsa.squoilin.eu/scen_taxshift_plus_20260913/ |
+| `scen_biomethane_industrie` | https://pypsa.squoilin.eu/scen_biomethane_industrie_20260913/ |
+| `scen_realiste_nets` | https://pypsa.squoilin.eu/scen_realiste_nets_20260913/ |
+| `scen_realiste_nobnd30` | https://pypsa.squoilin.eu/scen_realiste_nobnd30_20260913/ |
+| `scen_retardnucleaire` | https://pypsa.squoilin.eu/scen_retardnucleaire_20260913/ |
+| `scen_central_2013` | https://pypsa.squoilin.eu/scen_central_2013_20260913/ |
+
 The six `scen_nuctip_*` are **not** extracted and **not** uploaded as scenario
 trees, and they are **not** scenarios in the combined report. They appear in it
 only as the *Sensitivity analyses* page — one curve, built from their solved
-networks, inside every published scenario's `html/pypsa/` folder (§1.4).
+networks, inside every published scenario's `html/pypsa/` folder (§1.4). They
+have no URL of their own.
 
 ## 18. Open items
 
