@@ -147,6 +147,67 @@ def add_industry_cc_floor(n, node: str, kt: float) -> None:
     logger.info("Pinned %s industry CC capture to ≥ %.1f kt/a.", node, kt)
 
 
+#: Links that take CO₂ off a node's `co2 stored` bus towards storage: the
+#: inter-node pipelines and the node's own `co2 sequestered` link.
+CO2_EXPORT_CARRIERS = ("CO2 pipeline", "co2 sequestered")
+
+
+def add_co2_export_limit(n, node: str, kt: float, overage_price=None) -> None:
+    """Net annual CO₂ leaving ``node``'s `co2 stored` bus ≤ ``kt`` × 1000 t.
+
+    Lever D of `docs/co2-sequestration.md` §10.2: Wallonia has no domestic sink,
+    so "less CCS" physically means "less CO₂ leaves Wallonia". The cap is on the
+    *net* outflow of the bus, so Flemish and Brussels transit cancels and the
+    constraint needs no list of capture carriers: flow out on links whose
+    ``bus0`` is the bus, minus the CO₂ delivered by links whose ``bus1`` is it.
+
+    With ``overage_price`` (EUR/t) the cap is a ship-or-pay subscription —
+    tonnes above it are allowed at that price, so the constraint can never make
+    the LP infeasible (the doc's "overage valve is mandatory"). Without it the
+    cap is hard.
+
+    The row is registered as the ``GlobalConstraint`` ``co2_export_limit_<node>``
+    so its dual (EUR/t, ≤ 0 when binding) is written into the solved network,
+    as for ``co2_limit_per_country<ct>``. The overage itself is not stored; it
+    is ``max(0, net export − constant)``, recomputable from the link flows.
+    """
+    bus = f"{node} co2 stored"
+    links = n.links.loc[n.links.carrier.isin(CO2_EXPORT_CARRIERS)]
+    out_links = links.index[links.bus0 == bus]
+    in_links = links.index[links.bus1 == bus]
+    if out_links.empty and in_links.empty:
+        logger.warning("CO2 export limit: no CO2 pipeline at %s, skip.", bus)
+        return
+    weights = n.snapshot_weightings.generators
+    p = n.model["Link-p"]
+    link_dim = p.dims[1]
+    outflow = None
+    if len(out_links):
+        outflow = (p.loc[:, out_links] * weights).sum()
+    if len(in_links):
+        eff = xr.DataArray(
+            links.loc[in_links, "efficiency"].astype(float).values,
+            coords={link_dim: in_links},
+            dims=[link_dim],
+        )
+        inflow = (p.loc[:, in_links] * eff * weights).sum()
+        outflow = -inflow if outflow is None else outflow - inflow
+    cap_t = float(kt) * 1e3
+    name = f"co2_export_limit_{node}"
+    if overage_price:
+        over = n.model.add_variables(lower=0, name=f"co2_export_overage_{node}")
+        n.model.add_constraints(outflow - over <= cap_t, name=f"GlobalConstraint-{name}")
+        n.model.objective = n.model.objective + float(overage_price) * over
+        logger.info(
+            "Capped %s net CO2 export at %.0f kt/a, overage at %.0f EUR/t.",
+            node, kt, float(overage_price),
+        )
+    else:
+        n.model.add_constraints(outflow <= cap_t, name=f"GlobalConstraint-{name}")
+        logger.info("Capped %s net CO2 export at %.0f kt/a (hard).", node, kt)
+    n.add("GlobalConstraint", name, constant=cap_t, sense="<=", type="")
+
+
 def _p_nom_sum(n, names: pd.Index):
     if names.empty:
         return None

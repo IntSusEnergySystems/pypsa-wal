@@ -1,0 +1,24 @@
+# Run layer for the low-CCS / power-to-fuel TEST (`scen_test_lowccs_ptx`,
+# 1 h, weather 2010). Not a cabinet scenario. Use *after* config.walloon.yaml
+# so it wins:
+#
+#   CONFIGFILE="config/config.walloon.yaml config/config.test_lowccs_ptx.yaml" \
+#     ./cluster/nic5.sh prepare        # then push / solve / pull as usual
+#
+# cluster/config.sh reads RUN_NAME from the last config that sets `run.name`,
+# so every nic5.sh step then targets this scenario alone. Recipe and reading
+# guide: docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §5.3 and §12.
+#
+# Only two keys, and both have to live here rather than in the scenario overlay:
+#   * `run.name` selects the overlay in scenarios.walloon.yaml, and so RDIR:
+#     results/walloon/scen_test_lowccs_ptx, next to the batch trees;
+#   * `html_publish.enable` is read from the static parse-time config by
+#     rules/publish_html.smk, so a scenario override cannot reach it (the
+#     2026-09-03 smoke test published itself by accident). With it off, the
+#     publish rule does not exist: run `postprocess` with HTML_PUBLISH=0 (and
+#     SKIP_S3_UPLOAD=1 — a test run is not uploaded either).
+run:
+  name:
+  - scen_test_lowccs_ptx
+html_publish:
+  enable: false

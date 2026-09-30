@@ -477,6 +477,19 @@ sector:
     enable: false
     node: BEWAL
     file: data/walloon/times_industrial_capture.csv
+  # Lever D (docs/co2-sequestration.md §10.2): cap on the NET CO2 leaving the
+  # node's `co2 stored` bus (pipelines + its own `co2 sequestered` link), kt/a
+  # per horizon. Transit cancels. A horizon missing from `kt` is uncapped. With
+  # `overage_price` (EUR/t) tonnes above the cap are allowed at that price
+  # (ship-or-pay), so the cap cannot make the LP infeasible; without it the cap
+  # is hard. The dual is GlobalConstraint `co2_export_limit_<node>`. Must stay
+  # at or above `industry_cc_floor` when both are on, or the floor forces the
+  # overage. Default off; used by `scen_test_lowccs_ptx` (2026-09-30).
+  co2_export_limit:
+    enable: false
+    node: BEWAL
+    kt: {}
+    overage_price: null
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
   # TIMES Sankey diagrams into results/<prefix>/<run>/html/times/, beside

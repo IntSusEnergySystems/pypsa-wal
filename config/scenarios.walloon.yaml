@@ -879,10 +879,13 @@ scen_nuctip_4500:
 # on 2026-09-24, scope confirmed 2026-09-29: "on maintient bien le CCS sur
 # process et on ne permet pas la capture sur centrales gaz (existantes et
 # nouvelles)"). TIMES drops the CCGT CCS retrofit of the two recent units and the
-# new post-combustion CCGT. PyPSA caps `CCGT CC` and `urban central gas CHP CC`
-# at 0 MW in BEWAL at every horizon (config/scenarios/scen_noccsccgt.csv ->
-# custom_potentials_scen_noccsccgt.csv). Industrial capture, biomass CHP CC, and
-# every non-Walloon node are untouched, as in the other sensitivities.
+# new post-combustion CCGT. PyPSA caps every power-generation capture route in
+# BEWAL at 0 MW at every horizon — `CCGT CC`, `urban central gas CHP CC` and,
+# since 2026-09-30, `urban central solid biomass CHP CC`, the one other CHP
+# capture option the Walloon node has (config/scenarios/scen_noccsccgt.csv ->
+# custom_potentials_scen_noccsccgt.csv). What stays: industrial capture
+# (`process emissions CC`, `gas for industry CC`, `solid biomass for industry
+# CC`), hydrogen from `SMR CC`, and every non-Walloon node, as in TIMES-WAL.
 #
 # CAVEAT: this export (…_260929_2909) was built on the central BEFORE ICEDD's
 # last change of 30 Sep 15:43; its 2025 differs from the final central in 405
@@ -957,6 +960,70 @@ scen_realiste:
       GB: 0.45
       NL: 0.45
       LU: 0.45
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
+# ---------------------------------------------------------------------------
+# TEST — less CCS, power-to-fuel back in (2026-09-30). NOT a cabinet scenario:
+# solved last, not published, not in the combined report. If the result is
+# usable it goes to ICEDD for a TIMES run first. Design, numbers and reading
+# guide: docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §12.
+#
+# = scen_central (same export, same side files, same data files) plus three
+# changes:
+# 1. Lever D, docs/co2-sequestration.md §10.2: Walloon NET CO2 export capped at
+#    3 000 kt/a from 2040 — arbitrary by design; half of the 6 Mt/a CO2STG01
+#    ceiling in TIMES-WAL's own 2040 solution, a third of the 9.3 Mt/a the
+#    29 Sep PyPSA central exports. 2030 is left free so the chain is the
+#    central's up to 2030 and the test isolates 2040-2050. Overage allowed at
+#    500 EUR/t on top of the endogenous disposal price: above the ~290 EUR/t a
+#    tonne must be worth to Walloon Fischer-Tropsch in 2040, so the valve only
+#    prevents infeasibility and does not replace the cap.
+# 2. The TIMES industrial-capture floor is off. It transfers TIMES's capture
+#    under TIMES's own storage ceiling; with it on, the floor (4.1 / 5.1 Mt)
+#    would sit above the cap and force the overage or utilisation by
+#    construction instead of letting the LP choose.
+# 3. The power-to-X must-runs are removed (FT 0.5, methanolisation and
+#    methanation 0.3 -> 0). They are LP must-runs on extendable links with no
+#    unit commitment (§8.3). On the 29 Sep 1 h central they alone keep Walloon
+#    FT out in 2050: 137 % capex recovery at free dispatch, 98 % with the 0.5
+#    must-run. Prepare-time keys, so this block needs its own prepare.
+# DAC stays off. Fallback only if no Walloon PtX appears: copy this block with
+# `sector: dac: true` (a prepare-time key too).
+scen_test_lowccs_ptx:
+  sector:
+    times_file: data/walloon/scen_central_v01_260929_3009.vd
+    rooftop_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_central.csv
+    industry_cc_floor:
+      enable: false
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_central.csv
+    co2_export_limit:
+      enable: true
+      node: BEWAL
+      kt:
+        2040: 3000
+        2045: 3000
+        2050: 3000
+      overage_price: 500
+    min_part_load_fischer_tropsch: 0
+    min_part_load_methanolisation: 0
+    min_part_load_methanation: 0
+  electricity:
+    retrofit_nuclear_once: false
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_demande_haute.csv
   self_sufficiency:
     self_sufficiency_constraint: true
     mode: absolute

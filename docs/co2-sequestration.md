@@ -647,6 +647,18 @@ informative test of this result.
 
 ### 8.1 Nothing is built, anywhere, in any horizon [V]
 
+> **Out of date since lever A (2026-09-22) — re-measured 2026-09-30** on the 29 Sep 1 h
+> central.
+> * **2050:** the scarcer storage lifts the BEWAL disposal price to −348 €/t. That brings
+>   in 65 GW of electrolysis and 17 GW_H₂ of Fischer-Tropsch, all **outside Belgium**
+>   (GB, NL, DE, FR).
+> * **Wallonia builds none.** At free dispatch a Walloon FT plant recovers 137 % of its
+>   capex; with the 0.5 must-run of §8.3 it recovers 98 %.
+> * **2040** is still as described below.
+>
+> The table and the test built on it are in
+> [`logs/2026-09-30_cabinet_batch_20260930_2010_1h.md`](logs/2026-09-30_cabinet_batch_20260930_2010_1h.md) §12.
+
 System-wide, not just at BEWAL:
 
 | route | 2030 | 2040 | 2050 | in Wallonia |
@@ -1141,6 +1153,16 @@ double-count if applied together.**
 > an absolute rooftop-capacity floor and `solar-hsat` was removed. See §10.4.
 > **C**, **D**, **F**, **G**, **H** are unchanged and untouched — in particular
 > C must stay out until A has been re-measured, or the two double-count.
+>
+> **Update — 2026-09-30: D is implemented**, as designed in §10.2.
+> * **Code:** `add_co2_export_limit` in `scripts/walloon_scripts/named_pins.py`, config
+>   `sector.co2_export_limit`, off by default.
+> * **The dual is kept:** GlobalConstraint `co2_export_limit_<node>` is registered, as
+>   §10.2 asks.
+> * **Tested** on a toy LP (`test/test_co2_export_limit.py`), including the transit sign
+>   test of §11 step 5.
+> * **Used only by the test `scen_test_lowccs_ptx`**, not by any cabinet scenario. Its
+>   design and reading guide are in the 30 Sep batch log §12.
 
 | # | change | why it sits here |
 |---|---|---|

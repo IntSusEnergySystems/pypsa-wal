@@ -46,6 +46,7 @@ from pypsa.descriptors import get_activity_mask
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 from scripts.prepare_sector_network import determine_emission_sectors
 from scripts.walloon_scripts.named_pins import (
+    add_co2_export_limit,
     add_industry_cc_floor,
     add_rooftop_floor_constraint,
     lookup_year_value,
@@ -2232,6 +2233,17 @@ def extra_functionality(
         node = cc_cfg.get("node", "BEWAL")
         if kt is not None:
             add_industry_cc_floor(n, node, float(kt))
+    export_cfg = sector_cfg.get("co2_export_limit") or {}
+    if export_cfg.get("enable"):
+        year = planning_year(planning_horizons)
+        kt = lookup_year_value(export_cfg, year, "kt", "kt")
+        if kt is not None:
+            add_co2_export_limit(
+                n,
+                export_cfg.get("node", "BEWAL"),
+                float(kt),
+                export_cfg.get("overage_price"),
+            )
     if n.config["co2_budget_national"]:
         # prepare co2 constraint
         nhours = n.snapshot_weightings.generators.sum()

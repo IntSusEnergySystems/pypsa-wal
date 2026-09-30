@@ -13,10 +13,16 @@ logger = logging.getLogger(__name__)
 # Typical duration of Belgian TSO-connected BESS (Vilvoorde, Navagne, Storm, …).
 UTILITY_BATTERY_HOURS = 4.0
 
-# Gas-fired power/CHP links whose per-vintage `<bus> <carrier>-<year>` capacity
-# a potentials row may set. The two CC carriers are what the `scen_noccsccgt`
-# sensitivity caps at 0 MW (no capture on Walloon gas plants, 2026-09-24).
-GAS_POWER_LINK_CARRIERS = ("CCGT", "CCGT CC", "urban central gas CHP CC")
+# Power/CHP links whose per-vintage `<bus> <carrier>-<year>` capacity a
+# potentials row may set. The three CC carriers are what `scen_noccsccgt` caps
+# at 0 MW: no capture on Walloon power generation, only on industrial processes
+# (2026-09-24 / 2026-09-30).
+POWER_LINK_CARRIERS = (
+    "CCGT",
+    "CCGT CC",
+    "urban central gas CHP CC",
+    "urban central solid biomass CHP CC",
+)
 
 
 def _utility_battery_chargers(n, bus):
@@ -552,7 +558,7 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
                 kt = potential * 1e3
             apply_process_emission_load(n, bus, kt)
             continue
-        if carrier in GAS_POWER_LINK_CARRIERS:
+        if carrier in POWER_LINK_CARRIERS:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}
             assert attr in allowed, f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
 

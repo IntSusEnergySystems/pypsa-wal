@@ -117,7 +117,19 @@ the team) rather than stacking another pending 1 TB request.
    fix commits must be re-run, not shipped).
 3. Chain without asking: `push` → `solve` as soon as `prepare` reports
    `N of N steps (100%) done`.
-4. Changing weather year or resolution invalidates `resources/` and
+4. **Several groups of runs in parallel need one NIC5 directory each.** Two
+   orchestrators cannot share a directory. Clone the second one on the cluster
+   side (`rsync -a` with *anchored* excludes: `/results`, `/tmp`, `/.cache`,
+   `/cluster/logs`, `/.snakemake/locks`, `/.snakemake/incomplete`), then
+   `REMOTE_DIR=<clone> ./cluster/nic5.sh push`.
+   * Keep `resources/` in the clone when the runs share the run prefix. Without
+     it, `push` resends every prepared tree over the office uplink.
+   * Archive old trees on NIC5 **outside** `results/`: `pull` syncs all of
+     `results/`, and only `results/walloon` is a symlink onto `/sylvain/mount`.
+   * A scenario name new to this machine prepares its whole per-scenario chain,
+     ~100 jobs. An existing tree needs ~45 after a new `.vd`.
+   * Worked example: `docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md` §5.
+5. Changing weather year or resolution invalidates `resources/` and
    Snakemake will not always notice (`KeyError` on the snapshot index deep
    in `prepare_sector_network`): `rm -rf resources/walloon/<scenario>` and
    rebuild.
