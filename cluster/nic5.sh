@@ -203,22 +203,31 @@ sync_brownfield_mtimestamps() {
 }
 
 cmd_prepare() {
-    local targets log
+    local targets log dry_flag=""
     log="$HERE/logs/prepare.log"
     targets=$(prepare_targets | tr '\n' ' ')
-    msg "Preparing un-solved solve inputs locally ($LOCAL_CORES cores)"
+    # DRY_RUN=1: list the jobs and stop. The job count is the check that the
+    # shared weather resources are reused (no retrieve_*/build_renewable_profiles)
+    # before an hour of preprocessing is committed.
+    if [ "${DRY_RUN:-0}" = "1" ]; then
+        dry_flag="-n"
+        log="$HERE/logs/prepare_dryrun.log"
+    fi
+    msg "Preparing un-solved solve inputs locally ($LOCAL_CORES cores)${dry_flag:+ — DRY RUN}"
     msg "  config: $CONFIGFILE"
     msg "  targets: $targets"
     msg "  log: $log  (also: $REPO/.snakemake/log/ and $REPO/logs/${RUN_DIR_REL}/)"
     # --rerun-incomplete: resume jobs left incomplete by an aborted run
     # (e.g. disk-full crash) instead of failing on .snakemake/incomplete.
+    # shellcheck disable=SC2086
     snakemake_local \
         --cores "$LOCAL_CORES" \
         --rerun-triggers mtime \
         --rerun-incomplete \
         --printshellcmds \
+        $dry_flag \
         -- $targets 2>&1 | tee "$log"
-    msg "Local preparation complete."
+    msg "Local preparation complete${dry_flag:+ (dry run: nothing was built)}."
 }
 
 cmd_push() {
@@ -447,6 +456,24 @@ cmd_postprocess() {
         --rerun-triggers mtime \
         --printshellcmds \
         -- $targets 2>&1 | tee -a "$log"
+
+    # Calibrated network costs (docs/network-costs-review-20260928.md §7-§8).
+    # Not Snakemake rules, so a batch used to get them only where someone
+    # remembered to run them by hand -- and the cost chart then silently fell
+    # back to ClimAct's uncalibrated Distribution/Transport segments. Run before
+    # the upload so the two CSVs travel with the tree. A failure is reported,
+    # not fatal: the solved results are unaffected. NETWORK_COST_REPORT=0 skips.
+    if [ "${NETWORK_COST_REPORT:-1}" = "1" ]; then
+        local d
+        for d in $(run_dirs); do
+            msg "Network cost report + TIMES bill harmonisation: results/${d}"
+            if ! (cd "$REPO" && $LOCAL_RUN python scripts/walloon_scripts/network_cost_report.py \
+                    "results/${d}" && $LOCAL_RUN python scripts/walloon_scripts/bill_harmonisation.py \
+                    "results/${d}") 2>&1 | tee -a "$log"; then
+                warn "network cost reporting failed for results/${d} (see $log)"
+            fi
+        done
+    fi
 
     msg "Post-processing complete (log: $log)."
     cmd_upload_s3

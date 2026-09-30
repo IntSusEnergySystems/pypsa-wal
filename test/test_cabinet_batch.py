@@ -2,11 +2,12 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Invariants of the September 2026 cabinet batch.
+"""Invariants of the cabinet batches (September and 30 September 2026).
 
-Each test here pins something that was got wrong once while the batch was being
+Each test here pins something that was got wrong once while a batch was being
 built, and whose failure mode is a run that completes and is quietly wrong
-rather than one that stops. See docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md.
+rather than one that stops. See docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md
+and docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md.
 """
 
 from pathlib import Path
@@ -21,18 +22,34 @@ SCENARIOS = ROOT / "config" / "scenarios.walloon.yaml"
 WAL = ROOT / "data" / "walloon"
 CENTRAL_AGG = WAL / "agg_p_nom_minmax_demande_haute.csv"
 
+# The batch in run.name: ICEDD's times_20260930_* exports, central first.
 BATCH = [
     "scen_central",
+    "scen_noccsccgt",
+    "scen_retardnucleaire",
+    "scen_biomethane_industrie",
+    "scen_realiste",
+]
+# The .vd each batch scenario must read. A block left on an older export runs
+# without complaint and is a different scenario.
+BATCH_VD = {
+    "scen_central": "scen_central_v01_260929_3009.vd",
+    "scen_noccsccgt": "scen_sensibilite_central_noccsccgt_260929_2909.vd",
+    "scen_retardnucleaire": "scen_sensibilite_retardnucleaire_260929_3009.vd",
+    "scen_biomethane_industrie": "scen_sensibilite_biomethane_industrie_v01_260929_3009.vd",
+    "scen_realiste": "scen_sensibilite_realiste_260929_3009.vd",
+}
+# September-only scenarios: their blocks and generated files stay in the tree
+# for reproducibility, so the file-level invariants below still apply to them.
+SEPTEMBER = [
     "scen_taxshift",
     "scen_taxshift_plus",
-    "scen_biomethane_industrie",
     "scen_realiste_nets",
     "scen_realiste_nobnd30",
-    "scen_retardnucleaire",
     *[f"scen_nuctip_{c}" for c in (9500, 7500, 6500, 6000, 5500, 4500)],
 ]
-REALISTE = ["scen_realiste_nets", "scen_realiste_nobnd30"]
-NUCTIP = [s for s in BATCH if s.startswith("scen_nuctip_")]
+REALISTE = ["scen_realiste_nets", "scen_realiste_nobnd30", "scen_realiste"]
+NUCTIP = [s for s in SEPTEMBER if s.startswith("scen_nuctip_")]
 
 # TIMES `Transfo_Imp` is a binding bound, identical in all eight exports.
 IMPORT_CAP = {2030: 2.94, 2040: 6.47, 2050: 10.0}
@@ -57,7 +74,15 @@ def test_run_name_is_the_batch(run_names):
     """
     assert run_names == BATCH, (
         "run.name in config/config.walloon.yaml has drifted from the batch "
-        "documented in docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md §1"
+        "documented in docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §1"
+    )
+
+
+@pytest.mark.parametrize("scenario", BATCH)
+def test_batch_reads_the_30_september_export(scenario, scenarios):
+    times_file = scenarios[scenario]["sector"]["times_file"]
+    assert Path(times_file).name == BATCH_VD[scenario], (
+        f"{scenario} reads {times_file}, not the 30 Sep export"
     )
 
 
@@ -124,7 +149,27 @@ def test_softlink_files_are_scenario_specific(scenario, scenarios):
         )
 
 
-@pytest.mark.parametrize("scenario", [s for s in BATCH if (WAL / f"agg_p_nom_minmax_{s}.csv").exists()])
+@pytest.mark.parametrize("scenario", BATCH)
+def test_softlink_files_come_from_the_scenario_export(scenario, scenarios):
+    """The side files must have been extracted from the .vd the scenario reads.
+
+    The 24 and 29 Sep central runs read `…260923_2_2309.vd` with floors still
+    extracted from `…260911_1109.vd`: the right file names, the wrong export,
+    and nothing failed. The extractor writes its source into line 1.
+    """
+    sector = scenarios[scenario]["sector"]
+    vd = Path(sector["times_file"]).name
+    for key in ("rooftop_floor", "industry_cc_floor"):
+        path = ROOT / sector[key]["file"]
+        first = path.read_text().splitlines()[0]
+        assert first.startswith(f"# Extracted from {vd} "), (
+            f"{scenario}: {path.name} says {first!r}, but the scenario reads {vd}. "
+            "Re-run extract_times_softlink_values.py <vd> --scenario "
+            f"{scenario} --write."
+        )
+
+
+@pytest.mark.parametrize("scenario", [s for s in BATCH + SEPTEMBER if (WAL / f"agg_p_nom_minmax_{s}.csv").exists()])
 def test_flanders_is_never_touched(scenario):
     """The instruction is Wallonia only; BE parent rows move as arithmetic.
 
@@ -169,23 +214,22 @@ def _agg_cell(path: Path, location: str, carrier: str, year: str, bound: str) ->
 @pytest.mark.parametrize("scenario", [s for s in REALISTE if (WAL / f"agg_p_nom_minmax_{s}.csv").exists()])
 @pytest.mark.parametrize("carrier,cap", [("solar-all", "3310"), ("onwind", "2366")])
 def test_realiste_2030_corridor_is_not_empty(scenario, carrier, cap):
-    """ICEDD's realistic 2030 caps are BELOW the central floors.
+    """ICEDD's realistic 2030 caps are BELOW the old central floors.
 
-    The central scenario keeps a 2030 floor of 6500 MW solar-all / 3000 MW
-    onwind (c337f36a). The realiste caps are 3310 / 2366 (ICEDD's 3474 / 2203
-    with their swapped PV/wind increments corrected — see the batch doc §1.2).
-    Dropping a row
-    from the master table only stops it being *managed* — the seeded value
+    The realiste caps are 3310 / 2366 (ICEDD's 3474 / 2203 with their swapped
+    PV/wind increments corrected — see the September batch doc §1.2). Dropping
+    a row from the master table only stops it being *managed* — the seeded value
     stays in the cell — so the first generated realiste file carried
     min 6500 / max 3474: an empty corridor and an infeasible 2030, three files
-    away from the error message. The floor must be BLANK here.
+    away from the error message. Since e27dccfd (16 Sep) the floor is set
+    explicitly 5 % below the cap; what must hold is min < max.
     """
     path = WAL / f"agg_p_nom_minmax_{scenario}.csv"
     assert _agg_cell(path, "BEWAL", carrier, "2030", "max") == cap
     floor = _agg_cell(path, "BEWAL", carrier, "2030", "min")
-    assert floor == "", (
+    assert floor == "" or float(floor) < float(cap), (
         f"{scenario}: BEWAL {carrier} 2030 floor is {floor!r} against a cap of "
-        f"{cap} — min > max is an empty corridor. Re-run "
+        f"{cap} — min >= max is an empty corridor. Re-run "
         "`build_common_parameters.py --write --all-scenarios`."
     )
 
@@ -260,18 +304,20 @@ def test_nuctip_capacity_is_actually_free(scenario):
     assert _agg_cell(path, "BE", "nuclear-all", "2050", "min") == "4000"
 
 
-def test_realiste_pair_is_pypsa_identical(scenarios):
-    """ICEDD: the two realiste scenarios differ only in their .vd."""
-    a, b = (dict(scenarios[s]) for s in REALISTE)
+@pytest.mark.parametrize("other", ["scen_realiste_nobnd30", "scen_realiste"])
+def test_realiste_pair_is_pypsa_identical(scenarios, other):
+    """ICEDD: the realiste scenarios differ only in their .vd.
+
+    The single 30 Sep `scen_realiste` keeps the September PyPSA side too.
+    """
+    a, b = (dict(scenarios[s]) for s in ("scen_realiste_nets", other))
     for block in (a, b):
         block["sector"] = {
             k: v for k, v in block["sector"].items() if k != "times_file"
         }
     # the per-scenario file names embed the scenario name; compare their shape
     def _strip(d):
-        return yaml.safe_dump(d).replace("scen_realiste_nets", "X").replace(
-            "scen_realiste_nobnd30", "X"
-        )
+        return yaml.safe_dump(d).replace("scen_realiste_nets", "X").replace(other, "X")
 
     assert _strip(a) == _strip(b), (
         "the two realiste scenarios have diverged on the PyPSA side; ICEDD "
@@ -295,3 +341,62 @@ def test_shared_resources_excludes_the_f_string_families():
         assert prefix in shared.get("exclude", []), (
             f"{prefix} must stay in run.shared_resources.exclude"
         )
+
+
+def test_realiste_override_matches_the_september_one():
+    """Same override rows as scen_realiste_nets, row for row."""
+    a = pd.read_csv(ROOT / "config" / "scenarios" / "scen_realiste_nets.csv")
+    b = pd.read_csv(ROOT / "config" / "scenarios" / "scen_realiste.csv")
+    cols = ["pypsa_wal_target", "year", "value", "status"]
+    assert a[cols].equals(b[cols])
+
+
+def test_retardnucleaire_follows_icedd_and_times():
+    """ICEDD's scen_RetardNucleaire.csv and the TIMES export: 1.75 GW in 2050.
+
+    The September override pinned Wallonia at the 1 GW LTO through 2050, from
+    the brief, and was never reconciled with ICEDD's file (committed 78 min
+    later). TIMES builds 0.5 GW large + 0.25 GW SMR in 2050 in that export —
+    the central 2045 step moved five years — so the floor sits at the cap.
+    The BE parent row is the unchanged Flemish part plus the Walloon one.
+    """
+    path = WAL / "agg_p_nom_minmax_scen_retardnucleaire.csv"
+    assert _agg_cell(path, "BEWAL", "nuclear-all", "2050", "min") == "1750"
+    assert _agg_cell(path, "BEWAL", "nuclear-all", "2050", "max") == "1750"
+    assert _agg_cell(path, "BEWAL", "nuclear-all", "2045", "min") == "1000"
+    assert _agg_cell(path, "BEWAL", "nuclear-all", "2045", "max") == "1030"
+    flemish = {b: float(_agg_cell(CENTRAL_AGG, "BEVLG", "nuclear-all", "2050", b)) for b in ("min", "max")}
+    for bound in ("min", "max"):
+        assert float(_agg_cell(path, "BE", "nuclear-all", "2050", bound)) == flemish[bound] + 1750
+
+
+_KEYS = {
+    "custom_costs": ["planning_horizon", "technology", "parameter"],
+    "custom_potentials": ["bus", "technology", "parameter", "year"],
+}
+
+
+@pytest.mark.parametrize("kind", sorted(_KEYS))
+@pytest.mark.parametrize(
+    "scenario",
+    sorted(p.stem for p in (ROOT / "config" / "scenarios").glob("*.csv")),
+)
+def test_scenario_copies_have_the_central_structure(scenario, kind):
+    """A generated copy must carry every row of the central file.
+
+    The patchers only rewrite values. Until 2026-09-30 a copy was seeded once
+    and never rebuilt, so the September copies silently lacked the 29 Sep
+    network-cost calibration rows (620 EUR/kW distribution, HVAC 450/408/372)
+    and still had the 25-year electrolysis lifetime: those scenarios would
+    have run on uncalibrated costs. `--write --all-scenarios` now re-seeds.
+    """
+    path = WAL / f"{kind}_{scenario}.csv"
+    if not path.exists():
+        pytest.skip(f"{path.name} not generated")
+    keys = _KEYS[kind]
+    central = pd.read_csv(WAL / f"{kind}.csv", comment=None)[keys].astype(str)
+    copy = pd.read_csv(path, comment=None)[keys].astype(str)
+    assert sorted(map(tuple, copy.values)) == sorted(map(tuple, central.values)), (
+        f"{path.name} has drifted from {kind}.csv; re-run "
+        "`build_common_parameters.py --write --all-scenarios`"
+    )

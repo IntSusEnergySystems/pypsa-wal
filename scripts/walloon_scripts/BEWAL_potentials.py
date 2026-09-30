@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 # Typical duration of Belgian TSO-connected BESS (Vilvoorde, Navagne, Storm, …).
 UTILITY_BATTERY_HOURS = 4.0
 
+# Gas-fired power/CHP links whose per-vintage `<bus> <carrier>-<year>` capacity
+# a potentials row may set. The two CC carriers are what the `scen_noccsccgt`
+# sensitivity caps at 0 MW (no capture on Walloon gas plants, 2026-09-24).
+GAS_POWER_LINK_CARRIERS = ("CCGT", "CCGT CC", "urban central gas CHP CC")
+
 
 def _utility_battery_chargers(n, bus):
     """Charger links of the utility battery at `bus` (not home batteries)."""
@@ -547,7 +552,7 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
                 kt = potential * 1e3
             apply_process_emission_load(n, bus, kt)
             continue
-        if carrier in ["CCGT", "CCGT CC"]:
+        if carrier in GAS_POWER_LINK_CARRIERS:
             allowed = {"p_nom", "p_nom_extendable", "p_nom_min", "p_nom_max"}
             assert attr in allowed, f"Unsupported attr: {attr!r}; expected one of {', '.join(sorted(allowed))}"
 
@@ -564,6 +569,15 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
                 continue
 
             link_name = f"{bus} {carrier}-{planning_horizons}"
+            if link_name not in n.links.index:
+                # `.loc[name, attr] = v` on a missing label would ENLARGE the
+                # table with an all-NaN link instead of failing. A horizon
+                # without the new-build vintage (e.g. `sector.ccgt_cc: false`)
+                # has nothing to cap.
+                logger.warning(
+                    f"No link {link_name!r}; {attr} for {carrier} on {bus} not applied."
+                )
+                continue
             if "el" in unit:
                 potential = potential / n.links.loc[link_name, "efficiency"]
             n.links.loc[link_name, attr] = potential

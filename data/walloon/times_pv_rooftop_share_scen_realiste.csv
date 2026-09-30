@@ -1,0 +1,15 @@
+# Extracted from scen_sensibilite_realiste_260929_3009.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# Rooftop share of TIMES PV capacity (VAR_Cap, plant PV only).
+year,share,rooftop_gw,utility_gw
+# 2030 row REMOVED on purpose (same reason as the September realiste pair):
+# TIMES builds almost no PLANT PV that year in this scenario (0.15 GW roof +
+# 0.25 GW ground) while the behind-the-meter PV stays on the roofs, so the
+# plant-only share (0.377) and the all-PV share (0.904) disagree by 53 pp and
+# neither describes the BEWAL solar fleet that PyPSA's rooftop floor applies
+# to. With no 2030 row lookup_year_value() returns None and the floor is not
+# added that horizon; 2035-2050 keep the plant-only convention used everywhere.
+# was: 2030,0.376559,0.151000,0.250000
+2035,0.673344,7.161349,3.474152
+2040,0.701906,10.949616,4.650222
+2045,0.721769,12.063304,4.650222
+2050,0.721769,12.063304,4.650222

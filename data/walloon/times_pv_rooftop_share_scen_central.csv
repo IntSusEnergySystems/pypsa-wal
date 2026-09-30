@@ -1,8 +1,8 @@
-# Extracted from scen_central_v01_260911_1109.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
-# Rooftop share of TIMES PV plant capacity (VAR_Cap).
+# Extracted from scen_central_v01_260929_3009.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# Rooftop share of TIMES PV capacity (VAR_Cap, plant PV only).
 year,share,rooftop_gw,utility_gw
-2030,0.651264,4.289904,2.297142
-2035,0.654986,7.046240,3.711612
-2040,0.690491,10.470106,4.693181
-2045,0.700266,10.964639,4.693181
-2050,0.705985,11.269192,4.693181
+2030,0.689864,4.511236,2.028079
+2035,0.658492,7.305890,3.788999
+2040,0.698176,11.007436,4.758557
+2045,0.718225,12.129224,4.758557
+2050,0.718225,12.129224,4.758557

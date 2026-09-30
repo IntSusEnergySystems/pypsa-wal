@@ -1,0 +1,7 @@
+# Extracted from scen_sensibilite_realiste_260929_3009.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# TIMES STORAGEMININD VAR_FOut of CO2STOCK, kt/a.
+year,kt
+2035,3420.424760
+2040,4235.737277
+2045,5201.428848
+2050,5280.743471

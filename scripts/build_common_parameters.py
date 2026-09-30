@@ -288,11 +288,12 @@ def apply_scenario_overrides(
 
 
 def seed_scenario_outputs(scenario: str, write: bool) -> tuple[list[str], list[str]]:
-    """Copy the central generated files into place for a new scenario.
+    """Rebuild a scenario's three generated files from the central ones.
 
     The patch functions may only rewrite the `value` cell of an existing row —
     they never add or remove rows. A scenario therefore needs a structurally
-    complete file to patch, and the central one is by definition that file.
+    complete file to patch, and the central one is by definition that file;
+    on a write it is copied afresh every time, then patched with the overrides.
 
     Returns (notes, missing). `missing` is non-empty only when seeding was not
     allowed to happen (``--check``, or ``--write --dry-run``): a preview must
@@ -302,12 +303,18 @@ def seed_scenario_outputs(scenario: str, write: bool) -> tuple[list[str], list[s
     notes: list[str] = []
     missing: list[str] = []
     for src, dst in zip(scenario_outputs(None), scenario_outputs(scenario)):
-        if dst.exists():
-            continue
         if write:
-            dst.write_bytes(src.read_bytes())
-            notes.append(f"seeded {dst.relative_to(ROOT)} from {src.name}")
-        else:
+            # Re-seed on EVERY write, not only when the copy is missing. The
+            # patchers never add rows, so a copy seeded once kept the central's
+            # structure of that day for good: on 2026-09-30 the 12 Sep copies
+            # still lacked the 29 Sep network-cost calibration rows and carried
+            # the pre-24 Sep electrolysis lifetime. A scenario owns nothing in
+            # these files beyond its override values, so rebuilding them from
+            # the central file loses nothing.
+            if not dst.exists() or dst.read_bytes() != src.read_bytes():
+                dst.write_bytes(src.read_bytes())
+                notes.append(f"seeded {dst.relative_to(ROOT)} from {src.name}")
+        elif not dst.exists():
             missing.append(str(dst.relative_to(ROOT)))
     return notes, missing
 
@@ -487,9 +494,14 @@ def fmt_value(v: float) -> str:
 
 def same_value(cell: str, v: float) -> bool:
     try:
-        return abs(float(cell) - v) < 1e-9
+        c = float(cell)
     except (TypeError, ValueError):
         return False
+    # `inf - inf` is nan, so an uncapped `inf` row would read as out of sync
+    # forever and `--check` could never pass.
+    if c == v:
+        return True
+    return abs(c - v) < 1e-9
 
 
 # --------------------------------------------------------------------------- #

@@ -9,28 +9,22 @@ run:
   # a single run and several are a multi-scenario run — the only difference is how
   # many names are listed. Every name must be a key of run.scenarios.file;
   # `name: all` expands to all of them.
-  # September 2026 cabinet batch. Every name here is a key of
-  # config/scenarios.walloon.yaml, and cluster/config.sh DERIVES its scenario
-  # list from this block, so this is the single place that decides what runs.
-  # Comment a line out to drop that scenario from the batch.
+  # 30 September 2026 cabinet batch (ICEDD exports times_20260930_*). Every
+  # name here is a key of config/scenarios.walloon.yaml, and cluster/config.sh
+  # DERIVES its scenario list from this block, so this is the single place that
+  # decides what runs. Comment a line out to drop that scenario from the batch;
+  # `RUN_NAME=<name> ./cluster/nic5.sh …` runs a subset (the central goes first,
+  # docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §5).
   #
-  # All 13 are weather year 2010. `scen_central_2013` is deliberately NOT here:
-  # it needs a second --configfile (config/config.weather2013.yaml) and its own
-  # resources tree — see docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md.
+  # The September batch (taxshift pair, realiste_nets / realiste_nobnd30, the
+  # scen_nuctip_* CAPEX sweep) keeps its blocks in the scenarios file but is not
+  # re-run: it is on the 11 Sep exports. docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md.
   name:
-  - scen_central                 # reference case, the one that ships Monday
-  - scen_taxshift                # single surcharge across vectors from 2030
-  - scen_taxshift_plus           # + regional levies moved to gas
+  - scen_central                 # reference case — run first
+  - scen_noccsccgt               # no capture on Walloon gas power plants
+  - scen_retardnucleaire         # new nuclear delayed by five years
   - scen_biomethane_industrie    # biogas volume reserved for industry
-  - scen_realiste_nets           # realistic 2030 PV/wind, non-ETS target kept
-  - scen_realiste_nobnd30        # realistic 2030 PV/wind, no 2030 target
-  - scen_retardnucleaire         # new nuclear deferred to 2055
-  - scen_nuctip_9500             # nuclear CAPEX sweep: tipping-point search,
-  - scen_nuctip_7500             #   capacity free between the LTO floor and the
-  - scen_nuctip_6500             #   central envelope. 9500 = central cost, i.e.
-  - scen_nuctip_6000             #   the sweep's own reference point. Clustered
-  - scen_nuctip_5500             #   on 6000, where earlier analyses put the
-  - scen_nuctip_4500             #   break-even.
+  - scen_realiste                # realistic 2030 PV/wind (not for publication)
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:

@@ -63,30 +63,34 @@ NIC5 node sizes (check live with `sinfo -o '%P %a %D %t %C %m'`):
 
 | Partition | Nodes | RAM per node | Use for |
 |---|---|---|---|
-| `batch` (~70 nodes) | ~258 GB | 6h test solves only |
-| `hmem` (**3 nodes**) | **~1 TB** | **all 1h production solves (mandatory)** |
+| `batch` (~70 nodes) | ~258 GB | **default for 1h solves** (80 GB request) |
+| `hmem` (**3 nodes**) | **~1 TB** | fallback when `batch` has no node with 16 free cores |
 
 Mechanics:
 
 - The partition is set **explicitly**, not inferred from the memory request:
-  `SOLVE_PARTITION` in `cluster/config.sh` (default `hmem`), passed as
-  `--default-resources slurm_partition=…` by `nic5.sh solve`.
+  `SOLVE_PARTITION` in `cluster/config.sh` (default **`batch`** since the
+  12 Sep cabinet batch), passed as `--default-resources slurm_partition=…`
+  by `nic5.sh solve`. Override per command: `SOLVE_PARTITION=hmem ./cluster/nic5.sh solve`.
 - The memory request is `solving.mem_mb` in `cluster/config_cluster.yaml`
-  (production: **100000** ≈ 100 GB), with `solving.cpus` = Gurobi
-  `threads` = **16** (keep the three in sync). `SOLVE_RUNTIME` = 1440 min.
-- Observed 1h peak is ~37 GB per solve. 100 GB leaves headroom **and still
-  fits a shared (`mix`) hmem node**, so the job starts fast. Requesting the
-  full ~1 TB forces an **exclusive node** on a 3-node partition — expect a
-  long `Resources` wait whenever anyone else holds a node.
-- Never send a 1h solve to `batch`: the LP spikes during Gurobi model
-  generation and will OOM or crawl. (`batch` at ~100 GB is fine for 6h
-  development tests only.)
+  (**80000**), with `solving.cpus` = Gurobi `threads` = **16** (keep the three
+  in sync). `SOLVE_RUNTIME` = **720** min; the NumericFocus fallback of
+  13 Sep took 7.5 h on one horizon, still inside it.
+- Measured 1h peaks: 20–31 GB (24 Sep), 31–35 GB (29 Sep). 80 GB is ample
+  and fits a shared `batch` node. The 13 Sep batch ran 13 chains on `batch`,
+  all RUNNING within four minutes; on `hmem` it would have run one or two at a
+  time.
+- **Which partition:** read `sinfo` before every `solve`. On 29 Sep `batch` had no
+  node with 16 free cores after 15:30 and the chain moved to `hmem` mid-run.
+  Requesting the full ~1 TB of `hmem` forces an exclusive node — never do that.
+- (Superseded, kept for history: until 12 Sep this section said `hmem` was
+  mandatory at 100 GB. The measured peaks above are why that changed.)
 
 Before submitting, look at the free spots (also wrapped by
 `./cluster/nic5.sh status`):
 
 ```bash
-ssh nic5 "sinfo -p hmem -o '%P %a %D %t %C %m'"
+ssh nic5 "sinfo -p batch,hmem -o '%P %a %D %t %C %m'"
 ssh nic5 "squeue -p hmem -h -o '%T' | sort | uniq -c"          # by state
 ssh nic5 "squeue -p hmem -h -o '%u' | sort | uniq -c | sort -rn | head"  # by user
 ssh nic5 "squeue --me --format='%.18i %.10P %.26j %.8T %.10M %R'"

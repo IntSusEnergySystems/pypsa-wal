@@ -539,3 +539,144 @@ a re-run.
    degenerate extendable options from the 2025 LP. It is a scenario choice, not a fix.
 3. **Solver:** `FeasibilityTol 1e-5`, the value PyPSA-Eur's `gurobi-fallback` uses. It
    shortens a primal tail, but it changes tolerances relative to every earlier run.
+
+## 13. Addendum 2026-09-30: gas plants with capture, the NoCCSCCGT sensitivity, and a correction to R1
+
+Written while preparing the next cabinet batch (see
+[`2026-09-30_cabinet_batch_20260930_2010_1h.md`](2026-09-30_cabinet_batch_20260930_2010_1h.md)).
+The numbers come from the three solved central trees. Scripts are in that log's §10.
+
+### 13.1 Walloon CCGT with capture is small in this run
+
+BEWAL, electrical capacity `p_nom_opt × efficiency` (MW_e) and output (TWh_e):
+
+| run (TIMES file) | carrier | 2030 | 2040 | 2050 |
+|---|---|---:|---:|---:|
+| 13 Sep batch (`260911`) | CCGT | 1 740 / 6.67 | 2 831 / 11.56 | 2 323 / 1.89 |
+| | CCGT CC | 0 | 707 / 4.37 | **2 172 / 9.17** |
+| | urban central gas CHP CC | 0 | 0 | 409 / 1.58 |
+| 24 Sep (`260923`) | CCGT | 1 740 / 6.12 | 3 134 / 12.11 | 2 626 / 2.06 |
+| | CCGT CC | 0 | 141 / 0.84 | **3 416 / 8.95** |
+| | urban central gas CHP CC | 0 | 0 | 482 / 1.34 |
+| **29 Sep, this run** (`260923`) | CCGT | 1 740 / 6.37 | 3 042 / 11.75 | 2 534 / 2.20 |
+| | CCGT CC | 0 | 551 / 3.26 | **551 / 1.33** |
+| | urban central gas CHP CC | 0 | 0 | 449 / 1.26 |
+
+CO₂ captured on Walloon gas plants: 1.44 / 3.71 Mt in 2040 / 2050 (13 Sep), 0.28 / 3.51
+(24 Sep), **1.07 / 1.01** (this run).
+
+**Why it collapsed in 2050.** The 2050 Walloon and Flemish nuclear are back at 3 GW each
+(`bbc9450e`). The 24 Sep run had them at the 1.03 / 1.0 GW retrofit and filled the gap
+with 3.4 GW of CCGT CC (§7, and R1 of the 24 Sep log). The CC fleet here is the 551 MW_e
+built in 2040, carried to 2050 and run at ~28 % load. No CC plant is added in 2050.
+
+**The figures sent to the SPW are superseded.** J. Simon's reply of 29 Sep on the new CCGT
+permit ("1,9 GW en 2030, 3,5 GW en 2040 et 4,5 GW en 2050 (dont 2,6 GW avec captage) … 7, 17
+et 12 TWh") reproduces the **13 Sep batch**: 1 740 + 178 OCGT; 2 831 + 707; 2 323 + 2 172 +
+409 CHP CC. The current central says, for 2050: 2.5 GW of unabated CCGT producing 2.2 TWh,
+and 1.0 GW of gas plant with capture producing 2.6 TWh. The unabated fleet is a backup
+fleet, not a baseload one. Worth a correction before it is quoted in a permit opinion.
+
+### 13.2 Will the NoCCSCCGT sensitivity change anything?
+
+**What TIMES removes** (`scen_sensibilite_central_noccsccgt_260929_2909.vd` against the
+central `scen_central_v01_260929_3009.vd`):
+* `ETSTP_Retrofit_CCGT_CCS_E12_N` and `…_E13_N`, the capture retrofit of the two recent
+  CCGTs, 0.51 + 0.51 GW from 2040, ≈ 10 PJ of activity each;
+* the new post-combustion plant `ETSTP_CCGT-CCS_PostC_GAS_N`.
+
+The two recent units then run unabated, 0.87 GW each (`ETSTP_CCGT_exist_E12/E13_N`).
+TIMES-WAL has no gas-CHP-with-capture process in the solution.
+
+**What PyPSA would lose, on this run's numbers:**
+* about 1.1 Mt/a of capture in 2040 and 1.0 Mt/a in 2050;
+* 3.3 TWh_e (2040) and 2.6 TWh_e (2050) of firm low-carbon output.
+
+That is a real but moderate change: about a quarter of what the 13 Sep or 24 Sep baselines
+would have implied (3.5–3.7 Mt/a in 2050). In 2040 the output shifts to unabated CCGT at
+the ~150 EUR/t Walloon CO₂ price. In 2050 it has to come from PV, storage and a higher
+carbon price, not from imports: the one-way import cap already binds in 2030, 2040 and
+2050 (§11 level 4), so moving the capture to Flanders and importing the power is closed.
+
+**The honest answer is "less than in TIMES, and mostly in 2040".** Two things can move it
+before tonight's numbers exist:
+* the next central uses the 30 Sep TIMES file and the foreign-nuclear corridor of the batch
+  log §3. Less French and British nuclear in 2040–2050 raises import prices, which makes
+  domestic CC more attractive;
+* the NoCCSCCGT export was built on the **pre-final** central. In 2025 it is identical to
+  the RetardNucleaire and biomethane exports and differs from the final central in 405
+  flows. So the difference between the two TIMES files is not purely the CCS switch (batch
+  log §2.2).
+
+**PyPSA formalisation.** Two `potential:BEWAL:<carrier>:p_nom_max = 0` rows per horizon,
+for `CCGT CC` and `urban central gas CHP CC`, in `config/scenarios/scen_noccsccgt.csv`.
+* Industrial capture is kept, as agreed on 29 Sep ("on maintient bien le CCS sur process").
+  That covers process emissions CC, gas / solid biomass for industry CC, SMR CC and biomass
+  CHP CC.
+* Flanders, Brussels and the neighbours are unchanged, as in every other sensitivity.
+
+### 13.3 Correction to R1: the foreign "rebuild" is forced, not chosen
+
+R1 reads the 49 GW of French new build in 2030 as the optimiser's choice, with no
+build-rate limit. **It is forced.**
+* The central caps file, `data/walloon/agg_p_nom_minmax_demande_haute.csv`, carries
+  `legacy-unreviewed` rows with the foreign nuclear figures in the **min** columns:
+  * FR ≥ 61 761 MW in 2030 and ≥ 62 907 MW from 2040;
+  * GB ≥ 5 510 MW in 2030 and ≥ 13 236 MW from 2040;
+  * NL ≥ 486 → 243 → 0 MW.
+* `add_CCL_constraints` only adds a floor for a group that has extendable links. The rows
+  were therefore inert on 24 Sep, when the 10 MW cleanup had deleted the FR/GB
+  `nuclear-2025` options. They bind as soon as `bbc9450e` keeps those options: this run's
+  61.8 / 62.9 / 62.9 GW (FR) and 5.5 / 13.2 / 13.2 GW (GB) are exactly the floors.
+
+**The floor was what kept France realistic.** The model's existing French fleet retires on
+38–41-year lifetimes: 39.4 GW in 2025 (real fleet about 63 GW), 13.1 GW in 2030, 6.2 GW in
+2040, 0 in 2050. A max-only cap would therefore collapse French nuclear in 2030. The fix is
+a reviewed **min/max corridor** from national plans, not a ceiling. It is implemented for
+the next batch (batch log §3). The 2025 base-year shortfall is left as found and is
+recorded there.
+
+### 13.4 Is the calibration replicable for the next runs? One hole, now closed
+
+The calibration lives in three places. All three reach every scenario:
+* the base config: `sector.network_calibration`, `transmission_efficiency`,
+  `gas_distribution_grid_cost_factor`;
+* the global tables: `discount_rates.csv` (3.5 % for network assets) and
+  `transmission_cost_overrides.csv` (ALEGrO, CO₂ trunks);
+* the code (the HVDC twin fix).
+
+**The one exception was the scenario-specific cost files.**
+* A scenario with an override (`config/scenarios/<name>.csv`) reads its own
+  `custom_costs_<name>.csv`. Those copies were seeded once, on 12 Sep, and the patcher
+  never adds rows. So `custom_costs_scen_retardnucleaire.csv`, the two realiste copies and
+  the six `scen_nuctip_*` copies had **no** `electricity distribution grid` (620 €/kW) and
+  **no** `HVAC overhead` (450 / 408 / 372) row. They would have run on technology-data's
+  668 €/kW and the DEA line cost.
+* They also still had the 25-year electrolysis lifetime (10 years since 24 Sep).
+* `--check --all-scenarios` reported it; `--check` alone does not look at scenarios.
+
+Fixed on 30 Sep: `--write --all-scenarios` now rebuilds each copy from the central file
+before applying the overrides. `test_scenario_copies_have_the_central_structure` fails if
+a copy ever drifts again. No solved run was affected: the calibration postdates every
+scenario-specific run.
+
+**Reporting:**
+* `network_cost_report.py` and `bill_harmonisation.py` now run inside `nic5.sh
+  postprocess` for every scenario of a batch; before, only by hand.
+* The ClimAct *Distribution* / *Transport* segments in the Explorer are still the
+  uncalibrated ones: `plot_cost_segments.py --network-costs calibrated` fixes the chart,
+  not the Explorer CSVs.
+
+**What the cabinet was told on 29 Sep, against what is implemented:**
+* J. Simon's reply quoted "529 €/kW … revu à la hausse (autour de 650 €/kW). Ces montants
+  combinent bien électricité et gaz". The implemented value is **620 €/kW**, up from 668
+  (technology-data), and it is **electricity only**.
+* Gas distribution is a separate fixed block (282 M€/a, CWaPE 2025) plus a boiler charge
+  of ≈ 5 €/kW_th/a (factor 0.12). The old chart's *Distribution* bar did mix in a ClimAct
+  gas slice; that is what Antoine Dubois spotted.
+* The calibrated 2030 Walloon electricity-distribution requirement is 800 M€ (L1 + L2 + L3
+  + meters + PV hosting), against CWaPE's 2029 authorised revenue of 981 M€, which also
+  contains losses, PSO, the road-use fee and "other" (≈ 189 M€). Like for like, 800 vs
+  ~792 M€.
+* Worth sending that correction with the next results.
+
