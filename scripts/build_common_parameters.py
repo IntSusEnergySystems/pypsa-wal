@@ -539,6 +539,12 @@ def patch_costs(df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool) -> P
     """Patch data/walloon/custom_costs.csv from `cost:<tech>:<param>` targets."""
     patch = Patch(path=COSTS_FILE)
     targets = collect_targets(df, "cost", horizons, nparts=2)
+    # `cost:<tech>:discount rate` rows are per-technology overrides of the
+    # sector hurdle rate: resolve_hurdle_rates writes them to the generated
+    # discount_rates.csv, which process_cost_data applies last. They have no
+    # business in custom_costs.csv, and requiring a row there would make every
+    # override fail with "no row for active target".
+    targets = {k: t for k, t in targets.items() if k[1] != "discount rate"}
     frame = _read_str(COSTS_FILE)
     before = frame.copy()
     patch.rows = len(frame)

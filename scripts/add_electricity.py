@@ -434,6 +434,15 @@ def set_transmission_costs(
         return
 
     dc_b = n.links.carrier == "DC"
+    # The zero-length `-reversed` twin that `lossy_bidirectional_links` adds must
+    # keep capital_cost 0. This function runs again in `add_brownfield` (through
+    # `set_transmission_limit`) once the twins exist; pricing them charged every
+    # DC link its converter pair a second time from the second horizon on
+    # (docs/network-costs-review-20260928.md §6.2).
+    twin = n.links.index.str.endswith("-reversed")
+    if "reversed" in n.links:
+        twin |= n.links["reversed"].fillna(False).astype(bool)
+    dc_b &= ~twin
 
     # If there are no dc links, then the 'underwater_fraction' column
     # may be missing. Therefore we have to return here.

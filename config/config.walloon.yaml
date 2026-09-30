@@ -312,6 +312,35 @@ clustering:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
+  # --- Network-cost calibration (2026-09-29) --------------------------------
+  # Decisions, data and sources: docs/network-costs-review-20260928.md §2–§6. The
+  # unit costs and discount rates live in config/input_parameters_for_models.csv
+  # (cost:electricity distribution grid:investment = 620 EUR/kW, HVAC overhead =
+  # 450 EUR/MW/km, cost:<network tech>:discount rate = 3.5 %).
+  #
+  # Distribution losses: TIMES EVTRANS_H-M (0.973) x EVTRANS_M-L (0.968) for LV
+  # deliveries, 0.973 for MV ones, weighted by the 2025 TIMES volumes = 0.949.
+  transmission_efficiency:
+    electricity distribution grid:
+      efficiency_static: 0.95
+  # Avoidable cost of keeping one decentral gas customer connected, ~5 EUR/kW_th/a
+  # (CWaPE 2025: 111 EUR/meter/yr controllable OPEX, about half customer-driven,
+  # plus the meter; 16.2 kW_th of boiler per meter in BEWAL), expressed against
+  # the recalibrated electricity distribution annuity (41.4 EUR/kW/a). The fixed
+  # cost of the existing gas grid is reported separately, not charged per kW.
+  gas_distribution_grid_cost_factor: 0.12
+  network_calibration:
+    # Share of `industry electricity` connected at HV (Elia), moved off the LV
+    # bus: TIMES draws 70 % of Walloon industrial electricity on ELCHIGG in every
+    # horizon (5.8/8.3 TWh in 2025, 16.2/23.2 TWh in 2050). Applied at all nodes.
+    industry_hv_share: 0.70
+    # LV hosting-capacity charge on NEW rooftop PV, EUR/kWp, annualised like the
+    # distribution grid: 25 % of the CWaPE transition capex over 2026-30 (774 MEUR)
+    # over 1.58 GWp of new rooftop PV. Range 0-250.
+    pv_hosting_investment: 120
+    # ALEGrO project cost; economies of scale on large CO2 trunks.
+    transmission_cost_overrides: data/walloon/transmission_cost_overrides.csv
+  # ---------------------------------------------------------------------------
   # Elia AdeqFlex 2025 "Current commitments", derived by
   # scripts/walloon_scripts/build_ev_charging_weights.py -- do not hand-edit.
   # bev_dsm_availability is the MARKET share (V1M+V2M) of the fleet;

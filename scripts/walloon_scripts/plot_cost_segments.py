@@ -27,17 +27,24 @@ Distribution     the electricity distribution grid
 Because it reads the extraction rather than the networks, it runs in under a
 second and needs no ``pypsa``.
 
-Caveat on the Transmission slice
---------------------------------
-ClimAct's extraction groups branch costs by PyPSA's ``location`` attribute,
-which ``assign_locations`` sets from the *first* bus — so an interconnector is
-booked wholly to whichever of the two region codes sorts first, not split
-between them. Wallonia therefore carries its links to ``FR``/``LU`` in full and
-its links to ``BEBRU``/``BEVLG`` not at all. The 50/50 sharing added to
-``scripts/make_summary.py`` on 2026-09-15 fixes ``nodal_costs.csv`` but has not
-propagated to this extraction. It moves roughly 5 % of the regional total
-between neighbours and, since both scenarios use the same attribution, leaves
-every scenario *difference* on this chart untouched.
+How the network segments are built
+----------------------------------
+With ``--network-costs climact`` (the original slide) the two network bars are
+ClimAct's. *Distribution* is then the electricity distribution link plus a gas
+slice the extraction recomputes from its own ``data/costs/CZ`` file (500 €/kW ×
+⅓), and *Transmission* pools every branch of the six-country system per carrier
+and splits the pool by each node's share of connected capacity — about twice
+the 50/50 cost of the branches Wallonia touches. Neither matches the regulated
+accounts (docs/network-costs-review-20260928.md §1.1).
+
+With ``--network-costs calibrated`` (the default) both bars come from
+``<run>/csvs/network_cost_segments.csv``, written by ``network_cost_report.py``:
+the existing grid from the 2025 regulated accounts plus the model's own
+increments, and the tariff view of Elia and Fluxys (§2–§6). *Production* is then
+corrected so nothing is counted twice or dropped: ClimAct's gas slice is put
+back into the boilers it was taken from, and the rooftop-PV hosting charge and
+the per-boiler gas-grid charge — already inside the calibrated *Distribution* —
+are taken out of *Production*.
 
 Usage
 -----
@@ -46,7 +53,8 @@ Usage
     python scripts/walloon_scripts/plot_cost_segments.py \\
         --runs results/walloon/scen_central results/walloon/scen_retardnucleaire \\
         --labels "Central" "Retard nucléaire" \\
-        --horizons 2030 2040 2050 --region wl --lang fr --outdir docs/figures
+        --horizons 2030 2040 2050 --region wl --lang fr --outdir docs/figures \\
+        --network-costs calibrated
 
 More than two runs simply add more bars per horizon, in the order given; every
 bar after the first is annotated with its deviation from the first. ``--bare``
@@ -125,6 +133,8 @@ L10N = {
         "footnote": "Imports nets : énergie entrant dans la région valorisée au "
                     "prix marginal nodal, nette des exports. Source : "
                     "explorer/pypsa/costs_segments.csv.",
+        "footnote_net": "Réseaux : réseau existant selon les comptes régulés 2025 "
+                        "(CWaPE, CREG), renforcements du modèle, vue tarifaire du transport.",
     },
     "en": {
         "title": "Total Walloon system cost by segment",
@@ -140,12 +150,15 @@ L10N = {
         "footnote": "Net imports: energy entering the region valued at the nodal "
                     "marginal price, net of exports. Source: "
                     "explorer/pypsa/costs_segments.csv.",
+        "footnote_net": "Networks: existing grid from the 2025 regulated accounts "
+                        "(CWaPE, CREG), model reinforcements, tariff view of transmission.",
     },
 }
 
 
 # --------------------------------------------------------------------------- #
-def read_segments(run: Path, region: str, horizons: list[str]) -> pd.DataFrame:
+def read_segments(run: Path, region: str, horizons: list[str],
+                  network_costs: str = "calibrated") -> pd.DataFrame:
     """Segment × horizon table in bn€/yr for one results tree."""
     path = run / "explorer" / "pypsa" / "costs_segments.csv"
     if not path.exists():
@@ -162,7 +175,41 @@ def read_segments(run: Path, region: str, horizons: list[str]) -> pd.DataFrame:
     if absent:
         raise ValueError(f"{path}: no column for horizon(s) {absent}")
     out = sel.set_index(sel.config.map(wanted))[horizons] / 1e9
-    return out.loc[[key for key, _, _ in SEGMENTS]]
+    out = out.loc[[key for key, _, _ in SEGMENTS]]
+    if network_costs == "calibrated":
+        out = _calibrated_networks(run, out, region, horizons)
+    return out
+
+
+def _calibrated_networks(run: Path, out: pd.DataFrame, region: str,
+                         horizons: list[str]) -> pd.DataFrame:
+    """Swap ClimAct's network bars for network_cost_report.py's, fixing Production."""
+    if region != "wl":
+        raise ValueError("calibrated network costs exist for the Walloon node only")
+    seg_fn = run / "csvs" / "network_cost_segments.csv"
+    long_fn = run / "csvs" / "network_costs_calibrated.csv"
+    if not seg_fn.exists():
+        raise FileNotFoundError(
+            f"{seg_fn} not found — run scripts/walloon_scripts/network_cost_report.py {run}")
+    seg = pd.read_csv(seg_fn, index_col=0)
+    seg.columns = seg.columns.astype(str)
+    long = pd.read_csv(long_fn)
+    long["year"] = long.year.astype(str)
+
+    def item(net, text):
+        m = (long.network == net) & long["item"].str.startswith(text)
+        return long[m].groupby("year").value.sum().reindex(horizons).fillna(0) / 1e3
+
+    link = (item("electricity_distribution", "reinforcement")
+            + item("electricity_distribution", "model valuation"))
+    climact_gas_slice = (out.loc["distr"] - link).clip(lower=0)
+    out = out.copy()
+    out.loc["prod"] = (out.loc["prod"] + climact_gas_slice
+                       - item("electricity_distribution", "rooftop PV hosting")
+                       - item("gas_distribution", "avoidable per-boiler charge"))
+    out.loc["distr"] = seg.loc["distr_wl", horizons] / 1e3
+    out.loc["tran"] = seg.loc["tran_wl", horizons] / 1e3
+    return out
 
 
 def dec(v: float, dp: int, lang: str) -> str:
@@ -333,6 +380,8 @@ def main() -> None:
                    help="region suffix in costs_segments.csv (wl, fl, bx, be, ...)")
     p.add_argument("--lang", choices=sorted(L10N), default="fr")
     p.add_argument("--outdir", type=Path, default=Path("docs/figures"))
+    p.add_argument("--network-costs", choices=["calibrated", "climact"], default="calibrated",
+                   help="network bars from network_cost_report.py (default) or ClimAct's extraction")
     p.add_argument("--bare", action="store_true",
                    help="also write a title-less variant for slide use")
     args = p.parse_args()
@@ -343,8 +392,10 @@ def main() -> None:
     if len(labels) != len(args.runs):
         p.error(f"{len(args.runs)} runs but {len(labels)} labels")
     T = L10N[args.lang]
+    if args.network_costs == "calibrated":
+        T = dict(T, footnote=T["footnote"] + "\n" + T["footnote_net"])
 
-    data = [read_segments(r, args.region, args.horizons) for r in args.runs]
+    data = [read_segments(r, args.region, args.horizons, args.network_costs) for r in args.runs]
 
     stem = build_figure(data, labels, args.horizons, T, args.lang, args.outdir, False)
     if args.bare:

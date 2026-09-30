@@ -1900,6 +1900,10 @@ rule prepare_sector_network:
         ),
         ntc_csv="data/walloon/ntc_{planning_horizons}.csv",
         ntc_floors="data/walloon/ntc_floors.csv",
+        # Per-corridor network cost overrides (docs/network-costs-review-20260928.md §6.5).
+        transmission_cost_overrides=config_provider(
+            "sector", "network_calibration", "transmission_cost_overrides", default=[]
+        ),
         clever_transport=resources("clever_Transport_{clusters}_{planning_horizons}.csv"),
     output:
         resources(

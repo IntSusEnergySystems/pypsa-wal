@@ -35,9 +35,17 @@ from scripts.walloon_scripts.sequestration_bounds import (
     apply_sequestration_fleet_cap,
 )
 from scripts.walloon_scripts.set_NTCs import apply_ntc_floors
+from scripts.walloon_scripts.network_calibration import (
+    apply_transmission_cost_overrides,
+    read_transmission_cost_overrides,
+)
 
 logger = logging.getLogger(__name__)
 idx = pd.IndexSlice
+
+# Nuclear capacity (MW_th) below which a carried `nuclear-2025` option counts as
+# solver rounding and restarts from zero. The new-build seeds are 0.031 MW_th.
+NUCLEAR_DUST_MW = 1e-3
 
 
 def add_brownfield(
@@ -141,7 +149,15 @@ def add_brownfield(
         ]
         keep = n.links.index.intersection(prev_nuclear.index)
         if len(keep):
-            n.links.loc[keep, "p_nom_min"] = prev_nuclear.loc[keep, "p_nom_opt"]
+            # An unbuilt option comes back from the barrier at ~1e-7 MW, not 0.
+            # Carried as a lower bound, that dust took the 2030 RHS range of the
+            # 2026-09-29 central run down to 4e-7 (3e-5 before): the spread
+            # threshold_capacity exists to prevent, which nuclear is exempt from.
+            # The 0.03 MW seeds are well above the cut and keep their size.
+            prev_opt = prev_nuclear.loc[keep, "p_nom_opt"]
+            dust = keep[prev_opt < NUCLEAR_DUST_MW]
+            n.links.loc[keep, "p_nom_min"] = prev_opt
+            n.links.loc[dust, ["p_nom_min", "p_nom"]] = 0.0
 
     # deal with gas network
     if h2_retrofit:
@@ -492,7 +508,20 @@ if __name__ == "__main__":
 
     kind = snakemake.params.transmission_limit[planning_horizon][0]
     factor = snakemake.params.transmission_limit[planning_horizon][1:]
-    set_transmission_limit(n, kind, factor, load_costs(snakemake.input.costs))
+    costs_h = load_costs(snakemake.input.costs)
+    set_transmission_limit(n, kind, factor, costs_h)
+    # set_transmission_limit has just re-costed every line and DC link from the
+    # generic unit costs: re-apply the per-corridor project costs. Only the
+    # idempotent `investment` rows; `capital_cost_factor` rows were applied once
+    # when each vintage was created (prepare_sector_network) and would compound.
+    apply_transmission_cost_overrides(
+        n,
+        costs_h,
+        read_transmission_cost_overrides(
+            snakemake.input.get("transmission_cost_overrides") or None
+        ),
+        parameters=("investment",),
+    )
 
     # set_transmission_limit rewrites s_nom_min/p_nom_min from today's grid,
     # undoing the carry-forward add_brownfield established above. Re-apply it,

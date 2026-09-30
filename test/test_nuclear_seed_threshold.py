@@ -63,3 +63,25 @@ def test_brownfield_keeps_an_unbuilt_nuclear_link():
     assert "BEWAL nuclear-2025" in n.links.index
     assert n.links.at["BEWAL nuclear-2025", "p_nom"] == pytest.approx(0.030675)
     assert "BEWAL OCGT-2025" not in n.links.index
+
+
+def test_brownfield_restarts_nuclear_dust_from_zero():
+    # An unbuilt extendable option comes back from the barrier at ~1e-7 MW.
+    # Carrying that as p_nom_min widened the 2030 RHS range to 4e-7 on
+    # 2026-09-29. The seed must keep its size; the dust must restart from 0.
+    n = pypsa.Network()
+    n_p = pypsa.Network()
+    for net in (n, n_p):
+        for bus, carrier in [("BEWAL", "AC"), ("FR", "AC"), ("uranium", "uranium")]:
+            net.add("Bus", bus, carrier=carrier)
+    _seed_link(n_p, "BEWAL nuclear-2025", "nuclear", 0.030675)
+    _seed_link(n_p, "FR nuclear-2025", "nuclear", 4.07e-7)
+    n_p.links.loc["FR nuclear-2025", "bus1"] = "FR"
+
+    add_brownfield(n, n_p, year=2030, capacity_threshold=10)
+
+    assert n.links.at["BEWAL nuclear-2025", "p_nom_min"] == pytest.approx(0.030675)
+    assert n.links.at["BEWAL nuclear-2025", "p_nom"] == pytest.approx(0.030675)
+    assert "FR nuclear-2025" in n.links.index
+    assert n.links.at["FR nuclear-2025", "p_nom_min"] == 0.0
+    assert n.links.at["FR nuclear-2025", "p_nom"] == 0.0

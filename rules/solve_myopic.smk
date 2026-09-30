@@ -94,6 +94,10 @@ rule add_brownfield:
         walloon_potentials=config_provider("electricity", "walloon_potentials"),
         nuclear_p_max_pu=config_provider("conventional", "nuclear", "p_max_pu"),
         ntc_floors="data/walloon/ntc_floors.csv",
+        # Re-applied after set_transmission_limit re-costs the branches.
+        transmission_cost_overrides=config_provider(
+            "sector", "network_calibration", "transmission_cost_overrides", default=[]
+        ),
         network=resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
         ),

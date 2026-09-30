@@ -51,6 +51,12 @@ from scripts.walloon_scripts.BEWAL_potentials_overnight import update_BEWAL_pote
 from scripts.walloon_scripts.set_NTCs import apply_ntc_floors, apply_ntc_limits
 from scripts.walloon_scripts.ptes_bounds import ptes_store_e_nom_max
 from scripts.walloon_scripts.power_plant_cc import disable_power_plant_cc
+from scripts.walloon_scripts.network_calibration import (
+    add_rooftop_pv_hosting_cost,
+    apply_transmission_cost_overrides,
+    read_transmission_cost_overrides,
+    split_industry_electricity,
+)
 
 spatial = SimpleNamespace()
 logger = logging.getLogger(__name__)
@@ -1813,6 +1819,15 @@ def insert_electricity_distribution_grid(
         marginal_cost=costs.at["home battery storage", "marginal_cost"],
         p_nom_extendable=True,
         lifetime=costs.at["battery inverter", "lifetime"],
+    )
+
+    # Network-cost calibration (docs/network-costs-review-20260928.md §4.3):
+    # HV-connected industry leaves the LV bus, new rooftop PV pays for the LV
+    # hosting capacity it needs. Both are no-ops without the config block.
+    calibration = options.get("network_calibration") or {}
+    split_industry_electricity(n, calibration.get("industry_hv_share"))
+    add_rooftop_pv_hosting_cost(
+        n, costs, calibration.get("pv_hosting_investment")
     )
 
 
@@ -7616,5 +7631,16 @@ if __name__ == "__main__":
     )
 
     apply_nuclear_inflexibility(n, snakemake.config)
+
+    # Per-corridor cost overrides: project cost for ALEGrO, economies of scale
+    # for large CO2 trunks (docs/network-costs-review-20260928.md §6.5). After
+    # lossy_bidirectional_links, so the reversed twins exist and are skipped.
+    apply_transmission_cost_overrides(
+        n,
+        costs,
+        read_transmission_cost_overrides(
+            snakemake.input.get("transmission_cost_overrides") or None
+        ),
+    )
 
     n.export_to_netcdf(snakemake.output[0])

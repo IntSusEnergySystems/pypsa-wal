@@ -14,15 +14,15 @@ all,BioSNG,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hu
 all,BtL,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,CCGT,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
 all,CH4 (g) fill compressor station,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,CH4 (g) pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,CH4 (g) submarine pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CH4 (g) pipeline,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,CH4 (g) submarine pipeline,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
 all,CH4 (l) transport ship,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
 all,CH4 evaporation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,CH4 liquefaction,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,CO2 liquefaction,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,CO2 pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CO2 pipeline,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
 all,CO2 storage tank,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,CO2 submarine pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,CO2 submarine pipeline,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
 all,Charging infrastructure fast (purely) battery electric vehicles passenger cars,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
 all,Charging infrastructure fuel cell vehicles passenger cars,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
 all,Charging infrastructure fuel cell vehicles trucks,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
@@ -60,15 +60,15 @@ all,Gravity-Water-Aboveground-store,discount rate,0.075,per unit,input_parameter
 all,Gravity-Water-Underground-bicharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
 all,Gravity-Water-Underground-store,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
 all,H2 (g) fill compressor station,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,H2 (g) pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,H2 (g) pipeline repurposed,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,H2 (g) submarine pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,H2 (g) submarine pipeline repurposed,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 (g) pipeline,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,H2 (g) pipeline repurposed,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,H2 (g) submarine pipeline,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,H2 (g) submarine pipeline repurposed,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
 all,H2 (l) storage tank,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,H2 (l) transport ship,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: transport
 all,H2 evaporation,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,H2 liquefaction,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,H2 pipeline,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
+all,H2 pipeline,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
 all,H2 production biomass gasification,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,H2 production biomass gasification CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,H2 production coal gasification,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
@@ -77,13 +77,13 @@ all,H2 production heavy oil partial oxidation,discount rate,0.075,per unit,input
 all,H2 production natural gas steam reforming,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,H2 production natural gas steam reforming CC,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,H2 production solid biomass steam reforming,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
-all,HVAC overhead,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
-all,HVAC submarine,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
-all,HVAC underground,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
-all,HVDC inverter pair,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
-all,HVDC overhead,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
-all,HVDC submarine,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
-all,HVDC underground,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,HVAC overhead,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,HVAC submarine,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,HVAC underground,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,HVDC inverter pair,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,HVDC overhead,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,HVDC submarine,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
+all,HVDC underground,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
 all,Haber-Bosch,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,HighT-Molten-Salt-charger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
 all,HighT-Molten-Salt-discharger,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
@@ -220,7 +220,7 @@ all,electric arc furnace,discount rate,0.1,per unit,input_parameters_for_models.
 all,electric arc furnace with hbi and scrap,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
 all,electric boiler steam,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
 all,electric steam cracker,discount rate,0.1,per unit,input_parameters_for_models.csv,TIMES hurdle: industry
-all,electricity distribution grid,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
+all,electricity distribution grid,discount rate,0.035,per unit,input_parameters_for_models.csv,master CSV cost:<tech>:discount rate override
 all,electricity grid connection,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: power
 all,electrobiofuels,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply
 all,electrolysis,discount rate,0.075,per unit,input_parameters_for_models.csv,TIMES hurdle: supply

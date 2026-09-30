@@ -1,1374 +1,991 @@
-# Network costs in the central scenario — distribution, transmission, gas
+# Network costs in PyPSA-Wal: diagnosis, calibration and coupling with TIMES
 
-**Date:** 2026-09-28
-**Trigger:** stakeholder e-mail feedback on the central scenario and the September 2026
-cabinet deck (sections "Distribution", "Transport", "Nucléaire"). It compares the
-*Distribution* and *Transport* bars of the chart
-*« Coûts totaux du système wallon par segment »*
-([`docs/figures/cost_segments.md`](figures/cost_segments.md), drawn by
-[`plot_cost_segments.py`](../scripts/walloon_scripts/plot_cost_segments.py)) with the
-CWaPE-approved authorised revenues of the Walloon DSOs.
-**Runs examined:** `results/walloon/scen_central` (TIMES
-`scen_central_v01_260911_1109.vd`, 1 h, weather 2010, networks of 2026-09-15) and
-`results/walloon/scen_retardnucleaire`.
-**Scope:** networks only — electricity distribution, electricity transmission, gas
-distribution and transmission, H₂ and CO₂ pipelines. Nuclear is out of scope (3 GW in
-2050 is kept until the meeting with the cabinet).
-**Status:** analysis, proposals and calibration plan. The calibration plan (§6) and the
-TIMES bill harmonisation (§7) were added on 2026-09-29. No model code or input was
-changed. One code bug found in passing (§4.1.4) is filed as a separate task.
+**Scope:** electricity distribution, electricity transmission, gas distribution and
+transmission, H₂ and CO₂ pipelines.
 
-Every number in this note is reproducible from the solved networks, the ClimAct
-extraction output (`explorer/pypsa/costs_segments.csv`) and the five CWaPE decisions;
-see the appendix.
+**Status:** implemented and solved. The calibration is part of the base configuration
+(every scenario), and `scen_central` has been re-solved with it: 1 h resolution, weather
+2010, NIC5. The run is documented in
+[`logs/2026-09-29_scen_central_2010_1h_netcal.md`](logs/2026-09-29_scen_central_2010_1h_netcal.md).
+Results are in §9.
+
+**History:**
+* 2026-09-28: diagnosis written in response to stakeholder feedback on the September
+  cabinet deck ("Distribution / Transport / Nucléaire").
+* 2026-09-29: calibration decided and implemented.
+
+**Trigger.** The feedback compared the *Distribution* and *Transport* bars of the chart
+« Coûts totaux du système wallon par segment » with the CWaPE-approved authorised
+revenues of the Walloon DSOs:
+* 981 M€ of DSO revenue in 2029, against a 0.4 bn€ bar;
+* Elia's investment programme against the *Transport* bar.
+
+It asked:
+* whether gas was in the distribution bar;
+* how distribution, transmission and gas networks are represented and costed, in PyPSA
+  and in TIMES;
+* how transmission costs are split between nodes.
+
+This document records the answers, the calibration decisions taken to fix the current
+three-node formulation, the data behind each decision, the implementation, and the link
+with TIMES, which will report the effect of the scenarios on energy bills.
 
 ---
 
-## 0. Short answers
+## 0. Summary
 
-| Question raised | Short answer | § |
+**What was wrong**
+* **The *Distribution* bar mixed gas and electricity.** ClimAct's extraction added a gas
+  slice computed from its own cost file.
+* **The electricity distribution grid was valued at ⅓ of its regulated cost.** The
+  existing grid was built "from scratch" in 2025 at an undocumented placeholder cost
+  (668 €/kW, "TODO" in technology-data), sized at the regional coincident peak, with
+  2 %/a of OPEX. The DSOs' operating costs alone are 4.7× that OPEX.
+* **The *Transport* bar pooled the whole six-country grid** and split it by connected
+  capacity, which doubled Wallonia's share. 31 % of it was CO₂ pipelines.
+* **Transmission was far from the regulated benchmark:**
+  * the internal Elia grid (380–36 kV) was absent;
+  * system services were absent;
+  * interconnectors were costed on centroid-to-centroid lengths;
+  * a bug charged every HVDC converter twice from the second horizon on.
+* **Gas distribution had no network.** Instead there was a charge on new gas boilers
+  equal to the electricity distribution cost.
+* **TIMES carries no network cost in its grid processes.** Its sectoral "Fuel Tech"
+  mark-ups (e.g. 179.5 €/MWh on residential electricity) look like tariffs plus taxes.
+
+**What was decided and implemented**
+
+| network | decision | where |
 |---|---|---|
-| Does the *Distribution* bar combine gas and electricity? | **Yes.** In 2030 the 0.375 bn€ bar is 0.320 bn€ of electricity distribution plus 0.054 bn€ of gas distribution. The like-for-like comparison with the CWaPE electricity figures is therefore **0.32 bn€**, and the gap is larger than the one computed in the feedback: ×3.1 on the total authorised revenue, ×2.3 on its network core. | 1.1, 2.2 |
-| Is the gas distribution grid represented? How? | **Not as a network.** PyPSA adds a fixed €/kW charge to the capital cost of *new* decentral gas boilers and micro-CHP. Existing boilers, industry and CHP pay nothing, and the charge disappears when boilers are not replaced. The gas slice in the bar is not even that charge: the ClimAct extraction recomputes it with another cost file and a factor ⅓. | 3.1 |
-| How is distribution approximated in PyPSA? A capacity cost added to production assets? Is OPEX included? | A **capacity cost, but not attached to production**. It is a separate asset between the transmission node and a "low voltage" bus. It is sized endogenously at the hourly, region-wide coincident peak of everything connected at LV, at **66.4 €/kW/a** (668 €/kW, 40 y, 7.5 %, plus 2 %/a FOM). The only OPEX is that 2 %/a FOM, about 20 % of the annual cost. Grid-connection costs of wind and utility PV (187 €/kW) *are* added to production assets and are booked in *Production*. | 2.1 |
-| How does TIMES approximate distribution? Does the gap come from missing reinforcement for electrification? | TIMES-WAL has four grid processes (HV, HV→MV, MV→LV, LV→MV) that carry **losses only**: no capacity and no cost appear in the solution dump. Grid costs seem to enter TIMES as **volumetric €/MWh mark-ups** on its sectoral "Fuel Tech" processes (residential electricity 179.5 €/MWh, services 94.1, industry 24.6). These look like end-user network tariffs plus taxes, to be confirmed with ICEDD. In PyPSA, the level gap comes mainly from the *existing* grid: its valuation, and OPEX. The increment is low as well: 0.7 bn€ of new distribution capacity to 2030, against 3.3 bn€ of DSO capex planned for 2026–30, which also covers renewal and connections. | 5, 2.2, 2.3 |
-| Are the chart and the central-vs-delayed-nuclear difference interpretable? | We agree the chart must not be presented as a *total* system cost. It holds PyPSA costs only, TIMES's demand-side costs are missing, and the two scenarios use different TIMES runs. The networks, however, are **not** what drives the 2050 difference: they account for 0.07 of the 1.29 bn€/a gap. | 5.3 |
-| Transmission: how are CAPEX and OPEX approximated? | Replacement-value annuities of the **inter-node** branches only: 3 Belgian regions plus one node per neighbouring country, at Danish Energy Agency 2025 unit costs, on centroid-to-centroid lengths × 1.25. OPEX is a 1.5 %/a FOM. There are no system services and no internal 380/220/150/70 kV grid. One bug double-counts HVDC converters from 2030 on. | 4.1 |
-| Transmission: how are costs split between nodes? | Three different rules coexist. The optimisation needs none. `make_summary` splits each branch 50/50 between its ends. The ClimAct extraction behind the chart **pools every branch of the 6-country system** and redistributes the pool by each node's share of connected capacity. That rule gives Wallonia **2.1×** its 50/50 share (507 vs 246 M€ in 2030), and 31 % of the Walloon *Transport* bar is CO₂ pipelines. | 4.2 |
-| How should the costs be recalibrated in the current model? | Split every network into the **existing grid** (sunk, calibrated on 2025 regulated accounts: 678 M€ electricity distribution, 282 M€ gas distribution, Walloon share of Elia and Fluxys revenue) and the **increment** (endogenous). For the increment, the calibrated unit cost is 620 €/kW for electricity distribution, plus 120 €/kWp for PV hosting, annualised at a regulated 3.5 % real. HV industry comes off the LV bus, losses rise to 5 %, and the gas-boiler charge drops to its avoidable part (factor ≈ 0.1). The recalibrated Walloon distribution cost is ≈ 0.73 bn€ in 2030 instead of 0.32 bn€. Most of the change is a reporting layer that needs no re-solve. | 6 |
-| How is PyPSA kept consistent with the bills TIMES will report? | Through a bill identity with five components: energy, network, taxes, support levies and fixed charges. PyPSA provides the zonal energy price, the network revenue requirements and the support needs. TIMES provides the volumes and taxes. A reconciliation identity requires the TIMES mark-ups to recover the calibrated network costs. The first gap to resolve is the wholesale price level (PyPSA 109 vs TIMES 69 €/MWh in 2030). | 7 |
+| all | Split every network cost into the existing grid (L1), the increment (L2), non-capacity OPEX (L3) and add-ons (L4). L1 is calibrated on the **2025** regulated accounts. Only L2 and losses are endogenous | §2 |
+| all | Annualise regulated network assets at **3.5 % real** (the regulated return), not the 7.5 % power-sector hurdle | §3 |
+| electricity distribution | Increment at **620 €/kW** of regional peak, calibrated on the DSOs' transition capex 2026–30 | §4 |
+| electricity distribution | **70 %** of industrial electricity moved to HV (TIMES split) | §4 |
+| electricity distribution | Losses **5 %** (TIMES) | §4 |
+| electricity distribution | **120 €/kWp** hosting charge on new rooftop PV | §4 |
+| gas distribution | Existing grid as a fixed block (**282 M€**, CWaPE 2025). The boiler charge is reduced to its avoidable part (**factor 0.12**, ≈ 5 €/kW_th/a) | §5 |
+| transmission | HVDC double-counting fixed | §6.2 |
+| transmission | New AC branches at **450 → 372 €/MW/km** (ACER level, DEA learning shape) | §6.5 |
+| transmission | ALEGrO at its project cost | §6.5 |
+| transmission | Economies of scale on large CO₂ trunks | §6.5 |
+| transmission | Regional reporting in a **direct** view (50/50 per branch) and a **tariff** view (Walloon share of Elia/Fluxys revenue) | §6.3 |
+| TIMES | A harmonisation table checks volumes, prices, network revenue requirements against the mark-ups, and support needs, run after every solve | §8 |
 
-The rest of the note explains these answers and proposes, for each network, what to
-change **now** (3 Belgian nodes, same scenario) and what to prepare for the **multi-node**
-Belgium of the next phase (§8). §6 turns the proposals into a parameter-by-parameter
-**calibration plan** for the current formulation. §7 defines how PyPSA's network and
-price outputs are **harmonised with TIMES**, which will report the effect of the
-scenarios on electricity and gas bills.
+§9 has the effect on the central scenario, §11 the open data requests, and §12 the
+formulation improvements left for the multi-node phase.
 
 ---
 
-## 1. What the two bars contain
+## 1. Context and diagnosis
 
-Both bars are rebuilt here to the euro from the solved networks. The rebuild uses the
-same rules as the ClimAct extraction (`graph_extraction_transform.py` in
-`climact-pypsa-eur_results_extraction`), so the figures below are exactly those of the
-chart.
+### 1.1 The cost chart and its two network bars
 
-### 1.1 *Distribution* (BEWAL, M€/a, `scen_central`)
+The chart is drawn by
+[`plot_cost_segments.py`](../scripts/walloon_scripts/plot_cost_segments.py) from
+ClimAct's extraction (`explorer/pypsa/costs_segments.csv`). Rebuilt to the euro for the
+September cabinet central run (networks of 2026-09-15), BEWAL, M€/a:
 
-| | 2025 | 2030 | 2040 | 2050 |
+| *Distribution* bar | 2025 | 2030 | 2040 | 2050 |
 |---|---:|---:|---:|---:|
-| Electricity distribution link, capital (PyPSA objective) | 250.7 | 320.4 | 520.8 | 683.5 |
-| Gas distribution, as recomputed by the ClimAct extraction | 64.6 | 54.3 | 46.7 | 26.8 |
-| OPEX (marginal cost on the link) | 0.2 | 0.5 | 0.8 | 1.3 |
-| **Bar in the chart** | **315.5** | **375.2** | **568.3** | **711.5** |
-| *memo:* gas-grid charge actually in the PyPSA objective (§3.1) | 113.3 | 126.5 | 195.9 | 112.4 |
+| electricity distribution link (PyPSA objective) | 250.7 | 320.4 | 520.8 | 683.5 |
+| gas slice recomputed by the extraction | 64.6 | 54.3 | 46.7 | 26.8 |
+| OPEX on the link | 0.2 | 0.5 | 0.8 | 1.3 |
+| **bar** | **315.5** | **375.2** | **568.3** | **711.5** |
 
-The gas slice is **not** the gas-grid charge the model optimised against. The extraction
-subtracts from boilers a charge built from its own cost file, `data/costs/CZ/costs_2025.csv`,
-at 500 €/kW, a 7 % fill rate and a factor `nyears = 1/3`: 15.8 €/kW/a for boilers built
-from 2025 and 3.3 €/kW/a for older ones. The model itself charges 66.4 €/kW/a, on
-boilers built from 2025 only. The remaining ~72 M€ (2030) of the model's gas-grid charge
-therefore stays inside *Production*. The ⅓ has no counterpart in the model and looks
-like a leftover of another study's setup; raise it with ClimAct.
+The gas slice does not come from the model. The extraction uses its own
+`data/costs/CZ/costs_2025.csv`: 500 €/kW at 7 %, with a factor `nyears = 1/3` that has
+no counterpart in PyPSA. The model itself charged 66.4 €/kW/a on new boilers only.
 
-### 1.2 *Transport* (BEWAL, CAPEX, M€/a, `scen_central`)
-
-| carrier | ClimAct rule, 2025 / 2030 / 2040 / 2050 | 50/50 per branch, 2025 / 2030 / 2040 / 2050 |
+| *Transport* bar, BEWAL, CAPEX M€/a | ClimAct rule: 2025 / 2030 / 2040 / 2050 | 50/50 per branch: 2025 / 2030 / 2040 / 2050 |
 |---|---|---|
-| Electricity (AC lines + DC links) | 189.4 / 256.0 / 300.4 / 274.4 | 87.6 / 135.4 / 164.2 / 154.6 |
-| Methane pipelines | 41.7 / 41.7 / 41.7 / 42.5 | 13.8 / 13.8 / 13.9 / 14.6 |
+| electricity (AC + DC) | 189.4 / 256.0 / 300.4 / 274.4 | 87.6 / 135.4 / 164.2 / 154.6 |
+| methane pipelines | 41.7 / 41.7 / 41.7 / 42.5 | 13.8 / 13.8 / 13.9 / 14.6 |
 | H₂ pipelines | 48.6 / 54.1 / 59.3 / 69.5 | 17.3 / 18.6 / 22.7 / 29.9 |
 | CO₂ pipelines | 3.2 / 155.2 / 186.0 / 333.2 | 3.2 / 77.9 / 82.2 / 142.5 |
-| **Total** (= bar in the chart, left) | **282.9 / 507.0 / 587.4 / 719.6** | **121.9 / 245.7 / 283.0 / 341.6** |
+| **total** | **282.9 / 507.0 / 587.4 / 719.6** | **121.9 / 245.7 / 283.0 / 341.6** |
 
-The right-hand column equals `csvs/nodal_costs.csv` (50/50 split in `make_summary`
-since 2026-09-15). The electricity row on the right still contains the double-counted
-DC converter of §4.1.4. Corrected, it reads 87.6 / 105.2 / 136.8 / 129.1.
+ClimAct's `distribute_transmission_costs` pools every branch of the six-country system
+per carrier, then splits the pool by each node's share of connected capacity, ignoring
+length. Wallonia thereby pays a share of FR–DE and GB–FR.
 
-The docstring of `plot_cost_segments.py` says the extraction books a branch "wholly to
-whichever of the two region codes sorts first". The code does something else: lines get
-location `EU`, and `distribute_transmission_costs` pools every *Transmission* row per
-carrier across all eight nodes, then splits the pool by capacity share (§4.2). The
-docstring should be corrected.
+### 1.2 The regulated benchmarks
 
----
+**Walloon electricity DSOs.** Five CWaPE decisions (Appendix A). M€ nominal:
 
-## 2. Electricity distribution
-
-### 2.1 How PyPSA represents it
-
-`insert_electricity_distribution_grid` (`scripts/prepare_sector_network.py`) adds, per
-AC node, a bus `<node> low voltage` and an extendable link
-`<node> electricity distribution grid` from the transmission bus to it. The following are
-moved onto the LV bus:
-
-* every electricity load whose carrier contains `electric`: household and services
-  electricity, **industry electricity**, agriculture;
-* inflexible EV charging, BEV chargers and V2G;
-* heat pumps, resistive heaters, micro-CHP;
-* rooftop PV and home batteries (utility PV and onshore wind stay on the transmission
-  bus).
-
-**What sizes the link.** The link capacity is the highest hourly *net* flow from the
-transmission node to the LV bus over the year: the coincident peak of all LV-connected
-demand, net of LV generation and storage at that hour. In every horizon of `scen_central`
-the optimum sits exactly at that peak. The flow practically never reverses at the
-regional level (a single hour in four horizons, 169 MW in 2040), so rooftop-PV export
-plays no role in the sizing:
-
-| BEWAL | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| capacity (GW) | 3.78 | 4.83 | 7.84 | 10.30 |
-| of which built in the horizon (GW) | 3.78 | 1.05 | 3.02 | 2.45 |
-| energy through the link (TWh) | 21.5 | 27.7 | 47.5 | 61.6 |
-| peak hour | 1 Dec 17:00 | 1 Dec 17:00 | 1 Dec 14:00 | 10 Feb 05:00 |
-| annual cost (M€) | 250.7 | 320.4 | 520.8 | 683.5 |
-
-What stands behind the peak (MW at the peak hour):
-
-| BEWAL LV bus | 2025 | 2030 | 2050 |
-|---|---:|---:|---:|
-| household + services electricity | 1 721 | 1 974 | 2 485 |
-| industry electricity | 979 | 1 136 | 2 656 |
-| inflexible EV charging | 14 | 479 | 1 671 |
-| heat pumps | 258 | 674 | 4 290 |
-| resistive heaters | 653 | 457 | 241 |
-| home batteries (discharge) | — | −77 | −1 396 |
-| rooftop PV | 0 | 0 | 0 |
-
-**Cost.** The model uses technology-data v0.14.0 `electricity distribution grid`:
-investment **667.9 €/kW**, lifetime 40 y, FOM 2 %/a. The source field of that row
-literally reads *"TODO, from old pypsa cost assumptions"*. The value is the old,
-undocumented 500 €/kW of PyPSA-Eur-Sec, indexed from 2015 to 2025 prices
-(667.9 / 500 = 1.336, §2.4); it is not new evidence. The discount rate is 7.5 %, the TIMES hurdle
-rate for the power sector (`data/walloon/discount_rates.csv`). The annualised cost is
-0.0794 × 667.9 + 0.02 × 667.9 = **66.4 €/kW/a**. `custom_costs.csv` does not override it.
-
-**OPEX.** The only OPEX is the 2 %/a FOM inside that capital cost: 13.4 €/kW/a, i.e.
-64 M€ of the 320 M€ in 2030. There are no customer-, metering- or IT-related costs. The
-3 % static loss on the link (`efficiency = 0.97`) is energy that has to be generated or
-imported; its cost is therefore booked under *Production* / *Imports*, not *Distribution*.
-
-**Existing grid.** The link starts at **zero** in 2025 and is built from scratch.
-The 2025 vintage (3.78 GW) is the whole existing Walloon distribution grid, priced as
-new but sized to the region-wide coincident peak. Later horizons only add increments.
-With a 40-year lifetime nothing retires before 2065, so the renewal of today's ageing
-grid is not represented either.
-
-**Not a production cost.** The distribution link is not added to generators. What *is*
-added to production assets is `electricity grid connection`, 187 €/kW (18.6 €/kW/a),
-on the capital cost of onshore wind and utility PV. It is booked in *Production* and is
-worth 63 M€/a for the Walloon units built in 2030 alone.
-
-### 2.2 The CWaPE benchmark
-
-The 2029 budgets of the five decisions (Tableau 4 for ORES, Tableau 8 for the others),
-grouped by nature. M€, nominal 2029:
-
-| family | ORES | RESA | AIESH | AIEG | REW | **total** |
-|---|---:|---:|---:|---:|---:|---:|
-| controllable OPEX (excluding PSO) | 208.8 | 81.8 | 4.6 | 4.3 | 3.5 | **303.0** |
-| depreciation ("charges liées aux immobilisations") | 161.0 | 41.7 | 3.3 | 2.2 | 3.8 | **211.8** |
-| fair margin on the RAB (excluding revaluation gains) | 116.8 | 37.8 | 2.5 | 2.2 | 2.3 | **161.7** |
-| margin on revaluation gains ("PV de réévaluation") | 11.3 | 2.5 | 0.2 | 0.1 | 0.2 | **14.2** |
-| corporate tax on the margin | 33.4 | 8.8 | 0.8 | 0.8 | 0.8 | **44.6** |
-| *network core (sum of the five rows above)* | *531.2* | *172.5* | *11.3* | *9.6* | *10.6* | ***735.3*** |
-| network losses (energy purchases) | 58.7 | 17.9 | 1.8 | 1.5 | 0.6 | 80.6 |
-| public service obligations (PSO) | 30.2 | 14.6 | 1.1 | 0.6 | 1.0 | 47.5 |
-| road-use fee ("redevance de voirie") | 34.7 | 11.8 | 0.6 | 0.7 | 0.4 | 48.4 |
-| smart meters | 43.7 | 11.6 | 0.4 | 0.7 | 0.5 | 57.0 |
-| other (transit, FeReSO, pensions, ONSSAPL, taxes) | 0.7 | 10.3 | 0.8 | 0.8 | 0.0 | 12.6 |
-| **authorised revenue 2029** | **699.3** | **238.8** | **16.1** | **13.9** | **13.2** | **981.3** |
-
-Against the like-for-like electricity figure of 320 M€ (2030):
-
-| comparison | CWaPE (M€) | ratio |
+| | 2025 | 2029 |
 |---|---:|---:|
-| total authorised revenue | 981 | 3.1 |
-| total minus losses, PSO, road fee and smart meters (the rule in the feedback) | 748 | 2.3 |
-| network core: OPEX plus capital charges | 735 | 2.3 |
-| capital charges only (depreciation + margins + tax), vs the model's pure annuity of 256 M€ | 432 | 1.7 |
-| controllable OPEX, vs the model's FOM of 64 M€ | 303 | **4.7** |
+| authorised revenue | 896.3 | 981.3 |
+| network core (OPEX + capital charges) | 677.9 | 735.3 |
+| of which capital charges (depreciation + margins + corporate tax) | 390.5 | 432.3 |
+| of which controllable OPEX | 287.4 | 303.0 |
+| losses / PSO / road-use fee / smart meters / other | 87.0 / 45.0 / 43.8 / 22.9 / 19.8 | 80.6 / 47.5 / 48.4 / 57.0 / 12.6 |
 
-Two conventions blur the comparison slightly. CWaPE figures are nominal 2029 euros
-(about 8 % above 2025 euros at 2 %/a). The regulated revenue reflects historic-cost
-accounting, including revaluation gains that are being amortised, while PyPSA uses a
-replacement-cost annuity. Neither effect comes close to explaining a factor of 2–3.
+**Investment is rising fast.** CWaPE opinion CD-25k27-CWaPE-0967 (Tableau 14) puts the
+DSOs' gross investment at 302 M€/yr in 2020–24 and **662 M€/yr in 2026–30** (+119 %).
+Tableau 15 splits the 3.3 bn€ of 2026–30 by driver:
 
-**The revenue is also about to rise.** CWaPE's opinion on the 2026–2030 adaptation plans
-(CD-25k27-CWaPE-0967, Tableau 14) reports average annual gross DSO investment of
-**302 M€/yr in 2020–24 and 662 M€/yr in 2026–30 (+119 %)**: ORES 229 → 534, RESA
-61 → 113 M€/yr. The stated driver is mostly "évolution prévisible de la consommation
-et pointes de charges", i.e. PV, EVs and heat pumps. The model's new-build over the
-same stretch is 1.05 GW × 668 €/kW = **0.70 bn€** overnight, against 3.3 bn€ of
-planned DSO capex. The planned capex also covers renewal of ageing assets and new
-connections, which the model does not represent (§2.3).
+| driver (CWaPE motivation codes) | M€ over 2026–30 |
+|---|---:|
+| transition: E1.1 load and peaks, E1.3 congestion, E1.4 voltage quality, government transition subsidy | **774** |
+| new connections (E1.2.x) | 798 |
+| renewal and compliance (E2.1–E2.6, E2.8, E1.5) | 1 136 |
+| smart meters (E2.7) | 601 |
 
-The 2029 figures above already include the 2025 revisions (smart meters, and the ORES
-subsidy reallocation of CD-25d03-CWaPE-1056). We found no public CWaPE decision on the
-ORES revision request mentioned in the feedback as of September 2026. ORES's 2026–30
-adaptation plan reportedly flags a capex overrun of about 418 M€ on 2025–29 from
-contractor prices; that figure comes from a research summary and has not been
-re-checked here.
+**Walloon gas DSOs.** ORES gaz + RESA gaz, CD-24c28-CWaPE-0890/0891:
 
-### 2.3 Why the model is low: decomposing the gap
+* authorised revenue: 335.0 M€ in 2025, rising to 354.9 M€ in 2029;
+* network core: 282.0 M€;
+* RAB: 1 866 M€ at 1 January 2025;
+* physical base (CD-26g30-CWaPE-0981): 801 102 meters, 17 426 GWh, 14 497 km of mains;
+* gross capex: 117.4 M€ in 2025, and 104.6 M€/yr planned for 2027–31.
 
-1. **OPEX is the largest single gap.** The DSOs' controllable OPEX (303 M€) is 41 % of
-   the network core. Much of it is driven by the number of connections, not by peak
-   load: meter reading, customer service, IT, field staff. A 2 %/a FOM on a
-   capacity-based asset captures 64 M€ of it.
-2. **The unit investment cost is a placeholder.** 668 €/kW of coincident peak has no
-   documented source. Divided by the 2025 regional peak, the network core of 735 M€
-   corresponds to **195 €/kW/a** (263 €/kW/a if HV-connected industry is taken off the
-   peak), 3–4× the 66.4 €/kW/a in the model. §2.4 compares this with the literature.
-3. **Coincident vs local peak.** A single regional LV bus at 1 h resolution sees the most
-   diversified peak possible. Real MV/LV assets are sized on local, 15-minute,
-   non-coincident peaks with N-1 redundancy on MV. ORES's revision of 14 March 2025
-   (CD-25d03-CWaPE-1056) is a case in point: 180 km of LV reinforcement targeted at
-   **PV inverter tripping**, a
-   local over-voltage problem that a regional node, where rooftop PV never exports,
-   cannot see.
-4. **Scope effects in both directions.**
-   * *Overstatement.* All industry electricity sits on the LV bus: 979 MW of the 2025
-     peak and 2.7 GW in 2050. Most of it is connected to Elia (30–150 kV) or directly to
-     MV, and does not use the DSO grid the model is charging it for. TIMES
-     distinguishes the voltage levels (§5.1): in 2025, 20.6 TWh leave its HV grid, of
-     which 14.4 TWh reach MV and 11.0 TWh LV, against 21.5 TWh through the PyPSA link.
-   * *Understatement.* The 150/70/36 kV grid (Elia's "réseau de transport local" in
-     Wallonia) is neither in the transmission representation nor in the distribution
-     cost (§4.1).
-5. **No renewal.** The existing grid never retires in the model, whereas renewal of
-   ageing assets is a structural part of DSO capex. CWaPE lists age-based LV conversion
-   (3×230 V → 3N400 V at 25 and 50 years), replacement of pre-1980 LV cables and of
-   pre-1960 overhead lines among the planned measures (opinion 0967, §2.4.3).
-6. **Items outside a system-cost model.** Losses (80.6 M€) are counted in the model as
-   energy, not as grid cost. PSO, the road-use fee and smart meters (153 M€) are
-   transfers or non-network activities and have no reason to appear in a
-   technology-rich cost model, other than in an explicitly labelled "regulated add-on"
-   line.
+**Elia.** CREG (B)658E/85, Tableau 1bis:
 
-Point 4 matters for the *increments*, not just the level. The model's distribution
-growth to 2050 (3.8 → 10.3 GW, +433 M€/a) is driven by heat pumps, inflexible EV
-charging and industry electrification; the industry share of that growth is
-misallocated.
+* allowed revenue for all Belgian voltages: 970.7 / 1 552.1 / 1 706.4 / 1 876.0 M€ for
+  2024–27;
+* 2022 actual structure: grid capital 425 M€, controllable OPEX 389 M€, ancillary
+  services 547 M€, interconnection income −422 M€;
+* 6.4 bn€ investment programme for 2024–27.
 
-### 2.4 Literature and other models
+The Walloon 30–70 kV plan is 691 M€ over 2026–30 (CD-26g30-CWaPE-1283). Elia realises
+48 % of such plans on an 11-year average.
 
-Items marked [S] were seen in secondary sources or abstracts only; everything else was
-read in the primary source.
+### 1.3 Why the model was low
 
-**The PyPSA-Eur value has no source.**
+Against the like-for-like electricity bar, 320 M€ in 2030, the regulated revenue is 3.1×
+higher, and its network core 2.3×. The decomposition:
 
-* **Origin.** technology-data's `inputs/costs_PyPSA.csv` carries "electricity
-  distribution grid, investment, 500, EUR/kW, TODO". The PyPSA-Eur-Sec documentation
-  repeats "currently assumed to be 500 Eur/kW" without a reference. We found no link to
-  a published study.
-* **Critique upstream.** PyPSA-Eur issue
-  [#1760](https://github.com/PyPSA/pypsa-eur/issues/1760) points out that reusing it for
-  gas boilers makes two thirds of a gas boiler's cost a grid charge.
-* **A cheaper alternative now exists.** technology-data master adds
-  `distribution grid reinforcement` at **188.6 €/kW** (2025 €), from DEA *Technology
-  Data for el and DH*, v17 p. 15, "Cost of grid expansion". That figure covers only the
-  local grid and substation strengthening caused by one new generator or large consumer.
+1. **OPEX.** The DSOs spend 303 M€; the model's 2 %/a FOM covers 64 M€. Much of the DSO
+   OPEX scales with connections (meter, customer, IT), not with peak.
+2. **Valuation of the existing grid.** The link starts at zero in 2025 and builds the
+   whole grid at 668 €/kW of *regional coincident* peak. Its replacement value in the
+   model, 2.5 bn€, is below the regulator's net book value of 3.8 bn€.
+3. **Scope.** All industry electricity sat behind the DSO link, although about 70 % is
+   drawn at HV. Meanwhile the 150/70/36 kV grid was neither transmission nor
+   distribution in the model.
+4. **No renewal** of ageing assets. Nothing retired before 2065.
+5. **Items outside a system-cost model:** losses, PSO, road-use fee, smart meters.
 
-**Incremental reinforcement cost per kW does not converge.**
+The increment was low too, but by less. The model built 0.7 bn€ of new distribution
+capacity to 2030, against 3.3 bn€ of planned DSO capex. Most of that capex, however, is
+renewal and connections, not load growth.
 
-| source | scope | value |
-|---|---|---|
-| DEA via technology-data | local grid + substation, per new connection | 189 €/kW |
-| PyPSA-Eur / technology-data | "distribution grid", all LV peak | 668 €/kW (66 €/kW/a) |
-| Priyadarshan et al., [arXiv:2410.04540](https://arxiv.org/abs/2410.04540) (2024) [S] | US residential full electrification, 600 GW of reinforcement for $350–790 bn | ≈ $580–1 320/kW |
-| Turk, Schittekatte et al., *Energy Journal* 2025 [S] | US distribution LRMC used for tariff design | $50–150/kW (probably per year) |
-| Navigant for Agora (2019) [S] | Germany LV+MV, EV integration | 1.5–2.1 bn€/yr to 2050 |
+### 1.4 How TIMES represents networks
 
-Our 668 €/kW sits inside that range. The problem is less the unit value than what it is
-applied to: *all* LV coincident peak, the existing grid included, with a 2 % OPEX.
+**Grid processes carry losses only.** TIMES-WAL's grid processes (`EVTRANS_H-H`,
+`EVTRANS_H-M`, `EVTRANS_M-L`, `EVTRANS_L-M`) have no cost or capacity in the `.vd`.
+Their implied losses are 1.6 % (HV), 2.7 % (HV→MV) and 3.2 % (MV→LV).
 
-**How other models handle the existing grid.**
+**Delivery costs are volumetric mark-ups** on sectoral "Fuel Tech" processes, in
+€₂₀₂₁/MWh, constant from 2025 to 2050:
 
-* **PRIMES** (E3M 2018 model description) computes grid costs by grid type on a
-  regulated asset base that "includes capital costs of old infrastructure, cost of new
-  investment and operating/maintenance costs". It recovers them through tariffs per
-  voltage level. That is the D2 + D3 split proposed in §2.5.
-* **Energy Transition Model** (Quintel, [network docs](https://docs.energytransitionmodel.com/main/network/)):
-  * Layers are LV, LV/MV, MV, MV/HV and HV.
-  * The used capacity of each layer is its hourly net peak, compared with *present*
-    capacity minus a spare margin.
-  * Only the excess is priced, in discrete steps: 200 kW at LV (about 100 households),
-    2 MW at MV, 20 MW at HV.
-* **TIMES-WAL** carries no grid cost in its grid processes (§5.1). We found no
-  per-voltage grid cost in JRC-EU-TIMES or TIMES-PanEU in this pass.
+| process | €₂₀₂₁/MWh |
+|---|---:|
+| `RSDELC00` residential electricity | 179.5 |
+| `COMELC00` services electricity | 94.1 |
+| `INDELC00` industry electricity | 24.6 |
+| `AGRELC00` agriculture electricity | 91.7 |
+| `RSDGMX00` residential gas | 33.8–57.6 |
+| `COMGMX00` services gas | 13.2–37.0 |
+| `INDGMX00` / `INDGAS00` industry gas | 6.6 |
 
-**Aggregate benchmarks.**
-
-* **Eurelectric, *Grids for Speed* (2024), EU27 + NO.** Distribution investment has to rise from €33 bn/yr (2019–23) to
-  **€67 bn/yr over 2025–2050**, split LV 44 %, MV 41 %, HV 15 %. Anticipatory investment
-  plus grid-friendly flexibility cuts it by about 18 %. Per inhabitant this is
-  ≈ 150 €/yr, which would be about 0.55 bn€/yr of *investment* for Wallonia; the CWaPE
-  plans (0.66 bn€/yr, §2.2) are of the same order.
-* **IEA,
-  [*Electricity Grids and Secure Energy Transitions*](https://www.iea.org/reports/electricity-grids-and-secure-energy-transitions)
-  (2023).** Global grid investment has to nearly double, to over USD 600 bn/yr by 2030.
-* **EU Grid Action Plan, COM(2023) 757** [S]. It cites €584 bn of grid investment this
-  decade and notes that about 40 % of distribution grids are over 40 years old.
-
-**Methodological points.**
-
-* **Coincidence.** Consentec for E.ON, *Netz-Stresstest* (*et* 12/2020), uses
-  heat-pump simultaneity factors of **1.0 at LV, 0.95 at MV/LV substations and 0.9 at
-  MV** on a cold winter peak. Heat pumps are therefore almost fully coincident even
-  locally, and the regional hourly peak captures them reasonably. EV charging and PV
-  export are different: they are local, controllable or reversed flows, which a single
-  regional LV bus understates or misses entirely.
-* **Hourly vs 15-min peaks.** We found no source quantifying the gap; ETM also works on
-  hourly peaks. Treat this as an unquantified bias, not a correction factor.
-* **Pricing the existing grid at new-build cost** from the first year raises total cost.
-  It also makes every kW of LV peak equally expensive, overstating the value of
-  peak-shaving where headroom exists. Böttcher et al. (RWTH IAEW,
-  [arXiv:2310.11853](https://arxiv.org/abs/2310.11853), 2023) represent each voltage
-  level by stepwise expansion regions and note that linearisation "partially
-  underestimates the grid costs".
-* **Network types.** Pudjianto et al. (*Energy Policy* 2013) [S] and Böttcher et al.
-  both separate rural, urban and mixed network types. A single BEWAL value blends rural
-  Luxembourg-province MV/LV with the urban grids of Liège and Charleroi.
-
-### 2.5 Proposals
-
-**Now, with three Belgian nodes, same scenario**
-
-| # | change | where | needs a re-solve? |
-|---|---|---|---|
-| D1 | Report electricity distribution alone, straight from the network (`nodal_costs.csv`), never mixed with gas | reporting | no |
-| D2 | Add an explicit, **labelled "existing distribution grid" block**, calibrated on the **2025** CWaPE network core (678 M€; not 2029, which already contains the 2025–28 transition investments), with a renewal rule. It is sunk and exogenous, so it changes no decision but makes totals comparable with regulated revenues (§6.3, E1–E3) | reporting, or a non-extendable 2025 vintage | no (reporting) |
-| D3 | Price only the **increment** above the 2025 peak, at the unit cost calibrated on the DSOs' transition capex: **620 €/kW (410–960)**, plus a PV hosting charge of 120 €/kWp (§6.3, E5 and E8). The literature brackets it between 189 €/kW (DEA local reinforcement) and about 1 000 €/kW (US full-electrification estimates); sensitivities go through `adjustments.sector.factor.Link.electricity distribution grid.capital_cost`. Replace the central value once CWaPE/ORES give the demand / PV split of the 2026–30 capex (§9, item 6) | master CSV, scenario overlay | yes |
-| D4 | Take HV-connected industry off the LV bus, using TIMES's own split of HV / MV / LV deliveries (§5.1) | `insert_electricity_distribution_grid` (a few lines) | yes |
-| D5 | Align distribution losses with TIMES (1.6 % HV, 2.7 % HV→MV, 3.2 % MV→LV, instead of a flat 3 %) | config `transmission_efficiency` | yes |
-| D6 | Model DSO OPEX as a fixed block, mostly per connection, rather than 2 %/a of a capacity asset | reporting | no |
-
-The `adjustments` factor also rescales the 2025 vintage, i.e. the existing grid. For a
-sensitivity, read the effect on the 2030–2050 *increments* and on the decisions; the
-reported level of the existing grid should come from D2, not from this factor.
-
-Calibrated values, estimation methods and implementation for D1–D6 are in §6.3 (E1–E11).
-
-D1, D2 and D6 alone bring the reported Walloon distribution cost to the level of the
-regulated revenue without touching the optimisation. D3–D5 change the *decisions*
-(how much flexibility, where heat pumps and EVs are worth it), and are therefore the
-ones to discuss with TIMES first.
-
-**Next phase, multi-node Belgium**
-
-* One LV bus per node with a node-specific cost, calibrated per DSO area: ORES and RESA
-  publish their authorised revenue separately, and the literature separates rural,
-  urban and mixed network types (§2.4).
-* A two-tier MV / LV representation, so that MV-connected industry and utility PV use
-  only the MV tier and rooftop PV export can congest the LV tier.
-* Peak coincidence handled explicitly: either sub-hourly peaks via a coincidence factor,
-  or an exogenous hosting-capacity cap per node
-  ([`network-representation-analysis.md`](network-representation-analysis.md) §9).
+TIMES's residential electricity price is its LV commodity marginal plus the mark-up. The
+mark-ups sit in TIMES's objective and therefore steer its technology choices. Whether
+they contain network tariffs, taxes or both is to be confirmed by ICEDD (§11).
 
 ---
 
-## 3. Gas networks
-
-### 3.1 Gas distribution: how it is represented
-
-**PyPSA.** There is no gas distribution network. `insert_gas_distribution_costs` adds
-`gas_distribution_grid_cost_factor` (1.0) × the *electricity* distribution cost
-(66.4 €/kW/a) to the capital cost of every extendable decentral gas boiler and micro-CHP.
-Existing boilers, added by `add_existing_baseyear`, keep their plain boiler cost.
-Consequences:
-
-| BEWAL | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| decentral gas boilers, all vintages (GW_th) | 13.0 | 9.2 | 3.0 | 1.7 |
-| of which built from 2025 (GW_th) | 1.7 | 1.9 | 3.0 | 1.7 |
-| gas-grid charge in the model (M€/a) | 113 | 127 | 196 | 112 |
-| gas slice in the chart (ClimAct, M€/a) | 65 | 54 | 47 | 27 |
-
-* **The charge follows new boilers, not the grid.** In 2025, 87 % of the gas-boiler
-  fleet pays nothing. In 2040 the charge peaks (196 M€) while gas volumes collapse. In
-  2050 it is 112 M€ for 1.7 GW of boilers, about 66 €/kW, i.e. the equivalent of a full
-  distribution grid per kW of boiler.
-* **Industry, services' non-boiler uses and CHP pay no distribution cost at all.**
-* **The fixed cost of the existing grid is absent**, and so are the choices that
-  actually matter for Wallonia after 2030: keep, repurpose (biomethane, H₂) or
-  decommission, and the rising cost per remaining customer. When a household leaves gas,
-  the model avoids the 66 €/kW/a charge of a new boiler, a charge its old boiler never
-  carried. The real saving is close to zero until the street is decommissioned.
-* Losses, pressure levels, the number of connections and decommissioning costs are not
-  represented.
-
-**TIMES.** TIMES-WAL charges gas delivery by volume on its sectoral "Fuel Tech"
-processes: residential 33.8 €/MWh in 2025, 53.4 in 2030, 56.2 in 2040 and 33.8 in 2050;
-services 13.2–35.7; industry 6.6 €/MWh (§5.2). The profile over time suggests the
-mark-up includes taxes or carbon levies, not only network tariffs.
-
-### 3.2 Gas transmission, H₂ and CO₂
-
-* **Methane transmission.** `gas_network: true`. The existing Fluxys pipelines between
-  the 8 nodes are non-extendable, with capital cost from technology-data
-  `CH4 (g) pipeline` (110 €/MW/km, 50 y, FOM 1.5 %); a small extendable
-  `gas pipeline new` is built on BEWAL–LU. The cost of these existing pipelines is sunk
-  and a constant in the objective, but it is reported as an annuity of their replacement
-  value (13.8 M€/a for BEWAL at 50/50, 41.7 M€ under the ClimAct rule).
-* **H₂.** New-build pipelines only (382 €/MW/km); retrofitting is off
-  (`H2_retrofit: false`). 18.6 M€/a for BEWAL at 50/50 in 2030.
-* **CO₂.** Endogenous pipelines, 2 672 €/(t/h)/km, carrying the CO₂ captured in
-  Wallonia towards storage ([`ccs_alignment.md`](ccs_alignment.md)). They are the
-  largest Walloon transmission item by 2050: 142.5 M€/a at 50/50 and 333 M€/a under the
-  ClimAct rule. They are not a "grid" in the sense of the feedback and should be
-  reported on their own line.
-
-### 3.3 Literature and benchmarks
-
-**Walloon gas DSOs.** CWaPE decisions CD-24c28-CWaPE-0890 (ORES gas) and -0891 (RESA
-gas), authorised revenue, M€ nominal:
-
-| | 2025 | 2026 | 2027 | 2028 | 2029 |
-|---|---:|---:|---:|---:|---:|
-| ORES gas | 218.5 | 222.2 | 226.2 | 230.7 | 235.3 |
-| RESA gas | 116.5 | 117.4 | 117.0 | 118.2 | 119.6 |
-| **total** | **335.0** | **339.6** | **343.2** | **348.9** | **354.9** |
-
-The 2029 composition is:
-
-* ORES: controllable 142.1 M€, of which capital-related 71.6; road-use fee 18.3; fair
-  margin 61.1 (49.8 on the RAB).
-* RESA: controllable 70.7 M€ (capital-related 27.3); road-use fee 8.6; margin 31.3.
-
-The physical base at the end of 2025 (CWaPE opinion CD-26g30-CWaPE-0981, Tableau 2) is
-**801 102 meters, 17 426 GWh distributed and 14 497 km of mains**. That puts the
-existing gas distribution grid at about **420 € per meter per year, or 19 €/MWh**. More
-than half of it is capital charges and margin on a RAB that does not shrink when
-volumes do.
-
-Set against the model:
-
-* **Level.** 0.34 bn€/a regulated, against a gas-grid charge of 0.11–0.20 bn€/a in the
-  model and 0.03–0.06 bn€/a in the chart.
-* **Shape.** The regulated cost is flat to rising to 2029. The model's charge follows
-  new boiler sales. The ClimAct slice declines with the boiler fleet.
-
-The ICEDD study for CWaPE on the future of gas (final report 27/03/2025, published
-2026) frames the question the model cannot answer today. It runs scenarios of 0–18 TWh
-of residual gas in 2050, with a central case around 10 TWh, and depreciation periods of
-33–50 years with an explicit stranded-asset risk. Only the 0 TWh case decommissions the
-whole network. These study figures come from our research summary and have not been
-re-checked here.
-
-**How the literature treats gas distribution.** It treats it as a **fixed cost that
-persists until physical decommissioning**, recovered through tariffs whose €/MWh rises
-as volumes fall. Both of our models miss that. PyPSA drops the cost as soon as boilers
-are not replaced; TIMES keeps a flat €/MWh mark-up, so there is no "death spiral".
-Items marked [S] were seen in secondary sources only.
-
-* **Germany.** Agora Energiewende with BET and Rosin Büdenbender,
-  [*Ein neuer Ordnungsrahmen für Erdgasverteilnetze*](https://www.agora-energiewende.de/publikationen/ein-neuer-ordnungsrahmen-fuer-erdgasverteilnetze)
-  (April 2023), finds that:
-  * more than 90 % of the gas distribution grid is not needed by 2045;
-  * grid fees rise 9–16× by 2044 if the fixed cost base is spread over falling volumes;
-  * up to 10 bn€ is stranded, out of a residual value of 20–60 bn€ (10–20 % of
-    replacement cost).
-  
-  Planned decommissioning with a bonus scheme saves up to 5 bn€/a.
-* **United Kingdom** [S]. Ofgem's RIIO-3 finance annex, as summarised by
-  [Regen](https://www.regen.co.uk/insights/who-will-pay-for-gas-network-decline-and-decommissioning),
-  projects per-kWh charges that could reach 10 p/kWh by 2040 and 40 p/kWh by 2050. It
-  puts the gas distribution RAV at £26 bn, with about £3 bn unrecovered by 2050 under
-  45-year asset lives.
-* **Decommissioning cost per connection** [S]. A survey of 115 DSOs in North
-  Rhine-Westphalia (Verbraucherzentrale NRW) gives about 930 € to seal a house
-  connection and 1 750 € to remove it, with a range of 100–4 000 €. We found no robust
-  €/km figure.
-* **Regulation.** Directive (EU) 2024/1788, Art. 57 [S; check the text], requires gas
-  DSOs to draw up network decommissioning plans when falling demand calls for it. It
-  makes an approved plan a prerequisite for refusing or cutting connections, and it had
-  to be transposed by August 2026.
-
-  The [CEER note on stranded assets in distribution networks](https://www.ceer.eu/wp-content/uploads/2024/04/C19-DS-55-07_CEER-note-on-stranded-assets-in-distribution-networks-II.pdf)
-  (2020) lists accelerated depreciation, revaluation, cost-of-capital adjustment and
-  compensation outside tariffs as the tools available.
-* **PyPSA-Eur itself.** The gas distribution charge on boilers and micro-CHP was
-  introduced in PyPSA-Eur-Sec v0.3.0 (September 2020). We found no justification for
-  `gas_distribution_grid_cost_factor: 1.0`, i.e. for pricing a kW of gas boiler like a
-  kW of electricity distribution.
-
-**H₂ and CO₂ pipelines.**
-
-* **H₂.** The model uses the 2021 European Hydrogen Backbone cost (382 €/MW/km new,
-  163 repurposed). The [EHB 2022 update](https://ehb.eu/files/downloads/ehb-report-220428-17h00-interactive-1.pdf)
-  is lower, at 2.8 M€/km new and 0.5 M€/km repurposed for a large 48″ pipe, i.e. about
-  215 and 38 €/MW/km. That makes the model's H₂ network conservative by a factor of
-  about 1.5–4.
-* **CO₂.** The model's cost (Danish Energy Agency, 12″, 120–500 t/h) is **linear in
-  capacity**. It matches ZEP estimates at small scale but ignores economies of scale on
-  trunks: a 1 800 t/h line such as BEWAL–DE in 2030 comes out at about 4.9 M€/km. The
-  JRC puts the EU network at 0.6–0.9 M€/km on average (Tumara et al. 2024,
-  [doi:10.2760/582433](https://publications.jrc.ec.europa.eu/repository/bitstream/JRC136709/JRC136709_01.pdf)).
-  The CO₂ line of the *Transport* bar is therefore probably overstated as well as
-  misallocated (§4.2).
-* **Belgian context.** The Walloon capture projects listed by the JRC are Anthemis
-  (Antoing, 0.8 Mt/a), GO4ZERO (Obourg, 1.3 Mt/a) and LEILAC (Lixhe). Fluxys c-grid is
-  the designated CO₂ network operator for Wallonia and Flanders. It has proposed
-  corridors for Tournai, Mons–Charleroi, Namur and Liège, but has published no cost
-  figures yet.
-
-### 3.4 Proposals
-
-**Now**
-
-| # | change | needs a re-solve? |
-|---|---|---|
-| G1 | Report gas distribution on its own line, computed from the model's own charge (or from G2), not recomputed with the extractor's cost file | no |
-| G2 | Replace the per-boiler charge by (a) a **fixed existing-grid block** calibrated on the CWaPE gas authorised revenues (0.34 bn€/a, §3.3), following an explicit decommissioning pathway, and (b) a small per-kW charge representing only what is avoidable when one customer leaves: connection, meter, and a share of LV mains O&M | yes for (b) |
-| G3 | Put methane transmission, H₂ and CO₂ pipelines on separate lines of the *Transport* bar | no |
-| G4 | Update the H₂ pipeline cost to EHB 2022, and give CO₂ pipelines a scale-dependent cost (piecewise by diameter class) instead of the linear DEA value | yes |
-
-Calibrated values, estimation methods and implementation for G1–G4 are in §6.4
-(GD1–GD6) and §6.5 (TR10–TR12).
-
-**Next phase.** A gas decommissioning trajectory by zone (urban mains kept for biomethane
-and H₂, rural mains decommissioned) only makes sense with more than one Walloon node, and
-should be designed jointly with TIMES so that both models see the same cost per
-remaining customer.
-
----
-
-## 4. Electricity transmission
-
-### 4.1 CAPEX and OPEX
-
-#### 4.1.1 What is costed
-
-Only the branches **between** the model's nodes: BEVLG–BEWAL, BEBRU–BEWAL, BEWAL–FR,
-BEWAL–LU and ALEGrO (BEWAL–DE, DC). The whole internal Elia grid of each region
-(380/220/150 kV and the 70/36 kV local transmission grid) disappears in the clustering
-into three Belgian nodes, and so do substations and transformers.
-
-| Walloon branch (2030) | type | capacity (MW) | modelled length (km) | annual cost (M€) |
-|---|---|---:|---:|---:|
-| BEVLG–BEWAL | AC | 5 094 | 110 | 39.8 |
-| BEBRU–BEWAL | AC | 3 396 | 96 | 23.1 |
-| BEWAL–FR | AC | 2 433 | 400 | 69.0 |
-| BEWAL–LU | AC | 343 | 90 | 2.2 |
-| BEWAL–DE (ALEGrO) | DC | 1 000 | 281 | 76.4 (+60.4 double-counted, §4.1.4) |
-
-#### 4.1.2 Unit costs
-
-From technology-data v0.14.0, i.e. Danish Energy Agency, *Technology Data for Energy
-Transport*, July 2025. Annuity at 7.5 % over 40 y plus FOM:
-
-| item | investment 2025 → 2050 | FOM | annual cost 2030 |
-|---|---|---:|---:|
-| HVAC overhead | 750 → 620 €/MW/km | 1.5 % | 70.8 €/MW/km/a |
-| HVDC overhead | 600 → 500 €/MW/km | 1.5 % | 56.6 €/MW/km/a |
-| HVDC submarine | 3 220 → 2 680 €/MW/km | 2.5 % | 336 €/MW/km/a |
-| HVDC converter pair | 640 → 540 €/kW | 1.5 % | 60.4 €/kW/a |
-
-* **Lengths are centroid-to-centroid distances × 1.25.** With one node per neighbouring
-  country, BEWAL–FR is 400 km and ALEGrO 281 km, against a real route of about 90 km
-  (§4.3).
-  An interconnector is therefore also paying for a notional share of the neighbour's
-  internal grid. For AC lines, whose cost is purely per km, that convention drives the
-  whole cost. For ALEGrO the converter pair dominates, so the modelled length inflates
-  its annual cost by about 17 %.
-* **The cost applies to nominal thermal rating.** With `s_max_pu = 0.7`, a usable MW of
-  AC capacity costs 1/0.7 = 1.43× the unit cost.
-* **Existing branches carry the same annuity as new ones** in the reports, although their
-  cost is sunk. The reported *Transport* cost is therefore a replacement-value annuity of
-  the whole inter-node grid, not what Elia recovers in tariffs.
-* **Minor inconsistency.** In the first horizon the lines are costed with the 2050 unit
-  cost (620 €/MW/km, from `costs.year: 2050` in `add_electricity`), then re-costed per
-  horizon from 2030.
-
-#### 4.1.3 OPEX
-
-The FOM above is the only OPEX. AC losses are modelled physically
-(`transmission_losses: 2`) and DC losses as 2 % plus 2.3 %/1000 km; their cost is energy
-booked in production and imports. The model has no reserves, redispatch, black-start or
-other system services, and no levies. These are a large part of Elia's tariff (§4.3).
-
-#### 4.1.4 Bug: HVDC converters counted twice from 2030 on
-
-`lossy_bidirectional_links` splits each DC link into a forward leg and a zero-length
-`-reversed` twin with `capital_cost = 0`. `add_brownfield` then re-runs
-`set_transmission_limit` for every horizon after the first, and `set_transmission_costs`
-re-prices every `carrier == "DC"` link, twins included. With zero length, each twin gets
-exactly the converter-pair annuity.
-
-In `scen_central` this adds 616 / 509 / 523 M€/a system-wide in 2030 / 2040 / 2050, and
-60.4 M€/a on ALEGrO alone in 2030. Because the twin's capacity is tied to the forward
-leg, the **cost of expanding DC borders** in 2040/2050 is overstated as well. That is a
-plausible cause of the under-build recorded in
-[`network-representation-analysis.md`](network-representation-analysis.md) §3.1.2:
-BE–GB at 41 % and BE–DE at 47 % of their NTC ceiling while at their limit half of the
-time. It is filed as a separate task. The fix is a one-line exclusion of
-`reversed == True` links and needs a re-solve.
-
-### 4.2 Allocation between nodes
-
-| rule | where | effect for Wallonia, 2030 |
-|---|---|---|
-| none: the objective is one system cost | `solve_network` | — |
-| each branch 50/50 between its two ends; before 2026-09-15 100 % to `bus0` | `make_summary` → `csvs/nodal_costs.csv` | 245.7 M€ (105.2 for electricity once §4.1.4 is corrected) |
-| **pool per carrier over the whole 6-country system, split by each node's share of connected capacity** (MW, both ends for bidirectional branches, origin only for one-way pipelines, length ignored) | ClimAct extraction → chart | **507.0 M€** |
-
-Under the ClimAct rule Wallonia pays a share of FR–DE, GB–FR, NL–DE and every other
-corridor of the modelled system, and pays it by MW regardless of length. It carries
-6.9 % of the system's AC+DC cost under that rule, against 3.6 % under a 50/50 split of
-the branches it actually touches. Neither rule matches how the network is paid for:
-Elia's tariffs are a **national postage stamp**, identical across Belgium for a given
-connection voltage.
-
-**Recommendation.** For regional cost reporting, use two numbers side by side:
-
-1. **Direct cost** of the branches touching the region, 50/50 (`nodal_costs.csv`). This
-   is physically interpretable and is what the multi-node model will refine.
-2. **Tariff-consistent cost**: the Belgian transmission cost, ideally Elia's allowed
-   revenue (§4.3), times Wallonia's share of Belgian offtake. This is what Walloon users
-   actually pay.
-
-Stop using the capacity-pooled rule for regional figures.
-
-### 4.3 Benchmarks
-
-**Elia's allowed revenue (Belgium, all voltages ≥ 30 kV).** CREG decision (B)658E/85
-of 9 Nov 2023, Tableau 1bis, M€ nominal:
-
-| 2022 (actual) | 2024 | 2025 | 2026 | 2027 |
-|---:|---:|---:|---:|---:|
-| 925.3 | 970.7 | 1 552.1 | 1 706.4 | 1 876.0 |
-
-The budget breakdown is confidential. The 2022 actuals show what a transmission
-revenue is made of:
-
-* depreciation 197.5 M€
-* controllable costs 388.7 M€
-* ancillary services: use 284.1 M€ and reservations (R1/R2/R3) 262.7 M€
-* net fair margin 116.7 M€
-* corporate tax 42.4 M€
-* interconnection and congestion income −422.0 M€
-
-The 2024–27 tariff is built on a **6.4 bn€ investment programme**. The same decision
-notes 2 bn€ for 2016–19 and 1.5 bn€ for 2020–23.
-
-**Walloon local transmission (30–70 kV).** CWaPE's decision on Elia's 2026–2036
-adaptation plan (CD-26g30-CWaPE-1283, 30/07/2026) covers **691 M€ of investment over
-2026–30**. The same decision notes that Elia realises 107.4 M€/yr (78 % of what it
-announces), and only 48 % of its announced local-transmission budget on an 11-year
-average. None of this grid is in the model.
-
-**Interconnector reality check.** ALEGrO is about 90 km of HVDC cable, Lixhe–Oberzier,
-1 GW, commissioned in 2020, at roughly 0.5 bn€. The model has it at 281 km, at 76 M€/a
-(0.81 bn€ overnight equivalent), before the double-counting of §4.1.4. These ALEGrO
-figures come from the ENTSO-E TYNDP 2016 project sheet (project 92), as reported by our
-research summary, and have not been re-checked here.
-
-**Order of magnitude of the gap.** A tariff-consistent Walloon share, Elia's 2027
-revenue × about 25 % of Belgian offtake (the BEWAL share of electricity withdrawals in
-the 2030 network; 23 % in 2025), is **≈ 0.45–0.5 bn€/a**. The model's direct
-electricity transmission cost for BEWAL is 0.105 bn€/a (2030, 50/50, corrected for
-§4.1.4). The factor of about 4.5 is not
-a like-for-like error, for three reasons:
-
-* Elia's revenue contains system services and offshore costs, and is net of congestion
-  income.
-* The model contains none of the internal grid.
-* The model's interconnectors are over-long.
-
-Still, it shows that the *Transport* bar compares even worse with the regulated
-benchmark than *Distribution* does. The pooled ClimAct rule only happened to land
-closer, at 0.26 bn€ for electricity.
-
-**Unit costs are not the problem.** ACER, *Unit Investment Cost indicators* (April
-2026, commissioned projects, HICP-adjusted), gives the following medians:
-
-| asset | ACER median | ACER mean |
-|---|---:|---:|
-| 400 kV overhead line, 1 circuit | 0.52 M€/km | 0.60 |
-| 400 kV overhead line, 2 circuits | 1.18 M€/km | 1.46 (max 4.87) |
-| 220 kV underground cable, 1 circuit | 2.08 M€/km | — |
-| HVDC converter | 0.21 M€/MW | — |
-
-ACER also finds costs rising about 6 %/yr above inflation since 2018.
-
-At roughly 1.8 GVA per 380 kV circuit, the double-circuit median is about 330 €/MW/km,
-less than half the DEA 750 €/MW/km in the model. ACER's line figures exclude
-substations, so the comparison is indicative only. On converters, if the ACER figure
-is per station, a pair costs about 420 €/kW against the model's 640 €/kW.
-
-The model's per-km costs are therefore on the high side of observed projects.
-Advanced conductors (HTLS reconductoring) are reported to roughly double capacity on an
-existing right-of-way at a third to a half of new-build cost [S: Chojkiewicz et al.,
-PNAS 2024]. That matters for the 2040/2050 HTLS headroom in the NTC tables.
-
-The gap with Elia's revenue is a matter of **scope**:
-
-* the internal grid, 380 kV down to 36 kV, is missing;
-* substations and transformers are missing;
-* system services (reserves, redispatch) are missing;
-* offshore costs are missing.
-
-On top of that, interconnector lengths are inflated by the one-node-per-country
-convention, which the multi-node model will correct.
-
-### 4.4 Proposals
-
-**Now**
-
-| # | change | needs a re-solve? |
-|---|---|---|
-| T1 | Fix the reversed-DC costing (§4.1.4) | yes |
-| T2 | Split *Transport* into electricity / methane / H₂ / CO₂, and use the 50/50 direct cost plus the tariff-consistent cost (§4.2) instead of the pooled rule | no |
-| T3 | Add a labelled **"Elia grid not represented"** block for the internal 380–36 kV grid and system services, calibrated on the CREG-approved revenue × the Walloon share of offtake | no |
-| T4 | For the committed projects of the NTC tables (Boucle du Hainaut, Lonny–Achêne–Gramme, the second BE–DE HVDC, Nautilus), use project costs and real route lengths instead of centroid distance × DEA unit cost | yes |
-
-Calibrated values, estimation methods and implementation for T1–T4 are in §6.5
-(TR1–TR13).
-
-**Next phase.** With 10–20 Belgian nodes, internal corridors become explicit lines with
-real lengths, and the 150 kV and 70/36 kV levels can be added for Belgium only
-([`network-representation-analysis.md`](network-representation-analysis.md) §8). The
-Walloon transmission cost then becomes a sum over Walloon branches plus 50/50 of the
-cross-border ones. The postage-stamp figure should stay as the tariff view.
-
----
-
-## 5. The TIMES side
-
-### 5.1 Grid processes: losses only
-
-`EVTRANS_H-H` (HV grid), `EVTRANS_H-M` (HV→MV and grid), `EVTRANS_M-L` (MV→LV and
-grid) and `EVTRANS_L-M` (LV→MV, unused) carry flows. They have no `Cost_Inv`,
-`Cost_Fom`, `Cost_Act`, `VAR_Cap` or `VAR_Ncap` rows in the solution dump. The `.vd` only
-writes non-zero attributes, so either these processes have no cost in TIMES-WAL, or
-their cost is booked elsewhere. `scen_central_v01_260911_1109.vd`, TWh:
-
-| | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| into the HV grid | 20.97 | 24.35 | 42.59 | 56.24 |
-| HV → MV | 14.43 | 16.71 | 28.19 | 38.06 |
-| MV → LV | 11.00 | 12.67 | 20.82 | 28.76 |
-| implied losses | 1.6 % HV, 2.7 % HV→MV, 3.2 % MV→LV | | | |
-
-LV deliveries grow 2.6× between 2025 and 2050. That is the electrification the feedback
-refers to. Its cost is endogenous in PyPSA (§2.1) but not, it seems, in TIMES.
-
-### 5.2 Delivery mark-ups on "Fuel Tech" processes
-
-TIMES-WAL puts `Cost_Act` on its sectoral fuel-technology processes. Divided by activity,
-in €₂₀₂₁/MWh (the model currency is `MEUR21`):
-
-| process | 2025 | 2030 | 2040 | 2050 | M€ in 2050 |
-|---|---:|---:|---:|---:|---:|
-| `RSDELC00` residential electricity | 179.5 | 179.5 | 179.5 | 179.5 | 1 171 |
-| `COMELC00` services electricity | 94.1 | 94.1 | 94.1 | 94.1 | 1 219 |
-| `INDELC00` industry electricity | 24.6 | 24.6 | 24.6 | 24.6 | 571 |
-| `AGRELC00` agriculture electricity | 91.7 | 91.7 | 91.7 | 91.7 | 6 |
-| `RSDGMX00` residential gas | 33.8 | 53.4 | 56.2 | 33.8 | 118 |
-| `COMGMX00` services gas | 13.2 | 32.8 | 35.7 | 13.2 | 27 |
-| `INDGAS00` / `INDGMX00` industry gas | 6.6 | 6.6 | 6.6 | 6.6 | 20 |
-| `RSDOIL00` residential oil | 27.0 | 54.2 | 92.8 | — | — |
-
-Electricity mark-ups reach 1.7 bn€/a in 2025 and 3.0 bn€/a in 2050. The residential
-179.5 €/MWh is close to the non-energy part of a Walloon household bill: distribution,
-transmission, levies and excise, excluding VAT. The rising oil and gas mark-ups look like
-a carbon levy (ETS2). **This is our reading of the data and has to be confirmed with
-ICEDD**, because the consequences differ:
-
-* If the mark-ups contain network tariffs, TIMES already carries a **volumetric**
-  distribution cost. It grows with kWh, not with peak, and adding PyPSA's distribution
-  cost on top would double-count.
-* If they contain taxes, they are transfers. They must be excluded from any system-cost
-  comparison, but they still drive TIMES's technology choice. At 179.5 €/MWh for
-  electricity against 33.8 €/MWh for gas, residential electrification is heavily
-  penalised in TIMES, and that mix is what PyPSA pins its heating to (option B′,
-  [`heat-softlink.md`](heat-softlink.md)).
-
-### 5.3 What the cost chart can and cannot say
-
-The chart is a PyPSA-only view of supply-side, storage and network costs. It omits the
-demand-side costs that live in TIMES (vehicles, appliances, renovation), and it uses a
-different TIMES run for each scenario (`scen_retardnucleaire` reads
-`scen_sensibilite_retardnucleaire_260911_1109.vd`). We therefore agree it should not be
-shown as a total system cost, nor used to compare scenarios, until the TIMES costs are
-added on a consistent perimeter.
-
-Networks are not what drives the 2050 central-vs-delayed-nuclear gap: *Transport* moves
-by 30 M€ and *Distribution* by 36 M€, 5 % of the 1.29 bn€/a difference. Correcting the
-network *levels* as proposed here moves both scenarios by about the same amount.
-
----
-
-## 6. Calibration plan for the current formulation
-
-This section turns §2–§5 into a parameter-by-parameter plan for the model as it stands:
-three Belgian nodes, one LV bus per node, inter-node branches only. Every value is
-derived from the data gathered for this note. Where a parameter cannot be observed
-directly, §6.6 gives the estimation method and the data that should eventually replace
-it. Changes that go beyond parameters and small code hooks are left to §8.
-
-### 6.1 Principles
+## 2. Calibration principles
 
 **1. Four cost layers per network.**
 
-| layer | content | treatment in the current formulation | drives decisions? |
+| layer | content | treatment | drives decisions? |
 |---|---|---|---|
-| **L1 — existing grid** | capital charges of the assets in service in the base year | exogenous block, calibrated on the 2025 regulated accounts, evolved with a renewal rule | no |
-| **L2 — increment** | reinforcement caused by the scenario: peak growth, PV, new branches | endogenous: optimal capacity × annualised unit cost | **yes** |
-| **L3 — non-capacity OPEX** | customer service, metering, IT, system operation | exogenous block, per connection or per MWh | no |
-| **L4 — losses, add-ons, transfers** | losses; PSO, road-use fee, smart meters, taxes, system services | losses endogenous through the link efficiency; everything else exogenous and used for bills only (§7) | losses only |
+| **L1 — existing grid** | capital charges of the assets in service in 2025 | exogenous block, 2025 regulated accounts, constant in real terms | no |
+| **L2 — increment** | reinforcement caused by the scenario: peak growth, PV hosting, new branches | endogenous: optimal capacity of the vintages built after the first horizon × annualised unit cost | **yes** |
+| **L3 — non-capacity OPEX** | customer service, metering, IT, system operation | exogenous block; the per-connection part is indexed on the connection count | no |
+| **L4 — losses, add-ons, transfers** | losses; PSO, road-use fee, smart meters, taxes, system services | losses endogenous through the link efficiency; the rest exogenous, for bills | losses only |
 
-**2. Calibrate on 2025, validate on 2029.** The 2029 authorised revenue already contains
-the capital charges of the 2025–28 transition investments, which the model builds itself
-as L2. Calibrating L1 on 2029 would count them twice. 2029 is kept as an out-of-sample
-check (V5 in §6.3).
+**2. Calibrate on 2025, validate on 2029.** The 2029 revenue already contains the capital
+charges of the 2025–28 transition investments, which the model builds as L2.
 
-**3. Only L2 and the losses need a re-solve.** L1, L3 and L4 are reporting layers and can
-be added to the existing September runs.
+**3. Two views of transmission** (§6.3):
+* the **direct** view, the physical cost of the branches touching the region;
+* the **tariff** view, what Walloon users pay under Elia's national postage stamp.
 
-**4. Price base.** CWaPE and CREG figures are nominal. PyPSA costs are real EUR2025
-(master CSV) and TIMES costs are MEUR21. Deflate regulatory figures with the Belgian
-HICP, and state the base in every table.
+**4. Price base.**
+* Model costs are real EUR2025, and CWaPE/CREG 2025 figures are nominal 2025 = EUR2025.
+* 2029 figures are deflated at 2.4 %/a.
+* TIMES is in MEUR21.
 
-**5. One financial convention for regulated networks** (§6.2).
-
-### 6.2 Financial parameters common to all networks
-
-| parameter | current | calibrated | range | basis | where |
-|---|---|---|---|---|---|
-| discount rate of network assets *r*<sub>net</sub> | 7.5 % (TIMES power/supply hurdle) | **3.5 % real, pre-tax** | 3.3–5 %; keep 7.5 % as a sensitivity | See note below | new `hurdle:networks` row in `input_parameters_for_models.csv`, mapped in `config/hurdle_rate_mapping.csv` (see note), then `build_common_parameters.py --write` |
-| lifetime | 40 y (electricity), 50 y (pipelines) | unchanged | 40–50 y | regulatory depreciation periods of 33–50 y for gas assets (ICEDD gas study, research summary) | — |
-| FOM of new network assets | 2 % (distribution), 1.5 % (lines, DC, CH₄) | unchanged | 1.5–2 % | DEA; asset-related share of DSO OPEX (E2 below) | — |
-
-*Basis for r*<sub>net</sub>. The CWaPE 2025–29 methodology allows **4.03 %** on the RAB
-after corporate tax. Fair margin plus tax is 5.37 % of the RAB, pre-tax and nominal,
-i.e. about 3.3 % real at 2 % inflation. That equals the config's
-`social_discountrate: 0.035`.
-
-*Mapping.* The new row applies to `electricity distribution grid`,
-`electricity grid connection`, `HVAC *`, `HVDC *`, `CH4 (g) pipeline*`,
-`H2 (g) pipeline*` and `CO2 pipeline*`.
-
-Annuity plus 2 % FOM falls from **9.94 % to 6.68 %** of the investment (40 y), i.e.
-−33 %; it is 6.26 % at 50 y. This is a shared parameter. It has to be agreed with ICEDD
-even though TIMES has no network investment today, because §7 uses it to turn network
-investment into tariffs.
-
-### 6.3 Electricity distribution
-
-**Calibration targets.** 2025 budgets of the five CWaPE decisions (Tableau 4 / 8,
-*Budget 2025* column), M€ nominal:
-
-| item | 2025 | note |
-|---|---:|---|
-| authorised revenue | 896.3 | |
-| network core (L1 + L3) | **677.9** | OPEX 287.4 + depreciation 197.2 + margins 151.8 + corporate tax 41.5 |
-| of which capital charges (L1) | **390.5** | depreciation + margins + tax |
-| of which OPEX (L3 and asset maintenance) | 287.4 | |
-| losses | 87.0 | energy purchases |
-| road-use fee / smart meters | 43.8 / 22.9 | L4 |
-| RAB (derived) | ≈ 3.10 bn€ + 0.67 bn€ revaluation | margins ÷ 4.03 % |
-| electricity EAN (2024) | 1.95 M | CWaPE opinion 0967, §2.3.4 |
-| energy withdrawn at distribution (2024) | 12.68 TWh | same, excluding compensated volumes |
-
-Unit values of the network core: 348 €/EAN/yr, 53.5 €/MWh, and 219 €/kW/a of the 2025
-LV peak after E6 (3.09 GW).
-
-**Parameters.**
-
-| id | parameter | current | calibrated central (range) | data and method | implementation | re-solve |
-|---|---|---|---|---|---|---|
-| E1 | existing-grid capital charges | implicit: 3.78 GW × 66.4 = 251 M€ | **390.5 M€** (2025) | CWaPE 2025 budgets (above) | reporting block. Optionally overwrite the capital cost of the carried-forward 2025 vintage in `add_brownfield`; it is sunk, so decisions are unaffected | no |
-| E2 | existing-grid OPEX | 2 % FOM ≈ 50 M€ | **287 M€**: asset-related 85–190, per connection 100–200 (50–100 €/EAN/yr) | asset part = 1.5–2 % × replacement value (§6.6); the remainder is per EAN | reporting block; per-EAN part indexed on the EAN count (+1 %/yr, CWaPE) | no |
-| E3 | evolution of E1 (renewal) | none: nothing retires before 2065 | held **constant in real terms**; sensitivity +1 %/yr real | Renewal and compliance capex 2026–30 is 227 M€/yr against depreciation of 197 M€/yr, i.e. renewal ≈ depreciation plus catch-up. *Grids for Speed*: about 27 % of distribution capex is replacement [S] | reporting block | no |
-| E4 | discount rate / lifetime | 7.5 % / 40 y | 3.5 % / 40 y (§6.2) | — | master CSV | yes |
-| E5 | incremental reinforcement cost *c*<sub>inc</sub> | 668 €/kW | **620 €/kW (410–960)** | See note below | `cost:electricity distribution grid:investment` in the master CSV; `adjustments` factor for the range | yes |
-| E6 | load behind the link | all industry electricity on LV | move **70 %** of `industry electricity` to the transmission bus | TIMES draws 5.8 of 8.3 TWh of industrial electricity at HV in 2025, 6.8 of 9.7 in 2030 and 16.2 of 23.2 in 2050 (`VAR_FIn` on `ELCHIGG` vs `ELCMED`) | a few lines in `insert_electricity_distribution_grid`: split the load with a per-horizon share read from the TIMES export | yes |
-| E7 | distribution losses | 3 % static | **5 %** (`efficiency_static: 0.95`) | TIMES: HV→MV 2.7 % and MV→LV 3.2 %. Weighting LV (0.942) and MV (0.973) deliveries by 2025 volumes gives 0.949. Cross-check: 5 % × 14 TWh × ~120 €/MWh ≈ 84 M€, against 87 M€ of DSO loss purchases | `sector.transmission_efficiency.electricity distribution grid` | yes |
-| E8 | PV hosting cost *c*<sub>host</sub> | 0: at a regional node rooftop PV never congests the grid | **120 €/kWp (0–250)** | the PV share of E5's transition capex, over new rooftop PV 2025–30 (1.58 GWp). Bounds: DEA local reinforcement per new generator (189 €/kW) and PV-specific capex (E1.4 + ORES LV task force ≈ 50 M€ → 32 €/kWp) | adder on the `solar rooftop` capital cost (two lines after rooftop PV is added, or a custom-cost row) | yes |
-| E9 | local-vs-regional diversity *k*<sub>div</sub> | 1 | **keep 1** | E5 is expressed per kW of *regional* coincident peak, so diversity is already inside it. The sub-hourly effect is +0.6 % at national level: Elia 2024, max 15-min 13 282 MW vs max hourly 13 206 MW | if ever needed, `p_max_pu = 1/k_div` on the link | — |
-| E10 | flexibility credit φ | 1 (implicit) | 1 central, **0.5 as a sensitivity** | home batteries shave 1.4 GW off the 2050 regional peak, a credit local grids may not see. *Grids for Speed*: flexibility −18 % of investment; Priyadarshan et al.: DSM up to −¾ [S] | one constraint per snapshot in `extra_functionality`: `p_nom_dist ≥ flow(t) + (1−φ)·home-battery discharge(t)` | yes |
-| E11 | regulated add-ons | absent | PSO 48, road fee 44, smart meters 23 → 57 (2029), other 13 M€ | CWaPE | bill module only (§7) | no |
-
-*Basis for E5.* CWaPE opinion 0967, Tableau 15, puts **transition-driven capex at
-774 M€ over 2026–30**:
-
-* E1.1 "évolution prévisible de la consommation et pointes de charge": 649 M€
-* E1.3 congestion: 1 M€
-* E1.4 voltage quality: 35 M€
-* the Walloon government's transition subsidy: 88 M€
-
-Adding E2.4 voltage harmonisation (129 M€) gives 903 M€. The model's LV peak increase
-over 2025–30, after E6, is 0.94 GW. The PV-driven share *s*<sub>PV</sub> of that capex
-is unknown (§6.6), so the result is a table (below). With E2.4 the upper value is
-961 €/kW. The calibrated value is close to the current 668 €/kW.
-
-**Splitting E5 between demand and PV (E8).**
-
-| PV share of transition capex | *c*<sub>inc</sub> (€/kW of LV peak) | *c*<sub>host</sub> (€/kWp) |
-|---:|---:|---:|
-| 0 | 823 | 0 |
-| **0.25 (central)** | **618** | **123** |
-| 0.5 | 412 | 246 |
-
-**Validation checks after calibration.**
-
-| id | check | target |
-|---|---|---|
-| V1 | reported 2025 distribution cost, L1 + L3 | 678 M€ (CWaPE core 2025) |
-| V2 | model new-build 2025→30, overnight | ≈ 0.77 bn€ (transition capex), ± the flexibility effect |
-| V3 | energy through the link, 2025 | ≈ 14–15.5 TWh. After E6 the link carries 15.5 TWh, against TIMES MV + LV consumption of 14.1 TWh and DSO withdrawals of 12.7 TWh (plus compensated volumes and losses) |
-| V4 | loss cost | ≈ 87 M€/a |
-| V5 | 2030 reported cost vs the CWaPE 2029 core | within ±10 % in real terms (735 M€ nominal ≈ 680 M€₂₀₂₅) |
-
-**What the calibration does to the Walloon distribution cost.** Illustrative, *not
-re-solved*. It combines the existing block, the increments at 620 €/kW and PV hosting
-at 120 €/kWp, at 3.5 %/40 y plus 2 % FOM, on the peaks of the current networks with E6
-applied. M€₂₀₂₅/a:
-
-| | 2025 | 2030 | 2040 | 2050 |
-|---|---:|---:|---:|---:|
-| current model (distribution link) | 251 | 320 | 521 | 684 |
-| LV peak after E6 (GW) | 3.09 | 4.03 | 6.35 | 8.44 |
-| rooftop PV (GWp) | 1.77 | 3.35 | 7.91 | 9.01 |
-| L1 + L3 existing grid | 678 | 678 | 678 | 678 |
-| L2 demand increment | — | 39 | 135 | 221 |
-| L2 PV hosting | — | 13 | 49 | 58 |
-| **recalibrated total** | **678** | **729** | **862** | **957** |
-
-The recalibrated 2030 figure sits within 7 % of the CWaPE 2029 core in real terms. Most
-of the correction is L1 + L3, which changes no decision. The decision-relevant part (L2)
-actually becomes *smaller* than the model's current increments: 52 vs 70 M€ in 2030, and
-279 vs 433 M€ in 2050. Three effects combine: the lower discount rate, HV industry
-leaving the LV bus, and a calibrated *c*<sub>inc</sub> close to today's value. Only the
-new PV hosting charge adds to it. A re-solve with these values will therefore not make
-flexibility more attractive on distribution grounds; if anything, slightly less.
-
-### 6.4 Gas distribution
-
-**Calibration targets.** 2025 budgets of CD-24c28-CWaPE-0890 (ORES gas) and -0891 (RESA
-gas), M€ nominal:
-
-| item | 2025 | note |
-|---|---:|---|
-| authorised revenue | 335.0 | ORES 218.5 + RESA 116.5 |
-| network core (L1 + L3) | **282.0** | OPEX 88.9 + depreciation 92.2 + margins 81.9 + tax 19.0 |
-| road-use fee / PSO / other | 25.8 / 22.7 / 4.5 | L4 |
-| RAB | 1 866 M€ + ≈ 0.33 bn€ revaluation | 1 288 + 578 at 1 Jan 2025, from the decisions |
-| gross capex | 117.4 M€ (2025); 104.6 M€/yr planned 2027–31 | CWaPE 0981 |
-| meters / energy / mains (end 2025) | 801 102 / 17 426 GWh / 14 497 km | CWaPE 0981, Tableau 2 |
-
-Unit values of the core: **352 €/meter/yr, 16.2 €/MWh** (19.2 €/MWh on the total).
-
-**Parameters.**
-
-| id | parameter | current | calibrated central (range) | data and method | implementation | re-solve |
-|---|---|---|---|---|---|---|
-| GD1 | existing gas-grid block (L1 + L3) | absent (0.03–0.06 bn€ slice in the chart) | **282 M€** (2025) | RAB rule: RAB(t+1) = RAB(t) + capex(t) − depreciation(t), with capex from a decommissioning pathway. Two pathways: *keep*, where capex continues at the 2027–31 plan (≈ 105 M€/yr against 92 M€/yr of depreciation) and the RAB stays roughly flat; and *managed decommissioning*, capex limited to mains kept and depreciation accelerated as the regulator allows. OPEX is split per km of mains in service and per meter | reporting block, per pathway | no |
-| GD2 | avoidable cost per customer, i.e. the per-boiler charge | 66.4 €/kW_th/a (`gas_distribution_grid_cost_factor: 1.0`) | **5 €/kW_th/a (3–7)**, which is factor **0.075** today or **0.12** after E4/E5 | controllable OPEX of 111 €/meter/yr, about half of it customer-driven, plus the meter annuity gives 50–110 €/meter/yr; divided by the 16.2 kW_th of BEWAL boiler per meter | config `sector.gas_distribution_grid_cost_factor` (scenario overlay); recompute the factor whenever the electricity distribution cost changes | yes |
-| GD3 | scope of GD2 | new decentral boilers and micro-CHP | unchanged | existing boilers are sunk; industry and CHP carry their network share in GD1 | — | — |
-| GD4 | decommissioning cost | absent | **930–1 750 € per connection** (seal vs remove) [S]; mains sealed and left in place | NRW survey of 115 DSOs; number of disconnections from the TIMES dwelling stock | reporting block | no |
-| GD5 | tariff per MWh (for bills) | flat TIMES mark-up | GD1 ÷ distributed volume | A flat core block over TIMES residential and services volumes (`RSDGMX00` + `COMGMX00`: 15.9 / 15.6 / 8.3 / 5.5 TWh in 2025/30/40/50) gives **18 / 18 / 34 / 51 €/MWh** | §7 | no |
-| GD6 | distribution losses | absent | leave absent | negligible in cost | — | — |
-
-The ClimAct gas slice must be recomputed from GD1–GD2, or dropped: its CZ cost file and
-⅓ factor match neither the model nor the regulator (§1.1). Industrial gas needs a
-distribution/transmission split before GD5 can be applied to it. CWaPE distributes
-17.4 TWh (2025), against 15.9 TWh of residential and services gas in TIMES plus part of
-industry (§9, item 10).
-
-### 6.5 Transmission: electricity, methane, H₂ and CO₂
-
-**Calibration targets (electricity).**
-
-* **Elia allowed revenue** (Belgium): 1 552 M€ in 2025 and 1 876 M€ in 2027.
-* **2022 structure:** grid capital 425 M€ (46 %), controllable OPEX 389 M€ (42 %),
-  ancillary services 547 M€ (59 %), interconnection income −422 M€ (−46 %).
-* **Investment:** 6.4 bn€ over 2024–27 for Belgium; 691 M€ over 2026–30 for Walloon
-  30–70 kV, with a 48 % historical realisation rate.
-* **Walloon share of Belgian offtake:** 22.7 % (2025), 25.4 % (2030) and 36 % (2050) in
-  the model. TIMES gives 26 % for 2025: 21.0 TWh into the Walloon HV grid against the
-  81.0 TWh of Belgian load Elia measured in 2024.
-
-**Parameters.**
-
-| id | parameter | current | calibrated central (range) | data and method | implementation | re-solve |
-|---|---|---|---|---|---|---|
-| TR1 | existing grid, tariff view (L1 + L3) | existing inter-node branches at replacement annuity (88 M€ for BEWAL at 50/50, 2025) | **Walloon share × Elia allowed revenue**: 350–400 M€ (2025), 450–490 M€ (2027); model branches existing in 2025 set to 0 in this view | CREG B658E/85 × offtake share. Split system services and interconnection income out once Elia's yearly breakdown is obtained (§9, item 8) | reporting block | no |
-| TR2 | new AC branch cost | 750 → 620 €/MW/km (DEA) | **450 €/MW/km (350–750)** | ACER UIC 2026: 400 kV double circuit, median 1.18 M€/km ÷ ~3.4 GW ≈ 350, plus a substation share. DEA is kept as the high case | master CSV `cost:HVAC overhead:investment` | yes |
-| TR3 | capacity added by HTLS on existing corridors | same as new build | **⅓–½ of TR2** (150–225 €/MW/km) [S] | Chojkiewicz et al., PNAS 2024. Applies to the 2040/2050 HTLS headroom of the NTC tables (BEWAL–BEVLG 13.2 → 14.4 GW, BE–FR) | per-branch override (TR5) | yes |
-| TR4 | HVDC converter pair | 640 → 540 €/kW | **420–640 €/kW** | ACER UIC 2026: 0.21 M€/MW per converter | master CSV | yes |
-| TR5 | per-branch project costs | centroid length × unit cost | ALEGrO ≈ 90 km, ≈ 0.5 bn€₂₀₁₅ [research summary]; Boucle du Hainaut, second BE–DE HVDC and Nautilus from Elia/TYNDP project data | project table | `data/walloon/transmission_cost_overrides.csv`, applied after every `set_transmission_costs` call (`prepare_network`, `add_brownfield`) | yes |
-| TR6 | reversed-DC legs | charged the converter pair from 2030 | 0 | bug, §4.1.4 | fix in `set_transmission_costs` (task filed) | yes |
-| TR7 | lengths, `s_max_pu` | centroid × 1.25; 0.7 | **unchanged** | they drive impedance, losses and the NTC gross-up; costs are corrected through TR5 instead | — | — |
-| TR8 | system services | absent | **≈ 6.7 €/MWh of offtake** (2022: 547 M€ / 81 TWh; a crisis year) | replace with Elia's 2023–25 actuals | reporting block (endogenous reserves are future work) | no |
-| TR9 | interconnection income | not reported | model: Belgian share (50 %) of cross-border congestion rent, 1.04 / 0.77 / 0.63 / 0.72 bn€ in 2025/30/40/50, vs Elia's actual 0.42 bn€ (2022) | the model probably overstates it (no flow-based coupling, coarse nodes); check against Elia's 2023–25 actuals before using it as an offset | reporting | no |
-| TR10 | methane transmission (Fluxys), tariff view | SciGRID pipelines at replacement annuity | **Walloon share of gas offtake** (33 % in 2025 → 38 % in 2050, model) **× Fluxys regulated revenue**: ≈ 100–125 M€/yr on the pre-decision indicative 309–330 M€/yr [research summary; approved values confidential]. Existing pipelines set to 0 in this view | CREG / Fluxys | reporting block | no |
-| TR11 | H₂ pipelines | EHB 2021: 382 / 163 €/MW/km (new / repurposed) | **EHB 2022**: ≈ 215 / 38 €/MW/km for large pipes; smaller size classes from EHB 2022 tables | EHB 2022 | master CSV | yes |
-| TR12 | CO₂ pipelines | linear, 2 672 €/(t/h)/km | **scale-dependent**. Fit C ∝ Q<sup>0.6</sup> through the DEA point (12″, ≈ 300 t/h, 0.80 M€/km) and linearise per link at the capacity found in a first run (iterate once). BEWAL–DE at 1 845 t/h: 2.4 M€/km, i.e. 1 290 €/(t/h)/km (−52 %) | JRC network average 0.62–0.89 M€/km. The 0.6 exponent is an engineering rule of thumb, to be checked against the JRC size classes | per-link override (TR5 file) | yes |
-| TR13 | discount rate / lifetime | 7.5 % / 40–50 y | 3.5 % (§6.2) | — | master CSV | yes |
-
-**Validation checks.**
-
-| id | check | target |
-|---|---|---|
-| TV1 | TR1 + model increments, Walloon tariff view | Elia allowed revenue × offtake share, per year |
-| TV2 | model congestion rent (TR9) | Elia interconnection income, 2023–25 actuals |
-| TV3 | cost of committed projects built through the NTC floors | project costs (TR5) |
-| TV4 | 50/50 direct Walloon cost after TR6 | 88 / 105 / 137 / 129 M€ (§1.2) before TR2–TR5 |
-
-### 6.6 Parameters without direct data, and how they are estimated
-
-| parameter | why it is missing | provisional method | provisional value | replace with |
-|---|---|---|---|---|
-| PV share *s*<sub>PV</sub> of transition capex | CWaPE groups PV, EV and heat pumps under E1.1 | bracket 0–0.5. Central 0.25: only E1.4 and the ORES task force are PV-specific, while E1.1 explicitly mixes the three | 0.25 | the DSOs' split of E1.1 (§9, item 6) |
-| DSO (MV + LV) coincident peak | not published | model LV peak after E6 | 3.1 GW (2025) | Synergrid / ORES peak data (§9, item 4) |
-| DSO OPEX split, asset vs customer | not published | asset part = FOM (1.5–2 %) × replacement value | 85–190 / 100–200 M€ | DSO cost accounting |
-| replacement value of the DSO grid | not published | 1.5–2.5 × net book value (3.77 bn€) = 5.6–9.4 bn€. Cross-check: its annuity at 3.5 %/40 y (262–440 M€) brackets the 390 M€ of capital charges | ≈ 7.5 bn€ | network length by voltage × unit costs (CWaPE 0967, Tableau 19) |
-| local vs regional diversity | no Walloon data | embedded in *c*<sub>inc</sub> | *k*<sub>div</sub> = 1 | smart-meter data (ORES digital twin, CD-25d03-CWaPE-1056 §6.2.2) |
-| sub-hourly peak | — | Elia 2024: 15-min vs hourly peak | +0.6 %, ignored | — |
-| flexibility credit φ | no data | sensitivity | 1 / 0.5 | DSO flexibility programmes |
-| Walloon share of Belgian offtake | Elia does not publish by region | model withdrawals; TIMES HV input ÷ Elia load | 23–26 % (2025) | SPW / Elia regional balance |
-| Elia revenue breakdown 2024–27 | confidential in the decision | 2022 actual shares | — | Elia annual reports, CREG ex-post decisions |
-| Fluxys allowed revenue | confidential | pre-decision indicative figures | 309–330 M€/yr | CREG / Fluxys |
-| gas decommissioning cost per km | not found | seal and leave in place; per-connection cost only | 930–1 750 €/connection | ICEDD–CWaPE gas study; DSO data |
-
-### 6.7 Implementation sequence
-
-| step | content | effort | re-solve |
-|---|---|---|---|
-| 0 | fix the reversed-DC costing (TR6), with its unit test | S | yes, next run |
-| 1 | reporting layer: a script (e.g. `scripts/walloon_scripts/network_cost_report.py`) reads the solved networks and a calibration table `data/walloon/network_cost_calibration.csv`, then writes `csvs/network_costs_calibrated.csv` split into L1–L4 per network. The table holds E1–E3, E11, GD1, GD4, TR1, TR8–TR10 with sources. The cabinet chart's *Distribution* and *Transport* segments are then drawn from this file instead of the ClimAct extraction | M | no |
-| 2 | parameters and hooks: master CSV (E4/TR13, E5, TR2, TR4, TR11); config (E7, GD2); hooks (E6 industry split, E8 PV adder, TR5 overrides, optional E10 constraint) | M | one 6 h test, then one 1 h chain |
-| 3 | validation V1–V5 and TV1–TV4, written into section 11 of the run's solve log | S | — |
-| 4 | TIMES harmonisation (§7) | M–L | — |
-
-Step 1 alone answers the stakeholder's comparison, since it changes the *level* and not
-the decisions. Step 2 changes results, so it follows the usual run-review procedure.
-
-### 6.8 Improving the formulation later
-
-These go beyond calibration and belong with the multi-node work (§8):
-
-* the existing grid as vintaged, non-extendable age cohorts, so that renewal becomes
-  endogenous;
-* a two-tier MV / LV representation with separate unit costs, and HV industry on its
-  own bus;
-* node-specific costs per DSO area;
-* a reverse-flow hosting constraint instead of the PV adder;
-* endogenous reserves;
-* gas distribution as a bus per zone, with a fixed cost and a decommissioning decision;
-* piecewise-linear pipeline costs for economies of scale.
+**5. The first-horizon vintage of the distribution link is the existing grid.** Its model
+cost is reported as a memo line and replaced by L1. Its capacity still constrains the
+dispatch, and its cost is a constant in the 2025 objective.
 
 ---
 
-## 7. Harmonisation with TIMES for bill reporting
+## 3. Financial parameters
 
-TIMES will report the effect of the scenarios on the electricity and gas bills of
-different users. PyPSA and TIMES must therefore agree on every bill component, or the
-bills will not be reproducible from the scenarios they claim to describe.
+| parameter | before | decided | basis | where |
+|---|---|---|---|---|
+| discount rate of regulated network assets | 7.5 % (TIMES power/supply hurdle) | **3.5 % real, pre-tax** | See note below | 17 rows `cost:<tech>:discount rate` in `config/input_parameters_for_models.csv`, generated into `data/walloon/discount_rates.csv` |
+| lifetime | 40 y (electricity), 50 y (pipelines) | unchanged | regulatory depreciation 33–50 y | — |
+| FOM | 2 % (distribution), 1.5 % (lines, DC, CH₄) | unchanged | DEA | — |
 
-### 7.1 The bill identity
+*Basis for the 3.5 %.* CWaPE's 2025–29 methodology allows **4.03 %** on the RAB after
+corporate tax (CD-24c28-CWaPE-0890, Tableau 2). Margin plus tax is 5.37 % of the RAB,
+pre-tax and nominal, i.e. about 3.3 % real. This equals `costs.social_discountrate` (3.5 %).
 
-For each user type *u*, energy carrier *e* and year *t*:
+*Scope of the 3.5 %.* It applies to `electricity distribution grid`, `HVAC *`, `HVDC *`,
+`CH4 (g) pipeline*`, `H2 (g) pipeline*`, `H2 pipeline` and `CO2 pipeline*`.
+`electricity grid connection` is paid by the producer and keeps the power hurdle.
 
-> **Bill**<sub>u,e</sub> = V<sub>u,e</sub> × ( p<sup>energy</sup><sub>u,e</sub> + t<sup>network</sup><sub>u,e</sub> + τ<sub>u,e</sub> + σ<sub>u,e</sub> ) + F<sub>u,e</sub>, plus VAT
+Annuity plus 2 % FOM falls from 9.94 % to **6.68 %** of the investment (40 y).
+`build_common_parameters.py` handles these per-technology overrides in
+`resolve_hurdle_rates`. Its `custom_costs.csv` patcher now skips them, since they
+belong to `discount_rates.csv`.
 
-where:
+---
 
-* V is the billed volume, net of self-consumption;
-* p<sup>energy</sup> is the commodity price seen by that user's consumption profile;
-* t<sup>network</sup> is the distribution and transmission tariff (volumetric and/or
-  capacity);
-* τ is taxes and regulatory levies (excise, federal contribution, regional PSO);
-* σ is the support-scheme levies (green certificates, offshore and nuclear support,
-  CRM);
-* F is the fixed charge per connection.
+## 4. Electricity distribution
+
+### 4.1 Representation in PyPSA
+
+`insert_electricity_distribution_grid` (`scripts/prepare_sector_network.py`) adds per AC
+node a `<node> low voltage` bus and an extendable `electricity distribution grid` link
+to it. Moved onto the LV bus are:
+* the household, services, industry and agriculture electricity loads;
+* EV charging;
+* heat pumps, resistive heaters and micro-CHP;
+* rooftop PV and home batteries.
+
+**What sizes the link.** The link is sized at the hourly *regional coincident* net peak
+behind it. In practice it never exports: a single hour in four horizons. Heat pumps are
+almost fully coincident even locally: Consentec for E.ON uses simultaneity 1.0 at LV,
+0.95 at MV/LV and 0.9 at MV. EV and PV effects, by contrast, are local.
+
+**What stands behind the peak.** At the 2025 BEWAL peak (15 Sep networks, before the
+industry split):
+
+| | 2025 peak |
+|---|---:|
+| household and services | 1 721 MW |
+| industry | 979 MW |
+| resistive heating | 653 MW |
+| heat pumps | 258 MW |
+| rooftop PV | 0 |
+
+In 2050, home batteries shave 1.4 GW off the peak.
+
+### 4.2 Data
+
+| item | value | source |
+|---|---|---|
+| authorised revenue 2025 / 2029 | 896.3 / 981.3 M€ | CWaPE decisions (Appendix A) |
+| network core 2025 | 677.9 M€: capital 390.5, OPEX 287.4 | idem |
+| RAB (derived) | 3.10 bn€ + 0.67 bn€ revaluation | margins ÷ 4.03 % |
+| connections | 1.95 M EAN (2024), +1.0 %/yr | CWaPE 0967 §2.3.4 |
+| energy withdrawn at distribution | 12.68 TWh (2024) | idem |
+| gross capex 2020–24 / 2026–30 | 302 / 662 M€/yr | CWaPE 0967 Tableau 14 |
+| transition capex 2026–30 | 774 M€ (903 incl. voltage harmonisation) | CWaPE 0967 Tableau 15 |
+| TIMES HV / MV / LV split | industry 70 % at HV in every horizon; losses 2.7 % HV→MV, 3.2 % MV→LV | `scen_central_v01_260911_1109.vd` and `…260923_2_2309.vd` |
+| sub-hourly peak | 15-min national peak 0.6 % above the hourly one | Elia open data `ods001`, 2024 (81.0 TWh) |
+
+### 4.3 Decisions
+
+| id | parameter | before | decided | method | implementation |
+|---|---|---|---|---|---|
+| E1 | existing-grid capital charges | implicit: 3.78 GW × 66.4 €/kW/a = 251 M€ | **390.5 M€/a**, constant real | CWaPE 2025 budgets | reporting, `network_cost_report.py` (L1) |
+| E2 | existing-grid OPEX | 2 % FOM | **287.4 M€/a**: asset share 48 %; the per-connection part 52 % grows +1 %/yr with EAN | asset part = 1.5–2 % × replacement value (5.6–9.4 bn€, §4.4) | reporting (L3) |
+| E3 | renewal of the existing grid | none | L1 held constant in real terms (renewal ≈ depreciation) | renewal and compliance capex 227 M€/yr vs depreciation 197 M€/yr | reporting |
+| E4 | discount rate / lifetime | 7.5 % / 40 y | 3.5 % / 40 y | §3 | master CSV |
+| E5 | incremental cost *c*<sub>inc</sub> | 668 €/kW (technology-data "TODO") | **620 €/kW (410–960)** → 41.4 €/kW/a | See note below | master CSV `cost:electricity distribution grid:investment` → `custom_costs.csv` |
+| E6 | load behind the link | all industry on LV | **70 % of `industry electricity` on the transmission bus**, at every node | TIMES `VAR_FIn` on `ELCHIGG` vs `ELCMED` (5.8/8.3 TWh in 2025, 16.2/23.2 in 2050) | `split_industry_electricity` (config `sector.network_calibration.industry_hv_share: 0.70`) |
+| E7 | distribution losses | 3 % | **5 %** (`efficiency_static: 0.95`) | TIMES: LV delivery 0.973 × 0.968, MV 0.973, weighted by 2025 volumes = 0.949. Check: 5 % × 14 TWh × ~120 €/MWh ≈ 84 M€ vs 87 M€ of DSO loss purchases | config `sector.transmission_efficiency` |
+| E8 | PV hosting cost | 0 | **120 €/kWp** on *new* rooftop PV → +8.0 k€/MW/a | the PV share of E5 over 1.58 GWp of new rooftop PV 2025–30. Bounds 32 €/kWp (PV-specific capex) and 189 €/kW (DEA local reinforcement) | `add_rooftop_pv_hosting_cost` (`pv_hosting_investment: 120`) |
+| E9 | local-vs-regional diversity | 1 | **1** | E5 is per kW of regional peak, so diversity is inside it; the sub-hourly effect is 0.6 % | — |
+| E10 | flexibility credit of home batteries | 1 (implicit) | **1**, not activated | no data to set it below 1 | future work (§12) |
+| E11 | regulated add-ons | absent | PSO, road-use fee, smart meters, other: 2025 budget, then 2029 deflated | CWaPE | reporting (L4), bills (§8) |
+
+*Method for E5.* The 774 M€ of transition capex (CWaPE Tableau 15) is divided over the
+model's 2025→30 BEWAL LV peak increase after E6 (0.94 GW). 25 % of the capex is
+attributed to PV hosting (E8):
+
+| PV share of the transition capex | *c*<sub>inc</sub> | *c*<sub>host</sub> |
+|---:|---:|---:|
+| 0 | 823 €/kW | 0 |
+| **0.25 (decided)** | **618 €/kW** | **123 €/kWp** |
+| 0.5 | 412 €/kW | 246 €/kWp |
+
+The decided value, rounded to 620 €/kW, lands close to technology-data's 668 €/kW, whose
+source field reads "TODO". That value is the undocumented 500 €/kW of PyPSA-Eur-Sec
+indexed to 2025; the new one is calibrated. The literature range is 189 €/kW (DEA,
+local reinforcement per new connection) to about $580–1 320/kW (US full
+electrification).
+
+### 4.4 Parameters without direct data
+
+| parameter | method used | value | to be replaced by |
+|---|---|---|---|
+| PV share of transition capex | bracket 0–0.5. Only E1.4 and the ORES PV task force are PV-specific, while E1.1 mixes PV, EV and heat pumps | 0.25 | the DSOs' split of E1.1 (§11) |
+| DSO coincident peak | model LV peak after E6 | 3.09 GW (2025) | Synergrid / ORES peak data |
+| OPEX split, asset vs connection | FOM × replacement value | 48 % / 52 % | DSO cost accounting |
+| replacement value | 1.5–2.5 × net book value (3.77 bn€) = 5.6–9.4 bn€. Its annuity at 3.5 %/40 y (262–440 M€) brackets the 390 M€ of capital charges | ≈ 7.5 bn€ | network length by voltage × unit costs |
+| local diversity | embedded in E5 | 1 | smart-meter data (ORES digital twin) |
+
+### 4.5 Validation
+
+| id | check | target | result |
+|---|---|---|---|
+| V1 | reported 2025 cost, L1 + L3 | 678 M€ | by construction |
+| V2 | new-build 2025→30, overnight | ≈ 0.77 bn€ | §9 |
+| V3 | energy through the link, 2025 | ≈ 14–15.5 TWh (TIMES MV + LV 14.1 TWh; DSO withdrawals 12.7 TWh + compensated volumes + losses) | §9 |
+| V4 | loss cost | ≈ 87 M€/a | §9 |
+| V5 | 2030 reported cost vs the CWaPE 2029 core in real terms (≈ 680 M€₂₀₂₅) | ±10 % | §9 |
+
+---
+
+## 5. Gas distribution
+
+### 5.1 Representation
+
+There is no gas distribution network in the model. `insert_gas_distribution_costs` adds
+`gas_distribution_grid_cost_factor` × the electricity distribution annuity to the capital
+cost of new decentral gas boilers and micro-CHP. Existing boilers, industry and CHP carry
+nothing.
+
+Before the calibration (factor 1.0, i.e. 66.4 €/kW_th/a) this charge:
+* followed boiler sales rather than the grid;
+* reached 196 M€/a in 2040, while gas volumes collapse;
+* vanished whenever boilers were not replaced.
+
+TIMES charges gas delivery by volume (§1.4).
+
+The literature treats gas distribution as a **fixed cost that persists until physical
+decommissioning** and is recovered through tariffs that rise as volumes fall:
+* Agora/BET/Rosin Büdenbender (2023): more than 90 % of the German grid is not needed by
+  2045, and grid fees rise 9–16× by 2044;
+* Ofgem RIIO-3 [S]: charges rising to 40 p/kWh by 2050.
+
+### 5.2 Data
+
+| item | value | source |
+|---|---|---|
+| authorised revenue 2025 | 335.0 M€: ORES 218.5 + RESA 116.5 | CD-24c28-CWaPE-0890/0891 |
+| network core 2025 | 282.0 M€: capital 193.1, OPEX 88.9 | idem |
+| road-use fee / PSO / other | 25.8 / 22.7 / 4.6 M€ | idem |
+| RAB 1 Jan 2025 | 1 866 M€ + 0.33 bn€ revaluation; return 4.03 % | idem, Tableau 2 |
+| meters / energy / mains | 801 102 / 17 426 GWh / 14 497 km | CD-26g30-CWaPE-0981, Tableau 2 |
+| capex 2025 / planned 2027–31 | 117.4 / 104.6 M€/yr, against 92.2 M€/yr of depreciation | idem, §4.1 |
+| decommissioning per connection | 930 (seal) – 1 750 € (remove) | Verbraucherzentrale NRW survey [S] |
+
+### 5.3 Decisions
+
+| id | parameter | before | decided | implementation |
+|---|---|---|---|---|
+| GD1 | existing gas grid (L1 + L3) | absent | **282.0 M€/a**, constant real (*keep* pathway: capex ≈ depreciation, RAB roughly flat) | reporting |
+| GD2 | avoidable cost per customer | 66.4 €/kW_th/a (factor 1.0) | **≈ 5 €/kW_th/a** (factor **0.12**) | config `sector.gas_distribution_grid_cost_factor` |
+| GD3 | scope of GD2 | new decentral boilers, micro-CHP | unchanged; existing boilers are sunk | — |
+| GD4 | decommissioning | absent | 1 340 €/connection (midpoint); **not applied yet**, because TIMES provides no disconnection series | calibration table |
+| GD5 | tariff per MWh | flat TIMES mark-up | GD1 ÷ distributed volume (the death-spiral indicator) | `bill_harmonisation.py` (§8) |
+| GD6 | losses | absent | absent (negligible in cost) | — |
+
+*Method for GD2.* Controllable OPEX is 111 €/meter/yr, about half of it
+customer-driven; adding the meter annuity gives 50–110 €/meter/yr. Divided by the
+16.2 kW_th of BEWAL boiler capacity per meter, that is 3–7 €/kW_th/a. Against the
+recalibrated 41.4 €/kW/a annuity, the factor is 0.12.
+
+The ClimAct gas slice is no longer used. The calibrated *Distribution* segment carries
+GD1, and `plot_cost_segments.py` puts the slice back into the boilers it was taken from.
+
+### 5.4 Validation
+
+* **Level.** GD1 + GD4 against the CWaPE core. This holds by construction for 2025.
+* **Tariff trajectory.** Checked against the TIMES residential and services gas volumes
+  (§9). With a flat core block, the per-MWh network cost rises as volumes fall.
+
+---
+
+## 6. Transmission: electricity, methane, H₂ and CO₂
+
+### 6.1 Representation and unit costs
+
+Only the **inter-node** branches are costed:
+* 3 Belgian regions plus one node per neighbouring country;
+* existing and new capacity alike, at replacement-value annuities;
+* lengths are centroid distances × 1.25.
+
+The internal 380/220/150/70/36 kV grid disappears in the clustering. OPEX is a 1.5 %/a
+FOM. Losses are physical (AC loss linearisation; DC 2 % + 2.3 %/1000 km). There are no
+reserves, redispatch or other system services.
+
+| unit cost | before | decided | source |
+|---|---|---|---|
+| HVAC overhead, 2030 / 2040 / 2050 | 750 / 680 / 620 €/MW/km (DEA) | **450 / 408 / 372 €/MW/km** | See note below |
+| HVDC converter pair | 640 → 540 €/kW | unchanged | ACER 0.21 M€/MW is ambiguous between per station and per pair |
+| H₂ pipeline | 382 €/MW/km (EHB 2021) | unchanged | EHB 2022 is cheaper for large pipes but dearer per MW for the 0.1–1.7 GW pipes the model builds. A linear cost cannot follow the size class |
+| CO₂ pipeline | 2 672 €/(t/h)/km (DEA 12″) | economies of scale on large trunks (TR12) | JRC 0.62–0.89 M€/km |
+
+*Basis for the HVAC value.* ACER UIC 2026 gives a median of 1.18 M€/km for a 400 kV
+double circuit, i.e. about 350 €/MW/km, plus substations. The 2040/2050 values follow
+technology-data's DEA learning shape. DEA is kept as the high sensitivity.
+
+### 6.2 HVDC converter double-counting (fixed)
+
+**The mechanism.** `lossy_bidirectional_links` gives every DC link a zero-length
+`-reversed` twin with `capital_cost = 0`. `add_brownfield` then re-runs
+`set_transmission_limit` for each horizon after the first, and `set_transmission_costs`
+re-priced every `carrier == "DC"` link, twins included, at the converter-pair annuity.
+
+**The size.** It added, system-wide in 2030 / 2040 / 2050:
+
+| Central run | Added cost (M€/a) |
+|---|---|
+| 15 September | 616 / 508 / 523, of which ALEGrO's twin was 60 / 55 / 51 |
+| 24 September | 713 / 774 / 856 |
+
+It also doubled the converter part of any DC expansion. On the recalibrated run it is 0 in
+every horizon (§9).
+
+**The fix.** `set_transmission_costs` skips links flagged `reversed` or named
+`*-reversed`. Four regression tests in `test/test_network_calibration.py` fail on the old
+code.
+
+### 6.3 Allocation between nodes: direct and tariff views
+
+The optimisation has one system cost and needs no allocation. For regional reporting,
+two views are produced side by side by `network_cost_report.py`:
+
+* **Direct.** The branches touching BEWAL, 50/50 between their two ends, at model cost,
+  with the capacity existing in 2025 separated from the increment. This is the physical
+  view, which the multi-node model will refine.
+* **Tariff.** The Belgian regulated revenue (Elia 1 552 M€ in 2025; Fluxys) plus the
+  Belgian branch increments, times Wallonia's share of Belgian offtake that horizon.
+  Belgian increments count internal branches at 100 % and cross-border ones at 50 %.
+  This is what Walloon users pay: Elia's tariffs are a national postage stamp per
+  voltage level. It is also the input for bills (§8).
+
+ClimAct's capacity-pooled rule is no longer used for Walloon figures.
+
+### 6.4 Data
+
+* **Elia.** Revenue and structure as in §1.2.
+* **Offtake shares.** Wallonia's share of Belgian electricity offtake comes from the
+  model's withdrawals: about 23 % in 2025, 25 % in 2030 and 36 % in 2050 on the
+  15 September run. TIMES's 21.0 TWh into the Walloon HV grid, against Elia's 81.0 TWh
+  of 2024 load, gives 26 %.
+* **Fluxys.** The approved revenue is confidential (CREG (B)656G/50). The pre-decision
+  indicative value is 317 M€ for 2025 [research summary, not re-checked].
+* **ALEGrO.** 94 km HVDC Lixhe–Oberzier, about 1 000 MW, **490–550 M€₂₀₁₅** plus 35–45 M€
+  of Belgian AC reinforcements (ENTSO-E TYNDP 2016, project 92 sheet).
+* **CO₂ trunk sizes.** From the 24 September central run.
+
+### 6.5 Decisions
+
+| id | parameter | before | decided | implementation |
+|---|---|---|---|---|
+| TR1 | existing grid, tariff view (L1 + L3) | inter-node branches at replacement annuity | **Elia 2025 revenue × Walloon offtake share**; model branches existing in 2025 are left out of this view | `network_cost_report.py` |
+| TR2 | new AC branch cost | DEA | **450 / 408 / 372 €/MW/km** | master CSV → `custom_costs.csv` (per horizon) |
+| TR3 | HTLS on existing corridors | — | not differentiated: one cost per branch in the current formulation | §12 |
+| TR4 | HVDC converter | DEA | unchanged | — |
+| TR5 | per-branch project costs | centroid length × unit cost | **ALEGrO corridor (BEWAL–DE DC) at 692.6 k€/MW**. The 520 M€₂₀₁₅ midpoint is inflated × 1.332 (EU27 HICP 2016–20, then `factor_2020_to_2025`). It also prices the second BE–DE HVDC. Other projects have no public cost | `data/walloon/transmission_cost_overrides.csv`, rows `investment`, set in `prepare_sector_network` and re-set in `add_brownfield` |
+| TR6 | reversed-DC legs | converter cost from 2030 | **0** | §6.2 |
+| TR7 | lengths, `s_max_pu` | centroid × 1.25; 0.7 | unchanged: they drive impedance, losses and the NTC gross-up | — |
+| TR8 | system services | absent | inside the Elia revenue of TR1 (the 2025 budget breakdown is confidential) | — |
+| TR9 | interconnection income | not reported | inside the Elia revenue (net). The model's Belgian share of cross-border congestion rent is reported for comparison | `bill_harmonisation.py` |
+| TR10 | methane transmission, tariff view | SciGRID pipelines at replacement annuity | **Fluxys 317 M€ × Walloon gas offtake share** | `network_cost_report.py` |
+| TR11 | H₂ pipelines | EHB 2021 | unchanged (§6.1) | — |
+| TR12 | CO₂ pipelines | linear DEA cost | See note below | overrides CSV, rows `capital_cost_factor`, generated by `build_co2_trunk_overrides.py`, applied once per vintage |
+| TR13 | discount rate | 7.5 % | 3.5 % (§3) | master CSV |
+
+*Method for TR12.* Each corridor's capital cost is multiplied by (Q/300 t/h)<sup>−0.4</sup>,
+the six-tenths rule, where Q is the corridor size in the 24 September central run. The
+factor is capped at 1, so small pipes keep the DEA cost. Eight corridors are affected:
+
+| corridor | factor |
+|---|---:|
+| BEVLG–BEWAL | 0.53 |
+| BEVLG–FR | 0.87 |
+| BEVLG–GB | 0.46 |
+| BEVLG–NL | 0.56 |
+| BEWAL–DE | 0.60 |
+| BEWAL–LU | 0.82 |
+| DE–FR | 0.32 |
+| FR–GB | 0.31 |
+
+### 6.6 Validation
+
+| id | check | target |
+|---|---|---|
+| TV1 | tariff view vs Elia revenue × offtake share | by construction for 2025 |
+| TV2 | model congestion rent vs Elia interconnection income | 0.42 bn€ (2022 actual); model 0.6–1.0 bn€ Belgian share — §9 |
+| TV3 | cost of the committed projects built through the NTC floors | no public project costs yet |
+| TV4 | reversed DC legs carry no cost | 0 in every horizon (§9) |
+
+---
+
+## 7. Implementation
+
+| component | file | notes |
+|---|---|---|
+| HVDC twin fix | `scripts/add_electricity.py` (`set_transmission_costs`) | global |
+| calibration hooks | `scripts/walloon_scripts/network_calibration.py` | `split_industry_electricity`, `add_rooftop_pv_hosting_cost`, `apply_transmission_cost_overrides`, `co2_scale_factor` |
+| hook calls | `scripts/prepare_sector_network.py` (end of `insert_electricity_distribution_grid`; before export), `scripts/add_brownfield.py` (after `set_transmission_limit`, `investment` rows only) | no-ops without `sector.network_calibration` |
+| rule inputs | `rules/build_sector.smk` (`prepare_sector_network`), `rules/solve_myopic.smk` (`add_brownfield`): `transmission_cost_overrides` | so that editing the table re-runs the chain |
+| unit costs and rates | `config/input_parameters_for_models.csv` → `data/walloon/custom_costs.csv`, `data/walloon/discount_rates.csv` | `python scripts/build_common_parameters.py --write` / `--check` |
+| switches | `config/config.walloon.yaml` → `sector.transmission_efficiency`, `sector.gas_distribution_grid_cost_factor`, `sector.network_calibration` | base config: every scenario |
+| per-corridor overrides | `data/walloon/transmission_cost_overrides.csv`; CO₂ rows from `scripts/walloon_scripts/build_co2_trunk_overrides.py <reference run>` | ALEGrO row hand-maintained with its source |
+| exogenous layers | `data/walloon/network_cost_calibration.csv`, generated by `scripts/walloon_scripts/build_network_cost_calibration.py` from the per-DSO budgets it transcribes | do not hand-edit |
+| reporting | `scripts/walloon_scripts/network_cost_report.py <run>` → `csvs/network_costs_calibrated.csv`, `csvs/network_cost_segments.csv` | layers × views × horizons |
+| chart | `plot_cost_segments.py --network-costs calibrated` (default) | puts the ClimAct gas slice back into *Production*; takes the PV hosting and boiler charges out of it |
+| TIMES harmonisation | `scripts/walloon_scripts/bill_harmonisation.py <run>` → `csvs/bill_harmonisation.csv` | §8 |
+| tests | `test/test_network_calibration.py` (15 tests); `test/test_discount_rates.py` updated | the twin tests fail on the old code |
+
+After a solve:
+
+```bash
+python scripts/walloon_scripts/network_cost_report.py results/walloon/<scenario>
+python scripts/walloon_scripts/bill_harmonisation.py results/walloon/<scenario>
+python scripts/walloon_scripts/plot_cost_segments.py --runs results/walloon/<scenario> ...
+```
+
+---
+
+## 8. Coupling with TIMES for bill reporting
+
+TIMES reports the effect of the scenarios on the electricity and gas bills of different
+users. The two models therefore have to agree on every bill component.
+
+### 8.1 The bill identity
+
+For each user type *u*, carrier *e* and year:
+
+> **Bill**<sub>u,e</sub> = V<sub>u,e</sub> × ( p<sup>energy</sup> + t<sup>network</sup> + τ + σ ) + F<sub>u,e</sub>, plus VAT
+
+The terms:
+* **V**: billed volume, net of self-consumption;
+* **p<sup>energy</sup>**: commodity price seen by the user's profile;
+* **t<sup>network</sup>**: distribution plus transmission tariff;
+* **τ**: taxes and levies;
+* **σ**: support levies;
+* **F**: fixed charge per connection.
 
 Suggested user types:
+* electricity: LV residential (with and without heat pump or EV), LV prosumer, LV
+  services, MV business, HV industry;
+* gas: residential, services, industry on distribution, industry on transmission.
 
-* electricity:
-  * LV residential, with and without a heat pump, with and without an EV
-  * LV prosumer with PV
-  * LV services
-  * MV business
-  * HV industry
-* gas:
-  * residential
-  * services
-  * industry on distribution
-  * industry on transmission
+**Division of labour.**
+* **PyPSA supplies the system side:** the zonal energy price, the network revenue
+  requirements (L1–L4, §2–§6) and the support needs.
+* **TIMES supplies the demand side:** volumes by user type, connections and
+  self-consumption, plus the taxes. It also reports the bills.
 
-**Division of labour.** PyPSA supplies the system side: prices, network revenue
-requirements and support needs. TIMES supplies the demand side (volumes by user type,
-connections, self-consumption) and the exogenous taxes, and reports the bills. The check
-is that TIMES's own mark-ups reproduce what PyPSA's system implies.
+### 8.2 The harmonisation table
 
-### 7.2 Variables to include in the harmonisation analysis
+`bill_harmonisation.py` writes one row per variable and horizon, with the PyPSA value,
+the TIMES value and the relative gap.
 
-**A. Volumes and structure.**
-
-| id | variable | PyPSA | TIMES | check |
+| group | variables | PyPSA side | TIMES side | tolerance |
 |---|---|---|---|---|
-| A1 | electricity by sector and voltage level | loads on the LV / HV buses after E6 | `VAR_FIn` of `ELCLOW` / `ELCMED` / `ELCHIGG` by RSD / COM / IND / TRA / AGR | equal by construction; ±2 % |
-| A2 | gas by sector and grid level | gas-bus withdrawals by carrier | `RSDGMX00`, `COMGMX00`, `INDGMX00`, `INDGAS00` | distribution / transmission split against CWaPE (17.4 TWh distributed in 2025) |
-| A3 | self-consumed PV | not represented: rooftop PV simply feeds the LV bus | `ERNW_PV-RES_Homes` output to `RSDELC` vs `ELCLOW` | define billed volumes consistently |
-| A4 | connections by user type | — | dwelling and heating-system stock | 1.95 M electricity EAN and 0.80 M gas meters today; gas disconnections drive GD4 and GD5 |
-| A5 | peaks by user type (for capacity tariffs) | hourly load by component at the LV peak hour (table in §2.1) | `EQ_Peak` (`ELCForPeak`) | contribution to peak per user type |
+| A volumes | electricity behind the distribution link; electricity at HV | link inflow; loads on the AC bus (after E6) | `VAR_FIn` on `ELCMED`+`ELCLOW`, and on `ELCHIGG`+`ELCHIG` | ±2 % |
+| B prices | wholesale electricity (time average and load weighted); LV–HV spread; gas; ETS1 | **Belgian zonal price**, the LV-inflow-weighted average of the three HV nodes; `BEWAL gas`; `CO2Limit` dual | `EQ_CombalM` on `ELCHIG`, `ELCLOW`, `GASNAT` (unweighted mean over timeslices) | ±10 % |
+| C networks | revenue requirement and €/MWh for electricity distribution, transmission (tariff view) and gas | `network_costs_calibrated.csv` | — | — |
+| C mark-ups | each "Fuel Tech" mark-up against the network €/MWh; the residual is taxes, levies and support | idem | `Cost_Act / VAR_Act` | — |
+| C reconciliation | network revenue required vs mark-ups collected (electricity, gas) | L1–L4 | Σ `Cost_Act` | — |
+| S support | cost minus market revenue of Belgian generation, per carrier | solved network | — | — |
 
-**B. Energy component.**
+**Two price conventions matter.**
+* **Use HV-bus prices, not the Walloon nodal price.** The nodal price contains the
+  import-cap dual (−18.5 €/MWh in 2030 on the 15 Sep run) and internal congestion, which
+  a zonal market does not have.
+* **Use the HV price plus the network tariff, not the LV-bus price.** The LV-bus price
+  already contains the distribution capacity rent, about 15–18 €/MWh, which recovers the
+  distribution annuity. Adding a tariff on top would count the grid twice.
 
-B1 — wholesale electricity price. Use the **Belgian zonal price**: the load-weighted
-average of the BEWAL / BEVLG / BEBRU *HV-bus* marginal prices. Do **not** use:
+### 8.3 Procedure
 
-* the Walloon nodal price, which contains the import-cap dual (−18.5 €/MWh in 2030)
-  and internal congestion;
-* the LV-bus price, which contains the distribution capacity rent (~15 €/MWh) and
-  would double-count the network tariff.
+1. After each PyPSA run: run `network_cost_report.py`, then `bill_harmonisation.py`.
+2. Read the gaps. At the time of writing, three are structural:
+   * the wholesale price level (§9);
+   * the mark-ups, constant 2025–2050, while network revenue requirements and volumes
+     are not;
+   * the residential electricity mark-up, far above the network €/MWh; the residual is
+     taxes and levies if the mark-up holds them.
+3. Hand the recomputed network tariffs per user type (C) and support levies (S) to ICEDD
+   as TIMES inputs, replacing the constant mark-ups.
+4. Re-run TIMES, then PyPSA once. The mark-ups steer TIMES's technology choice, which
+   feeds back into PyPSA's demands.
 
-Compare it with TIMES's `EQ_CombalM` on `ELCHIG` / `ELCHIGG` per timeslice
-(M€/PJ × 3.6 = €/MWh).
+Data needed from ICEDD:
+* timeslice durations (`G_YRFR`);
+* the content of the mark-ups;
+* the user types for bills;
+* connection counts;
+* self-consumption;
+* the ETS2, excise, levy and VAT assumptions;
+* any support schemes;
+* industrial gas by grid level.
 
-| €/MWh | 2025 | 2030 | 2050 |
-|---|---:|---:|---:|
-| PyPSA BE zonal time average | 169 | 109 | 91 |
-| TIMES `ELCHIG`, unweighted mean of 120 timeslices | 104 | 69 | 62 |
+### 8.4 What the cost chart can and cannot say
 
-**This gap is the first thing to resolve.** Weight TIMES by timeslice duration
-(`G_YRFR`, to request), then compare price formation.
+The chart is a PyPSA-only view of supply, storage and network costs. It omits TIMES's
+demand-side costs (vehicles, appliances, renovation). Each scenario also has its own
+TIMES run. It is therefore not a total system cost, and cannot compare scenarios, until
+the TIMES costs are added on a consistent perimeter.
 
-B2 — profile-weighted price per user type. PyPSA: hourly price × user profile (Synergrid
-SLPs, or the model's heat-pump and EV profiles). In 2030 at BEWAL LV:
-
-* residential/services 131 €/MWh
-* inflexible EV 127 €/MWh
-* industry 127 €/MWh
-
-These LV prices must have the ~15 €/MWh capacity rent removed. TIMES: timeslice price ×
-sector consumption per timeslice.
-
-B3 — gas wholesale. PyPSA BEWAL gas bus: 37.7 / 37.6 / 32.2 / 26.9 €/MWh
-(2025/30/40/50). TIMES `GASNAT` marginal: 33.2 / 30.8 / – / 22.2 €/MWh. Fuel prices come
-from the shared master CSV and must match.
-
-B4 — carbon prices.
-
-* **ETS1.** The dual of PyPSA's EU `CO2Limit` is 77 / 95 / 119 / 467 €/t; compare with
-  the TIMES ETS price.
-* **ETS2** (buildings and road) is not in PyPSA. TIMES's rising oil and gas mark-ups
-  suggest TIMES has it. Gas and oil bills must take it from a single harmonised
-  assumption.
-* The **national CO₂-limit duals** (BEWAL 379 €/t in 2025) are policy shadow prices, not
-  bill components. The CO₂ duals stack, so read bus marginal prices rather than
-  configured values.
-
-B5 — supplier margin, imbalance and CRM cost. Exogenous, and the same in both models.
-
-**C. Network component.**
-
-C1 — electricity distribution revenue requirement:
-R<sub>dist</sub>(t) = L1 + L3 (E1–E3) + L2 (E5, E8) + loss cost (E7 × p<sup>energy</sup>)
-+ add-ons (E11). Allocate it to user types with the CWaPE 2025–29 tariff structure
-(voltage level, and the fixed / capacity / volumetric shares).
-
-C2 — electricity transmission revenue requirement:
-R<sub>trans</sub>(t) = TR1 + L2 increments + system services (TR8) − interconnection
-income (TR9). Allocate it with Elia's national tariffs per voltage level.
-
-C3 — gas distribution revenue requirement: R<sub>gas,dist</sub>(t) = GD1 + GD4, per
-pathway. The €/MWh trajectory (GD5) is the death-spiral indicator for gas users.
-
-C4 — gas transmission: TR10.
-
-C5 — the **reconciliation identity**. For each network and year,
-Σ<sub>u</sub> t<sup>network</sup><sub>u</sub> × V<sub>u</sub>(TIMES) = R<sub>network</sub>(PyPSA-calibrated).
-The TIMES mark-ups (`RSDELC00` 179.5 €/MWh, `COMELC00` 94.1, `INDELC00` 24.6, and the gas
-equivalents) sit on top of the commodity price. They must therefore equal
-t<sup>network</sup> + τ + σ for the corresponding user type, with the fixed charges F
-converted to €/MWh. The
-mark-ups are constant from 2025 to 2050, while R and V are not. So they should be
-**recomputed from C1–C4 plus τ and σ and handed back to ICEDD as TIMES inputs**, then
-the check repeated once.
-
-**D. Support schemes.**
-
-S1 — missing money from PyPSA: annualised cost minus market revenue per technology.
-Belgian nuclear: 0.46 bn€/a in 2030 and 1.06 bn€/a in 2050. Utility PV: 0.11 bn€/a in
-2030; rooftop PV: 0.05–0.06 bn€/a. These gaps are exactly where policy constraints bind:
-capacity floors (`agg_p_nom_min`), CCL, the import cap, NTC floors. Their duals × capacity
-give the same answer. They are funded by levies, σ.
-
-S2 — TIMES support schemes: to be listed by ICEDD, if any.
-
-**E. Financial and accounting conventions.**
-
-| id | item | rule |
-|---|---|---|
-| FC-a | price base | TIMES MEUR21 vs PyPSA EUR2025: one HICP conversion, stated in every bill table |
-| FC-b | nominal vs real | tariffs are nominal, the models are real; report bills in real terms with an explicit inflation assumption |
-| FC-c | annualisation of network capex | regulated WACC (§6.2) in both models' reporting, not technology hurdle rates |
-| FC-d | depreciation | regulatory lives for tariffs; technical lives for system cost |
-
-**F. Time and space.**
-
-F1 — TIMES has 120 electricity timeslices, PyPSA 8 760 h. Map PyPSA hours onto the
-TIMES timeslices (definitions and durations to request) and compare price and load per
-timeslice.
-
-F2 — perimeter. Demands are the whole of Wallonia; the BEWAL node excludes western
-Hainaut; prices should be zonal (Belgium).
-
-### 7.3 Procedure
-
-1. After each PyPSA run, a harmonisation script produces one table per scenario and year.
-   It holds A1–F2 (all groups) with the TIMES values read from the same `.vd`, the difference, and a
-   pass / fail against tolerances: ±2 % volumes, ±10 % prices, ±5 % revenue
-   reconciliation. A possible name is `scripts/walloon_scripts/bill_harmonisation.py`,
-   built on the `.vd` readers of `times_pypsa`.
-2. PyPSA's outputs are turned into tariffs and levies per user type: R<sub>network</sub>
-   (C1–C4), σ (S1) and p<sup>energy</sup> (B1–B2).
-3. These are compared with TIMES's mark-ups and commodity prices.
-4. The recomputed mark-ups are sent to ICEDD for the next TIMES run.
-5. Plan one iteration. The mark-ups change TIMES's technology choice (§5.2), which feeds
-   back into PyPSA's demands. A second pass is needed only if volumes then move by more
-   than the tolerances.
-
-Data needed from ICEDD for this: timeslice durations (`G_YRFR`), the content of the
-mark-ups, the user-type definitions for bills, connection counts, self-consumption, and
-the tax and VAT assumptions (§9).
+In the September batch, networks explained 5 % of the 2050 gap between central and
+delayed-nuclear.
 
 ---
 
-## 8. Towards a multi-node Belgium
+## 9. Results of the recalibrated central run
 
-What changes in the next phase, and what can be prepared now:
+`scen_central`, weather 2010, 1 h, TIMES `scen_central_v01_260923_2_2309.vd`. The run was
+solved on NIC5 on 2026-09-29 and all four horizons are optimal. The solve log is
+[`logs/2026-09-29_scen_central_2010_1h_netcal.md`](logs/2026-09-29_scen_central_2010_1h_netcal.md).
+The reference is the 24 September central run (same TIMES file), reported with the same
+scripts.
 
-| network | today (3 BE nodes) | multi-node target | preparation now |
+### 9.1 What the comparison can attribute
+
+The run also carries `bbc9450e`, the nuclear seed threshold, committed the same morning.
+That commit keeps the FR/GB `nuclear-2025` investment options alive after 2025:
+
+| Nuclear (GW_e) | 2030 | 2040 | 2050 |
 |---|---|---|---|
-| electricity transmission | 5 Walloon inter-node branches, centroid lengths, no internal grid | 380/220/150 kV explicit for Belgium, real lengths, 70/36 kV as a proxy layer | Elia grid data request; project cost table (T4) |
-| electricity distribution | 1 LV bus, placeholder cost, starts at 0 | LV (± MV) bus per node, cost per DSO area, existing grid as a sunk block, hosting-capacity caps | CWaPE revenue per DSO (done here), peak per DSO area from Synergrid/ORES |
-| gas distribution | per-boiler charge on new boilers | fixed block per zone plus decommissioning pathway | CWaPE gas revenues; ORES/RESA mains length and connection counts |
-| gas / H₂ / CO₂ transmission | SciGRID_gas between regions; new-build H₂; endogenous CO₂ | Fluxys topology per node; H₂ retrofit option; CO₂ corridors per industrial site | Fluxys H₂ and CO₂ project data |
-| cost allocation | three rules (§4.2) | sum over regional branches + 50/50 cross-border, plus the tariff view | adopt the two-number reporting now |
+| France, this run | 61.8 | 62.9 | 62.9 |
+| France, 24 Sep | 13.1 | 6.2 | 0 |
+| GB, this run | 5.5 | 13.2 | 13.2 |
+| GB, 24 Sep | 4.7 | 3.4 | 3.4 |
 
-The regional perimeter also changes. The current BEWAL node leaves 2 191 km² of western
-Hainaut in BEVLG, while the CWaPE revenues cover the whole Region. For distribution the
-comparison above still holds, because BEWAL's electricity demand is the TIMES demand of
-the whole Region. For transmission it does not: some Walloon branches are booked to
-Flanders.
+BEWAL and BEVLG also reach 3 GW each in 2050. This state matches the 15 September batch
+behind the cabinet deck. The 24 September run is the outlier: its 10 MW cleanup had
+deleted the foreign options.
+
+This decides what the comparison can attribute:
+* **2025 is a clean before/after.** The nuclear fleet is identical, and a separate solve
+  without the seeds gives the same objective to 1e-6.
+* **2030–2050 mix the calibration with a different European nuclear fleet.** The 2030
+  Belgian price (192.6 → 124.6 €/MWh) and the ETS1 dual (186.7 → 93.9 €/t) follow the
+  French nuclear, not the networks.
+* **The network-local quantities of 2030–2050 are only indicative.** They are given below
+  as such.
+
+### 9.2 Validation
+
+| id | check | target | result |
+|---|---|---|---|
+| V1 | reported 2025 cost, L1 + L3 | 678 M€ | 677.9 M€ (by construction) |
+| V2 | new-build 2025→30, overnight | ≈ 0.77 bn€ | **0.64 bn€** (1 028 MW × 620 €/kW), −17 % |
+| V3 | energy through the link, 2025 | 14–15.5 TWh | **15.4 TWh** (24 Sep: 20.8 TWh before the HV split) |
+| V4 | loss cost, 2025 | ≈ 87 M€/a | **81.9 M€/a** (CWaPE 2025: 87.0) |
+| V5 | 2030 reported cost, L1 + L2 + L3, vs the CWaPE 2029 core in real terms | 680 M€ ± 10 % | **728 M€**, +7 % |
+| — | electricity distribution revenue requirement, 2025, all layers | CWaPE 896.3 M€ | 891.2 M€, −0.6 % |
+| GD | gas distribution level and tariff trajectory | 282.0 M€ | by construction. The network cost per MWh of residential + services gas rises 25.8 → 28.3 → 53.7 → 70.7 €/MWh as volumes fall |
+| TV1 | tariff view, 2025 | Elia × offtake share | 394.4 M€ = 1 552.1 × 25.4 % (by construction) |
+| TV2 | Belgian half of the cross-border congestion rent | Elia 0.42 bn€ (2022) | 0.11 / 0.83 / 0.62 / 1.58 bn€/a in 2025 / 30 / 40 / 50. 2022 was the crisis year, so 2025 has no comparable reference |
+| TV3 | cost of the committed projects built through the NTC floors | — | no public project costs |
+| TV4 | reversed DC legs carry no cost | 0 | **0 in every horizon** (24 Sep: 713 / 774 / 856 M€/a in 2030 / 40 / 50) |
+
+V2 is 17 % low. The model adds 1.03 GW of Walloon distribution capacity in 2025–2030, while
+the DSOs' plan implies about 1.24 GW at 620 €/kW. A higher PV share of the capex (§4.4) or a
+diversity factor below 1 would close part of that gap. Both need the DSOs' split of E1.1
+(§11).
+
+### 9.3 The two network bars
+
+`network_cost_report.py` gives the Walloon segments, which `plot_cost_segments.py
+--network-costs calibrated` draws (M€₂₀₂₅/a).
+
+**Distribution**
+
+| *Distribution* | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| electricity: existing grid L1 | 390.5 | 390.5 | 390.5 | 390.5 |
+| electricity: reinforcement L2 | 0 | 42.6 | 135.3 | 202.7 |
+| electricity: OPEX L3 | 287.4 | 295.0 | 311.4 | 329.6 |
+| electricity: smart meters | 22.9 | 51.8 | 51.8 | 51.8 |
+| electricity: rooftop-PV hosting | 0 | 20.2 | 76.1 | 90.4 |
+| gas: existing grid + OPEX (GD1) | 282.0 | 282.0 | 282.0 | 282.0 |
+| **segment** | **982.8** | **1 082.1** | **1 247.1** | **1 347.0** |
+| *September chart (15 Sep networks), for reference* | *315.5* | *375.2* | *568.3* | *711.5* |
+
+Losses are reported next to the segment and are not added to it: 81.9 / 142.7 / 178.7 /
+296.5 M€/a. They sit in *Production/Imports*. The same holds for PSO, the road-use fee and
+the other regulated items (99–109 M€/a): they are part of the tariff, not of the network
+bar.
+
+**Transport**
+
+| *Transport* | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| electricity, tariff view: Elia × offtake share | 394.4 | 417.7 | 529.5 | 549.1 |
+| electricity, tariff view: Belgian increments × share | 0 | 0 | 52.8 | 95.2 |
+| methane, tariff view: Fluxys × gas share | 69.2 | 94.5 | 109.2 | 102.4 |
+| H₂ pipelines, direct 50/50 | 0 | 13.4 | 13.4 | 14.3 |
+| CO₂ pipelines, direct 50/50 | 0 | 34.0 | 35.2 | 39.2 |
+| **segment** | **463.7** | **559.6** | **740.1** | **800.2** |
+| *September chart (ClimAct rule), for reference* | *282.9* | *507.0* | *587.4* | *719.6* |
+
+**The Walloon electricity offtake share** is 25.4 / 26.9 / 34.1 / 35.4 %. For comparison,
+the direct view of the electricity branches touching BEWAL gives 43.3 / 47.8 / 83.1 /
+106.8 M€/a (existing plus increment).
+
+**The redrawn chart.** It was drawn from this run's ClimAct extraction, run locally on
+2026-09-29 and not uploaded, with `plot_cost_segments.py --network-costs calibrated`:
+[`figures/netcal_20260929/cost_segments.png`](figures/netcal_20260929/cost_segments.png) (FR),
+[`cost_segments_en.png`](figures/netcal_20260929/cost_segments_en.png) (EN).
+* Total Walloon system cost: 11.6 / 10.8 / 11.2 / 14.0 bn€/a.
+* Distribution: 1.0 / 1.1 / 1.2 / 1.3 bn€/a, against 0.3–0.7 in September.
+* Transport: 0.5 / 0.6 / 0.7 / 0.8 bn€/a.
+
+The subtitle ("September 2026 cabinet batch") is the script's fixed text and should be
+edited before any slide use.
+
+### 9.4 Effect on the optimisation
+
+**2025 (clean comparison)**
+* **System cost.** It falls by 10.4 bn€/a (−1.8 %, capex + opex of the six countries). The
+  cause is the 3.5 % annuity on existing network assets, above all the distribution grid
+  (66.4 → 41.4 k€/MW/a).
+* **Distribution.** The BEWAL distribution link shrinks from 3.69 to 3.10 GW and its inflow
+  from 20.8 to 15.4 TWh. That is E6: 70 % of industrial electricity moved to HV.
+* **Gas boilers.** BEWAL gas boilers rise by 0.8 GW_th (8.66 → 9.46), from the lower
+  avoidable grid charge (GD2).
+* **Congestion rent.** Unchanged, at 0.11 bn€/a.
+
+**2030–2050 (indicative, see §9.1)**
+
+| BEWAL / BE | 2030 | 2040 | 2050 |
+|---|---|---|---|
+| distribution link (GW) | 4.13 (4.31) | 6.36 (7.72) | 7.99 (9.49) |
+| rooftop PV (GW) | 4.29 (4.29) | 10.47 (10.47) | 11.27 (18.87) |
+| batteries incl. home (GW) | 0.49 (2.59) | 2.10 (3.11) | 6.39 (8.98) |
+| AC expansion touching BE (GW) | 0 (0.03) | 1.77 (1.89) | 7.31 (6.22) |
+| H₂ pipelines touching BE (GW) | 7.8 (11.4) | 8.8 (11.8) | 13.3 (19.0) |
+| CO₂ pipelines touching BE (kt/h) | 4.05 (2.33) | 6.49 (4.48) | 8.41 (7.09) |
+
+24 September values are in brackets.
+
+These directions match the decisions:
+* **Batteries.** Fewer batteries in 2030, because cheaper distribution capacity makes
+  battery peak-shaving worth less. 2030 is the least confounded of these horizons.
+* **Rooftop PV.** Less rooftop PV above the TIMES floor in 2050, from the 120 €/kWp hosting
+  charge. 2040 is still at the floor.
+* **H₂ and CO₂ pipelines.** Fewer H₂ pipelines, and larger CO₂ trunks from the economies of
+  scale (TR12).
+
+Separating these effects from the nuclear change needs a calibration-only chain, which was
+not run (§12).
+
+### 9.5 TIMES harmonisation (`csvs/bill_harmonisation.csv`)
+
+`bill_harmonisation.py` flags 18 gaps beyond tolerance. The main ones:
+
+| variable | PyPSA 2025 / 2030 / 2040 / 2050 | TIMES | reading |
+|---|---|---|---|
+| electricity behind the distribution link (TWh) | 15.4 / 20.2 / 33.0 / 43.3 | 13.9 / 16.1 / 27.4 / 36.9 | +11 to +25 %. The 5 % losses explain part. The rest is LV load outside TIMES's `ELCMED` + `ELCLOW` rows, still to be mapped |
+| electricity at HV (TWh) | 5.6 / 6.5 / 13.3 / 16.5 | 6.5 / 8.1 / 15.0 / 18.0 | −8 to −20 %. The 70 % share (E6) is slightly low |
+| wholesale electricity, time average (€/MWh) | 105.4 / 124.6 / 97.6 / 111.0 | 80.2 / 67.2 / 96.8 / 61.1 (`ELCHIG`) | the structural gap of §8.3. TIMES has no timeslice weights (`G_YRFR`) |
+| wholesale gas (€/MWh) | 38.7 / 37.5 / 32.2 / 26.8 | 33.2 / 30.8 / 26.6 / 22.2 | +17 to +21 % |
+| LV − HV price spread (€/MWh) | 14.4 / 16.3 / 14.1 / 15.2 | 6.3 / 5.3 / 7.6 / 4.8 | PyPSA's spread is the distribution rent plus losses |
+| network cost per MWh of MV + LV electricity | 64.3 / 64.8 / 45.3 / 39.6 | residential mark-up 179.5, services 94.1 (constant) | the residential residual of 96–128 €/MWh is taxes and levies, if the mark-up holds them |
+| network cost per MWh of residential + services gas | 25.8 / 28.3 / 53.7 / 70.7 | residential mark-up 33.8 / 53.4 / 57.6 / 33.8 | TIMES's mark-up falls back in 2050, while the network cost per MWh keeps rising |
+| electricity: revenue required against mark-ups collected (M€/a) | 1 286 / 1 459 / 1 825 / 2 104 | 1 656 / 1 592 / 2 317 / 2 908 | the mark-ups collect 9–38 % more than the networks need |
+| gas: revenue required against mark-ups collected (M€/a) | 404 / 430 / 444 / 438 | 555 / 855 / 467 / 199 | in 2050 the mark-ups collect less than half the fixed gas grid |
+| support: Belgian nuclear, cost minus market revenue (M€/a) | 1 064 / 230 / −534 / 109 | — | the 2025 support need (24 Sep: 927) |
+
+These are the inputs of step 3 of §8.3: network tariffs per user type and support levies
+for ICEDD.
 
 ---
 
-## 9. Open questions and data requests
+## 10. Literature and benchmarks
+
+[S] marks values seen in secondary sources or abstracts only.
+
+**Distribution cost per kW**
+
+| source | scope | value |
+|---|---|---|
+| DEA via technology-data (`distribution grid reinforcement`) | local grid and substation per new connection | 189 €/kW |
+| PyPSA-Eur / technology-data | "distribution grid", all LV peak | 668 €/kW (500 €/kW₂₀₁₅, "TODO") |
+| Priyadarshan et al., [arXiv:2410.04540](https://arxiv.org/abs/2410.04540) [S] | US residential electrification | ≈ $580–1 320/kW |
+| Turk, Schittekatte et al., *Energy Journal* 2025 [S] | US distribution LRMC | $50–150/kW (probably per year) |
+| this calibration | Walloon transition capex ÷ model peak increase | 410–960 €/kW, 620 decided |
+
+**How other models treat the existing grid**
+* **PRIMES** (E3M 2018) computes network costs on a RAB of old plus new assets,
+  recovered through tariffs by voltage. That is the L1 + L2 split used here.
+* **The Energy Transition Model** prices only capacity above the present one, per layer,
+  in discrete steps.
+* **Böttcher et al.** ([arXiv:2310.11853](https://arxiv.org/abs/2310.11853)) use stepwise
+  expansion regions per voltage level.
+* **PyPSA-Eur issue [#1760](https://github.com/PyPSA/pypsa-eur/issues/1760)** flags the
+  reuse of the electricity grid cost for gas boilers.
+
+**Aggregates**
+* **Eurelectric, *Grids for Speed* (2024).** EU distribution investment rises from
+  €33 bn/yr to **€67 bn/yr** in 2025–2050 (LV 44 %, MV 41 %, HV 15 %; flexibility
+  −18 %). That is about 150 €/inhabitant/yr, or ≈ 0.55 bn€/yr for Wallonia, the same
+  order as the CWaPE plans (0.66 bn€/yr).
+* **IEA (2023).** Grid investment has to double to over USD 600 bn/yr by 2030.
+* **EU Grid Action Plan [S].** About 40 % of distribution grids are over 40 years old.
+
+**Transmission unit costs** (ACER UIC, April 2026; medians)
+
+| asset | cost |
+|---|---:|
+| 400 kV overhead line, 1 circuit | 0.52 M€/km |
+| 400 kV overhead line, 2 circuits | 1.18 M€/km |
+| 220 kV underground cable | 2.08 M€/km |
+| HVDC converter | 0.21 M€/MW |
+
+ACER also finds costs rising 6 %/yr above inflation since 2018. HTLS reconductoring is
+reported at ⅓–½ of new-build cost [S: Chojkiewicz et al., PNAS 2024].
+
+**Gas and pipelines**
+* Agora/BET/Rosin Büdenbender (2023), Ofgem RIIO-3 [S] and the
+  [CEER note](https://www.ceer.eu/wp-content/uploads/2024/04/C19-DS-55-07_CEER-note-on-stranded-assets-in-distribution-networks-II.pdf)
+  on stranded assets, as in §5.
+* Directive (EU) 2024/1788, Art. 57 [S]: decommissioning plans.
+* **H₂.** [EHB 2022](https://ehb.eu/files/downloads/ehb-report-220428-17h00-interactive-1.pdf):
+  2.8 / 0.5 M€/km for large new / repurposed pipes.
+* **CO₂.** JRC (Tumara et al. 2024,
+  [doi:10.2760/582433](https://publications.jrc.ec.europa.eu/repository/bitstream/JRC136709/JRC136709_01.pdf)):
+  0.62–0.89 M€/km average. Walloon capture projects: Anthemis (0.8 Mt/a), GO4ZERO
+  (1.3 Mt/a), LEILAC.
+
+---
+
+## 11. Open questions and data requests
 
 **ICEDD (TIMES-WAL)**
 
-1. What do the `Cost_Act` mark-ups on `RSDELC00`, `COMELC00`, `INDELC00` and the gas
-   "Fuel Tech" processes contain: network tariffs, excise, levies, ETS2? What are their
-   sources and base years?
-2. Do `EVTRANS_*` carry any cost or capacity in the VEDA workbooks that does not show in
-   the `.vd`?
-3. Is the HV / MV / LV split of final demand usable as the PyPSA load split (D4, E6)?
+1. The content of the `Cost_Act` mark-ups (network tariffs, excise, levies, ETS2) and
+   their sources.
+2. Whether `EVTRANS_*` carry any cost or capacity in the VEDA workbooks.
+3. Industrial gas by grid level (distribution vs Fluxys).
+4. For bills:
+   * timeslice durations (`G_YRFR`);
+   * user types;
+   * PV self-consumption;
+   * connection counts and gas disconnections;
+   * ETS2, excise, levy and VAT assumptions;
+   * support schemes.
 
 **CWaPE / DSOs**
 
-4. The 2029 peak and distributed energy per DSO, split MV/LV, to turn the revenue into
-   €/kW and €/MWh on the right denominator.
-5. The ORES revision request currently under review: amount, investment programme and
-   horizon. No public decision was found as of September 2026.
-6. The split of the 2026–30 capex (662 M€/yr) between renewal, connections, smart
-   meters and capacity reinforcement for PV / EV / heat pumps. Only the last is what
-   the model's increment should be compared with.
-7. Gas: mains length and connections per zone or municipality, to build a
-   decommissioning pathway (G2).
+5. The coincident peak and energy per DSO, split MV/LV.
+6. The split of E1.1 (load and peaks) between PV, EVs and heat pumps. This replaces the
+   25 % assumption of E5/E8.
+7. The ORES revision request under review. No public decision had been found as of
+   September 2026.
+8. Gas mains and connections per zone, for a decommissioning pathway.
 
-**Elia / CREG**
+**Elia / CREG / Fluxys**
 
-8. The 2024–27 budget breakdown of the allowed revenue, which is confidential in the
-   published decision. It is needed to split grid, system services and levies, and to
-   isolate federal from local transmission. Wallonia's share of offtake is also
-   needed. Together these calibrate T3.
+9. The 2024–27 budget breakdown of Elia's revenue (grid, services, levies, federal vs
+   local) and Wallonia's share of offtake.
+10. Project costs for Boucle du Hainaut, the second BE–DE HVDC and Nautilus.
+11. Fluxys's approved revenue.
 
 **ClimAct**
 
-9. The origin of the `nyears = 1/3` factor and of the CZ cost file in the gas slice
-   (§1.1), and whether the capacity-pooled transmission rule can be replaced by the 50/50
-   one (§4.2).
-
-**ICEDD: calibration and bills (§6–§7)**
-
-10. Gas by grid level: which share of `INDGMX00` / `INDGAS00` is on the distribution grid
-    and which is on the Fluxys grid. Needed for GD5 and A2.
-11. For the bill harmonisation:
-    * the timeslice durations (`G_YRFR`), to weight the `EQ_CombalM` prices (B1);
-    * the user types TIMES will report bills for;
-    * PV self-consumption by user type (A3);
-    * the connection counts and gas disconnections (A4, GD4);
-    * the ETS2 price and the excise, levy and VAT assumptions (B4, τ);
-    * any support schemes in TIMES (S2).
+12. The origin of `nyears = 1/3` in the gas slice, and whether the capacity-pooled
+    transmission rule can be dropped from the extraction.
 
 ---
 
-## Appendix — reproduction
+## 12. Future work
 
-CWaPE figures: Tableau 4 of CD-25d03-CWaPE-1056 (ORES, revision of 14/03/2025) and
-Tableau 8 of the RESA (CD-25b20-CWaPE-1043), REW (-1038), AIESH (-1037) and AIEG (-1036)
-decisions, *Budget 2029* column.
+The calibration fixes the *level* and the *marginal signals* within the current
+formulation. The following need formulation changes, mostly with the multi-node Belgium.
 
-<details>
-<summary>Model-side decomposition (pypsa-eur env, ~1 min)</summary>
+**Electricity distribution**
+* **Nodes and voltage levels.** One LV (and MV) bus per node, with costs per DSO area
+  (ORES, RESA) and per network type (urban, rural). A two-tier MV / LV representation,
+  so that MV industry and utility PV use only the MV tier.
+* **The existing grid as vintaged, non-extendable cohorts** from the DSO asset-age
+  distribution, so that renewal becomes endogenous instead of a constant block.
+* **A reverse-flow hosting-capacity constraint** per node, replacing the PV adder (E8).
+* **A flexibility credit (E10)**, so that behind-the-meter storage and smart charging
+  shave local rather than regional peaks, if DSO data support it.
 
-```python
-import pypsa
-ann = lambda n, r: r / (1 - (1 + r) ** -n)
-CL_NEW = (ann(40, .07) + .02) * 500e3 / 3   # ClimAct gas slice, boilers built >= 2025
-CL_OLD = 500e3 * .02 / 3                   # ClimAct gas slice, older boilers
-for y in [2025, 2030, 2040, 2050]:
-    n = pypsa.Network(f"results/walloon/scen_central/networks/base_s_adm___{y}.nc")
-    L = n.links
-    d = L[(L.carrier == "electricity distribution grid") & (L.bus0 == "BEWAL")]
-    g = L[((L.carrier.str.contains("gas boiler") & ~L.carrier.str.contains("urban central"))
-           | L.carrier.str.contains("micro gas")) & L.index.str.startswith("BEWAL")]
-    new = g.build_year >= 2025
-    print(y,
-          "dist GW", d.p_nom_opt.sum() / 1e3,
-          "dist M€", (d.p_nom_opt * d.capital_cost).sum() / 1e6,
-          "gas model M€", g[new].p_nom_opt.sum() * d.capital_cost.iloc[0] / 1e6,
-          "gas ClimAct M€", (g[new].p_nom_opt.sum() * CL_NEW + g[~new].p_nom_opt.sum() * CL_OLD) / 1e6)
-    rev = L[(L.carrier == "DC") & L.index.str.endswith("-reversed")]
-    print("   reversed-DC capex M€", (rev.p_nom_opt * rev.capital_cost).sum() / 1e6)
+**Transmission**
+* **Explicit 380/220/150 kV lines** for Belgium with real lengths; 70/36 kV as a proxy
+  layer.
+* **Project costs** for every committed project.
+* **HTLS as a separate, cheaper expansion option** on existing corridors (TR3).
+* **Endogenous reserves**, so system services leave the exogenous block.
+* **Regional cost** as the sum over regional branches plus 50/50 cross-border, with the
+  tariff view kept for bills.
+
+**Gas and pipelines**
+* **A gas distribution bus per zone** with a fixed cost and a decommissioning decision:
+  keep for biomethane or H₂, or seal. This needs a TIMES disconnection series and
+  per-zone mains data.
+* **Piecewise-linear pipeline costs** (H₂, CO₂) for economies of scale, instead of the
+  one-step linearisation of TR12.
+* **An H₂ retrofit option** once Fluxys's plan frees methane pipes.
+
+**TIMES coupling**
+* Automate the §8.3 loop: PyPSA network tariffs and support levies handed to TIMES as
+  mark-ups, with the bills reported on the harmonised components.
+* Add TIMES's demand-side costs to the cost chart on a common perimeter.
+* Map the LV loads that fall outside TIMES's `ELCMED` + `ELCLOW` rows, so that group A
+  closes to within the losses (§9.5).
+
+**Attribution and scenario hygiene**
+* **A calibration-only chain.** Today's code with `sector.network_calibration`, the
+  distribution efficiency, the boiler factor and the Calibration cost rows reverted.
+  §9.1 needs it to separate the 2030–2050 network effects from the nuclear change of
+  `bbc9450e`. That is about 4 h on NIC5.
+* **A build-rate limit on foreign nuclear.** With the FR/GB `nuclear-2025` options alive,
+  France adds about 49 GW between 2025 and 2030. This drives the 2030 Belgian price and
+  the ETS1 dual more than any network choice does.
+* **The distribution increment is 17 % low (V2).** Revisit the PV share of the transition
+  capex and the diversity factor once the DSOs' split of E1.1 is available.
+
+---
+
+## Appendix A — CWaPE budgets by DSO (M€ nominal)
+
+**Electricity, 2029** (Tableau 4 for ORES, Tableau 8 for the others):
+
+| family | ORES | RESA | AIESH | AIEG | REW | total |
+|---|---:|---:|---:|---:|---:|---:|
+| controllable OPEX (excl. PSO) | 208.8 | 81.8 | 4.6 | 4.3 | 3.5 | 303.0 |
+| depreciation | 161.0 | 41.7 | 3.3 | 2.2 | 3.8 | 211.8 |
+| fair margin on RAB | 116.8 | 37.8 | 2.5 | 2.2 | 2.3 | 161.7 |
+| margin on revaluation gains | 11.3 | 2.5 | 0.2 | 0.1 | 0.2 | 14.2 |
+| corporate tax on the margin | 33.4 | 8.8 | 0.8 | 0.8 | 0.8 | 44.6 |
+| losses | 58.7 | 17.9 | 1.8 | 1.5 | 0.6 | 80.6 |
+| PSO | 30.2 | 14.6 | 1.1 | 0.6 | 1.0 | 47.5 |
+| road-use fee | 34.7 | 11.8 | 0.6 | 0.7 | 0.4 | 48.4 |
+| smart meters | 43.7 | 11.6 | 0.4 | 0.7 | 0.5 | 57.0 |
+| other | 0.7 | 10.3 | 0.8 | 0.8 | 0.0 | 12.6 |
+| **authorised revenue** | **699.3** | **238.8** | **16.1** | **13.9** | **13.2** | **981.3** |
+
+The 2025 values and the gas budgets are transcribed in
+`scripts/walloon_scripts/build_network_cost_calibration.py`, which checks each DSO's sum.
+
+Decisions:
+* ORES: CD-25d03-CWaPE-1056 (revision of 14/03/2025);
+* RESA: CD-25b20-CWaPE-1043;
+* REW, AIESH, AIEG: decisions of 30/01/2025 (-1038, -1037, -1036);
+* gas: CD-24c28-CWaPE-0890 (ORES), -0891 (RESA).
+
+## Appendix B — Reproduction
+
+```bash
+python scripts/walloon_scripts/build_network_cost_calibration.py        # exogenous layers
+python scripts/walloon_scripts/build_co2_trunk_overrides.py results/_archive/scen_central_20260924_vd260923
+python scripts/build_common_parameters.py --write && python scripts/build_common_parameters.py --check
+python -m pytest test/test_network_calibration.py test/test_discount_rates.py -q
 ```
 
-</details>
-
-TIMES figures: `Cost_Act` / `VAR_Act` and `VAR_FIn` / `VAR_FOut` summed per process and
-period from `scen_central_v01_260911_1109.vd` (PJ ÷ 3.6 = TWh).
-
-Calibration and harmonisation inputs (§6–§7):
-
-* **Electricity DSO 2025 budgets.** *Budget 2025* column of the same five decisions.
-  Aggregated as in §2.2: network core = controllable OPEX (excluding PSO) + depreciation
-  + both fair margins + corporate tax.
-* **DSO capex by driver.** [CWaPE CD-25k27-CWaPE-0967](https://www.cwape.be/sites/default/files/cwape-documents/CD-25k27-CWaPE-0967-Avis%20plans%20d'adaptation%20GRD%20%C3%A9lectricit%C3%A9%202026-2030.pdf),
-  Tableau 15 by motivation code and Tableau 14 by DSO. EAN count and energy withdrawn
-  from §2.3.4 of the same opinion.
-* **Gas DSO budgets and RAB.** CD-24c28-CWaPE-0890 (ORES gas, Tableau 1) and -0891
-  (RESA gas).
-* **Gas network statistics and capex.** [CD-26g30-CWaPE-0981](https://www.cwape.be/documents-recents/grd-de-gaz-avis-concernant-les-plans-dinvestissement-2027-2031),
-  Tableau 2 and §4.1.
-* **Elia revenue.** [CREG (B)658E/85](https://www.creg.be/sites/default/files/assets/Publications/Decisions/B658E85FR.pdf),
-  Tableau 1bis. Walloon 30–70 kV plan:
-  [CD-26g30-CWaPE-1283](https://www.cwape.be/sites/default/files/cwape-documents/CD-26g30-CWaPE-1283-D%C3%A9cision%20plan%20adaptation%20Elia%202026-2036_ANONYMIS%C3%89E%20pour%20site.pdf).
-* **Belgian load, 15-min.** Elia open data `ods001`, 2024 (81.0 TWh; max 15-min
-  13 282 MW vs max hourly 13 206 MW).
-* **TIMES.** Voltage split and commodity marginals from `VAR_FIn` on `ELCHIGG` / `ELCMED`
-  / `ELCLOW` per sector-prefix, and `EQ_CombalM` (M€/PJ).
-* **PyPSA.**
-  * prices: `buses_t.marginal_price` at the HV, LV and gas buses;
-  * congestion rents: price difference × flow on the Belgian branches (50 % of
-    cross-border rent booked to Belgium);
-  * funding gaps: generation × nodal price minus capital and variable cost, per
-    carrier, for Belgian buses.
+The diagnosis figures of §1.1 come from the 15 September networks, archived under
+`results/_archive/scen_central_20260915_vd260911/`. The baseline for §9 is the
+24 September run, under `results/_archive/scen_central_20260924_vd260923/`.

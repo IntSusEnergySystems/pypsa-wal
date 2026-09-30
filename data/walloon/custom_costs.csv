@@ -62,3 +62,8 @@ all,SMR CC,lifetime,30,years,,
 all,methanation,lifetime,25,years,,
 all,direct air capture,lifetime,20,years,,
 all,CO2 storage tank,lifetime,40,years,,
+all,electricity distribution grid,investment,620,EUR/kW,"Calibration on CWaPE CD-25k27-CWaPE-0967 Tableau 15 (transition-driven DSO capex 2026-2030), docs/network-costs-review-20260928.md §4.3 E5",Incremental reinforcement cost per kW of regional coincident LV peak; managed by config/input_parameters_for_models.csv
+2025,HVAC overhead,investment,450,EUR/MW/km,"ACER Unit Investment Cost indicators (April 2026), docs/network-costs-review-20260928.md §6.5 TR2",New inter-node AC branches; DEA July 2025 kept as high sensitivity; managed by config/input_parameters_for_models.csv
+2030,HVAC overhead,investment,450,EUR/MW/km,"ACER Unit Investment Cost indicators (April 2026), docs/network-costs-review-20260928.md §6.5 TR2",New inter-node AC branches; DEA July 2025 kept as high sensitivity; managed by config/input_parameters_for_models.csv
+2040,HVAC overhead,investment,408,EUR/MW/km,"ACER Unit Investment Cost indicators (April 2026), docs/network-costs-review-20260928.md §6.5 TR2",New inter-node AC branches; DEA July 2025 kept as high sensitivity; managed by config/input_parameters_for_models.csv
+2050,HVAC overhead,investment,372,EUR/MW/km,"ACER Unit Investment Cost indicators (April 2026), docs/network-costs-review-20260928.md §6.5 TR2",New inter-node AC branches; DEA July 2025 kept as high sensitivity; managed by config/input_parameters_for_models.csv

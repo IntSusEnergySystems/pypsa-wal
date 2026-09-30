@@ -448,7 +448,11 @@ def test_variant_inherits_unlisted_sectors():
     mapping = pd.read_csv(HURDLE_MAPPING_FILE, dtype=str, keep_default_na=False)
     power = set(mapping.loc[mapping["hurdle_sector"] == "power", "technology"])
     for tech, rates in base.rates.items():
-        if tech in power:
+        if base.sectors.get(tech, "").startswith("override"):
+            # a master CSV cost:<tech>:discount rate row beats every sector rate,
+            # in the base and in every variant (e.g. regulated network assets)
+            assert high.rates[tech] == rates, tech
+        elif tech in power:
             assert high.rates[tech] != rates
             assert all(abs(v - 0.099) < 1e-12 for v in high.rates[tech].values())
         else:
@@ -503,7 +507,9 @@ def test_expected_rates_spot_check():
         "electrolysis": 0.075,  # SUP-processes
         "decentral air-sourced heat pump": 0.12,  # RSD-processes
         "industrial heat pump high temperature": 0.10,  # IND-process
-        "electricity distribution grid": 0.075,  # ELC-PUB
+        # regulated network asset: per-technology override at the regulated real
+        # WACC, not the ELC-PUB hurdle (docs/network-costs-review-20260928.md §3)
+        "electricity distribution grid": 0.035,
     }
     bad = {
         tech: float(costs.at[tech, "discount rate"])
