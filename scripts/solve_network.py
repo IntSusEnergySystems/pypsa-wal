@@ -2037,6 +2037,33 @@ def national_co2_expression(n, include_aviation: bool | None = None):
     return sum(lhs)  # dimension: (country)
 
 
+def apply_national_co2_reference(co2_limit_countries, reference_kt):
+    """Replace the 1990 base of listed countries by a fixed reference, kt -> t.
+
+    ``co2_totals`` splits the Belgian 1990 inventory by population, uniformly
+    across sectors, which puts Wallonia at 33.3 Mt. TIMES-WAL's own trajectory
+    implies ~45.6 Mt, because 1990 Wallonia carried the Belgian steel industry
+    (docs/co2-sequestration.md §6.1). With the population split, the same
+    "-55 % in 2030" gave PyPSA 4.7 Mt less room than TIMES and forced 6.2 Mt of
+    2030 capture that TIMES does not need (batch log 2026-09-30 §7 item 10).
+    Only the national cap reads this; the system-wide ``co2_budget`` keeps the
+    inventory total.
+    """
+    if not reference_kt:
+        return co2_limit_countries
+    out = co2_limit_countries.copy()
+    for ct, kt in reference_kt.items():
+        if ct not in out.index:
+            logger.warning("co2_reference_1990_kt: %s has no national cap, ignored.", ct)
+            continue
+        logger.info(
+            "1990 reference for %s: %.0f kt (inventory split %.0f kt).",
+            ct, float(kt), out[ct] / 1e3,
+        )
+        out[ct] = float(kt) * 1e3
+    return out
+
+
 def add_co2limit_country(n, limit_countries, nyears=1.0):
     """
     Add a set of emissions limit constraints for specified countries.
@@ -2075,6 +2102,11 @@ def add_co2limit_country(n, limit_countries, nyears=1.0):
     co2_limit_countries = co2_limit_countries.loc[
         co2_limit_countries.index.isin(limit_countries.keys())
     ]
+    cfg = getattr(n, "config", None)
+    co2_limit_countries = apply_national_co2_reference(
+        co2_limit_countries,
+        (cfg.get("co2_reference_1990_kt") if isinstance(cfg, dict) else None) or {},
+    )
     if suff_demand:
         lulucf = co2_totals.loc[countries, 'LULUCF']
         lulucf[lulucf > 0] = 0

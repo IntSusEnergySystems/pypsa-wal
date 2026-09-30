@@ -723,6 +723,17 @@ co2_budget:
   2040: 0.250
   2050: 0.050
 co2_budget_national: true
+# 1990 reference of the NATIONAL caps, kt, replacing the population split of
+# the Belgian inventory (33 337 kt for BEWAL, uniform across sectors). Wallonia
+# takes TIMES-WAL's reference, so a `budget_national` fraction means the same
+# tonnage in both models (decided 2026-09-30). 45 600 kt is inferred from TIMES's
+# own trajectory (-55 % @2030 -> 45 780, -95 % @2050 -> 45 421; mean;
+# docs/co2-sequestration.md §6.1). Confirm the exact figure with ICEDD. BEVLG
+# and BEBRU keep the split, so the Belgian total is not preserved, and the
+# system-wide `co2_budget` is untouched. Read by apply_national_co2_reference()
+# in scripts/solve_network.py.
+co2_reference_1990_kt:
+  BEWAL: 45600
 # Item 13: put aviation on the national cap (LHS *and* RHS). Default off —
 # kerosene is drawn from the EU oil bus and 2050 is likely infeasible.
 co2_budget_national_include_aviation: false

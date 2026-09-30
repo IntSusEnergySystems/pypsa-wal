@@ -419,6 +419,11 @@ A −90 % 2040 target means **3,334 kt** on PyPSA's reference — a 60 % cut fro
 current 8,334 — versus **4,560 kt** on TIMES's. Quoting a single percentage
 across both models would be indefensible.
 
+> **Adopted 2026-09-30 for Wallonia.** The national cap now uses 45 600 kt
+> (`co2_reference_1990_kt` in `config/config.walloon.yaml`, applied by
+> `apply_national_co2_reference()` in `scripts/solve_network.py`). Flanders,
+> Brussels and the system cap are unchanged.
+
 ### 6.2 Trajectories, each against its own reference
 
 | | PyPSA kt | % of its 1990 | TIMES kt | % of its 1990 | PyPSA − TIMES |
