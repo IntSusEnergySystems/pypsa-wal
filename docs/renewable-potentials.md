@@ -435,11 +435,14 @@ import prices and congestion rent all move with that.
    target win. It still sets the 2030 European price signal, and the run of
    2026-09-07 reproduces it exactly (115.00 GW). *Accept the target, or let the
    growth cap win?* Meeting decision, no code.
-7. **The Walloon biogas figure has no citation** (§9.5). 4.0 TWh in 2040 and
-   6.9 in 2050 come from the ICEDD meeting of 2026-08-27 and appear in no
-   source document; the `.vd` itself runs 7.67 / 8.07 TWh. Do not publish these
-   as TIMES-consistent. Ask at the same time whether 2025/2030 should come down
-   from the Valbiom 8.3 TWh — the trajectory is non-monotonic today.
+7. ~~**The Walloon biogas figure has no citation**~~ **Settled 2026-10-01.**
+   4.0 TWh in 2040 and 6.9 in 2050 are a cap agreed between ICEDD and Valbiom
+   and applied to **both** TIMES and PyPSA. It is a maximum on total Walloon
+   biogas, sustainable and unsustainable. TIMES-consistent by construction: the
+   30 Sep central export sits on it (4.000 / 6.93 TWh).
+   2025/2030 stay at the Valbiom 8.3 TWh. Production in those years is roughly
+   known and will not approach it, so the non-monotonic trajectory constrains
+   nothing. See [`biogas.md`](biogas.md) §3.1.
 8. **Two pellet-import channels describe the same physical flow** (§9.5) and
    only one may be active. `solid biomass import` (store + link, 4.0 / 4.0 /
    4.5 / 6.0 TWh, Bioenergy Europe) is **off**; `solid biomass transported`
@@ -573,7 +576,7 @@ annual-energy generators — **never read their `p_nom` as an annual potential**
 | `solid biomass` | 11 749 | 11 749 | 11 749 | 11 749 | Valbiom 9 222 (woody/agricultural) **+ 2 527 sludge** — see §9.7 |
 | `solid biomass transported` | **0** | **0** | **0** | **0** | ICEDD `4a4116aa`: no solid-biomass imports in the central scenario |
 | `solid biomass import` (off) | 4 000 | 4 000 | 4 500 | 6 000 | Bioenergy Europe — see §7.8 |
-| `biogas` | 8 300 | 8 300 | 4 000 | 6 900 | Valbiom, then the 2026-08-27 meeting — see §7.7 |
+| `biogas` | 8 300 | 8 300 | 4 000 | 6 900 | Valbiom (2025–2030, loose ceiling); 2040–2050 an ICEDD–Valbiom cap on **total** biogas, applied in TIMES and PyPSA — see [`biogas.md`](biogas.md) §3.1 |
 
 Two defects, both fixed 2026-09-05 (F8). `update_BEWAL_potentials` wrote the
 remainder `potential − upstream` onto the unsustainable generator (correct) and
