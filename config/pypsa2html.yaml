@@ -120,13 +120,13 @@ scenarios:
     label: Realistic 2030 deployment (not for publication)
     results_dir: results/walloon/scen_realiste
     resources_dir: resources/walloon/scen_realiste
-  # TEST, not a cabinet scenario (batch log §12): kept out of the combined
-  # report on purpose. Its own pages build without this entry; uncomment only to
-  # compare it with the central on the cross-scenario pages, locally.
-  # - name: scen_test_lowccs_ptx
-  #   label: TEST - Walloon CO2 export capped at 3 Mt/a, power-to-fuel
-  #   results_dir: results/walloon/scen_test_lowccs_ptx
-  #   resources_dir: resources/walloon/scen_test_lowccs_ptx
+  # TEST, not a cabinet scenario (batch log §12). Included on Sylvain's request
+  # (1 Oct 2026) so it sits next to the central on the cross-scenario pages; the
+  # label keeps it marked as a test.
+  - name: scen_test_lowccs_ptx
+    label: TEST - Walloon CO2 export capped at 3 Mt/a, power-to-fuel
+    results_dir: results/walloon/scen_test_lowccs_ptx
+    resources_dir: resources/walloon/scen_test_lowccs_ptx
   # NUCLEAR CAPEX SWEEP — a sensitivity, not six scenarios (2026-09-13).
   #
   # DISABLED for the 30 Sep batch: the six points were solved on 13 Sep (TIMES

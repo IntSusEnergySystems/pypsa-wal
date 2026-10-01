@@ -88,8 +88,11 @@ def test_the_run_layer_selects_it_and_cannot_publish():
 
 def test_it_is_not_part_of_the_cabinet_batch():
     assert NAME not in _load("config.walloon.yaml")["run"]["name"]
-    listed = [s["name"] for s in _load("pypsa2html.yaml")["scenarios"]]
-    assert NAME not in listed, "a test run must not enter the combined report"
+    # It may sit in the combined report (decided 1 Oct 2026), but only marked as a
+    # test, so it is never read as a cabinet scenario.
+    listed = {s["name"]: s.get("label", "") for s in _load("pypsa2html.yaml")["scenarios"]}
+    if NAME in listed:
+        assert listed[NAME].startswith("TEST"), "a test run in the report must be labelled TEST"
 
 
 def test_the_export_limit_is_off_by_default():
