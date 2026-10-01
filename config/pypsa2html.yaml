@@ -214,6 +214,26 @@ features:
   #                       to electricity)
   # Accounting switch only — no 50 % Belgian-offshore attribution to Wallonia.
   nuclear_primary: electricity_import
+  # Split of the carbon Sankey's net-emission node into what the regional
+  # (national) CO2 cap constrains and the rest (aviation), for a like-for-like
+  # read against TIMES-WAL's regional total and against `budget_national`
+  # (2026-10-01). The booking must be the solver's: these lists mirror
+  # NATIONAL_CO2_SOURCE_PATTERNS and AVIATION_CARRIER in scripts/solve_network.py,
+  # pinned by test/test_pypsa2html_capped_split.py. The EU-level links the
+  # solver excludes by name book to `EU` and are dropped by pypsa2html anyway.
+  capped_emissions:
+    enable: true
+    location_port:
+      DAC: 3
+    source_patterns:
+    - process emissions
+    - HVC to air
+    - electrobiofuels
+    - unsustainable bioliquids
+    - biomass-to-methanol
+    - biomass to liquid
+    exclude_patterns:
+    - kerosene for aviation
 
 # --- Parameter sweeps -------------------------------------------------------
 #
