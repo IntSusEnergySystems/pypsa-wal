@@ -285,6 +285,13 @@ cmd_solve() {
     # Snakemake dies with MissingRuleException (seen 2026-08-26). Put both
     # files on ONE flag; later files overwrite overlapping keys, so the
     # cluster mem/threads overlay must come second.
+    # EDIT (2026-10-01): the solve rule sets its own runtime from
+    # solving.runtime (48h in config.default.yaml), which beats
+    # --default-resources, so SOLVE_RUNTIME never reached Slurm and every solve
+    # asked for 2 days -- hard to backfill. --set-resources wins over the rule.
+    # Same trap as --configfile: ONE --set-resources flag with every entry.
+    # Written as three flags it kept only the last (add_brownfield), so the
+    # solve's cpus_per_task and runtime were silently dropped.
     rssh "cd '$REMOTE_DIR' && $REMOTE_ENV && mkdir -p cluster/logs && \
         setsid bash -c \"snakemake --configfile $CONFIGFILE cluster/config_cluster.yaml \
             --executor slurm --jobs $MAX_SLURM_JOBS \
@@ -292,8 +299,9 @@ cmd_solve() {
             --envvars XDG_CACHE_HOME TMPDIR GRB_LICENSE_FILE \
             --default-resources slurm_partition=$SOLVE_PARTITION runtime=$SOLVE_RUNTIME mem_mb=$DEFAULT_MEM_MB slurm_account=ceci \
             --set-resources solve_sector_network_myopic:cpus_per_task=$solve_cpus \
+                solve_sector_network_myopic:runtime=$SOLVE_RUNTIME \
+                add_brownfield:cpus_per_task=1 \
             --set-threads solve_sector_network_myopic=$solve_cpus \
-            --set-resources add_brownfield:cpus_per_task=1 \
             -- $targets </dev/null >'$log' 2>&1 & echo \\\$! >'$pidf'\" </dev/null >/dev/null 2>&1"
     sleep 2
     pid=$(rssh "cat '$REMOTE_DIR/$pidf' 2>/dev/null" | tr -d '[:space:]')

@@ -311,9 +311,13 @@ def test_realiste_pair_is_pypsa_identical(scenarios, other):
     The single 30 Sep `scen_realiste` keeps the September PyPSA side too.
     """
     a, b = (dict(scenarios[s]) for s in ("scen_realiste_nets", other))
+    # times_ev_fleet_skip_horizons follows the .vd too: it is set where an
+    # export's car count cannot carry its own EV load (scen_realiste 2025).
     for block in (a, b):
         block["sector"] = {
-            k: v for k, v in block["sector"].items() if k != "times_file"
+            k: v
+            for k, v in block["sector"].items()
+            if k not in ("times_file", "times_ev_fleet_skip_horizons")
         }
     # the per-scenario file names embed the scenario name; compare their shape
     def _strip(d):

@@ -387,6 +387,10 @@ sector:
     2050: 0.18
   bev_energy: 0.06 # Elia assumes 60 kWh
   bev_charge_rate: 0.011 # aligned with Elia
+  # Horizons where the Walloon BEV charger / EV battery keep the energy-ratio
+  # sizing instead of TIMES's car count (prepare_sector_network.add_land_transport).
+  # Empty = TIMES fleet everywhere. Per-scenario escape hatch only; see scen_realiste.
+  times_ev_fleet_skip_horizons: []
   bev_natural_charging_split: true
   bev_natural_charging_profile_fn: data/walloon/elia_natural_charging_daily_profile_utc0.csv
   local_bev_dsm:

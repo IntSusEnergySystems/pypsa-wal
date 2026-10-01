@@ -3118,7 +3118,28 @@ def add_land_transport(
                     "EV flexibility.",
                     detail,
                 )
-        if wallon_node in number_cars.index:
+        # Per-scenario escape hatch for a horizon whose TIMES car count cannot
+        # carry the EV load it comes with. p_nom/e_nom keep the energy-ratio
+        # sizing the load is built on (the behaviour before the TIMES fleet was
+        # used). scen_realiste 2025 (30 Sep export): fleet share 0.0026 against
+        # an energy share of 0.0050, so the Walloon BEV charger could deliver
+        # 1.001x the flexible EV load over the year and the 70 % morning
+        # state-of-charge floor made the EV battery bus infeasible (Gurobi
+        # presolve, 8 s). Batch log 2026-09-30 §9.
+        skip_fleet = investment_year in options.get("times_ev_fleet_skip_horizons", [])
+        if skip_fleet and logger:
+            logger.warning(
+                "%s %s: times_ev_fleet_skip_horizons -- TIMES fleet NOT applied; "
+                "p_nom/e_nom keep the population car count and the energy "
+                "ratio %.4f (TIMES fleet share %.4f).",
+                wallon_node,
+                investment_year,
+                electric_share.get(wallon_node, float("nan")),
+                times_bev_share,
+            )
+        if skip_fleet:
+            pass
+        elif wallon_node in number_cars.index:
             if logger:
                 logger.info(
                     "%s: TIMES fleet replaces the population-scaled car count "

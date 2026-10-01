@@ -929,6 +929,10 @@ scen_noccsccgt:
 scen_realiste:
   sector:
     times_file: data/walloon/scen_sensibilite_realiste_260929_3009.vd
+    # 2025 TIMES car count (4.76 kveh BEV, 0.0026 share vs 0.0045 in the central)
+    # cannot carry the export's EV load: the Walloon EV battery bus is infeasible
+    # (1 Oct 2026, batch log 2026-09-30 §9). 2025 keeps the energy-ratio sizing.
+    times_ev_fleet_skip_horizons: [2025]
     rooftop_floor:
       enable: true
       node: BEWAL
