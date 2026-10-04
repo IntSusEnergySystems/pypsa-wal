@@ -534,6 +534,14 @@ and `import_limit_BEWAL` binding at 6.47 TWh (μ = −9.04 EUR/MWh).
 
 ### 7.4 Why the marginal Walloon investment is CCGT-CC and not more PV + battery [V]
 
+> **Measured on the 13 Sep central; superseded since 22 Sep.** Point (i) of the summary is
+> what changed. After lever A (§10.4), 2050 disposal costs 112 instead of 25 EUR/MWh_e.
+> CCGT-CC's carbon-plus-disposal bill is therefore 124 EUR/MWh_e, against 218 for an
+> unabated plant at 661 EUR/t. Its short-run cost doubles, and the 1 Oct central builds no
+> CC in any horizon. A price-swap test ranks that ahead of the pin removal:
+> [`logs/2026-09-30_cabinet_batch_20260930_2010_1h.md`](logs/2026-09-30_cabinet_batch_20260930_2010_1h.md)
+> §11.7.
+
 A natural reading of §4.2 is that the model "prefers" a gas-plus-capture pathway
 to a solar-plus-storage one. It does not prefer either: **in an LP optimum every
 extendable asset that is built earns exactly its annualised capex**, so nothing

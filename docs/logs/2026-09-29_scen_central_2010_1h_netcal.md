@@ -570,6 +570,15 @@ CO₂ captured on Walloon gas plants: 1.44 / 3.71 Mt in 2040 / 2050 (13 Sep), 0.
 with 3.4 GW of CCGT CC (§7, and R1 of the 24 Sep log). The CC fleet here is the 551 MW_e
 built in 2040, carried to 2050 and run at ~28 % load. No CC plant is added in 2050.
 
+> **Incomplete, corrected 1 Oct.** Nuclear explains the step from 24 to 29 Sep. It does not
+> explain the step from **13 Sep**, which also had 3 GW of nuclear in 2050 and built
+> 2.2 GW of CC. That step is the CO₂ storage correction (lever A). Disposal goes from 78 to
+> 348 €/t, so CC's short-run cost doubles (85 → 176 €/MWh_e). With 13 Sep's CO₂ and disposal
+> prices, the 2050 candidate in this run's network would recover about 215 % of its capex,
+> against 92 % as solved. See the batch log
+> [`2026-09-30_cabinet_batch_20260930_2010_1h.md`](2026-09-30_cabinet_batch_20260930_2010_1h.md)
+> §11.7.
+
 **The figures sent to the SPW are superseded.** J. Simon's reply of 29 Sep on the new CCGT
 permit ("1,9 GW en 2030, 3,5 GW en 2040 et 4,5 GW en 2050 (dont 2,6 GW avec captage) … 7, 17
 et 12 TWh") reproduces the **13 Sep batch**: 1 740 + 178 OCGT; 2 831 + 707; 2 323 + 2 172 +

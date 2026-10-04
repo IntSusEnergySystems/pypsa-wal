@@ -35,8 +35,11 @@ Batch-log context: [`logs/2026-09-30_cabinet_batch_20260930_2010_1h.md`](logs/20
   * PyPSA gives Wallonia 1.45 TWh and Flanders 1.13 TWh in 2025;
   * the regional sources say about 0.9 TWh for Wallonia and about 2 TWh for Flanders;
   * TIMES has 0.99 TWh for Wallonia.
-* **Six items are listed in §7.** Only one of them moves results today: the cost double
-  count. The cap question (item 6) is settled.
+* **Six items are listed in §7.** The cost double count (item 5) moved results. It is fixed
+  in the inputs from 1 Oct 2026 (§8.1) and needs a re-solve. The cap question (item 6) is
+  settled.
+* **TIMES prices feedstock and digester separately** (§8.2). Its Walloon feedstock costs
+  ≈ 25–43 €/MWh of biogas (TIMES units ≈ EUR2021) and rises with energy crops.
 
 ---
 
@@ -224,8 +227,9 @@ key puts **1.45 TWh in Wallonia and 1.13 TWh in Flanders**, about 0.5 TWh too mu
 * PyPSA burns the forced amount, then **nothing in 2040**, then its full cap in 2050.
 * The 2040 zero is economic. At a 139 €/t CO₂ price a MWh of biogas is worth 59.8 €/MWh and
   costs at least 84.4 (batch log §11.8).
-* With the cost double count of §7 item 5 removed, a new 2040 chain costs about 60 €/MWh,
-  i.e. break-even, and PyPSA would sit near the 4.0 TWh cap that TIMES reaches.
+* With the cost double count of §7 item 5 removed (done 1 Oct, §8.1), a new 2040 chain costs
+  about 60 €/MWh, i.e. break-even. PyPSA should then sit near the 4.0 TWh cap that TIMES reaches.
+  This is not re-solved yet.
 
 ---
 
@@ -237,15 +241,163 @@ key puts **1.45 TWh in Wallonia and 1.13 TWh in Flanders**, about 0.5 TWh too mu
 | 2 | Eurostat year frozen at **2019** for every horizon | −10 % against 2023 for Belgium | minor; follows from 1 once overridden |
 | 3 | The label implies crops; Belgian inputs are mostly residues (§5) | reading only: "unsustainable" must not be reported as crop biogas | document; report it as "existing production" |
 | 4 | Valbiom cap **plus** forced volume in 2025–2030 (§4.4) | none: the 2025 / 2030 ceiling is loose by design (§3.1); from 2040 the forced part is 0 and the cap covers the total | none needed. Optional tidy-up: apply the cap to the sum of both generators |
-| 5 | **Cost double count**: generator at the all-in 78.81 €/MWh `biogas` fuel, and digester capex again on `biogas to gas` | biogas uneconomic until 2050; Walloon gas mix 2040 (R1) | one cost row: feedstock-only `biogas manure` fuel (25.16 €/MWh) with the capex on the link, or the all-in fuel with the upgrading capex only. Test at 6 h |
+| 5 | ~~**Cost double count**: generator at the all-in 78.81 €/MWh `biogas` fuel, and digester capex again on `biogas to gas`~~ **Fixed 1 Oct 2026** (§8.1) | biogas uneconomic until 2050; Walloon gas mix 2040 (R1). Every run solved before the fix carries it | `cost:biogas:fuel` = feedstock-only `biogas manure` fuel (25.16–25.33 €/MWh). The Valbiom digester and upgrading capex stay on the link. **Not yet solved:** a 6 h test, then the next central |
 | 6 | ~~2040 / 2050 caps read as TIMES output~~ **Settled 1 Oct 2026:** an ICEDD–Valbiom cap on total biogas, common to TIMES and PyPSA (§3.1) | 2040 cap not reached in PyPSA (nothing used, item 5); the 2050 cap binds at a 125 €/MWh rent, as it binds in TIMES | none: keep as is |
 
-Item 5 is the one that changes published numbers. Item 1 matters for the 2025–2030
+Item 5 was the one that changed published numbers. It is fixed in the inputs from 1 Oct
+2026; every run solved before that date carries it. Item 1 matters for the 2025–2030
 Walloon gas balance and for any biogas figure reported per region.
 
 ---
 
-## 8. Where to look
+## 8. Biogas costs: the double count, its fix, and what TIMES assumes
+
+### 8.1 The double count (checked and fixed 1 Oct 2026)
+
+**The evidence that it is a mistake:**
+
+1. **Where the 78.81 €/MWh comes from.** technology-data's `biogas, fuel` row is 59
+   EUR2015/MWh, "JRC and Zappa, from old pypsa cost assumptions" (`inputs/costs_PyPSA.csv`).
+   * It is a price of biogas as a product.
+   * Its sibling in the same old file, `solid biomass, fuel` (25.2), is a raw-fuel price.
+     Biogas has no raw form, so its "fuel" price must include the digestion.
+2. **PyPSA-Eur's own history** (in this repo's git log):
+   * 2020–2023 (`651a7ff6`, `bea8194b`): `biogas to gas` carried only the
+     `biogas upgrading` capex. The 59 €/MWh was then the whole production cost.
+   * PR #615, Jan 2024 (`f81886e4`, "biogas upgrading CC"): the link gained
+     `costs.at["biogas", "fixed"]`, i.e. the DEA sheet 81 *biogas plant* (the digester).
+     The fuel price was not changed. From then on the digester was paid twice.
+   * technology-data already has a feedstock-only row for this structure: `biogas manure`,
+     JRC ENSPRESO MINBIOGAS1.
+3. **The level is out of range.** Full chain at 90 % load in 2030:
+
+   | €/MWh of biomethane | feedstock | digester | upgrading | total |
+   |---|---:|---:|---:|---:|
+   | PyPSA before the fix | 78.8 | 28.6 | 12.8 | **120** |
+   | PyPSA after the fix | 25.2 | 28.6 | 12.8 | **67** |
+   | BIP Europe 2023, real plants ≥ 3 MW | | | | **54–91** |
+   | IEA (2020), Europe average | | | | ≈ 50 (USD 16/MBtu) |
+   | TIMES, 30 Sep central, marginal (manure) route (§8.2) | 29.9 | 14.1 + 4.1 VOM + 2.5 heat | 10.2 | **61** TIMES units ≈ **74** EUR2025 |
+
+4. **TIMES prices feedstock and digester separately** (§8.2). Its 2030 marginal biogas price
+   equals the sum of those parts.
+
+**The fix**, in the master CSV (`cost:biogas:fuel`, 4 rows, origin "Revue de littérature",
+`interp`), written to `data/walloon/custom_costs.csv`:
+
+| | 2025 | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|---:|
+| `biogas` fuel, EUR2025/MWh_th, before | 78.81 | 78.81 | 78.81 | 78.81 |
+| after (= technology-data `biogas manure`) | 25.16 | 25.23 | 25.24 | 25.33 |
+| digester capital cost, €/MW/a (unchanged) | 259 222 | 225 523 | 217 746 | 204 785 |
+
+* **Verified** with `prepare_costs` on the four horizons. `build_common_parameters.py --check`
+  passes, and `custom_costs.csv` is 72 / 72 managed. `test_cost_learning.py`,
+  `test_five_year_overlay.py` and `test_common_parameters_agg.py` pass.
+* **It applies to every node** and to the forced `unsustainable biogas` generator. The
+  forced volume does not move; only its constant cost in the objective falls.
+* **Not solved yet.** Every run up to and including the 1 Oct batch carries the double count.
+
+### 8.2 What TIMES assumes (30 Sep central, `scen_central_v01_260929_3009.vd`)
+
+`input_parameters_for_models.csv`, the convergence table, has **no TIMES biogas cost**.
+It holds only the Valbiom digester and upgrading capex, with an empty TIMES column. The
+`.vd` holds the solved chain. It is a solution dump, so these numbers are what TIMES
+*used*, read back from costs and flows, not its input sheets.
+
+```
+MINBIOEFF / IMPBIOEFF (effluents)  ─┐
+MINBIOCUL (crops)                  ─┤                    ┌─► BIOGAS ── BWSUPGZH100 (upgrading) ──► BIOGZH
+MINBIOSLUH, MINBIOBOU (sludges)    ─┼─► BWBIOGAZ100 ─────┤
+SUPHET (heat, 4.7 % of output)     ─┘   (digester)       │
+MINBIOGAS (existing, 0.62 TWh, ~free) ───────────────────┤
+MINCETGAS (landfill gas, free)    ───────────────────────┘
+```
+
+**Units.** TIMES costs are in M€ and energy in PJ, so M€/PJ = €/GJ.
+* TIMES's currency for these rows is not in the `.vd`.
+* Its gas import cost reproduces CLIMA.A's **EUR2021** gas prices to the decimal: 30.345 /
+  26.01 €/MWh in 2030 / 2040. The figures below are therefore read as ≈ EUR2021 (×1.222 →
+  EUR2025). **To confirm with ICEDD.**
+* The feedstock commodities are not in energy units. The digester turns one unit of
+  effluents into 1.026 PJ of biogas and one unit of crops into 3.31 PJ. That fits Mt of
+  fresh matter (≈ 28 and 92 m³ CH₄/t), which would make the feedstock costs €/t.
+
+**Feedstock unit costs** (flow cost ÷ flow) and their cost per MWh of biogas:
+
+| route | cost per feedstock unit | biogas per unit (PJ) | €/MWh of biogas (TIMES units) |
+|---|---:|---:|---:|
+| domestic effluents `MINBIOEFF` | 8.52 | 1.026 | **29.9** |
+| imported effluents `IMPBIOEFF` | 0.90 → 1.33 | 1.026 | 3.2 → 4.7 |
+| crops `MINBIOCUL` (from 2040) | 48.3 | 3.31 | **52.5** |
+| sludge `MINBIOSLUH` (from 2035) | 11.11 | ≈ 1.02 | 39.3 |
+| `MINBIOBOU` (from 2035) | 15.47 | ≈ 1.02 | 54.7 |
+| existing biogas `MINBIOGAS`, landfill `MINCETGAS` | ≈ 0 | — | ≈ 0 |
+
+**The chain, per MWh of new biogas** (TIMES units):
+
+| | 2025 | 2030 | 2035 | 2040 | 2050 |
+|---|---:|---:|---:|---:|---:|
+| feedstock, mix average | 3.2 | 25.4 | 30.2 | 37.9 | 43.2 |
+| digester capex (1 766 /kW lump sum, 110.9 /kW/a annuity, 90 % load, no FOM) | 14.1 | 14.1 | 14.1 | 14.1 | 14.1 |
+| digester VOM | 4.1 | 4.1 | 4.1 | 4.1 | 4.1 |
+| digester heat (4.7 % × `SUPHET` price) | 2.1 | 2.5 | 2.8 | 2.8 | 3.5 |
+| **raw biogas** | 23.5 | 46.1 | 51.2 | 58.9 | 64.9 |
+| upgrading (254 /kW lump sum; VOM 8.5) | 10.2 | 10.2 | 10.2 | 10.2 | 10.2 |
+| **biomethane** | 33.7 | 56.3 | 61.4 | 69.1 | 75.1 |
+| ≈ EUR2025 (×1.222) | 41 | 69 | 75 | 84 | 92 |
+
+**Prices** (`EQ_CombalM`, €/MWh, TIMES units):
+
+| | 2025 | 2030 | 2035 | 2040 | 2045 | 2050 |
+|---|---:|---:|---:|---:|---:|---:|
+| `BIOGAS` | 40.0 | **50.5** | 70.1 | **192.5** | 160.0 | 120.7 |
+| `BIOGZH` (biomethane) | 50.2 | 60.7 | 80.3 | 202.7 | 170.2 | 130.9 |
+
+* **2030 validates the decomposition.** The domestic-effluent route costs
+  29.9 + 14.1 + 4.1 + 2.5 = **50.6 €/MWh**, and the marginal `BIOGAS` price is **50.5**.
+* **2040–2050 carry a scarcity rent.** The methanisation bound binds: `BWBIOGAZ100` reduced
+  cost is −33.0 / −24.0 / −12.9 €/GJ in 2040 / 2045 / 2050.
+
+**Where the cap sits in TIMES.** There is no user constraint on biogas. The bound is on
+the activity of the new digester, `BWBIOGAZ100`:
+* **2040:** 14.400 PJ = **4.000 TWh**.
+* **2045:** 5.144 TWh.
+* **2050:** 6.289 TWh.
+* 2045 is exactly midway between 2040 and 2050.
+* Existing biogas (0.62 TWh) and landfill gas come **on top**. Total TIMES biogas is
+  therefore 4.67 TWh in 2040 and 6.93 TWh in 2050.
+
+In PyPSA, the same 4.0 / 6.9 TWh caps *all* Walloon biogas, because the forced part is 0
+from 2040. **So in 2040 PyPSA's cap is 0.67 TWh tighter than TIMES's total.** 2050 matches
+(6.9 against 6.93). This is worth a word with ICEDD: §3.1 records the cap as a maximum on
+the total.
+
+### 8.3 PyPSA against TIMES after the fix
+
+| €/MWh of biomethane, 90 % load | 2030 | 2040 | 2050 |
+|---|---:|---:|---:|
+| PyPSA after the fix (EUR2025) | 67 | 64 | 61 |
+| TIMES, mix average (≈ EUR2025) | 69 | 84 | 92 |
+| TIMES, manure route (≈ EUR2025) | 74 | 74 | 75 |
+
+* **The two models now agree in 2030.** From 2040 TIMES is dearer, for two reasons:
+  * its feedstock moves to energy crops (52.5 €/MWh of biogas);
+  * PyPSA's digester learns (1 548 → 1 223 €2025/kW) while TIMES's stays at 1 766 /kW.
+* **The capex is structured differently.** TIMES charges no digester FOM. PyPSA charges the
+  DEA's 7.8 %/a on top of a lower capex. The annualised digester costs are ≈ 111 /kW/a in
+  TIMES and 205–259 €2025/kW/a in PyPSA.
+* **Open choice:** keep ENSPRESO's Europe-wide 25 €/MWh, or use TIMES's Walloon feedstock
+  cost. The latter needs ICEDD to confirm units and currency, and probably a BEWAL-only
+  override, since `custom_costs` applies to every node (`common_parameters.md` §8, still open).
+
+Scripts: the extraction is reproducible with pandas on the `.vd` (`comment="*"`, the nine
+VEDA columns), from attributes `Cost_Flo`, `Cost_Inv`, `Cost_Act`, `Cap_New`
+(`LUMPINV` / `INSTCAP`), `VAR_FIn`, `VAR_FOut`, `VAR_Act`, `VAR_ActM` and `EQ_CombalM`.
+
+---
+
+## 9. Where to look
 
 * Code:
   * `scripts/build_biomass_potentials.py` (`add_unsustainable_potentials`);

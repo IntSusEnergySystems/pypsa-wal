@@ -256,6 +256,37 @@ adds `electricity grid connection` (187.012 EUR/kW, 40 y, 7.5 %, FOM 2 % →
 grid. It is 33 % of ground PV's annualised cost in 2050 and 0 % of rooftop's,
 so it is a large part of the ground-versus-rooftop ranking.
 
+### 3.12 Biogas cost counted twice — CLOSED (2026-10-01)
+
+**The defect.** PyPSA built raw biogas from two costs that both paid for the digester:
+* the generator's `marginal_cost` = technology-data's `biogas` **fuel**, 78.81 EUR2025/MWh.
+  Its source is "JRC and Zappa, from old pypsa cost assumptions" (59 EUR2015). It is an
+  all-in biogas price from the time when `biogas to gas` carried only the upgrading capex
+  (2020–2023);
+* the `biogas to gas` link, which has carried the digester capex as well since PyPSA-Eur
+  PR #615 (Jan 2024). Here that capex is the Valbiom `cost:biogas:investment` rows above.
+
+The result was about 114–120 EUR/MWh of biomethane at full load. BIP Europe (2023) gives
+54–91 EUR/MWh for the whole chain.
+
+**The fix.** New rows `cost:biogas:fuel` (2025–2050, `interp`). The value is
+technology-data's feedstock-only `biogas manure` fuel (JRC ENSPRESO MINBIOGAS1):
+25.158 / 25.228 / 25.241 / 25.333 EUR2025/MWh_th.
+* Written to `custom_costs.csv`, still 100 % master-managed (72/72).
+* It applies to every node and to the forced `unsustainable biogas` generator.
+* The digester and upgrading capex are unchanged.
+* The chain now costs ≈ 61–67 EUR/MWh of biomethane.
+
+**TIMES does the same split.** In the 30 Sep central `.vd`:
+* the feedstock commodities have their own flow costs (`MINBIOEFF`, `MINBIOCUL`,
+  `MINBIOSLUH`, …);
+* the digester `BWBIOGAZ100` carries capex (1 766 /kW, no FOM) and VOM.
+
+TIMES's feedstock cost per MWh of biogas is 25.4 / 37.9 / 43.2 in 2030 / 2040 / 2050. Its
+units reproduce CLIMA.A's EUR2021 gas price, i.e. ≈ ×1.22 for EUR2025. Details are in
+[`docs/biogas.md`](docs/biogas.md) §8. Whether to adopt TIMES's Walloon feedstock cost
+instead of ENSPRESO's is left open (§8, still open).
+
 ---
 
 ## 4. Currency-year strategy (decided + executed)
@@ -521,6 +552,15 @@ Script that applied targets/notes/additions: `scripts/apply_common_parameters_de
   need a per-potential config override, which pypsa-eur does not have.
 * **Building-retrofit interest rate** (`sector.retrofitting.interest_rate`, still 4 %)
   is outside the cost-table hurdle path — tracked separately.
+* **Biogas feedstock cost: ENSPRESO or TIMES?** (§3.12)
+  * `cost:biogas:fuel` is technology-data's ENSPRESO manure cost, ≈ 25 EUR2025/MWh, flat.
+  * TIMES's Walloon feedstock cost is higher and rises with energy crops: ≈ 31 / 46 / 53
+    EUR2025/MWh of biogas in 2030 / 2040 / 2050, assuming TIMES units ≈ EUR2021.
+  * TIMES's digester capex is higher (1 766 vs Valbiom 1 548 → 1 223) but has no FOM;
+    PyPSA's DEA FOM is 7.8 %/a.
+  * Adopting TIMES's value would need ICEDD to confirm the units of its biogas cost
+    inputs. The value would also apply to every PyPSA node, unless it becomes a BEWAL-only
+    override.
 * **20 untargeted JRC/ETRI reference rows keep their source currency.** The rows
   added with `4459a96c` (central gas CHP, central solid biomass CHP, SMR, H2 (l)
   storage tank) carry `EUR2010/2012/2013`, no `pypsa_wal_target` and no `status`,
