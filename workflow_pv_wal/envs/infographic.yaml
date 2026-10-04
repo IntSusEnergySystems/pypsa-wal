@@ -1,0 +1,18 @@
+# Environment of scripts/infographic_export.py (capture of the dashboard into
+# GIF, MP4 and PDF).  Kept apart from pypsa-eur: nothing here touches the model.
+#
+#   conda env create -f envs/infographic.yaml
+#   conda run -n infographic python -m playwright install chromium
+name: infographic
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - ffmpeg
+  - gifski
+  - gifsicle
+  - img2pdf
+  - pillow
+  - pip
+  - pip:
+      - playwright

@@ -1,0 +1,844 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Wal
+# SPDX-License-Identifier: MIT
+#
+# Configuration of the stand-alone Walloon ground-mounted PV land-eligibility
+# workflow, the PV counterpart of workflow_onwind_wal/.  Every layer, rule and
+# density is declared here with the text it implements, so the constraint set
+# can be audited without reading the Python.
+#
+# See docs/pv_potential_wallonia/ for the report.
+#
+# The regulatory situation differs from wind in one way that shapes this whole
+# file: Wallonia has NO numeric framework for ground-mounted PV.  The
+# "Circulaire relative aux permis d'urbanisme pour le photovoltaïque" of
+# 14 March 2024 (MB 16.04.2024, replacing that of 12 January 2022) is "un outil
+# d'aide à la décision" with refuse/avoid lists and no setback, size, slope or
+# farm-share figure.  Every number below is therefore labelled as one of
+#   law        a CoDT article or a refusal of the circular
+#   circular   an "éviter" of the circular, or its plan-de-secteur reading
+#   technical  an engineering criterion of this study
+#   judgement  a modelling choice of this study, bracketed in `sensitivity`
+#   policy     a choice a government could make, exposed in the dashboard
+
+version: "1.0"
+
+# ---------------------------------------------------------------------------
+# Region of interest: the administrative Walloon Region, as for wind.
+# ---------------------------------------------------------------------------
+region:
+  shapes: "../resources/regions_onshore_base_s_adm.geojson"
+  name: "BEWAL"
+  fallback_shapes: "../resources/nuts3_shapes.geojson"
+  fallback_prefix: ["BE3"]
+
+# ---------------------------------------------------------------------------
+# Grid.  Every layer is burnt on its own onto one 20 m grid in EPSG:3035.
+# 20 m, not the 100 m of the wind study: a PV park is a few hectares, the
+# median declared agricultural parcel is about 1.5 ha, and the setbacks that
+# matter (a road verge, a building) are tens of metres.  One cell = 0.04 ha.
+# ---------------------------------------------------------------------------
+grid:
+  crs: 3035
+  res: 20
+
+# Weather for the energy yield: the model's weather year (run_from_office_
+# computer.md §4: every production run uses 2010).
+atlite:
+  cutout: "/sylvain/mount/pypsa-wal-data/data-misc/cutout/archive/v1.0/europe-2010-sarah3-era5.nc"
+
+# ---------------------------------------------------------------------------
+# Walloon open-data layers (ESRI-REST, https://geoservices.wallonie.be,
+# CC-BY 4.0 unless stated).  `where` filters on the server; `count` is the
+# feature count observed on 2026-09-29, a sanity check only.
+# ---------------------------------------------------------------------------
+sources:
+  # --- plan de secteur ---------------------------------------------------
+  pds_zones:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 22
+    fields: ["AFFECT", "DESCRIPTION"]
+    count: 43797
+    title: "Plan de secteur — zones d'affectation"
+  pds_roads:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 9
+    fields: ["STYPE", "DESCRIPTION"]
+    count: 5420
+    title: "Plan de secteur — réseau routier"
+  pds_rail:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 11
+    fields: ["STYPE", "DESCRIPTION"]
+    count: 911
+    title: "Plan de secteur — réseau ferroviaire"
+  pds_hv_lines:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 12
+    fields: ["STYPE", "DESCRIPTION"]
+    count: 1016
+    title: "Plan de secteur — lignes électriques haute tension"
+  pds_landscape:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 17
+    fields: ["DESCRIPTION"]
+    count: 1456
+    title: "Plan de secteur — périmètres d'intérêt paysager"
+  pds_iche:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 18
+    fields: []
+    title: "Plan de secteur — périmètres d'intérêt culturel, historique ou esthétique"
+  pds_ecolinks:
+    service: "AMENAGEMENT_TERRITOIRE/PDS"
+    layer: 19
+    fields: []
+    title: "Plan de secteur — périmètres de liaison écologique"
+  adesa_landscape:
+    service: "AMENAGEMENT_TERRITOIRE/ADESA"
+    layer: 1
+    fields: []
+    title: "Périmètres d'intérêt paysager de l'inventaire ADESA"
+  # --- nature --------------------------------------------------------------
+  natura2000:
+    service: "FAUNE_FLORE/NATURA2000"
+    layer: 9
+    fields: []
+    count: 240
+    # 240 site perimeters of up to ~200 km2 each: unsimplified, one page of them
+    # makes the server fail (HTTP 500).  10 m is half a grid cell.
+    page_size: 20
+    simplify: 10
+    title: "Réseau Natura 2000 — périmètres des sites en vigueur"
+  reserves_forest:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 1
+    fields: []
+    count: 20
+    title: "Réserves forestières"
+  reserves_domanial:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 2
+    fields: []
+    count: 306
+    title: "Réserves naturelles domaniales"
+  reserves_agreed:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 3
+    fields: []
+    count: 264
+    title: "Réserves naturelles agréées"
+  wetlands:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 4
+    fields: []
+    count: 73
+    title: "Zones humides d'intérêt biologique"
+  caves:
+    service: "FAUNE_FLORE/CONSNAT"
+    layer: 0
+    fields: []
+    count: 80
+    title: "Cavités souterraines d'intérêt scientifique"
+  # --- heritage ------------------------------------------------------------
+  heritage_sites:
+    service: "AMENAGEMENT_TERRITOIRE/BC_PAT"
+    layer: 1
+    fields: []
+    count: 1259
+    title: "Biens classés — sites classés"
+  heritage_ensembles:
+    service: "AMENAGEMENT_TERRITOIRE/BC_PAT"
+    layer: 2
+    fields: []
+    count: 53
+    title: "Biens classés — ensembles architecturaux"
+  heritage_protection:
+    service: "AMENAGEMENT_TERRITOIRE/BC_PAT"
+    layer: 4
+    fields: []
+    count: 367
+    title: "Biens classés — zones de protection"
+  heritage_unesco:
+    service: "AMENAGEMENT_TERRITOIRE/PAT_MND_UNESCO"
+    layer: 1
+    fields: []
+    count: 24
+    title: "Patrimoine mondial UNESCO — zones tampon"
+  # --- hazards -------------------------------------------------------------
+  karst:
+    service: "AMENAGEMENT_TERRITOIRE/CONTR_KARST"
+    layer: 0
+    fields: ["NATURE"]
+    count: 449
+    title: "Zones de contraintes karstiques"
+  landslide:
+    service: "AMENAGEMENT_TERRITOIRE/RISQ_EBOULT"
+    layer: 0
+    fields: []
+    title: "Contraintes physiques liées aux éboulements"
+  steep_slopes:
+    service: "AMENAGEMENT_TERRITOIRE/RISQ_EBOULT"
+    layer: 1
+    fields: []
+    title: "Versants supérieurs à 30 degrés"
+  # Flood hazard (aléa d'inondation), the map CoDT D.IV.57 3° refers to.  Only
+  # overflow -- alone or combined with runoff -- at the high level: the pure
+  # runoff classes (3.4 M polygons) are concentrated-flow axes of a few metres
+  # that a PV layout routes around.  39 % of the 4.3 M polygons are pure runoff
+  # "moyen"; the medium overflow level is priced in the sensitivity through the
+  # extreme-return-period flood zones (EAU/ZI/2), the layer of the wind study.
+  flood_high:
+    service: "EAU/ALEA_INOND"
+    layer: 2
+    fields: ["TYPEALEA", "VALEUR"]
+    where: "VALEUR = 'Aléa élevé' AND TYPEALEA IN ('Débordement', 'Débordement & ruissellement')"
+    count: 300882
+    simplify: 5
+    workers: 1
+    title: "Aléa d'inondation élevé — débordement (et ruissellement associé)"
+  flood_extreme:
+    service: "EAU/ZI"
+    layer: 2
+    fields: []
+    count: 39893
+    simplify: 5
+    title: "Zones inondables — débordement, période de retour extrême"
+  water_capture:
+    service: "EAU/PROTECT_CAPT"
+    layer: 2
+    fields: []
+    title: "Zones de prévention rapprochée (IIa) des captages"
+  # --- degraded land -------------------------------------------------------
+  sar_droit:
+    service: "AMENAGEMENT_TERRITOIRE/SAR"
+    layer: 0
+    fields: ["CODECARTO", "LIBELLE", "NATURE", "TYPEARRETE", "SUPERFHA"]
+    count: 1097
+    title: "Sites à réaménager de droit (SAR)"
+  sar_inventaire:
+    service: "AMENAGEMENT_TERRITOIRE/ISA"
+    layer: 4
+    fields: ["ID", "NOM"]
+    count: 1939
+    title: "Inventaire des sites à réaménager (SAR de fait)"
+  terrils:
+    service: "SOL_SOUS_SOL/TERRILS_2018"
+    layer: 1
+    fields: ["ETAT_ACTUEL", "SURFACE"]
+    count: 543
+    title: "Terrils (inventaire 2018)"
+  quarries_active:
+    service: "SOL_SOUS_SOL/SURFACES_CARRIERES_ACTIVES"
+    layer: 1
+    fields: ["NOM_CARRIERE_ACTIVE", "MATIERES_EXTRAITES"]
+    count: 155
+    title: "Surfaces occupées par les carrières en activité (2010–2022)"
+  water_bodies:
+    # PICC "Hydrographie – Emprise": natural and other water bodies and
+    # artificial basins; swimming pools (PIS) are left on the server.
+    service: "TOPOGRAPHIE/PICC_VDIFF"
+    layer: 30
+    fields: ["NATUR_CODE", "NATUR_DESC"]
+    where: "NATUR_CODE IN ('PEN','APE','BAF')"
+    title: "PICC — hydrographie, emprise des plans d'eau"
+  # --- agriculture and soils -------------------------------------------------
+  # SIGEC 2024 is fetched as a bulk GeoPackage (324 MB), see `bulk` below; its
+  # LPIS layer (surfaces agricoles) is extracted by rule extract_lpis.
+  cnsw_types:
+    # Principal soil types of the Carte Numérique des Sols (1:250 000
+    # simplification, 23 classes): the pedological map a permit's
+    # « évaluation rigoureuse de la potentialité des sols » is based on.
+    service: "SOL_SOUS_SOL/CNSW__PRINC_TYPES_SOLS"
+    layer: 0
+    fields: ["CODE", "DESCRIPTION"]
+    count: 200483
+    simplify: 5
+    title: "Carte des sols — principaux types de sols (CNSW simplifiée)"
+
+# Bulk downloads (SPW "spwdatadownload", CC-BY 4.0).  Fetched once with curl
+# and unpacked into data/<key>/.
+bulk:
+  sigec_2024:
+    url: "https://geoservices.wallonie.be/geotraitement/spwdatadownload/results/c1945bfa-e21c-498e-8432-86352d0d6b62/SIGEC_PARC_AGRI_2024_GEOPACKAGE_3812.zip"
+    title: "SIGEC 2024 — parcelles agricoles (demande de superficie)"
+  walous_ocs_2023:
+    url: "https://geoservices.wallonie.be/geotraitement/spwdatadownload/results/4e780ba1-463c-478e-95df-d2f1963a150d/WAL_OCS_IA__2023_GEOTIFF_3812.zip"
+    title: "WALOUS — occupation du sol 2023, 1 m"
+  soils_awac:
+    url: "https://geoservices.wallonie.be/geotraitement/spwdatadownload/results/0c2924d1-6b95-4c25-b738-dd0427191c54/AWAC_SOLS_PROPRIETES_GEOTIFF_3812.zip"
+    title: "Propriétés des sols (AWAC / GxABT) — sols de bonne qualité agronomique"
+  # SPW LiDAR terrain model 2021-2022, 1 m, per province (42 GB in all).
+  # Averaged to 10 m on arrival and the 1 m tiles deleted (retrieve_dem).
+  dem_lidar:
+    url_pattern: "https://geoservices.wallonie.be/geotraitement/spwdatadownload/results/fe13bc84-e371-46ca-9632-8ad4139f1ee5/RELIEF_WALLONIE_MNT_1M_2021_2022_GEOTIFF_3812_PROV_{prov}.zip"
+    provinces: ["BRABANT_WALLON", "HAINAUT", "LIEGE", "LUXEMBOURG", "NAMUR"]
+    title: "MNT LiDAR 2021-2022, 1 m (SPW)"
+
+# ---------------------------------------------------------------------------
+# Exclusion layers.  Each is burnt on its own onto the grid (cell centre in
+# the buffered geometry), by scripts/burn_layer.py, and never unioned as a
+# vector.  `filter` keeps the features whose field takes one of the values;
+# `buffer_m` is applied feature by feature.  `family` is the constraint family
+# of the funnel; `basis` is what the rule rests on (see the header).
+# ---------------------------------------------------------------------------
+layers:
+  # --- nature: the refusal list of the circular (2024, p. 9) ----------------
+  natura2000:      {source: natura2000, family: nature, basis: law}
+  reserves_forest: {source: reserves_forest, family: nature, basis: law}
+  reserves_domanial: {source: reserves_domanial, family: nature, basis: law}
+  reserves_agreed: {source: reserves_agreed, family: nature, basis: law}
+  wetlands:        {source: wetlands, family: nature, basis: law}
+  caves:           {source: caves, family: nature, basis: law}
+  pds_natural:     {source: pds_zones, filter: {AFFECT: [R04]}, family: nature, basis: law}
+  pds_park:        {source: pds_zones, filter: {AFFECT: [R05]}, family: nature, basis: law}
+  # « Eviter … les périmètres de liaison écologique » (circular p. 9); works
+  # there are "soit interdits, soit subordonnés à des conditions" (R.II.21-6).
+  pds_ecolinks:    {source: pds_ecolinks, family: nature, basis: circular}
+  # Spoil tips still in place are among the richest dry grasslands of the
+  # Region and most are SGIB (a layer that is not published, see the report):
+  # judgement, only levelled or reworked tips are a gisement.
+  terril_inplace:  {source: terrils, filter: {ETAT_ACTUEL: ["Terril en place"]}, family: nature, basis: judgement}
+  # --- forest and green zones ------------------------------------------------
+  # Not an admitted use of the forest zone (D.II.37); a closed CET becomes a
+  # zone d'espaces verts (D.II.26 §2) and is handled as a gisement instead.
+  pds_forest:      {source: pds_zones, filter: {AFFECT: [R02]}, family: forest, basis: law}
+  pds_greenspace:  {source: pds_zones, filter: {AFFECT: [R03]}, family: forest, basis: law}
+  # --- landscape and heritage (circular p. 10: « éviter de porter atteinte ») --
+  pds_landscape:   {source: pds_landscape, family: landscape, basis: circular}
+  # The plan-de-secteur "périmètres de points de vue remarquable" (PDS/16) are
+  # published empty (0 features on 2026-09-29), and ADESA has view *lines*
+  # only: this refusal of the circular is not represented (see the report).
+  pds_iche:        {source: pds_iche, family: landscape, basis: circular}
+  adesa_landscape: {source: adesa_landscape, family: landscape, basis: judgement, reference: false}
+  heritage_sites:  {source: heritage_sites, family: landscape, basis: circular}
+  heritage_ensembles: {source: heritage_ensembles, family: landscape, basis: circular}
+  heritage_protection: {source: heritage_protection, family: landscape, basis: circular}
+  heritage_unesco: {source: heritage_unesco, family: landscape, basis: circular}
+  # --- natural hazards (circular p. 8; CoDT D.IV.57 3°) -----------------------
+  flood_high:      {source: flood_high, family: hazard, basis: circular}
+  flood_extreme:   {source: flood_extreme, family: hazard, basis: judgement, reference: false}
+  karst:           {source: karst, filter: {NATURE: ["contrainte forte"]}, family: hazard, basis: circular}
+  landslide:       {source: landslide, family: hazard, basis: circular}
+  steep_slopes:    {source: steep_slopes, family: hazard, basis: technical}
+  water_capture:   {source: water_capture, family: hazard, basis: judgement}
+  # --- infrastructure footprints and verges (technical) ---------------------
+  # Half the right of way plus a verge: the plan-de-secteur axis is the road's
+  # centre line.  Motorways 20 + 10 m, other plan-de-secteur roads 8 + 10 m,
+  # railways 6 + 10 m, HV lines 15 m either side (maintenance corridor).
+  motorways:       {source: pds_roads, filter: {DESCRIPTION: ["Autoroute existante"]}, buffer_m: 30, family: built, basis: technical}
+  roads:           {source: pds_roads, buffer_m: 18, family: built, basis: technical}
+  railways:        {source: pds_rail, buffer_m: 16, family: built, basis: technical}
+  hv_lines:        {source: pds_hv_lines, buffer_m: 15, family: built, basis: technical}
+
+# Raster layers derived from the bulk data (scripts/build_rasters.py).
+# WALOUS 2023 (1 m, 11 classes) is reduced to the share of each 20 m cell in
+# five groups; a cell is excluded when a group exceeds its threshold.
+walous:
+  # Codes of WAL_OCS_IA__2023.tif (from its .qml legend).
+  groups:
+    built: [2]           # constructions artificielles hors sol
+    sealed: [1, 3]       # revêtement artificiel au sol, réseau ferroviaire
+    water: [5]           # eaux de surface
+    trees: [8, 9]        # résineux / feuillus > 3 m
+    shrubs: [80, 90]     # résineux / feuillus <= 3 m
+    bare: [4]            # sols nus
+    herbaceous: [6, 7]   # couvert herbacé en rotation / toute l'année
+  # A PV table cannot stand on a building; a 20 m cell that is a fifth
+  # building is a yard or a garden, not a field.  Sealed surfaces are car parks
+  # and roads -- the rooftop-and-canopy segment of the model, not this study.
+  # Woodland outside the forest zone is still woodland: a PV park would need a
+  # clearing permit (D.IV.4), which the circular gives no ground for.
+  thresholds_pct:
+    built: 20
+    sealed: 50
+    trees: 50
+    water: 50
+
+# Terrain, from the LiDAR model averaged to 20 m (slope and aspect over a 40 m
+# baseline).  No Walloon text gives a figure: « un terrain … sans relief
+# accidenté » and « minimiser les modifications du relief » (circular p. 8).
+terrain:
+  # technical: fixed-tilt racking on piles is standard to about 15 % (8.5°)
+  # and possible to 20-25 %; beyond, terracing is needed.
+  max_slope_pct: 15
+  # technical: a north-facing slope shades the next row and loses yield; the
+  # loss reaches ~10 % at 10 % slope facing due north.  Aspect in the northern
+  # quadrant (315°-45°) is excluded above this slope.
+  north_sector_deg: [315, 45]
+  north_max_slope_pct: 7
+
+# ---------------------------------------------------------------------------
+# Gisements: what the land that survives the exclusions *is*.  Every cell
+# belongs to the first gisement, in this order, whose test it passes.  The
+# order encodes the circular: « la terre agricole, entendue comme terrain
+# utilisé pour l'agriculture quelle que soit son affectation au plan de
+# secteur, doit remplir sa vocation première » (p. 5) -- so a farmed parcel in
+# an extraction or economic zone is agricultural land, and the degraded
+# categories only come before it because a SAR, a CET or a spoil tip is not
+# farmed.
+# ---------------------------------------------------------------------------
+gisements:
+  - key: water_industrial     # floating: artificial basins, quarry lakes
+    test: "water_basin | (water_any & (pds_extraction | quarries_active | sar))"
+    system: floating
+  - key: water_other           # floating: other ponds and lakes >= 1 ha
+    test: "water_any"
+    system: floating
+  - key: cet                   # landfill zones of the plan de secteur
+    test: "pds_cet"
+    system: ground
+  - key: sar                   # brownfields: SAR de droit and de fait
+    test: "sar"
+    system: ground
+  - key: terril                # levelled, residual or reshaped spoil tips
+    test: "terril_worked"
+    system: ground
+  - key: quarry_active         # quarry surfaces in operation 2010-2022
+    test: "quarries_active"
+    system: ground
+  - key: agri_grassland_perm   # SIGEC: permanent grassland
+    test: "sigec == 1"
+    system: agrivoltaic_grazing
+  - key: agri_grassland_temp   # SIGEC: temporary grassland and fodder
+    test: "sigec == 2"
+    system: agrivoltaic_grazing
+  - key: agri_arable           # SIGEC: arable crops
+    test: "sigec == 3"
+    system: agrivoltaic_crops
+  - key: agri_perennial        # SIGEC: orchards, vines, small fruit, nurseries
+    test: "sigec == 4"
+    system: agrivoltaic_canopy
+  - key: agri_other            # SIGEC: fallow, agri-environmental strips
+    test: "sigec == 5"
+    system: agrivoltaic_grazing
+  - key: extraction            # extraction zones not in operation, not farmed
+    test: "pds_extraction"
+    system: ground
+  - key: infra_edge            # verges of motorways and railways, not farmed
+    test: "infra_edge"
+    system: ground
+  - key: zae                   # economic-activity zones, not farmed, not built
+    test: "pds_zae"
+    system: ground
+  - key: zspec                 # public services, zones d'enjeu, loisirs
+    test: "pds_zspec"
+    system: ground
+  - key: agri_zone_poor        # agricultural zone, not declared, soil mapped poor (AWAC 1-2)
+    test: "pds_agri & (soil >= 1) & (soil <= 2)"
+    system: ground
+  - key: agri_zone_unfarmed    # agricultural zone, not declared to SIGEC
+    test: "pds_agri"
+    system: ground
+  - key: habitat               # habitat zones and ZACC, not built
+    test: "pds_habitat"
+    system: ground
+  - key: other                 # anything else (zone blanche, etc.)
+    test: "region"
+    system: ground
+
+# Plan-de-secteur codes behind the gisement tests (PDS/22 AFFECT).
+pds_codes:
+  pds_cet: [P02]
+  pds_extraction: [X01, XR1, XR3, XR4]
+  pds_zae: [A01, A02, A11, A12, D02]
+  pds_zspec: [P01, P12, ZEC, L01, L11, L12, L13]
+  pds_agri: [R01]
+  pds_habitat: [H01, H02, D01]
+# Motorway and railway verges: cells within this distance of the axis, beyond
+# the footprint burnt in `layers` (the circular's « bords d'autoroutes ou de
+# lignes de chemin de fer », p. 5, and « le long d'une voirie », p. 7).
+infra_edge_m: 60
+# Water bodies smaller than this are not a floating-PV site.
+water_min_ha: 1.0
+
+# SIGEC 2024 crop codes -> agrivoltaic class.  `crop_id` maps the INSPIRE crop
+# class; `codes` overrides it for single crop codes.  1 permanent grassland,
+# 2 temporary grassland and fodder, 3 arable, 4 perennial crops, 5 other.
+sigec_classes:
+  crop_id:
+    pasturesAndMeadows: 1
+    permanentGrasslandNotUsed: 1
+    roughGrazing: 1
+    plantsHarvestedGreen: 2
+    cereals: 3
+    rootCrops: 3
+    industrialCrops: 3
+    freshVegetables: 3
+    dryPulses: 3
+    otherArableCrops: 3
+    permanentCropsForHumanConsumption: 4
+    nurseries: 4
+    otherPermanentCrop: 4
+    fallowLand: 5
+  codes:
+    "201": 3      # maïs ensilage: an arable crop, whatever its end use
+    "202": 3      # maïs grain
+
+# ---------------------------------------------------------------------------
+# From land to capacity
+# ---------------------------------------------------------------------------
+# The park rule: a PV park needs width for rows, a fence and an access track,
+# and the circular asks to « éviter l'éparpillement de petites installations »
+# and prefers parks « d'une superficie importante » for grid injection (p. 9)
+# -- without a figure.  judgement: 60 m minimum width (morphological opening),
+# 1 ha minimum contiguous area.
+park:
+  min_width_m: 60
+  min_area_ha: 1.0
+
+# MWc per hectare of eligible (fenced) land, by system.  The reference values
+# are set against the Walloon parks mapped in OSM (validate_fleet) and the
+# figures of the Livre blanc; brackets are carried in the sensitivity.
+# Ground: the ten Walloon parks of 1 ha or more with a tagged capacity have a
+# median of 0.97 MWc/ha (0.64-0.70 for the 2020-2024 fixed-tilt parks of
+# Tertre and Burgo, 1.6-1.9 for the dense 2024 layouts of INEOS Helios and
+# another 31 MWc park); area-weighted 1.25.
+densities_mwc_ha:
+  ground:              {ref: 1.0, low: 0.7, high: 1.4}   # fixed tilt, modern modules
+  agrivoltaic_grazing: {ref: 0.7, low: 0.5, high: 0.8}   # Wierde 10 MWc / 14 ha, GCR 35 %
+  agrivoltaic_crops:   {ref: 0.35, low: 0.25, high: 0.5} # vertical bifacial / wide-row canopy
+  agrivoltaic_canopy:  {ref: 0.6, low: 0.4, high: 0.7}   # elevated canopy over fruit
+  floating:            {ref: 1.5, low: 1.0, high: 2.0}   # per ha of *covered* water
+
+# Share of a water body that may be covered, and the setback from its bank.
+# No Walloon rule.  The only legislated precedent nearby is Germany's
+# Wasserhaushaltsgesetz §36(3) (2023): at most 15 % of an artificial lake,
+# 40 m from the bank.  Soignies-Perlonjour covers about a quarter of its lake.
+floating:
+  coverage: {ref: 0.25, low: 0.15, high: 0.5}
+
+# ---------------------------------------------------------------------------
+# Which gisements are open, and to what share: the policy layer.  `reference`
+# is the circular of 14 March 2024 read as it stands: conform or tolerated
+# land only, farmland closed except research pilots (not a potential).
+# ---------------------------------------------------------------------------
+policy:
+  reference:
+    water_industrial: 1.0
+    water_other: 0.0          # « éviter les plans d'eau (hormis les bassins industriels) »
+    cet: 1.0
+    sar: 1.0                  # temporary, pending reindustrialisation
+    terril: 1.0
+    quarry_active: 0.0        # self-supply of the quarry only
+    agri_grassland_perm: 0.0
+    agri_grassland_temp: 0.0
+    agri_arable: 0.0
+    agri_perennial: 0.0
+    agri_other: 0.0
+    extraction: 1.0           # parts not yet exploited, time-limited permit
+    infra_edge: 1.0
+    zae: 0.25                 # « pour autant qu'elles ne mettent pas en péril la destination première »
+    zspec: 0.25
+    # derogation D.IV.11 / D.IV.13 on « des terres où il est démontré que la
+    # qualité agronomique du sol est médiocre » (circular p. 19): the share of
+    # this land that could realistically be shown to be so, computed from the
+    # data by scripts/soil_evidence.py (see `soil_evidence`).
+    agri_zone_poor: soil_evidence
+    agri_zone_unfarmed: 0.0   # other unfarmed land of the agricultural zone
+    habitat: 0.0              # reserved for housing (SDT)
+    other: 0.0
+
+# Agrivoltaic opening, when farmland is opened by a future framework: a cap on
+# the share of the utilised agricultural area (SAU) taken by agrivoltaic
+# parks, among the classes admitted.  Livre blanc: the whole PACE 2030 PV
+# target on farmland would be ~1 % of SAU, the remainder after rooftops < 0.6 %.
+agrivoltaics:
+  # Open in the reference at the Livre blanc's 0.6 % of the SAU, on grassland.
+  # The circular as it stands admits only research pilots on land « en cours
+  # d'exploitation » (priced as the case `agri_closed`).  The Livre blanc's
+  # 0.6 % is what the PV still to be built *to 2030* would take if it were all
+  # agrivoltaic; the model's horizon is 2050, so the reference reads it as a
+  # policy already on the table, not as a ceiling.
+  open: true
+  sau_ha: 738927                # SAU 2022 (Livre blanc p. 5, Statbel)
+  classes_admitted: [agri_grassland_perm, agri_grassland_temp]
+  cap_share_sau: 0.006          # null = no quota
+
+# The circular's derogation condition on farmland: « des terres où il est
+# démontré que la qualité agronomique du sol est médiocre » (p. 19).  When
+# `max_class` is set, cells of the listed gisements on better soils (AWAC
+# class above it: 1 très faible … 5 très élevée) are not opened.
+soil_filter:
+  max_class: null
+  gisements: [agri_grassland_perm, agri_grassland_temp, agri_arable, agri_perennial,
+              agri_other, agri_zone_unfarmed]
+
+# ---------------------------------------------------------------------------
+# Poor soils: which share of the mapped-poor, unfarmed land of the agricultural
+# zone could realistically be *demonstrated* poor in a permit
+# (scripts/soil_evidence.py).  The only regional map, AWAC/GxABT 2024, ranks
+# soils by percentiles of plant-available water and depth: its classes 1-2 are
+# the bottom of a ranking, and are nearly all stony loams that farmers crop.
+# A cell counts, with a weight, when
+#   - it is not in the LPIS 2024 agricultural surfaces (aid-eligible farmland,
+#     whether or not declared this year: « en cours d'exploitation »);
+#   - it is more than `curtilage_m` from a building (not a garden or yard);
+#   - weight = 1 - the share of the land a farmer could farm that farmers do
+#     farm on its soil unit (CNSW principal type x AWAC class): a soil farmed
+#     wherever it is available is not « impropre à la fonction agricole ».
+# The share of the gisement opened is the weighted area over its whole area.
+# ---------------------------------------------------------------------------
+soil_evidence:
+  poor_classes: [1, 2]
+  curtilage_m: 40
+  curtilage_built_pct: 10
+
+# ---------------------------------------------------------------------------
+# Sensitivity.  Every case is the reference with the changes listed, so its
+# difference to the reference is the price of that one choice.  `group`:
+# policy (a government could decide it), judgement (a modelling choice of
+# this study), technical.
+# ---------------------------------------------------------------------------
+sensitivity:
+  cases:
+    # --- policy: which land is open --------------------------------------
+    sar_reserved:
+      group: policy
+      label: "brownfields kept for reindustrialisation (no PV on SAR)"
+      policy: {sar: 0.0}
+    zae_closed:
+      group: policy
+      label: "no PV in economic-activity and public-service zones"
+      policy: {zae: 0.0, zspec: 0.0}
+    zae_open:
+      group: policy
+      label: "all unbuilt, unfarmed land in economic-activity and public-service zones"
+      policy: {zae: 1.0, zspec: 1.0}
+    water_open:
+      group: policy
+      label: "floating PV on every water body of 1 ha or more, not only industrial ones"
+      policy: {water_other: 1.0}
+    poor_soils_none:
+      group: policy
+      label: "no derogation on poor soils"
+      policy: {agri_zone_poor: 0.0}
+    poor_soils_all:
+      group: policy
+      label: "derogation on all mapped-poor, unfarmed land of the agricultural zone"
+      policy: {agri_zone_poor: 1.0}
+    agri_closed:
+      group: policy
+      label: "no agrivoltaics (circular as it stands: research pilots only)"
+      agrivoltaics: {open: false}
+    agri_quota_1:
+      group: policy
+      label: "agrivoltaics on grassland, capped at 1 % of the SAU"
+      agrivoltaics: {cap_share_sau: 0.01}
+    agri_quota_2:
+      group: policy
+      label: "agrivoltaics on grassland, capped at 2 % of the SAU"
+      agrivoltaics: {cap_share_sau: 0.02}
+    agri_grassland_all:
+      group: policy
+      label: "agrivoltaics on every eligible grassland parcel, no quota"
+      agrivoltaics: {cap_share_sau: null}
+    agri_poor_soils:
+      group: policy
+      label: "agrivoltaics on any crop, poor soils only, no quota"
+      agrivoltaics: {cap_share_sau: null,
+                     classes_admitted: [agri_grassland_perm, agri_grassland_temp,
+                                        agri_arable, agri_perennial, agri_other]}
+      soil_filter: {max_class: 2, gisements: [agri_grassland_perm, agri_grassland_temp,
+                                              agri_arable, agri_perennial, agri_other]}
+    agri_all:
+      group: policy
+      label: "agrivoltaics on every eligible parcel, any crop, no quota"
+      agrivoltaics: {cap_share_sau: null,
+                     classes_admitted: [agri_grassland_perm, agri_grassland_temp,
+                                        agri_arable, agri_perennial, agri_other]}
+  # (the soil evidence's own judgements, priced on its share)
+    curtilage_20:
+      group: judgement
+      label: "poor soils: gardens and yards taken as 20 m around buildings"
+      soil_evidence: {curtilage_m: 20}
+    curtilage_60:
+      group: judgement
+      label: "poor soils: gardens and yards taken as 60 m around buildings"
+      soil_evidence: {curtilage_m: 60}
+    # --- judgement: which land is excluded -------------------------------
+    no_ecolinks:
+      group: judgement
+      label: "ecological-link perimeters not excluded"
+      drop_layers: [pds_ecolinks]
+    adesa:
+      group: judgement
+      label: "ADESA landscape perimeters excluded as well"
+      add_layers: [adesa_landscape]
+    no_landscape:
+      group: judgement
+      label: "no landscape or heritage perimeter excluded"
+      drop_layers: [pds_landscape, pds_iche, heritage_sites, heritage_ensembles,
+                    heritage_protection, heritage_unesco]
+    flood_extreme:
+      group: judgement
+      label: "extreme-return-period flood zones excluded as well"
+      add_layers: [flood_extreme]
+    no_water_capture:
+      group: judgement
+      label: "catchment protection zones IIa not excluded"
+      drop_layers: [water_capture]
+    terrils_inplace:
+      group: judgement
+      label: "spoil tips still in place admitted"
+      drop_layers: [terril_inplace]
+    # --- technical ---------------------------------------------------------
+    slope_10:
+      group: technical
+      label: "maximum slope 10 %"
+      terrain: {max_slope_pct: 10}
+    slope_20:
+      group: technical
+      label: "maximum slope 20 %"
+      terrain: {max_slope_pct: 20}
+    north_5:
+      group: technical
+      label: "north-facing slopes excluded from 5 %"
+      terrain: {north_max_slope_pct: 5}
+    north_off:
+      group: technical
+      label: "no rule on north-facing slopes"
+      terrain: {north_max_slope_pct: 254}
+    park_05ha:
+      group: technical
+      label: "parks down to 0.5 ha"
+      park: {min_area_ha: 0.5}
+    park_5ha:
+      group: technical
+      label: "parks of 5 ha or more"
+      park: {min_area_ha: 5.0}
+    width_40:
+      group: technical
+      label: "minimum park width 40 m"
+      park: {min_width_m: 40}
+    width_100:
+      group: technical
+      label: "minimum park width 100 m"
+      park: {min_width_m: 100}
+    density_low:
+      group: technical
+      label: "low capacity densities"
+      densities_mwc_ha: {ground: 0.7, agrivoltaic_grazing: 0.5, agrivoltaic_crops: 0.25,
+                         agrivoltaic_canopy: 0.4, floating: 1.0}
+    density_high:
+      group: technical
+      label: "high capacity densities"
+      densities_mwc_ha: {ground: 1.4, agrivoltaic_grazing: 0.8, agrivoltaic_crops: 0.5,
+                         agrivoltaic_canopy: 0.7, floating: 2.0}
+    floating_15:
+      group: technical
+      label: "floating PV on 15 % of a water body (German rule, WHG §36)"
+      floating_coverage: 0.15
+    floating_50:
+      group: technical
+      label: "floating PV on 50 % of a water body"
+      floating_coverage: 0.5
+    built_10:
+      group: technical
+      label: "a cell is built from 10 % building cover"
+      walous_thresholds_pct: {built: 10}
+    rules_in_force:
+      group: policy
+      label: "the circular strictly as it stands: no agrivoltaics, no derogation on poor soils"
+      agrivoltaics: {open: false}
+      policy: {agri_zone_poor: 0.0}
+
+# Vector masks behind the gisement tests, burnt like the layers above.
+# `source` may list several downloads; `min_area_ha` drops smaller features.
+masks:
+  pds_cet:        {source: pds_zones, filter: {AFFECT: [P02]}}
+  pds_extraction: {source: pds_zones, filter: {AFFECT: [X01, XR1, XR3, XR4]}}
+  pds_zae:        {source: pds_zones, filter: {AFFECT: [A01, A02, A11, A12, D02]}}
+  pds_zspec:      {source: pds_zones, filter: {AFFECT: [P01, P12, ZEC, L01, L11, L12, L13]}}
+  pds_agri:       {source: pds_zones, filter: {AFFECT: [R01]}}
+  pds_habitat:    {source: pds_zones, filter: {AFFECT: [H01, H02, D01]}}
+  sar:            {source: [sar_droit, sar_inventaire]}
+  terril_worked:  {source: terrils, filter: {ETAT_ACTUEL: ["Terril arasé", "Terril résiduel", "Terril remanié"]}}
+  quarries_active: {source: quarries_active}
+  lpis_agri:      {source: lpis_agri}
+  # PICC "bassin artificiel" also codes the Plate-Taille reservoir of the Eau
+  # d'Heure (348 ha), a multi-purpose reservoir (hydro, drinking water,
+  # leisure) and not an industrial basin; every other one is under 25 ha
+  # (settling ponds, the Coo pumped-storage basins).  It stays in water_other.
+  water_basin:    {source: water_bodies, filter: {NATUR_CODE: [BAF]}, max_area_ha: 100}
+  water_any:      {source: water_bodies, min_area_ha: 1.0}
+  infra_edge:
+    source:
+      - {source: pds_roads, filter: {DESCRIPTION: ["Autoroute existante"]}}
+      - pds_rail
+    buffer_m: 60
+
+# ---------------------------------------------------------------------------
+# Energy yield (scripts/energy.py), on the 2010 cutout of the model.
+# ---------------------------------------------------------------------------
+energy:
+  systems:
+    ground:              {panel: CSi, tilt: latitude_optimal, label: "fixed, south, latitude-optimal tilt (the model's solar)"}
+    agrivoltaic_grazing: {panel: CSi, tilt: 25, label: "fixed, south, 25°, elevated over pasture"}
+    agrivoltaic_canopy:  {panel: CSi, tilt: 20, label: "fixed, south, 20°, canopy over fruit"}
+    agrivoltaic_crops:   {panel: CSi, kind: vertical_bifacial, bifaciality: 0.85, label: "vertical bifacial, east-west faces"}
+    floating:            {panel: CSi, tilt: 12, label: "fixed, south, 12°, floats"}
+
+# ---------------------------------------------------------------------------
+# Benchmarks quoted in the report and the dashboard
+# ---------------------------------------------------------------------------
+benchmarks:
+  model_p_nom_max_mw: 13000        # BEWAL solar (ground-mounted), custom_potentials.csv
+  model_rooftop_p_nom_max_mw: 46000
+  pypsa_eur_land_mw: 37013         # BEWAL solar-all land potential, docs/renewable-potentials.md
+  installed_total_2025_mwc: 2400   # ~2 184 MWc end 2023 + 92 (2024) + ~100 (2025), Energie Commune / Renouvelle
+  pace_2030_gwh: 5100              # PACE 2030 PV target (all segments)
+  pace_2030_gwc: 6.0               # Renouvelle's conversion
+  apere_brownfields_gwc: 2.5       # APERe 2020, brownfields ">= 2.5 GWc"
+  livre_blanc_remaining_mwc: 2916  # remaining to 2030 after rooftops (Livre blanc p. 7)
+  livre_blanc_remaining_ha: 4483
+  glaes_scenarios_ha: [56787, 145855, 245233]
+  wierde_mwc: 10
+  wierde_ha: 14
+  sau_ha: 738927
+
+# ---------------------------------------------------------------------------
+# Dashboard (docs/pv_potential_wallonia/infographic_plan.md)
+# ---------------------------------------------------------------------------
+infographic:
+  loupe:
+    size_km: 12
+    centre: null          # EPSG:3035 metres; null = best-scoring window
+  choices:
+    # farmland classes the "agrivoltaïsme" choice admits
+    agri_sets:
+      none: []
+      prairies: [agri_grassland_perm, agri_grassland_temp]
+      toutes: [agri_grassland_perm, agri_grassland_temp, agri_arable, agri_perennial, agri_other]
+    quotas: [0.006, 0.01, 0.02]
+    poor_soil_max_class: 2
+  # choice tuples (agri set, SAR open, ZAE/ZSPEC share, poor-soil share --
+  # "ref" = the soil evidence's --, other water bodies, quota) that must
+  # reproduce the report's cases (the build fails otherwise)
+  checks:
+    sar_reserved: [prairies, 0, 0.25, ref, 0, 0.006]
+    zae_closed: [prairies, 1, 0.0, ref, 0, 0.006]
+    zae_open: [prairies, 1, 1.0, ref, 0, 0.006]
+    water_open: [prairies, 1, 0.25, ref, 1, 0.006]
+    poor_soils_none: [prairies, 1, 0.25, 0, 0, 0.006]
+    poor_soils_all: [prairies, 1, 0.25, 1, 0, 0.006]
+    agri_closed: [none, 1, 0.25, ref, 0, null]
+    agri_quota_1: [prairies, 1, 0.25, ref, 0, 0.01]
+    agri_quota_2: [prairies, 1, 0.25, ref, 0, 0.02]
+    agri_grassland_all: [prairies, 1, 0.25, ref, 0, null]
+    agri_all: [toutes, 1, 0.25, ref, 0, null]
+    rules_in_force: [none, 1, 0.25, 0, 0, null]
+  cities:
+    - {name: "Tournai", lat: 50.6056, lon: 3.3878}
+    - {name: "Mons", lat: 50.4542, lon: 3.9523}
+    - {name: "Charleroi", lat: 50.4108, lon: 4.4446}
+    - {name: "Namur", lat: 50.4674, lon: 4.8718}
+    - {name: "Liège", lat: 50.6326, lon: 5.5797}
+    - {name: "Arlon", lat: 49.6833, lon: 5.8167, side: "left"}
+  export_env: "infographic"
+  publish:
+    ssh_host: "negawatt.squoilin.eu"
+    ssh_user: "pypsa"
+    identity_file: "~/.ssh/rsa_nopasswd"
+    remote_dir: "/home/pypsa/public_html"
+    public_url: "https://pypsa.squoilin.eu"
+    folder: "pv_sol_wallonie"

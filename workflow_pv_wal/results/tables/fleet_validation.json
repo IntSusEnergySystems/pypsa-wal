@@ -1,0 +1,105 @@
+{
+  "parks": 88,
+  "area_ha": 240.8,
+  "cells": 6013,
+  "gisement_of_parks_ha": {
+    "agri_arable": 5.8,
+    "agri_zone_poor": 0.7,
+    "agri_zone_unfarmed": 17.4,
+    "cet": 16.7,
+    "extraction": 7.7,
+    "habitat": 10.2,
+    "infra_edge": 4.1,
+    "other": 5.4,
+    "quarry_active": 43.2,
+    "sar": 16.5,
+    "water_other": 23.5,
+    "zae": 84.1,
+    "zspec": 5.6
+  },
+  "gisement_of_parks_n": {
+    "zae": 33,
+    "quarry_active": 13,
+    "zspec": 10,
+    "sar": 7,
+    "agri_zone_unfarmed": 6,
+    "infra_edge": 5,
+    "habitat": 4,
+    "water_other": 3,
+    "extraction": 2,
+    "cet": 2,
+    "other": 1,
+    "agri_arable": 1,
+    "agri_zone_poor": 1
+  },
+  "share_of_fleet_area_eligible": 0.334,
+  "share_of_fleet_area_eligible_without_landcover_built": 0.722,
+  "tagged_parks_ge_1ha": 10,
+  "density_mwc_ha_median": 0.967,
+  "density_mwc_ha_area_weighted": 1.252,
+  "families": {
+    "nature": {
+      "rule": "family:nature",
+      "kind": "family",
+      "family": "nature",
+      "share_fleet": 0.0043,
+      "share_region": 0.1429,
+      "avoidance": 0.03,
+      "parks_mostly_inside": 1
+    },
+    "forest": {
+      "rule": "family:forest",
+      "kind": "family",
+      "family": "forest",
+      "share_fleet": 0.0298,
+      "share_region": 0.3132,
+      "avoidance": 0.095,
+      "parks_mostly_inside": 3
+    },
+    "cover": {
+      "rule": "family:cover",
+      "kind": "family",
+      "family": "cover",
+      "share_fleet": 0.0434,
+      "share_region": 0.3187,
+      "avoidance": 0.136,
+      "parks_mostly_inside": 1
+    },
+    "landscape": {
+      "rule": "family:landscape",
+      "kind": "family",
+      "family": "landscape",
+      "share_fleet": 0.0093,
+      "share_region": 0.2003,
+      "avoidance": 0.046,
+      "parks_mostly_inside": 2
+    },
+    "hazard": {
+      "rule": "family:hazard",
+      "kind": "family",
+      "family": "hazard",
+      "share_fleet": 0.0067,
+      "share_region": 0.0253,
+      "avoidance": 0.263,
+      "parks_mostly_inside": 3
+    },
+    "terrain": {
+      "rule": "family:terrain",
+      "kind": "family",
+      "family": "terrain",
+      "share_fleet": 0.1262,
+      "share_region": 0.2217,
+      "avoidance": 0.569,
+      "parks_mostly_inside": 7
+    },
+    "built": {
+      "rule": "family:built",
+      "kind": "family",
+      "family": "built",
+      "share_fleet": 0.4397,
+      "share_region": 0.0758,
+      "avoidance": 5.804,
+      "parks_mostly_inside": 46
+    }
+  }
+}

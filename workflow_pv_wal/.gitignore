@@ -1,0 +1,12 @@
+# Downloads, burnt rasters and logs live on the data disk (symlinks) and are
+# reproducible: only the code, the config and the small summary tables are
+# versioned.
+data
+resources
+logs
+.snakemake/
+results/figures/
+results/infographic
+
+# The root .gitignore ignores every *.html; the dashboard page is a source.
+!infographic/index.html

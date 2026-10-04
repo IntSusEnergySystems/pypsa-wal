@@ -1,0 +1,327 @@
+{
+  "_note": "Tous les libellés du tableau de bord. Espaces normales ici : la page pose elle-même les espaces fines insécables (avant : ; % ! ?, dans les guillemets, entre les milliers). Les {accolades} sont remplacées par les chiffres du calcul.",
+  "titre": "Où peut-on installer du photovoltaïque au sol en Wallonie ?",
+  "sous_titre": "Les règles wallonnes appliquées une à une à tout le territoire, puis les choix qui restent à faire",
+  "lien_rapport": "Le rapport complet (PDF)",
+  "lien_methode": "Comment lire cette carte",
+  "pourquoi": "Pourquoi ?",
+  "indicateur": {
+    "place_pour": "place pour",
+    "technique": "potentiel technique",
+    "possible": "possible selon les règles choisies",
+    "si_tout": "si chaque hectare était couvert de panneaux",
+    "terrain": "{km2} km² · {pct} % de la Région encore disponibles",
+    "ouverts": "sur {ha} ha ouverts au photovoltaïque",
+    "quota": "quota agrivoltaïque : {ha} ha sur {possible} ha possibles",
+    "choix_1": "Et si… : {n} choix modifié",
+    "choix_n": "Et si… : {n} choix modifiés"
+  },
+  "commandes": {
+    "etape_n": "Étape {n} sur {total}",
+    "bilan": "Bilan",
+    "lecture": "Lecture",
+    "pause": "Pause",
+    "precedent": "Étape précédente",
+    "suivant": "Étape suivante",
+    "voir_etsi": "Et si on changeait les règles ?"
+  },
+  "familles": [
+    "Nature protégée",
+    "Forêts et espaces verts",
+    "Paysage et patrimoine",
+    "Risques et relief",
+    "Bâti, réseaux et eau"
+  ],
+  "groupes": [
+    "Terrains dégradés",
+    "Zones d'activité",
+    "Prairies",
+    "Cultures",
+    "Plans d'eau",
+    "Autres terrains"
+  ],
+  "gisements": {
+    "water_industrial": "Bassin industriel ou lac de carrière",
+    "water_other": "Autre plan d'eau",
+    "cet": "Centre d'enfouissement technique",
+    "sar": "Friche (site à réaménager)",
+    "terril": "Terril arasé ou remanié",
+    "quarry_active": "Carrière en activité",
+    "agri_grassland_perm": "Prairie permanente",
+    "agri_grassland_temp": "Prairie temporaire, fourrage",
+    "agri_arable": "Grande culture",
+    "agri_perennial": "Verger, vigne, petits fruits",
+    "agri_other": "Jachère, bande agro-environnementale",
+    "extraction": "Zone d'extraction non exploitée",
+    "infra_edge": "Bord d'autoroute ou de voie ferrée",
+    "zae": "Zone d'activité économique",
+    "zspec": "Zone de services publics, de loisirs",
+    "agri_zone_unfarmed": "Zone agricole non déclarée",
+    "habitat": "Zone d'habitat non bâtie",
+    "other": "Autre terrain",
+    "agri_zone_poor": "Zone agricole non exploitée, sol faible"
+  },
+  "legende": {
+    "disponible": "Encore disponible",
+    "retire": "Retiré par :",
+    "trop_petit": "Trop petit ou trop étroit pour un parc",
+    "gisements": "Terrain restant, par type :",
+    "ferme": "Exclu, ou fermé par les règles choisies",
+    "quota": "Terres agricoles admissibles, dont le quota n'utilise que {pct} %",
+    "parcs": "Parcs existants cartographiés ({n})",
+    "note": "Chaque km² est compté dans la première famille de règles qui l'exclut. À cette échelle, le terrain disponible est agrandi pour rester visible ; tous les calculs sont faits sur une grille de 20 m."
+  },
+  "loupe": "Loupe : 12 × 12 km au 20 m, comme le calcul",
+  "survol": {
+    "disponible": "Encore disponible à cette étape",
+    "retire": "Retiré : {famille}",
+    "ouvert": "ouvert",
+    "ferme": "fermé"
+  },
+  "effet": {
+    "fermes": "{gwc} GWc de terrain technique restent fermés par les règles"
+  },
+  "etapes": [
+    {
+      "id": "0",
+      "titre": "La Wallonie",
+      "court": "La Wallonie",
+      "regle": "{region_km2} km² : aucune règle n'est encore appliquée",
+      "pourquoi": "Le point de départ : toute la Région, couverte à {dens_sol} MWc par hectare. Ce chiffre n'est pas un potentiel : il mesure seulement la place qu'occuperaient des panneaux partout.",
+      "picto": "wallonie"
+    },
+    {
+      "id": "1",
+      "famille": 1,
+      "titre": "Nature protégée",
+      "court": "Nature",
+      "regle": "Natura 2000, réserves naturelles et forestières, zones humides, cavités, zones naturelles et parcs du plan de secteur",
+      "pourquoi": "La circulaire wallonne sur le photovoltaïque demande de « refuser l'implantation dans les sites protégés ». Les terrils encore en place, souvent riches en biodiversité, sont aussi écartés.",
+      "source": "Circulaire relative aux permis d'urbanisme pour le photovoltaïque, 14 mars 2024, p. 9 ; CoDT D.II.39-40",
+      "picto": "nature"
+    },
+    {
+      "id": "2",
+      "famille": 2,
+      "titre": "Forêts et espaces verts",
+      "court": "Forêts",
+      "regle": "La zone forestière et les espaces verts du plan de secteur, et les bois où qu'ils soient",
+      "pourquoi": "Un champ photovoltaïque n'est pas une affectation admise en zone forestière, et un bois hors zone forestière demanderait un permis de déboisement.",
+      "source": "CoDT D.II.37, D.II.38, D.IV.4 ; carte WALOUS 2023",
+      "picto": "foret"
+    },
+    {
+      "id": "3",
+      "famille": 3,
+      "titre": "Paysage et patrimoine",
+      "court": "Paysage",
+      "regle": "Périmètres d'intérêt paysager et culturel, sites classés et zones de protection, patrimoine mondial",
+      "pourquoi": "La circulaire demande « d'éviter de porter atteinte à des paysages protégés » et aux sites classés.",
+      "source": "Circulaire du 14 mars 2024, p. 10 ; CoDT R.II.21-7",
+      "picto": "paysage"
+    },
+    {
+      "id": "4",
+      "famille": 4,
+      "titre": "Risques et relief",
+      "court": "Risques, relief",
+      "regle": "Zones inondables à aléa élevé, karst, éboulements, captages ; pentes de plus de 15 %, versants nord de plus de 7 %",
+      "pourquoi": "La circulaire demande un terrain « bien ensoleillé, sans relief accidenté » et d'éviter les risques naturels majeurs. Les seuils de pente et d'orientation sont des critères techniques de l'étude.",
+      "source": "Circulaire du 14 mars 2024, p. 8 ; CoDT D.IV.57 ; MNT LiDAR 2021-2022",
+      "picto": "risques"
+    },
+    {
+      "id": "5",
+      "famille": 5,
+      "titre": "Bâti, réseaux et eau",
+      "court": "Bâti, réseaux",
+      "regle": "Bâtiments, parkings et voiries, emprises des routes, rails et lignes haute tension, plans d'eau",
+      "pourquoi": "Les toitures et les parkings sont le segment « en toiture » du modèle, pas le photovoltaïque au sol. Les plans d'eau reviennent plus loin, pour le photovoltaïque flottant.",
+      "source": "Carte WALOUS 2023 ; plan de secteur",
+      "picto": "bati"
+    },
+    {
+      "id": "6",
+      "titre": "Assez grand pour un parc",
+      "court": "Taille d'un parc",
+      "regle": "Au moins {park_ha} ha d'un seul tenant et {park_m} m de large",
+      "pourquoi": "La circulaire veut « éviter l'éparpillement de petites installations au sol » et préfère des parcs « d'une superficie importante ». Le seuil chiffré est un choix de l'étude. La carte montre désormais ce qu'est le terrain restant.",
+      "source": "Circulaire du 14 mars 2024, p. 9",
+      "picto": "parc"
+    },
+    {
+      "id": "7",
+      "titre": "Ce que les règles permettent",
+      "court": "Ce que les règles permettent",
+      "regle": "Friches, décharges, terrils, zones d'extraction, bords d'autoroutes, bassins industriels, un quart des zones d'activité ; les sols médiocres par dérogation ; l'agrivoltaïsme sur {quota_ha} ha de prairies",
+      "pourquoi": "La circulaire de 2024 ouvre les terrains dégradés et, sans les chiffrer, les zones d'activité (l'étude en retient {zae_pct} %). Elle admet une dérogation sur les sols de qualité médiocre démontrée : environ {sols_pct} % des sols cartographiés comme faibles passent ce test. La référence ajoute l'agrivoltaïsme au niveau du Livre blanc : 0,6 % de la surface agricole. La circulaire seule, sans dérogation ni agrivoltaïsme, donne {strict_gwc} GWc.",
+      "source": "Circulaire du 14 mars 2024, p. 5 et 18-20 ; CoDT D.IV.11, D.IV.13 ; Livre blanc de l'agrivoltaïsme (2024)",
+      "picto": "circulaire"
+    },
+    {
+      "id": "bilan",
+      "titre": "≈ {gwc} GWc possibles",
+      "court": "Bilan",
+      "regle": "Avec les règles choisies, soit environ {twh} TWh par an",
+      "pourquoi": "Le terrain ne manque pas : ce sont les règles qui décident, et d'abord celle sur les terres agricoles. Toutes les terres agricoles éligibles porteraient à elles seules un potentiel technique de plusieurs centaines de GWc.",
+      "picto": "solaire"
+    }
+  ],
+  "bilan": {
+    "par_gisement": "Par type de terrain",
+    "ce_choix": "Avec ces choix",
+    "reference": "Référence de l'étude",
+    "modele": "Plafond du modèle PyPSA-Wal (PV au sol)",
+    "pace": "Objectif PACE 2030 (tout le PV, toitures comprises)",
+    "note": "Le parc wallon compte environ {installe_gwc} GWc, surtout en toiture. Une installation au sol produit environ {flh} kWh par kWc et par an (météo 2010).",
+    "strict": "Circulaire seule (sans dérogation ni agrivoltaïsme)"
+  },
+  "et_si": {
+    "titre": "Et si… ?",
+    "intro": "Les choix qui décident du résultat. Chaque option indique ce qu'elle change par rapport à la référence, les autres choix restant ce qu'ils sont.",
+    "reference": "référence",
+    "reinitialiser": "Revenir à la référence",
+    "choix": {
+      "agri": {
+        "titre": "Agrivoltaïsme : quelle part des terres agricoles ?",
+        "picto": "agri",
+        "regle": "Des panneaux surélevés ou verticaux au-dessus d'une activité agricole maintenue",
+        "pourquoi": "La circulaire n'admet aujourd'hui que des projets pilotes. La référence reprend le Livre blanc de l'agrivoltaïsme : 0,6 % de la surface agricole, sur prairies. Mais ce chiffre est ce qu'il faudrait pour l'objectif de 2030 ; l'horizon du modèle est 2050, d'où les quotas plus élevés. Les cultures sont équipées de rangées verticales, moins denses.",
+        "options": [
+          {
+            "v": "ferme",
+            "label": "Projets pilotes seulement (règle actuelle)"
+          },
+          {
+            "v": "q06",
+            "label": "Prairies, 0,6 % de la surface agricole"
+          },
+          {
+            "v": "q2",
+            "label": "Prairies, 2 % de la surface agricole"
+          },
+          {
+            "v": "prairies",
+            "label": "Toutes les prairies éligibles, sans quota"
+          },
+          {
+            "v": "toutes",
+            "label": "Toutes les parcelles éligibles, cultures comprises"
+          }
+        ]
+      },
+      "friches": {
+        "titre": "Les friches industrielles",
+        "picto": "friche",
+        "regle": "Sites à réaménager et anciens sites d'activité",
+        "pourquoi": "La circulaire veut d'abord ramener les friches vers l'activité économique. En attendant leur réhabilitation, elle y admet des champs photovoltaïques « à titre temporaire », pour autant qu'ils ne compromettent pas cette réhabilitation : un parc d'une trentaine d'années compte pour 2050.",
+        "options": [
+          {
+            "v": "1",
+            "label": "Règle actuelle",
+            "note": "Panneaux admis en attendant la réindustrialisation"
+          },
+          {
+            "v": "0",
+            "label": "Réservées à la réindustrialisation",
+            "note": "Pas de panneaux sur les friches"
+          }
+        ]
+      },
+      "sols": {
+        "titre": "Sols médiocres en zone agricole : la dérogation",
+        "picto": "sol",
+        "regle": "Terrains de la zone agricole non exploités, sur des sols cartographiés comme faibles ({sols_ha} ha éligibles)",
+        "pourquoi": "La circulaire admet la dérogation sur « des terres où il est démontré que la qualité agronomique du sol est médiocre ». Mais la carte régionale classe les sols par rang : les sols « faibles » sont surtout des limons caillouteux que les agriculteurs cultivent à {sols_farmed_pct} % là où ils le peuvent. Une fois écartés les terres agricoles de référence (SIGEC), les jardins et cours de ferme, et pondéré par l'usage agricole réel de chaque type de sol, il en reste environ {sols_pct} %.",
+        "options": [
+          {
+            "v": "0",
+            "label": "Aucune dérogation"
+          },
+          {
+            "v": "1",
+            "label": "La part démontrable (≈ {sols_pct} %)"
+          },
+          {
+            "v": "2",
+            "label": "Tous ces sols (100 %)"
+          }
+        ]
+      },
+      "zae": {
+        "titre": "Les zones d'activité économique et de services publics",
+        "picto": "zae",
+        "regle": "Le terrain libre de ces zones, ni bâti ni cultivé",
+        "pourquoi": "Le photovoltaïque y « a sa place pour autant qu'il ne mette pas en péril la destination première de la zone ». Quelle part ? Aucune règle ne le dit.",
+        "options": [
+          {
+            "v": "0",
+            "label": "Aucune"
+          },
+          {
+            "v": "25",
+            "label": "Un quart du terrain libre"
+          },
+          {
+            "v": "100",
+            "label": "Tout le terrain libre"
+          }
+        ]
+      },
+      "eau": {
+        "titre": "Le photovoltaïque flottant",
+        "picto": "eau",
+        "regle": "Un quart de la surface des plans d'eau d'au moins 1 ha",
+        "pourquoi": "La circulaire demande d'« éviter les plans d'eau (hormis les bassins industriels) ». Les lacs de carrière sont comptés avec les bassins industriels.",
+        "options": [
+          {
+            "v": "0",
+            "label": "Bassins industriels et lacs de carrière"
+          },
+          {
+            "v": "1",
+            "label": "Tous les plans d'eau"
+          }
+        ]
+      }
+    }
+  },
+  "methode": {
+    "titre": "Comment lire cette carte",
+    "paragraphes": [
+      "Chaque étape applique une famille de règles à toute la Wallonie, sur une grille de 20 m. Le terrain retiré prend la couleur de la première famille qui l'exclut.",
+      "À l'étape 6, le terrain restant doit pouvoir accueillir un parc : au moins {park_ha} ha d'un seul tenant et {park_m} m de large. La carte montre alors ce qu'est ce terrain : friche, zone d'activité, prairie, culture, plan d'eau.",
+      "À l'étape 7, seules restent ouvertes les catégories de la référence : celles que la circulaire wallonne de 2024 admet, la part des sols médiocres qui pourrait être démontrée, et l'agrivoltaïsme au niveau du Livre blanc. Les choix « Et si… ? » ouvrent ou ferment chacune d'elles.",
+      "Densités : {dens_sol} MWc par hectare au sol, {dens_agri} MWc par hectare en agrivoltaïsme sur prairie, moins sur les cultures. Tous les chiffres viennent du même calcul que le rapport."
+    ],
+    "fermer": "Fermer"
+  },
+  "expert": {
+    "titre": "Mode expert : les choix de modélisation",
+    "intro": "Chaque ligne est la référence avec un seul changement. Ces choix ne sont pas dans les « Et si… ? » : ce sont des hypothèses de l'étude, discutées dans le rapport.",
+    "cas": "Cas",
+    "ecart": "écart",
+    "cases": {
+      "no_ecolinks": "Liaisons écologiques non exclues",
+      "adesa": "Périmètres paysagers ADESA exclus en plus",
+      "no_landscape": "Aucun périmètre paysager ni patrimonial",
+      "flood_extreme": "Zones inondables extrêmes exclues en plus",
+      "no_water_capture": "Captages IIa non exclus",
+      "terrils_inplace": "Terrils en place admis",
+      "slope_10": "Pente maximale 10 %",
+      "slope_20": "Pente maximale 20 %",
+      "north_5": "Versants nord exclus dès 5 %",
+      "north_off": "Pas de règle sur les versants nord",
+      "park_05ha": "Parcs dès 0,5 ha",
+      "park_5ha": "Parcs de 5 ha au moins",
+      "width_40": "Largeur minimale 40 m",
+      "width_100": "Largeur minimale 100 m",
+      "density_low": "Densités basses",
+      "density_high": "Densités hautes",
+      "floating_15": "Flottant sur 15 % d'un plan d'eau (règle allemande)",
+      "floating_50": "Flottant sur la moitié d'un plan d'eau",
+      "built_10": "Bâti dès 10 % d'une maille"
+    }
+  },
+  "credits": "Source : étude PyPSA-Wal, Université de Liège, calcul du {date} · Données : Géoportail de la Wallonie (CC BY 4.0) — plan de secteur, SIGEC 2024, WALOUS 2023, MNT LiDAR 2021-2022 ; © les contributeurs d'OpenStreetMap (ODbL) ; météo SARAH-3 © EUMETSAT"
+}

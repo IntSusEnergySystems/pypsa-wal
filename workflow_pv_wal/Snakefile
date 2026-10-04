@@ -1,0 +1,727 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Wal
+# SPDX-License-Identifier: MIT
+#
+# Stand-alone land-eligibility workflow for ground-mounted PV in Wallonia, the
+# PV counterpart of workflow_onwind_wal/.  It shares nothing with the main
+# PyPSA-Wal Snakefile except read-only inputs (region shapes, atlite cutout).
+#
+#   cd workflow_pv_wal
+#   snakemake -c2 --resources mem_mb=8000 net=1 --rerun-triggers mtime <target>
+#
+# Targets:
+#   download   the Walloon open-data layers, bulk files, OSM, DEM
+#   all        eligibility, potentials, sensitivity, figures, tables
+#   report     the LaTeX report in docs/pv_potential_wallonia/
+#   infographic  the dashboard in results/infographic/
+#
+# data/, resources/, logs/ and results/infographic/ are symlinks to
+# /sylvain/mount/pypsa-wal-data/workflow_pv_wal/ (run_from_office_computer.md
+# §1): nothing heavy is written under /sylvain/git.
+
+import os
+from pathlib import Path
+
+# The scripts run with the environment's interpreter but without `conda
+# activate`, so GDAL and PROJ would not find their data files.
+os.environ.setdefault("PROJ_DATA", "/home/anaconda/envs/pypsa-eur/share/proj")
+os.environ.setdefault("GDAL_DATA", "/home/anaconda/envs/pypsa-eur/share/gdal")
+os.environ.setdefault("TMPDIR", "/sylvain/mount/pypsa-wal-data/workflow_pv_wal/tmp")
+
+
+configfile: "config.yaml"
+
+
+DATA = "data"
+RES = "resources"
+OUT = "results"
+DOCDIR = "../docs/pv_potential_wallonia"
+PY = "/home/anaconda/envs/pypsa-eur/bin"
+
+SOURCES = list(config["sources"])
+BULK = [k for k in config["bulk"] if "url" in config["bulk"][k]]
+PROVINCES = config["bulk"]["dem_lidar"]["provinces"]
+
+
+wildcard_constraints:
+    source="|".join(SOURCES),
+    bulk="|".join(BULK),
+    prov="|".join(PROVINCES),
+
+
+localrules:
+    download,
+
+
+rule download:
+    input:
+        expand(f"{DATA}/{{source}}.gpkg", source=SOURCES),
+        expand(f"{DATA}/{{bulk}}/.done", bulk=BULK),
+        f"{RES}/dem_20m.tif",
+        f"{DATA}/osm_pv.gpkg",
+        f"{DATA}/osm_grid.gpkg",
+
+
+# ---------------------------------------------------------------------------
+# Retrieval
+# ---------------------------------------------------------------------------
+rule retrieve_wallonia_layer:
+    message:
+        "Retrieving {wildcards.source} from the Géoportail de la Wallonie"
+    params:
+        spec=lambda w: config["sources"][w.source],
+    output:
+        f"{DATA}/{{source}}.gpkg",
+        f"{DATA}/{{source}}.meta.json",
+    log:
+        "logs/retrieve_{source}.log",
+    resources:
+        mem_mb=2000,
+    retries: 2
+    script:
+        "scripts/retrieve_wallonia_layer.py"
+
+
+rule retrieve_bulk:
+    message:
+        "Downloading the bulk file {wildcards.bulk}"
+    params:
+        url=lambda w: config["bulk"][w.bulk]["url"],
+    output:
+        touch(f"{DATA}/{{bulk}}/.done"),
+    log:
+        "logs/retrieve_bulk_{bulk}.log",
+    resources:
+        net=1,
+        mem_mb=500,
+    retries: 2
+    shell:
+        """
+        set -e
+        d=$(dirname {output})
+        mkdir -p $d
+        curl -sS -L --retry 5 -C - -o $d/archive.zip "{params.url}" > {log} 2>&1
+        unzip -o -q $d/archive.zip -d $d >> {log} 2>&1
+        rm -f $d/archive.zip
+        ls -la $d >> {log}
+        """
+
+
+rule extract_lpis:
+    message:
+        "Extracting the LPIS agricultural surfaces from the SIGEC 2024 GeoPackage"
+    params:
+        gdal=PY,
+    input:
+        f"{DATA}/sigec_2024/.done",
+    output:
+        f"{DATA}/lpis_agri.gpkg",
+        f"{DATA}/lpis_agri.meta.json",
+    log:
+        "logs/extract_lpis.log",
+    shell:
+        """
+        {params.gdal}/ogr2ogr -f GPKG -nln data {output[0]} {DATA}/sigec_2024/SIGEC_PARC_AGRI_2024.gpkg \
+            SIGEC_2024__SURFACE_AGRICOLE > {log} 2>&1
+        n=$({params.gdal}/ogrinfo -so {output[0]} data | grep "Feature Count" | awk '{{print $3}}')
+        printf '{{"service": "SIGEC 2024 bulk GeoPackage", "layer": "SIGEC_2024__SURFACE_AGRICOLE", "title": "LPIS — surfaces agricoles de référence 2024", "features_written": %s, "retrieved": "%s"}}' $n $(date +%F) > {output[1]}
+        """
+
+
+rule build_regions:
+    message:
+        "Building the administrative and model Walloon regions"
+    params:
+        region=config["region"],
+        crs=config["grid"]["crs"],
+    input:
+        shapes=config["region"]["shapes"],
+        fallback=config["region"]["fallback_shapes"],
+    output:
+        regions=f"{RES}/regions.gpkg",
+        mismatch=f"{RES}/region_mismatch.gpkg",
+        stats=f"{RES}/region_stats.json",
+    log:
+        "logs/build_regions.log",
+    script:
+        "scripts/build_regions.py"
+
+
+rule build_grid:
+    message:
+        "Defining the {params.res} m study grid"
+    params:
+        crs=config["grid"]["crs"],
+        res=config["grid"]["res"],
+    input:
+        regions=f"{RES}/regions.gpkg",
+    output:
+        grid=f"{RES}/grid.json",
+        region_mask=f"{RES}/region_mask.tif",
+    log:
+        "logs/build_grid.log",
+    resources:
+        mem_mb=2000,
+    script:
+        "scripts/build_grid.py"
+
+
+rule download_dem_province:
+    message:
+        "Downloading the LiDAR terrain model of {wildcards.prov}"
+    params:
+        url=lambda w: config["bulk"]["dem_lidar"]["url_pattern"].format(prov=w.prov),
+    output:
+        # temp(): removed once the province is warped (and only then, so a
+        # failed warp does not throw away 10 GB of download).
+        temp(f"{RES}/dem/MNT_1M_{{prov}}.zip"),
+    log:
+        "logs/download_dem_{prov}.log",
+    resources:
+        net=1,
+        mem_mb=300,
+    retries: 2
+    shell:
+        """
+        rm -f {output}.part
+        curl -sS -L --retry 5 -o {output}.part "{params.url}" > {log} 2>&1
+        unzip -Z1 {output}.part >> {log} 2>&1
+        mv {output}.part {output}
+        """
+
+
+rule retrieve_dem_province:
+    message:
+        "LiDAR terrain model of {wildcards.prov}: average onto the study grid"
+    params:
+        gdal=PY,
+    input:
+        grid=f"{RES}/grid.json",
+        zip=f"{RES}/dem/MNT_1M_{{prov}}.zip",
+    output:
+        f"{RES}/dem/dem_{{prov}}.tif",
+    log:
+        "logs/retrieve_dem_{prov}.log",
+    resources:
+        mem_mb=1500,
+    script:
+        "scripts/retrieve_dem.py"
+
+
+rule merge_dem:
+    message:
+        "Merging the provincial terrain models"
+    params:
+        gdal=PY,
+    input:
+        expand(f"{RES}/dem/dem_{{prov}}.tif", prov=PROVINCES),
+    output:
+        f"{RES}/dem_20m.tif",
+    log:
+        "logs/merge_dem.log",
+    shell:
+        """
+        {params.gdal}/gdalbuildvrt -srcnodata -9999 -vrtnodata -9999 {RES}/dem/dem.vrt {input} > {log} 2>&1
+        {params.gdal}/gdal_translate -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES \
+            {RES}/dem/dem.vrt {output} >> {log} 2>&1
+        """
+
+
+rule retrieve_osm:
+    message:
+        "Retrieving ground-mounted PV plants and grid substations from OpenStreetMap"
+    params:
+        crs=config["grid"]["crs"],
+    input:
+        regions=f"{RES}/regions.gpkg",
+    output:
+        pv=f"{DATA}/osm_pv.gpkg",
+        grid=f"{DATA}/osm_grid.gpkg",
+        meta=f"{DATA}/osm.meta.json",
+    log:
+        "logs/retrieve_osm.log",
+    resources:
+        mem_mb=2000,
+    retries: 2
+    script:
+        "scripts/retrieve_osm.py"
+
+
+# ---------------------------------------------------------------------------
+# Burning: every exclusion layer and gisement mask onto the 20 m grid
+# ---------------------------------------------------------------------------
+BURN = {**config["layers"], **config["masks"]}
+
+
+def burn_sources(w):
+    spec = BURN[w.layer]
+    items = spec["source"] if isinstance(spec["source"], list) else [spec["source"]]
+    return [f"{DATA}/{i if isinstance(i, str) else i['source']}.gpkg" for i in items]
+
+
+rule burn_layer:
+    message:
+        "Burning {wildcards.layer} onto the grid"
+    params:
+        spec=lambda w: BURN[w.layer],
+    input:
+        sources=burn_sources,
+        grid=f"{RES}/grid.json",
+        region_mask=f"{RES}/region_mask.tif",
+    output:
+        raster=f"{RES}/layers/{{layer}}.tif",
+        stats=f"{RES}/layers/{{layer}}.json",
+    log:
+        "logs/burn_{layer}.log",
+    resources:
+        mem_mb=2500,
+    wildcard_constraints:
+        layer="|".join(BURN),
+    script:
+        "scripts/burn_layer.py"
+
+
+rule burn_all:
+    input:
+        expand(f"{RES}/layers/{{layer}}.tif", layer=BURN),
+
+
+# ---------------------------------------------------------------------------
+# Continuous rasters on the grid
+# ---------------------------------------------------------------------------
+rule build_terrain:
+    message:
+        "Slope and aspect from the LiDAR terrain model"
+    input:
+        dem=f"{RES}/dem_20m.tif",
+        region_mask=f"{RES}/region_mask.tif",
+    output:
+        slope=f"{RES}/rasters/slope_pct.tif",
+        aspect=f"{RES}/rasters/aspect_deg.tif",
+        stats=f"{RES}/rasters/terrain.json",
+    log:
+        "logs/build_terrain.log",
+    resources:
+        mem_mb=4000,
+    script:
+        "scripts/build_terrain.py"
+
+
+rule build_sigec:
+    message:
+        "Burning the 2024 agricultural parcels"
+    params:
+        classes=config["sigec_classes"],
+    input:
+        folder=f"{DATA}/sigec_2024/.done",
+        grid=f"{RES}/grid.json",
+        region_mask=f"{RES}/region_mask.tif",
+    output:
+        classes=f"{RES}/rasters/sigec_class.tif",
+        pids=f"{RES}/rasters/sigec_pid.tif",
+        parcels=f"{RES}/sigec_parcels.gpkg",
+        stats=f"{RES}/rasters/sigec.json",
+    log:
+        "logs/build_sigec.log",
+    resources:
+        mem_mb=5000,
+    script:
+        "scripts/build_sigec.py"
+
+
+rule build_soils:
+    message:
+        "Agronomic soil quality onto the grid"
+    params:
+        gdal=PY,
+    input:
+        folder=f"{DATA}/soils_awac/.done",
+        grid=f"{RES}/grid.json",
+    output:
+        f"{RES}/rasters/soil_quality.tif",
+    log:
+        "logs/build_soils.log",
+    run:
+        import json as _j
+
+        g = _j.loads(Path(input.grid).read_text())
+        src = next(Path(input.folder).parent.rglob("SOLS_QUALITE_AGRO.tif"))
+        b = g["bounds"]
+        shell(
+            "{params.gdal}/gdalwarp -overwrite -t_srs EPSG:{g[crs]} -te {b[0]} {b[1]} {b[2]} {b[3]} "
+            "-tr {g[res]} {g[res]} -r near -ot Byte -co COMPRESS=DEFLATE -co TILED=YES "
+            "--config GTIFF_SRS_SOURCE EPSG {src} {output} > {log} 2>&1"
+        )
+
+
+rule build_cnsw:
+    message:
+        "Principal soil types of the CNSW onto the grid"
+    input:
+        soils=f"{DATA}/cnsw_types.gpkg",
+        grid=f"{RES}/grid.json",
+    output:
+        f"{RES}/rasters/cnsw_code.tif",
+    log:
+        "logs/build_cnsw.log",
+    resources:
+        mem_mb=4000,
+    script:
+        "scripts/build_cnsw.py"
+
+
+rule build_walous:
+    message:
+        "WALOUS 2023 land cover: share of each 20 m cell by class group"
+    params:
+        groups=config["walous"]["groups"],
+        gdal=PY,
+    input:
+        folder=f"{DATA}/walous_ocs_2023/.done",
+        grid=f"{RES}/grid.json",
+    output:
+        expand(f"{RES}/rasters/walous_{{g}}.tif", g=config["walous"]["groups"]),
+        stats=f"{RES}/rasters/walous.json",
+    log:
+        "logs/build_walous.log",
+    resources:
+        mem_mb=3000,
+    script:
+        "scripts/build_walous.py"
+
+
+# ---------------------------------------------------------------------------
+# Potential
+# ---------------------------------------------------------------------------
+RASTERS = {
+    "slope_pct": f"{RES}/rasters/slope_pct.tif",
+    "aspect_deg": f"{RES}/rasters/aspect_deg.tif",
+    "sigec_class": f"{RES}/rasters/sigec_class.tif",
+    "soil_quality": f"{RES}/rasters/soil_quality.tif",
+    "walous_built": f"{RES}/rasters/walous_built.tif",
+    "walous_sealed": f"{RES}/rasters/walous_sealed.tif",
+    "walous_water": f"{RES}/rasters/walous_water.tif",
+    "walous_trees": f"{RES}/rasters/walous_trees.tif",
+}
+
+
+rule soil_evidence:
+    message:
+        "Which share of the mapped-poor soils could be demonstrated poor"
+    params:
+        config=config,
+    input:
+        grid=f"{RES}/grid.json",
+        region_mask=f"{RES}/region_mask.tif",
+        layers=expand(f"{RES}/layers/{{layer}}.tif", layer=BURN),
+        rasters=list(RASTERS.values()),
+        cnsw=f"{RES}/rasters/cnsw_code.tif",
+    output:
+        json=f"{OUT}/tables/soil_evidence.json",
+        table=f"{OUT}/tables/soil_units.csv",
+    log:
+        "logs/soil_evidence.log",
+    resources:
+        mem_mb=7000,
+    script:
+        "scripts/soil_evidence.py"
+
+
+rule potential:
+    message:
+        "Reference potential and sensitivity cases"
+    params:
+        config=config,
+    input:
+        evidence=f"{OUT}/tables/soil_evidence.json",
+        grid=f"{RES}/grid.json",
+        region_mask=f"{RES}/region_mask.tif",
+        layers=expand(f"{RES}/layers/{{layer}}.tif", layer=BURN),
+        rasters=list(RASTERS.values()),
+    output:
+        reference=f"{OUT}/tables/potential_reference.csv",
+        funnel=f"{OUT}/tables/funnel.csv",
+        sensitivity=f"{OUT}/tables/sensitivity_cases.csv",
+        headline=f"{OUT}/tables/headline.json",
+        detail=f"{RES}/sensitivity_detail.json",
+        rasters_dir=directory(f"{RES}/reference"),
+    log:
+        "logs/potential.log",
+    resources:
+        mem_mb=7000,
+    script:
+        "scripts/potential.py"
+
+
+rule validate_fleet:
+    message:
+        "Testing the constraint set against the ground-mounted PV parks of Wallonia"
+    params:
+        config=config,
+    input:
+        grid=f"{RES}/grid.json",
+        region_mask=f"{RES}/region_mask.tif",
+        layers=expand(f"{RES}/layers/{{layer}}.tif", layer=BURN),
+        rasters=list(RASTERS.values()),
+        parks=f"{DATA}/osm_pv.gpkg",
+    output:
+        table=f"{OUT}/tables/fleet_avoidance.csv",
+        parks=f"{OUT}/tables/fleet_parks.csv",
+        summary=f"{OUT}/tables/fleet_validation.json",
+    log:
+        "logs/validate_fleet.log",
+    resources:
+        mem_mb=7000,
+    script:
+        "scripts/validate_fleet.py"
+
+
+rule energy:
+    message:
+        "Full-load hours of each PV system on the 2010 weather year"
+    params:
+        energy=config["energy"],
+    input:
+        cutout=config["atlite"]["cutout"],
+        regions=f"{RES}/regions.gpkg",
+        tech_land=f"{RES}/reference",
+    output:
+        table=f"{OUT}/tables/energy.csv",
+        json=f"{OUT}/tables/energy.json",
+    log:
+        "logs/energy.log",
+    resources:
+        mem_mb=4000,
+    script:
+        "scripts/energy.py"
+
+
+# ---------------------------------------------------------------------------
+# Figures
+# ---------------------------------------------------------------------------
+rule plot_maps:
+    message:
+        "Drawing the report maps"
+    params:
+        config=config,
+    input:
+        reference=f"{RES}/reference",
+        region_mask=f"{RES}/region_mask.tif",
+        regions=f"{RES}/regions.gpkg",
+        parks=f"{DATA}/osm_pv.gpkg",
+    output:
+        exclusions=f"{OUT}/figures/map_exclusions.png",
+        gisements=f"{OUT}/figures/map_gisements.png",
+    log:
+        "logs/plot_maps.log",
+    resources:
+        mem_mb=4000,
+    script:
+        "scripts/plot_maps.py"
+
+
+rule plot_summary:
+    message:
+        "Drawing the summary charts"
+    input:
+        headline=f"{OUT}/tables/headline.json",
+        sensitivity=f"{OUT}/tables/sensitivity_cases.csv",
+    output:
+        funnel=f"{OUT}/figures/funnel.png",
+        gisements=f"{OUT}/figures/gisements.png",
+        sensitivity=f"{OUT}/figures/sensitivity.png",
+    log:
+        "logs/plot_summary.log",
+    script:
+        "scripts/plot_summary.py"
+
+
+# ---------------------------------------------------------------------------
+# Dashboard (docs/pv_potential_wallonia/infographic_plan.md)
+# ---------------------------------------------------------------------------
+IG = f"{OUT}/infographic"
+
+
+rule infographic_data:
+    message:
+        "Exporting the maps and states the dashboard draws"
+    params:
+        config=config,
+    input:
+        grid=f"{RES}/grid.json",
+        region_mask=f"{RES}/region_mask.tif",
+        layers=expand(f"{RES}/layers/{{layer}}.tif", layer=BURN),
+        rasters=list(RASTERS.values()),
+        regions=f"{RES}/regions.gpkg",
+        pds_roads=f"{DATA}/pds_roads.gpkg",
+        parks=f"{DATA}/osm_pv.gpkg",
+        headline=f"{OUT}/tables/headline.json",
+        detail=f"{RES}/sensitivity_detail.json",
+        sensitivity=f"{OUT}/tables/sensitivity_cases.csv",
+        energy=f"{OUT}/tables/energy.json",
+        evidence=f"{OUT}/tables/soil_evidence.json",
+    output:
+        states=f"{IG}/data/states.json",
+        landmarks=f"{IG}/data/landmarks.json",
+        map=f"{IG}/data/map.png",
+        loupe=f"{IG}/data/loupe.png",
+    log:
+        "logs/infographic_data.log",
+    resources:
+        mem_mb=7000,
+    script:
+        "scripts/infographic_data.py"
+
+
+IG_SOURCES = sorted(str(p) for p in Path("infographic").rglob("*") if p.is_file())
+
+
+rule infographic_page:
+    message:
+        "Assembling the dashboard in {IG}"
+    input:
+        sources=IG_SOURCES,
+        states=f"{IG}/data/states.json",
+        report=f"{DOCDIR}/pv_potential_wallonia.pdf",
+    output:
+        f"{IG}/index.html",
+    run:
+        import shutil
+
+        import re
+        import time
+
+        stamp = time.strftime("%Y%m%d%H%M%S")
+        for src in input.sources:
+            dst = Path(IG) / Path(src).relative_to("infographic")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+        # Cache-busting: the page, its modules and their imports carry the
+        # build stamp, so a republished dashboard is never mixed with a cached one.
+        page = Path(IG) / "index.html"
+        page.write_text(page.read_text().replace('src="js/app.js"', f'src="js/app.js?v={stamp}"')
+                        .replace('href="css/style.css"', f'href="css/style.css?v={stamp}"'))
+        for js in (Path(IG) / "js").glob("*.js"):
+            js.write_text(re.sub(r'from "\./(\w+)\.js"', rf'from "./\1.js?v={stamp}"', js.read_text()))
+        shutil.copy2(input.report, Path(IG) / "pv_potential_wallonia.pdf")
+
+
+rule infographic:
+    input:
+        f"{IG}/index.html",
+
+
+rule infographic_publish:
+    message:
+        "Publishing the dashboard to {params.url}"
+    params:
+        p=config["infographic"]["publish"],
+        url=lambda w: f"{config['infographic']['publish']['public_url']}/{config['infographic']['publish']['folder']}/",
+    input:
+        page=f"{IG}/index.html",
+    output:
+        f"{IG}/published.url",
+    shell:
+        "rsync -a --delete --chmod=D755,F644 --exclude review/ --exclude published.url "
+        "-e 'ssh -i {params.p[identity_file]} -o BatchMode=yes' "
+        "{IG}/ {params.p[ssh_user]}@{params.p[ssh_host]}:{params.p[remote_dir]}/{params.p[folder]}/ "
+        "&& echo {params.url} > {output}"
+
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+REPORT_LABELS = {
+    "water_industrial": "Industrial basins and quarry lakes",
+    "water_other": "Other water bodies",
+    "cet": "Landfills (CET)",
+    "sar": "Brownfields (SAR)",
+    "terril": "Levelled or reworked spoil tips",
+    "quarry_active": "Quarries in operation",
+    "agri_grassland_perm": "Permanent grassland",
+    "agri_grassland_temp": "Temporary grassland, fodder",
+    "agri_arable": "Arable crops",
+    "agri_perennial": "Orchards, vines, small fruit",
+    "agri_other": "Fallow, agri-environmental strips",
+    "extraction": "Extraction zones (not in operation)",
+    "infra_edge": "Motorway and railway verges",
+    "zae": "Economic-activity zones",
+    "zspec": "Public-service and leisure zones",
+    "agri_zone_poor": "Agricultural zone, not declared, poor soil",
+    "agri_zone_unfarmed": "Agricultural zone, not declared",
+    "habitat": "Habitat zones, unbuilt",
+    "other": "Other land",
+    "outside": "outside every gisement",
+}
+
+
+rule make_report_inputs:
+    message:
+        "Generating the LaTeX macros and table fragments"
+    params:
+        config=config,
+        labels=REPORT_LABELS,
+    input:
+        headline=f"{OUT}/tables/headline.json",
+        detail=f"{RES}/sensitivity_detail.json",
+        sensitivity=f"{OUT}/tables/sensitivity_cases.csv",
+        fleet=f"{OUT}/tables/fleet_validation.json",
+        avoidance=f"{OUT}/tables/fleet_avoidance.csv",
+        parks=f"{OUT}/tables/fleet_parks.csv",
+        energy=f"{OUT}/tables/energy.json",
+        evidence=f"{OUT}/tables/soil_evidence.json",
+        grid=f"{RES}/grid.json",
+        layer_stats=expand(f"{RES}/layers/{{layer}}.json", layer=BURN),
+        source_meta=expand(f"{DATA}/{{source}}.meta.json", source=SOURCES),
+    output:
+        macros=f"{DOCDIR}/generated/macros.tex",
+        gisements=f"{DOCDIR}/generated/table_gisements.tex",
+        sensitivity=f"{DOCDIR}/generated/table_sensitivity.tex",
+        fleet=f"{DOCDIR}/generated/table_fleet.tex",
+        parks=f"{DOCDIR}/generated/table_parks.tex",
+        sources=f"{DOCDIR}/generated/table_sources.tex",
+    log:
+        "logs/make_report_inputs.log",
+    script:
+        "scripts/make_report_inputs.py"
+
+
+FIGURES = ["map_exclusions", "map_gisements", "funnel", "gisements", "sensitivity"]
+TECTONIC = "/sylvain/mount/pypsa-wal-data/envs/tex/bin/tectonic"
+
+
+rule build_report:
+    message:
+        "Compiling the LaTeX report"
+    input:
+        tex=f"{DOCDIR}/pv_potential_wallonia.tex",
+        generated=rules.make_report_inputs.output,
+        figures=expand(f"{OUT}/figures/{{f}}.png", f=FIGURES),
+    output:
+        f"{DOCDIR}/pv_potential_wallonia.pdf",
+    log:
+        "logs/build_report.log",
+    shell:
+        """
+        set -e
+        mkdir -p {DOCDIR}/figures
+        cp {input.figures} {DOCDIR}/figures/
+        export TECTONIC_CACHE_DIR=/sylvain/mount/pypsa-wal-data/tectonic-cache
+        export XDG_CACHE_HOME=/sylvain/mount/pypsa-wal-data/xdg-cache
+        {TECTONIC} -X compile --keep-logs {input.tex} > {log} 2>&1
+        rm -f {DOCDIR}/pv_potential_wallonia.log
+        """
+
+
+rule report:
+    input:
+        f"{DOCDIR}/pv_potential_wallonia.pdf",
+
+
+rule all:
+    input:
+        f"{OUT}/tables/potential_reference.csv",
+        f"{OUT}/tables/sensitivity_cases.csv",
+        f"{OUT}/tables/fleet_validation.json",
+        f"{OUT}/tables/energy.json",
+        expand(f"{OUT}/figures/{{f}}.png", f=FIGURES),
+        f"{DOCDIR}/generated/macros.tex",

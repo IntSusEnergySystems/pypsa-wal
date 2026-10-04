@@ -1,0 +1,89 @@
+name,kind,area_ha,mw_tag,mwc_per_ha,gisement,share_eligible,share_eligible_rules
+Helios,plant,31.715407189184347,60.0,1.892,zae,0.972,0.972
+,generator_cluster,19.59166080989385,31.0,1.582,water_other,0.0,0.0
+Parc photovoltaïque de Braine-l'Alleud,plant,15.924333088744817,,,cet,0.136,0.945
+Burgo Ardennes,plant,15.212616909910308,9.7,0.638,zae,0.22,0.22
+,plant,12.511801053308364,,,agri_zone_unfarmed,0.023,0.945
+Centrale solaire photovoltaïque de Tertre,plant,9.19798876451263,6.4,0.696,habitat,0.035,1.0
+,generator_cluster,7.248899125021228,4.6,0.635,quarry_active,0.005,1.0
+,plant,6.130515422733866,,,quarry_active,0.059,0.059
+,plant,5.791875522278418,6.0,1.036,agri_arable,0.903,0.903
+,plant,5.702151899296407,,,sar,0.241,0.241
+,plant,5.4395010893994735,,,quarry_active,0.08,0.754
+Railpark - Arlon,plant,5.351510095512959,1.0,0.187,other,0.465,1.0
+,plant,5.1862170403230845,,,quarry_active,0.172,0.664
+,plant,4.966283038503783,,,quarry_active,0.008,0.789
+,plant,4.568949501015465,,,zae,0.026,0.991
+,plant,4.3133028861747365,,,zae,0.661,0.881
+,plant,3.9680420334207853,,,quarry_active,0.218,0.832
+,plant,3.9464393880463686,,,extraction,1.0,1.0
+,generator_cluster,3.724936684598663,,,extraction,1.0,1.0
+,plant,3.612306503374561,,,zae,0.767,1.0
+,plant,2.9472331376027774,,,water_other,0.0,0.0
+,plant,2.9146238668273674,,,zae,0.37,0.945
+Avernas,plant,2.903149584196629,2.60304,0.897,agri_zone_unfarmed,0.708,0.708
+,generator_cluster,2.728172036449307,,,sar,0.0,0.857
+,plant,2.7038500486181007,,,zae,0.031,1.0
+,plant,2.675302303185928,,,zae,0.031,0.938
+,plant,2.4853186533872687,,,infra_edge,0.052,0.914
+Panneaux Photovoltaïques,generator_cluster,2.4793034028769476,,,sar,0.517,0.583
+,generator_cluster,2.334232254762226,,,quarry_active,0.033,1.0
+,generator_cluster,2.014024979877506,,,quarry_active,0.0,0.0
+,plant,1.8748876356690314,,,sar,0.826,0.826
+,plant,1.7688839302248016,,,quarry_active,0.256,0.674
+NMC & Luminus | Solaranlage,plant,1.7616250855747497,,,zae,0.659,1.0
+,generator_cluster,1.6673725131772255,,,zae,0.0,0.575
+,plant,1.6199578491591773,2.0,1.235,zae,0.167,0.952
+,generator_cluster,1.5424282738230097,,,sar,0.179,1.0
+Parking photovoltaïque de Walibi Belgium et Aqualibi,generator_cluster,1.529714035470642,,,zspec,0.0,1.0
+,plant,1.5223317303186323,,,sar,0.316,0.974
+,plant,1.3520041673241332,,,quarry_active,0.0,0.0
+,generator_cluster,1.2582338131844806,,,quarry_active,0.031,0.906
+,plant,1.2119330161904092,,,zae,0.25,1.0
+LCL Wallonia One Solar Park,plant,1.1597913957341668,1.6,1.38,zae,0.536,1.0
+,generator_cluster,1.083606732325384,,,quarry_active,0.0,0.0
+,plant,1.039116451236017,,,zspec,1.0,1.0
+,generator_cluster,0.9664073965112111,0.998,1.033,water_other,0.0,0.0
+,plant,0.8596173743946949,,,zae,0.0,0.727
+,generator_cluster,0.8567891698401756,,,zae,0.0,1.0
+,plant,0.8335183222951317,,,infra_edge,1.0,1.0
+,generator_cluster,0.747911180594367,,,zae,0.6,1.0
+,plant,0.7418995299848132,,,cet,0.941,0.941
+,generator_cluster,0.7153679395378094,,,agri_zone_unfarmed,0.667,1.0
+,plant,0.6879198065655694,,,zspec,0.375,0.375
+,plant,0.6785985238310812,,,agri_zone_poor,0.0,1.0
+,generator_cluster,0.6755895914862443,,,sar,0.0,0.529
+,plant,0.6410506802198674,,,zae,0.467,1.0
+,generator_cluster,0.6265611320668333,,,agri_zone_unfarmed,1.0,1.0
+,generator_cluster,0.6237280023936657,,,zae,0.0,1.0
+,generator_cluster,0.5992452083739187,,,zae,0.692,1.0
+,plant,0.5586527392807134,,,zspec,0.0,0.0
+,generator_cluster,0.539022441159174,,,habitat,1.0,1.0
+,generator_cluster,0.5027945629579014,,,zae,0.091,0.727
+,generator_cluster,0.48974671368313766,,,zspec,0.0,0.0
+,plant,0.4806425487127275,,,quarry_active,1.0,1.0
+,generator_cluster,0.4333155091909245,,,zae,0.0,1.0
+,generator_cluster,0.41658322962746613,,,zae,0.0,1.0
+,generator_cluster,0.3692201815441671,,,zae,0.5,1.0
+,plant,0.3683096251053234,0.43,1.167,agri_zone_unfarmed,0.0,0.0
+,generator_cluster,0.36740309772346746,,,zae,0.889,1.0
+,generator_cluster,0.36267660037268806,,,zae,1.0,1.0
+,generator_cluster,0.3305109469955937,,,zspec,0.0,1.0
+,generator_cluster,0.32746528286255744,,,zae,0.0,1.0
+,generator_cluster,0.3026008608608316,,,infra_edge,0.0,0.0
+,generator_cluster,0.2961752399141073,,,infra_edge,0.0,0.0
+,generator_cluster,0.2905082081811858,,,zspec,0.0,0.0
+,generator_cluster,0.29004570824166565,,,zae,0.0,1.0
+,plant,0.2850423257638381,,,zae,1.0,1.0
+,generator_cluster,0.276829395224275,,,agri_zone_unfarmed,0.0,0.0
+,generator_cluster,0.27308681456948797,,,zspec,0.667,1.0
+,generator_cluster,0.2625188766464365,,,zae,0.0,1.0
+,generator_cluster,0.2568269799688403,,,zae,0.375,1.0
+,plant,0.2516990591718734,,,zae,0.143,1.0
+,generator_cluster,0.25039625265374027,,,zae,0.0,1.0
+,generator_cluster,0.23387488609013682,,,habitat,0.333,0.333
+,generator_cluster,0.23161706080568228,,,zae,0.0,0.0
+,plant,0.2293497944138362,,,zspec,0.0,0.833
+,plant,0.21590579201839363,,,habitat,1.0,1.0
+,plant,0.2130679671877565,,,zspec,0.2,0.8
+,generator_cluster,0.20755777267071748,,,infra_edge,0.5,0.5

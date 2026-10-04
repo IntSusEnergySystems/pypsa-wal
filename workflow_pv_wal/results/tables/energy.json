@@ -1,0 +1,37 @@
+{
+  "ground": {
+    "system": "ground",
+    "flh_h": 969.0,
+    "flh_min_h": 942.0,
+    "flh_max_h": 1019.0,
+    "description": "fixed, south, latitude-optimal tilt (the model's solar)"
+  },
+  "agrivoltaic_grazing": {
+    "system": "agrivoltaic_grazing",
+    "flh_h": 978.0,
+    "flh_min_h": 949.0,
+    "flh_max_h": 1026.0,
+    "description": "fixed, south, 25\u00b0, elevated over pasture"
+  },
+  "agrivoltaic_canopy": {
+    "system": "agrivoltaic_canopy",
+    "flh_h": 972.0,
+    "flh_min_h": 942.0,
+    "flh_max_h": 1019.0,
+    "description": "fixed, south, 20\u00b0, canopy over fruit"
+  },
+  "agrivoltaic_crops": {
+    "system": "agrivoltaic_crops",
+    "flh_h": 1038.0,
+    "flh_min_h": 999.0,
+    "flh_max_h": 1086.0,
+    "description": "vertical bifacial, east-west faces"
+  },
+  "floating": {
+    "system": "floating",
+    "flh_h": 953.0,
+    "flh_min_h": 922.0,
+    "flh_max_h": 997.0,
+    "description": "fixed, south, 12\u00b0, floats"
+  }
+}

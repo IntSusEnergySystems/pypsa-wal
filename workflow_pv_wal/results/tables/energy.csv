@@ -1,0 +1,6 @@
+system,flh_h,flh_min_h,flh_max_h,description
+ground,969.0,942.0,1019.0,"fixed, south, latitude-optimal tilt (the model's solar)"
+agrivoltaic_grazing,978.0,949.0,1026.0,"fixed, south, 25°, elevated over pasture"
+agrivoltaic_canopy,972.0,942.0,1019.0,"fixed, south, 20°, canopy over fruit"
+agrivoltaic_crops,1038.0,999.0,1086.0,"vertical bifacial, east-west faces"
+floating,953.0,922.0,997.0,"fixed, south, 12°, floats"

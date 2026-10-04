@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photovoltaïque au sol en Wallonie : où peut-on construire ?</title>
+<meta name="description" content="Les règles wallonnes appliquées une à une à tout le territoire : du terrain disponible au potentiel de photovoltaïque au sol, friches, zones d'activité, plans d'eau et agrivoltaïsme.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232B8A3E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17h18l-3-9H6z'/%3E%3Cpath d='M12 17v4M8 21h8'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="page" id="page">
+
+  <header class="top">
+    <div class="top-text">
+      <h1 id="titre"></h1>
+      <p class="sous-titre" id="sous-titre"></p>
+    </div>
+    <nav class="top-links">
+      <button type="button" class="link-btn" id="btn-methode"></button>
+      <a id="lien-rapport" href="pv_potential_wallonia.pdf" target="_blank" rel="noopener"></a>
+      <a class="pill-link" href="#et-si" id="lien-etsi"></a>
+    </nav>
+  </header>
+
+  <section class="timeline" id="timeline" aria-label="Étapes"></section>
+
+  <main class="grid">
+    <div class="left">
+      <section class="map-panel" aria-label="Carte de la Wallonie">
+        <div class="map-box" id="map-box">
+          <canvas class="map-layer" id="map-a"></canvas>
+          <canvas class="map-layer" id="map-b"></canvas>
+          <svg class="map-svg" id="map-svg" aria-hidden="true"></svg>
+          <div class="indicator" id="indicator" aria-live="polite"></div>
+          <figure class="loupe" id="loupe">
+            <div class="loupe-view">
+              <canvas id="loupe-canvas"></canvas>
+              <svg id="loupe-svg" aria-hidden="true"></svg>
+            </div>
+            <figcaption id="loupe-caption"></figcaption>
+          </figure>
+          <div class="tooltip" id="tooltip" role="status"></div>
+          <div class="loading" id="loading">Chargement de la carte…</div>
+        </div>
+        <div class="legend" id="legend"></div>
+        <p class="map-note" id="map-note"></p>
+      </section>
+
+      <section class="etsi" id="et-si" aria-labelledby="etsi-titre">
+        <div class="etsi-head">
+          <h2 id="etsi-titre"></h2>
+          <button type="button" class="etsi-close" id="etsi-close" aria-label="Fermer"></button>
+        </div>
+        <p class="etsi-intro" id="etsi-intro"></p>
+        <div id="etsi-choix"></div>
+        <button type="button" class="reset" id="etsi-reset"></button>
+      </section>
+    </div>
+
+    <aside class="side">
+      <article class="card" id="card" aria-live="polite"></article>
+    </aside>
+  </main>
+
+  <details class="expert" id="expert">
+    <summary id="expert-titre"></summary>
+    <div id="expert-body"></div>
+  </details>
+
+  <footer class="credits" id="credits"></footer>
+</div>
+
+<button type="button" class="fab" id="fab-etsi"></button>
+
+<dialog class="modal" id="methode">
+  <form method="dialog">
+    <h2 id="methode-titre"></h2>
+    <div id="methode-body"></div>
+    <button class="reset" id="methode-fermer"></button>
+  </form>
+</dialog>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
