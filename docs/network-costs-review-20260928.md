@@ -264,6 +264,26 @@ behind it. In practice it never exports: a single hour in four horizons. Heat pu
 almost fully coincident even locally: Consentec for E.ON uses simultaneity 1.0 at LV,
 0.95 at MV/LV and 0.9 at MV. EV and PV effects, by contrast, are local.
 
+> **Updated 1 Oct on the 1 Oct central.** The link does export now, but export never
+> sizes it. It is split into a forward and a reversed leg with one shared `p_nom`, so its
+> capacity is the hourly maximum in either direction. In every horizon that maximum is the
+> withdrawal.
+>
+> | BEWAL | 2025 | 2030 | 2040 | 2050 |
+> |---|---:|---:|---:|---:|
+> | capacity = peak withdrawal, GW | 3.06 | 4.20 | 6.21 | 7.80 |
+> | peak injection (rooftop surplus), GW | 0.01 | 0.88 | 3.79 | 2.82 |
+> | hours with injection | 2 | 255 | 614 | 248 |
+> | mean withdrawal, GW | 1.73 | 2.28 | 3.69 | 4.85 |
+> | hour of the peak | 1 Dec 17:00 | 1 Dec 17:00 | 10 Feb 05:00 | 10 Feb 05:00 |
+>
+> At the 2050 peak the link carries household and services load (2.55 GW), heat pumps
+> (3.21), inflexible EV charging (1.71), the LV share of industry (0.81) and resistive
+> heaters (0.23). Home batteries supply 1.15 GW of it, and PV gives nothing at 05:00. So
+> the endogenous distribution cost follows demand. Production enters only through the PV
+> hosting charge (E8), which is added separately because a regional link cannot see local
+> reverse flows. Script: `tmp/ccgtcc_20261001/dist_peak.py`.
+
 **What stands behind the peak.** At the 2025 BEWAL peak (15 Sep networks, before the
 industry split):
 
@@ -341,7 +361,7 @@ electrification).
 | V2 | new-build 2025→30, overnight | ≈ 0.77 bn€ | §9 |
 | V3 | energy through the link, 2025 | ≈ 14–15.5 TWh (TIMES MV + LV 14.1 TWh; DSO withdrawals 12.7 TWh + compensated volumes + losses) | §9 |
 | V4 | loss cost | ≈ 87 M€/a | §9 |
-| V5 | 2030 reported cost vs the CWaPE 2029 core in real terms (≈ 680 M€₂₀₂₅) | ±10 % | §9 |
+| V5 | 2030 reported cost vs the CWaPE 2029 core in real terms (735.3 M€ ÷ 1.024⁴ = 669 M€₂₀₂₅; first written as ≈ 680, corrected 1 Oct) | ±10 % | §9 |
 
 ---
 
@@ -680,7 +700,7 @@ This decides what the comparison can attribute:
 | V2 | new-build 2025→30, overnight | ≈ 0.77 bn€ | **0.64 bn€** (1 028 MW × 620 €/kW), −17 % |
 | V3 | energy through the link, 2025 | 14–15.5 TWh | **15.4 TWh** (24 Sep: 20.8 TWh before the HV split) |
 | V4 | loss cost, 2025 | ≈ 87 M€/a | **81.9 M€/a** (CWaPE 2025: 87.0) |
-| V5 | 2030 reported cost, L1 + L2 + L3, vs the CWaPE 2029 core in real terms | 680 M€ ± 10 % | **728 M€**, +7 % |
+| V5 | 2030 reported cost, L1 + L2 + L3, vs the CWaPE 2029 core in real terms | 669 M€ ± 10 % (first written 680) | **728 M€**, +9 % (1 Oct central: 733 M€, +10 %) |
 | — | electricity distribution revenue requirement, 2025, all layers | CWaPE 896.3 M€ | 891.2 M€, −0.6 % |
 | GD | gas distribution level and tariff trajectory | 282.0 M€ | by construction. The network cost per MWh of residential + services gas rises 25.8 → 28.3 → 53.7 → 70.7 €/MWh as volumes fall |
 | TV1 | tariff view, 2025 | Elia × offtake share | 394.4 M€ = 1 552.1 × 25.4 % (by construction) |
