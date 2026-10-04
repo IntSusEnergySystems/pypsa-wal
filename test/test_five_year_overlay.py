@@ -85,14 +85,15 @@ def test_out_of_horizon_rows_are_inert_for_the_ten_year_run():
     patch = bcp.patch_potentials(bcp.load_master(), H10, dry_run=True)
     assert patch.errors == [], patch.errors
     assert patch.changes == [], patch.changes
-    # 34 managed rows (17 groups; the three power-CC caps of scen_noccsccgt
-    # were added on 2026-09-30) are skipped as out-of-horizon; the other 12
-    # (6 unmanaged groups: co2/gas storage, process emissions, biomass import)
-    # never reach that branch — they are reported as unmanaged first.
+    # 40 managed rows (20 groups; the three power-CC caps of scen_noccsccgt
+    # were added on 2026-09-30, the three `co2 disposal service` parameters on
+    # 2026-10-04) are skipped as out-of-horizon; the other 12 (6 unmanaged
+    # groups: co2/gas storage, process emissions, biomass import) never reach
+    # that branch — they are reported as unmanaged first.
     out_of_horizon = [n for n in patch.notes if "outside this run's horizons" in n]
-    assert len(out_of_horizon) == 34, out_of_horizon
+    assert len(out_of_horizon) == 40, out_of_horizon
     touched = [n for n in patch.notes if "@2035" in n or "@2045" in n]
-    assert len(touched) == 46, f"expected all 46 new rows accounted for, got {len(touched)}"
+    assert len(touched) == 52, f"expected all 52 new rows accounted for, got {len(touched)}"
 
 
 def test_a_year_no_config_solves_is_still_an_error(tmp_path, monkeypatch):

@@ -1,8 +1,8 @@
-# Extracted from scen_sensibilite_biomethane_industrie_v01_260929_3009.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# Extracted from scen_sensibilite_biomethane_industrie_v01_261002_0210.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
 # Rooftop share of TIMES PV capacity (VAR_Cap, plant PV only).
 year,share,rooftop_gw,utility_gw
-2030,0.688666,4.514152,2.040769
-2035,0.659268,7.314041,3.780144
-2040,0.705855,11.076421,4.615778
-2045,0.724660,12.148161,4.615778
-2050,0.724660,12.148161,4.615778
+2030,0.678084,4.749153,2.254628
+2035,0.665658,7.561606,3.797992
+2040,0.707815,11.134395,4.596262
+2045,0.726336,12.199024,4.596262
+2050,0.726336,12.199024,4.596262

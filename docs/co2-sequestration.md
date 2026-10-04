@@ -1176,6 +1176,20 @@ double-count if applied together.**
 >   test of §11 step 5.
 > * **Used only by the test `scen_test_lowccs_ptx`**, not by any cabinet scenario. Its
 >   design and reading guide are in the 30 Sep batch log §12.
+>
+> **Update — 2026-10-04: a TIMES-priced disposal route at BEWAL.** Not lever C (the generic
+> `co2_sequestration_cost` is untouched) and not geology (the Belgian `co2 storage` zero
+> stands).
+> * **What:** Wallonia may export captured CO₂ through TIMES-WAL's `CO2STG01` service (Antwerp
+>   terminal, shipping, offshore storage, e.g. Northern Lights).
+> * **Price and volume:** 13.8 €/t collection + 70 / 58 / 54 / 50 €/t downstream, capped at
+>   TIMES's 4 / 6 / 7 / 8 Mt/a, closed before 2035.
+> * **Walloon CO₂ only:** solve-time row `co2_disposal_own_capture_BEWAL`. The endogenous
+>   pipeline route stays open above the cap.
+> * **Scope:** on in every cabinet scenario except `scen_noccsccgt`.
+> * **Code:** `BEWAL_potentials.apply_co2_disposal_service`,
+>   `named_pins.add_co2_disposal_own_capture`.
+> * Design, TIMES reading and expectations: `logs/2026-10-04_cabinet_batch_20261002_2010_1h.md` §3.
 
 | # | change | why it sits here |
 |---|---|---|

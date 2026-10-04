@@ -71,9 +71,10 @@ scenarios:
     results_dir: results/walloon/scen_evflex
     resources_dir: resources/walloon/scen_evflex
 
-  # --- Cabinet batch of 30 September 2026 (TIMES times_20260930_*,
-  # docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md), which replaces the
-  # September batch (docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md).
+  # --- Cabinet batch on ICEDD's 2 October 2026 exports (times_20261002_*,
+  # docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md), which replaces the
+  # 30 Sep batch (docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md) and
+  # the September one (docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md).
   # A scenario listed here but not solved yet is SKIPPED by
   # `generate_html_report_all_scenarios`, so the combined report can be
   # rebuilt after each scenario lands instead of only at the end.
@@ -113,20 +114,24 @@ scenarios:
     results_dir: results/walloon/scen_retardnucleaire
     resources_dir: resources/walloon/scen_retardnucleaire
   - name: scen_noccsccgt
-    label: No capture on gas power plants
+    label: No capture on power plants, endogenous CO2 disposal
     results_dir: results/walloon/scen_noccsccgt
     resources_dir: resources/walloon/scen_noccsccgt
+  - name: scen_noccsccgt_route
+    label: No capture on power plants, TIMES disposal route kept
+    results_dir: results/walloon/scen_noccsccgt_route
+    resources_dir: resources/walloon/scen_noccsccgt_route
   - name: scen_realiste
     label: Realistic 2030 deployment (not for publication)
     results_dir: results/walloon/scen_realiste
     resources_dir: resources/walloon/scen_realiste
-  # TEST, not a cabinet scenario (batch log §12). Included on Sylvain's request
-  # (1 Oct 2026) so it sits next to the central on the cross-scenario pages; the
-  # label keeps it marked as a test.
-  - name: scen_test_lowccs_ptx
-    label: TEST - Walloon CO2 export capped at 3 Mt/a, power-to-fuel
-    results_dir: results/walloon/scen_test_lowccs_ptx
-    resources_dir: resources/walloon/scen_test_lowccs_ptx
+  # TEST, not a cabinet scenario (30 Sep batch log §12). Shown next to the 1 Oct
+  # central on Sylvain's request; commented out for the October batch because
+  # its tree is the 1 Oct vintage (30 Sep exports, must-runs on in the central).
+  # - name: scen_test_lowccs_ptx
+  #   label: TEST - Walloon CO2 export capped at 3 Mt/a, power-to-fuel
+  #   results_dir: results/walloon/scen_test_lowccs_ptx
+  #   resources_dir: resources/walloon/scen_test_lowccs_ptx
   # NUCLEAR CAPEX SWEEP — a sensitivity, not six scenarios (2026-09-13).
   #
   # DISABLED for the 30 Sep batch: the six points were solved on 13 Sep (TIMES

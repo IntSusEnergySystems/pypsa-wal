@@ -208,9 +208,10 @@ EXPLORER_TYPE="${EXPLORER_TYPE-times-pypsa}"
 #
 #  * TIMES .vd files that no active scenario names. -L turns 15 symlinks into
 #    1.1 GB of real files; the September batch needed 8 of them (605 MB). The
-#    include below names the exports of the batch in run.name — the 30 Sep
-#    batch: `*_260929_3009.vd` (central + three sensitivities) and the
-#    NoCCSCCGT `*_260929_2909.vd`. Update it with the batch.
+#    include below names the exports of the batch in run.name — the October
+#    batch: `*_261002_0210.vd` (ICEDD's 2 Oct central + three sensitivities)
+#    and `*_260929_3009.vd`, of which only scen_realiste's is still read.
+#    Update it with the batch.
 #
 # Both are trimmed by default. This matters because the workstation's uplink is
 # the slow leg of the whole pipeline. Clear the variable to push everything:
@@ -227,8 +228,8 @@ PUSH_EXCLUDES="${PUSH_EXCLUDES-\
 --exclude resources/walloon_5y \
 --exclude resources/walloon/scen_test_2013_6h \
 --exclude resources/walloon/scen_demande_haute \
---include data/walloon/*_260929_3009.vd \
---include data/walloon/*_260929_2909.vd \
+--include data/walloon/*_261002_0210.vd \
+--include data/walloon/scen_sensibilite_realiste_260929_3009.vd \
 --exclude data/walloon/*.vd}"
 
 # --- local conda invocation ----------------------------------------------------

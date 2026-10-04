@@ -925,10 +925,32 @@ def build_budget_national(
     expanded = expand_years(rule, anchors, horizons)
     for year in holes:
         expanded.pop(year, None)
-    return {
+    budget = {
         y: {reg: round(frac, 6) for reg in BUDGET_REGIONS}
         for y, frac in sorted(expanded.items())
     }
+    # `config:budget_national:<REGION>` rows override one region at the years
+    # they name and nowhere else: no interpolation, so a single 2040 anchor for
+    # BEWAL cannot leak onto 2030 or 2050 (decided 2026-10-04: BEWAL 2040 on
+    # TIMES-WAL's own 2040 tonnage, every other region on the shared series).
+    for _, r in act[
+        act["pypsa_wal_target"].astype(str).str.startswith("config:budget_national:")
+    ].iterrows():
+        reg = str(r["pypsa_wal_target"]).split(":", 2)[2]
+        if reg not in BUDGET_REGIONS:
+            raise SystemExit(
+                f"config:budget_national:{reg}: unknown region; expected one of "
+                f"{', '.join(BUDGET_REGIONS)}"
+            )
+        if pd.isna(r["year"]) or pd.isna(r["value"]):
+            raise SystemExit(
+                f"config:budget_national:{reg} needs an explicit year and value "
+                "(region rows are not interpolated)"
+            )
+        year = int(r["year"])
+        if year in budget:
+            budget[year][reg] = round(float(r["value"]) / 100.0, 6)
+    return budget
 
 
 def render_budget_block(budget: dict[int, dict[str, float]]) -> str:
@@ -961,9 +983,14 @@ def patch_walloon_config(
         patch.notes.append("budget_national already in sync")
         return patch
 
+    def _year_label(regions: dict[str, float]) -> str:
+        common = max(set(regions.values()), key=list(regions.values()).count)
+        odd = [f"{reg} {v}" for reg, v in regions.items() if v != common]
+        return f"{common}" + (f" ({', '.join(odd)})" if odd else "")
+
     patch.changes.append(
         "budget_national: "
-        + ", ".join(f"{y}={next(iter(r.values()))}" for y, r in budget.items())
+        + ", ".join(f"{y}={_year_label(r)}" for y, r in budget.items())
     )
     if not dry_run:
         config.write_text(text[: m.start()] + new + trailing + text[m.end() :])

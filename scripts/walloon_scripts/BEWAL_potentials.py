@@ -290,6 +290,71 @@ def apply_co2_store_cap(n, bus, attr, value):
     )
 
 
+#: Parameters of the `co2 disposal service` potentials rows. The price of the
+#: route is the sum of the two `vom_*` legs (EUR/t).
+DISPOSAL_SERVICE_PARAMS = ("e_nom_max", "vom_downstream", "vom_onshore")
+
+
+def apply_co2_disposal_service(n, bus, cap_t, price):
+    """Open a priced CO₂ export route at `bus`: TIMES-WAL's ``CO2STG01``.
+
+    TIMES-WAL disposes of Walloon CO₂ through a subscription to a shared export
+    chain (onshore collection, Antwerp terminal, shipping, offshore storage such
+    as Northern Lights), paid per tonne and capped in volume. PyPSA represents
+    it on the node's own ``co2 sequestered`` Store and Link, which otherwise
+    carry the documented Belgian zero (no geology):
+
+    * the Store fleet may hold ``cap_t`` tonnes a year. Inherited vintages
+      count against it, and the extendable vintage gets the residual;
+    * the extendable Store has no capital cost, because the tariff is the whole price;
+    * every ``co2 sequestered`` Link into the node's sequestered bus charges
+      ``price`` EUR/t as marginal cost, so each tonne pays the tariff of the
+      horizon it is disposed in, as a service would.
+
+    The route is not a pipeline. CO₂ from other nodes must not reach it through
+    the CO₂ network, and :func:`scripts.walloon_scripts.named_pins.add_co2_disposal_own_capture`
+    enforces that at solve time. The endogenous route (pipelines to the
+    CO2StoP stores) stays open, so tonnes above the cap still have an outlet.
+
+    ``cap_t <= 0`` leaves the documented zero untouched: the route is closed.
+    """
+    if not cap_t or cap_t <= 0:
+        logger.info("CO2 disposal service at %s: closed this horizon.", bus)
+        return
+    seq_bus = f"{bus} co2 sequestered"
+    stores = n.stores.index[
+        n.stores.carrier.astype(str).eq("co2 sequestered")
+        & n.stores.bus.astype(str).eq(seq_bus)
+    ]
+    links = n.links.index[
+        n.links.carrier.astype(str).eq("co2 sequestered")
+        & n.links.bus1.astype(str).eq(seq_bus)
+    ]
+    if stores.empty or links.empty:
+        logger.warning(
+            "CO2 disposal service at %s: no co2 sequestered Store/Link; not applied.",
+            bus,
+        )
+        return
+    extendable = stores[n.stores.loc[stores, "e_nom_extendable"].fillna(False).astype(bool)]
+    inherited = stores.difference(extendable)
+    existing = float(n.stores.loc[inherited, "e_nom"].sum()) if len(inherited) else 0.0
+    residual = max(float(cap_t) - existing, 0.0)
+    if len(extendable):
+        n.stores.loc[extendable, "e_nom_max"] = residual
+        n.stores.loc[extendable, "capital_cost"] = 0.0
+    n.links.loc[links, "marginal_cost"] = float(price)
+    logger.info(
+        "CO2 disposal service at %s: %.3f Mt/a at %.1f EUR/t "
+        "(%.3f Mt/a inherited, %.3f Mt/a on the new vintage).",
+        bus,
+        float(cap_t) / 1e6,
+        float(price),
+        existing / 1e6,
+        residual / 1e6,
+    )
+
+
 def apply_process_emission_load(n, bus, kt_per_year):
     """Set the process-emissions Load at `bus` to an annual TIMES volume.
 
@@ -339,6 +404,10 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
         potentials = potentials.rename(
             columns={potentials.columns[0]: "technology"}
         )
+
+    # Applied after the loop, so the documented `co2 storage` zero of the same
+    # node is written first whatever the row order in the file.
+    disposal: dict[str, dict[str, float]] = {}
 
     for _, row in potentials.iterrows():
         attr = row["parameter"]
@@ -546,6 +615,18 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
                 potential = potential * 1e6  # t
             apply_co2_store_cap(n, bus, attr, potential)
             continue
+        if carrier == "co2 disposal service":
+            assert attr in DISPOSAL_SERVICE_PARAMS, (
+                f"Unsupported attr: {attr!r}; expected one of "
+                f"{', '.join(DISPOSAL_SERVICE_PARAMS)}"
+            )
+            if attr == "e_nom_max":
+                if "Mt" in unit:
+                    potential = potential * 1e6
+                elif "kt" in unit:
+                    potential = potential * 1e3
+            disposal.setdefault(bus, {})[attr] = potential
+            continue
         if carrier == "process emissions":
             allowed = {"p_set"}
             assert attr in allowed, (
@@ -589,3 +670,17 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
             n.links.loc[link_name, attr] = potential
         else:
             logger.warning(logger_msg_failure)
+
+    for bus, params in disposal.items():
+        missing = [p for p in DISPOSAL_SERVICE_PARAMS if p not in params]
+        if missing:
+            raise ValueError(
+                f"co2 disposal service at {bus}: missing {', '.join(missing)} for "
+                f"{planning_horizons} in {walloon_potentials}"
+            )
+        apply_co2_disposal_service(
+            n,
+            bus,
+            params["e_nom_max"],
+            params["vom_downstream"] + params["vom_onshore"],
+        )

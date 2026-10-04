@@ -9,22 +9,23 @@ run:
   # a single run and several are a multi-scenario run — the only difference is how
   # many names are listed. Every name must be a key of run.scenarios.file;
   # `name: all` expands to all of them.
-  # 30 September 2026 cabinet batch (ICEDD exports times_20260930_*). Every
+  # Cabinet batch on ICEDD's 2 October 2026 exports (times_20261002_*). Every
   # name here is a key of config/scenarios.walloon.yaml, and cluster/config.sh
   # DERIVES its scenario list from this block, so this is the single place that
   # decides what runs. Comment a line out to drop that scenario from the batch;
   # `RUN_NAME=<name> ./cluster/nic5.sh …` runs a subset (the central goes first,
-  # docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §5).
+  # docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md §5).
   #
   # The September batch (taxshift pair, realiste_nets / realiste_nobnd30, the
-  # scen_nuctip_* CAPEX sweep) keeps its blocks in the scenarios file but is not
-  # re-run: it is on the 11 Sep exports. docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md.
+  # scen_nuctip_* CAPEX sweep) and the 30 Sep test scen_test_lowccs_ptx keep
+  # their blocks in the scenarios file but are not re-run.
   name:
   - scen_central                 # reference case — run first
-  - scen_noccsccgt               # no capture on Walloon gas power plants
+  - scen_noccsccgt               # no capture on Walloon power plants, endogenous disposal only
+  - scen_noccsccgt_route         # same ban, TIMES disposal route kept (one-change twin)
   - scen_retardnucleaire         # new nuclear delayed by five years
   - scen_biomethane_industrie    # biogas volume reserved for industry
-  - scen_realiste                # realistic 2030 PV/wind (not for publication)
+  - scen_realiste                # realistic 2030 PV/wind, 30 Sep export (not for publication)
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
@@ -494,6 +495,27 @@ sector:
     node: BEWAL
     kt: {}
     overage_price: null
+  # TIMES-WAL's CO2 disposal route (CO2STG01, decided 2026-10-04): Wallonia
+  # subscribes to a shared export chain (collection, Antwerp terminal,
+  # shipping, offshore storage such as Northern Lights), paid per tonne and
+  # capped in volume. Volume and tariff are `co2 disposal service` rows of the
+  # potentials file, so a scenario switches the route off with its own copy
+  # (scen_noccsccgt: volume 0). The endogenous route (pipelines to the CO2StoP
+  # stores) stays open above the cap. `own_capture_only` keeps other nodes'
+  # CO2 out of the route (GlobalConstraint `co2_disposal_own_capture_<node>`).
+  # docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md §3.
+  co2_disposal_service:
+    node: BEWAL
+    own_capture_only: true
+  # Power-to-X must-runs (config.default.yaml: FT 0.5, methanolisation and
+  # methanation 0.3) removed for every scenario (decided 2026-10-04). They are
+  # p_min_pu on extendable links with no unit commitment anywhere in the
+  # network, i.e. an LP artefact: worth ~1.06 bn EUR/a in 2050 on the 1 Oct
+  # central, and alone enough to keep Walloon FT out at 137 % free-dispatch
+  # capex recovery. 2026-09-30 batch log §12.8. Prepare-time keys.
+  min_part_load_fischer_tropsch: 0
+  min_part_load_methanolisation: 0
+  min_part_load_methanation: 0
   # times_mappings_dir: optional override; defaults to TIMES_PyPSA data/ via times_pypsa.default_mappings_dir()
   # times_use_preexported: true  # if coupling_dir set, copy pypsa_inputs instead of re-parsing .vd
   # TIMES Sankey diagrams into results/<prefix>/<run>/html/times/, beside
@@ -766,7 +788,7 @@ budget_national:
   2040:
     BEBRU: 0.25
     BEVLG: 0.25
-    BEWAL: 0.25
+    BEWAL: 0.15
     DE: 0.25
     FR: 0.25
     GB: 0.25

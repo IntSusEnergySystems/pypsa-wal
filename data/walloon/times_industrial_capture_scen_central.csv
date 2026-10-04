@@ -1,7 +1,7 @@
-# Extracted from scen_central_v01_260929_3009.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# Extracted from scen_central_v01_261002_0210.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
 # TIMES STORAGEMININD VAR_FOut of CO2STOCK, kt/a.
 year,kt
-2035,2344.745624
-2040,4145.608921
+2035,2543.776783
+2040,4145.320912
 2045,5147.168506
-2050,5147.168506
+2050,5119.624531

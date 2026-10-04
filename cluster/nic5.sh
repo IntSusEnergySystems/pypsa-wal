@@ -426,9 +426,17 @@ cmd_pull() {
     # (229-363 MB each, ~1.3 GB per scenario at 1h resolution), and netCDF4
     # already stores them zlib-compressed: a measured sample gzips to 97.6 % of
     # its size, so -z would burn CPU on both ends for ~2 %.
-    rssync -arhK --no-g --info=progress2 \
-        "${REMOTE}:${REMOTE_DIR}/results/" "$REPO/results/" \
-        || msg "(no results dir yet)"
+    # One tree per scenario of RUN_NAME, not the whole remote results/: on
+    # 2026-10-01 the full mirror would have brought back a 920 MB remote
+    # `_archive` onto the office root disk and overwritten a local
+    # scenario that was not part of the batch (2026-09-30 log, I6).
+    local d
+    for d in $(run_dirs); do
+        mkdir -p "$REPO/results/${d}"
+        rssync -arhK --no-g --info=progress2 \
+            "${REMOTE}:${REMOTE_DIR}/results/${d}/" "$REPO/results/${d}/" \
+            || msg "(no results/${d} yet)"
+    done
     rssync -arhK --no-g \
         "${REMOTE}:${REMOTE_DIR}/cluster/logs/" "$HERE/logs/" || true
     msg "Pull complete. Solved networks are in results/${RUN_DIR_REL}/networks/."
@@ -490,6 +498,12 @@ cmd_postprocess() {
 cmd_upload_s3() {
     if [ "${AUTO_UPLOAD_S3:-1}" != "1" ]; then
         msg "AUTO_UPLOAD_S3!=1 — skipping S3 upload (run: $0 upload)"
+        return 0
+    fi
+    # Checked here too (2026-09-30 log, I9): upload_s3.sh re-checks it, but a
+    # skip that depends on the callee is one refactor away from an upload.
+    if [ "${SKIP_S3_UPLOAD:-0}" = "1" ]; then
+        msg "SKIP_S3_UPLOAD=1 — skipping S3 upload (run: $0 upload)"
         return 0
     fi
     msg "Publishing results to Intervectoriel S3 ($S3_ENV/)"

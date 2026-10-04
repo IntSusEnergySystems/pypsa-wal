@@ -208,6 +208,81 @@ def add_co2_export_limit(n, node: str, kt: float, overage_price=None) -> None:
     n.add("GlobalConstraint", name, constant=cap_t, sense="<=", type="")
 
 
+#: Carriers that move CO₂ between `co2 stored` buses or out of one. They are
+#: not capture, so they never count as the node's own supply.
+CO2_TRANSPORT_CARRIERS = ("CO2 pipeline", "co2 sequestered")
+
+
+def add_co2_disposal_own_capture(n, node: str) -> None:
+    """Annual CO₂ into ``node``'s disposal route ≤ CO₂ captured at ``node``.
+
+    The route of :func:`BEWAL_potentials.apply_co2_disposal_service` is a
+    Walloon subscription, priced below the endogenous disposal price in 2050.
+    Without this row the LP would pipe Flemish or foreign CO₂ into Wallonia to
+    use it. The bound is the CO₂ the node's own links put on its `co2 stored`
+    bus: every non-transport link port ``bus<k>`` (k ≥ 1) with a positive
+    efficiency, i.e. capture (industry, power, CHP, SMR, DAC). Ports with a
+    negative efficiency are local *use* (Fischer-Tropsch, methanolisation) and
+    are not subtracted, so local use may still draw on imported CO₂.
+
+    No row is added while the node's ``co2 sequestered`` Stores hold no
+    capacity (route closed). Registered as GlobalConstraint
+    ``co2_disposal_own_capture_<node>`` so the dual survives into the network.
+    """
+    bus = f"{node} co2 stored"
+    seq_bus = f"{node} co2 sequestered"
+    stores = n.stores.loc[
+        (n.stores.carrier.astype(str) == "co2 sequestered") & (n.stores.bus == seq_bus)
+    ]
+    room = float(stores.e_nom.sum())
+    ext = stores.e_nom_extendable.fillna(False).astype(bool)
+    room += float(stores.loc[ext, "e_nom_max"].clip(upper=1e12).sum())
+    if room <= 0:
+        return
+    seq_links = n.links.index[
+        (n.links.carrier.astype(str) == "co2 sequestered") & (n.links.bus0 == bus)
+    ]
+    if seq_links.empty:
+        logger.warning("CO2 disposal own-capture: no co2 sequestered link at %s, skip.", bus)
+        return
+    weights = n.snapshot_weightings.generators
+    p = n.model["Link-p"]
+    link_dim = p.dims[1]
+    disposed = (p.loc[:, seq_links] * weights).sum()
+
+    others = n.links.loc[~n.links.carrier.astype(str).isin(CO2_TRANSPORT_CARRIERS)]
+    ports = [c[3:] for c in others.columns if c.startswith("bus") and c[3:].isdigit()]
+    captured = None
+    for k in ports:
+        if k == "0":
+            continue
+        eff_col = "efficiency" if k == "1" else f"efficiency{k}"
+        if eff_col not in others:
+            continue
+        sel = others.index[(others[f"bus{k}"] == bus) & (others[eff_col].astype(float) > 0)]
+        if sel.empty:
+            continue
+        if eff_col in n.links_t and not n.links_t[eff_col].columns.intersection(sel).empty:
+            logger.warning(
+                "CO2 disposal own-capture: time-varying %s on %s; static value used.",
+                eff_col, list(n.links_t[eff_col].columns.intersection(sel)),
+            )
+        eff = xr.DataArray(
+            others.loc[sel, eff_col].astype(float).values,
+            coords={link_dim: sel},
+            dims=[link_dim],
+        )
+        term = (p.loc[:, sel] * eff * weights).sum()
+        captured = term if captured is None else captured + term
+    name = f"co2_disposal_own_capture_{node}"
+    if captured is None:
+        n.model.add_constraints(disposed <= 0, name=f"GlobalConstraint-{name}")
+    else:
+        n.model.add_constraints(disposed - captured <= 0, name=f"GlobalConstraint-{name}")
+    n.add("GlobalConstraint", name, constant=0.0, sense="<=", type="")
+    logger.info("CO2 disposal route at %s limited to the node's own capture.", node)
+
+
 def _p_nom_sum(n, names: pd.Index):
     if names.empty:
         return None

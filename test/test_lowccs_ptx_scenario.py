@@ -24,12 +24,13 @@ from scripts.walloon_scripts.named_pins import lookup_year_value
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config"
 NAME = "scen_test_lowccs_ptx"
+# The third lever, the power-to-X must-runs at 0, moved into config.walloon.yaml
+# for every scenario on 2026-10-04, so it no longer differs from the central.
+# The block still states it, and test_the_levers_have_the_documented_values
+# still pins the value.
 CHANGED = {
     "co2_export_limit",
     "industry_cc_floor",
-    "min_part_load_fischer_tropsch",
-    "min_part_load_methanolisation",
-    "min_part_load_methanation",
 }
 
 
@@ -48,7 +49,7 @@ def merged():
     return test, central
 
 
-def test_only_the_three_levers_differ_from_the_central(merged):
+def test_only_the_levers_differ_from_the_central(merged):
     test, central = merged
     for key in set(test) | set(central):
         if key != "sector":

@@ -175,12 +175,13 @@ def test_committed_csvs_expose_the_capacity_column_the_model_reads():
         # the superseded share column must stay consistent with the capacities
         recomputed = df["rooftop_gw"] / (df["rooftop_gw"] + df["utility_gw"])
         assert (recomputed - df["share"]).abs().max() < 1e-4
-    # Re-extracted from scen_central_v01_260929_3009.vd for the 30 Sep batch
-    # (11 Sep export: 10.470106 / 11.269192). A value change here means the
-    # central's TIMES export changed: re-run extract_times_softlink_values.py.
+    # Re-extracted from scen_central_v01_261002_0210.vd for the October batch
+    # (30 Sep export: 11.007436 / 12.129224; 11 Sep: 10.470106 / 11.269192). A
+    # value change here means the central's TIMES export changed: re-run
+    # extract_times_softlink_values.py.
     central = year_map(CENTRAL_CSV, "rooftop_gw")
-    assert central[2040] == pytest.approx(11.007436, rel=1e-6)
-    assert central[2050] == pytest.approx(12.129224, rel=1e-6)
+    assert central[2040] == pytest.approx(11.033485, rel=1e-6)
+    assert central[2050] == pytest.approx(12.135510, rel=1e-6)
 
 
 def test_floor_clears_the_baseyear_fleet_so_it_actually_binds():

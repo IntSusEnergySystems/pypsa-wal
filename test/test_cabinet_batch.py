@@ -2,12 +2,13 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Invariants of the cabinet batches (September and 30 September 2026).
+"""Invariants of the cabinet batches (September, 30 September and October 2026).
 
 Each test here pins something that was got wrong once while a batch was being
 built, and whose failure mode is a run that completes and is quietly wrong
 rather than one that stops. See docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md
-and docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md.
+docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md and
+docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md.
 """
 
 from pathlib import Path
@@ -22,10 +23,12 @@ SCENARIOS = ROOT / "config" / "scenarios.walloon.yaml"
 WAL = ROOT / "data" / "walloon"
 CENTRAL_AGG = WAL / "agg_p_nom_minmax_demande_haute.csv"
 
-# The batch in run.name: ICEDD's times_20260930_* exports, central first.
+# The batch in run.name: ICEDD's times_20261002_* exports, central first;
+# scen_realiste stays on its 30 Sep export (not re-exported on 2 Oct).
 BATCH = [
     "scen_central",
     "scen_noccsccgt",
+    "scen_noccsccgt_route",
     "scen_retardnucleaire",
     "scen_biomethane_industrie",
     "scen_realiste",
@@ -33,10 +36,11 @@ BATCH = [
 # The .vd each batch scenario must read. A block left on an older export runs
 # without complaint and is a different scenario.
 BATCH_VD = {
-    "scen_central": "scen_central_v01_260929_3009.vd",
-    "scen_noccsccgt": "scen_sensibilite_central_noccsccgt_260929_2909.vd",
-    "scen_retardnucleaire": "scen_sensibilite_retardnucleaire_260929_3009.vd",
-    "scen_biomethane_industrie": "scen_sensibilite_biomethane_industrie_v01_260929_3009.vd",
+    "scen_central": "scen_central_v01_261002_0210.vd",
+    "scen_noccsccgt": "scen_sensibilite_central_noccsccgt_261002_0210.vd",
+    "scen_noccsccgt_route": "scen_sensibilite_central_noccsccgt_261002_0210.vd",
+    "scen_retardnucleaire": "scen_sensibilite_retardnucleaire_261002_0210.vd",
+    "scen_biomethane_industrie": "scen_sensibilite_biomethane_industrie_v01_261002_0210.vd",
     "scen_realiste": "scen_sensibilite_realiste_260929_3009.vd",
 }
 # September-only scenarios: their blocks and generated files stay in the tree
@@ -74,15 +78,15 @@ def test_run_name_is_the_batch(run_names):
     """
     assert run_names == BATCH, (
         "run.name in config/config.walloon.yaml has drifted from the batch "
-        "documented in docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §1"
+        "documented in docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md §1"
     )
 
 
 @pytest.mark.parametrize("scenario", BATCH)
-def test_batch_reads_the_30_september_export(scenario, scenarios):
+def test_batch_reads_its_export(scenario, scenarios):
     times_file = scenarios[scenario]["sector"]["times_file"]
     assert Path(times_file).name == BATCH_VD[scenario], (
-        f"{scenario} reads {times_file}, not the 30 Sep export"
+        f"{scenario} reads {times_file}, not {BATCH_VD[scenario]}"
     )
 
 
@@ -141,6 +145,9 @@ def test_softlink_files_are_scenario_specific(scenario, scenarios):
         expected = scenario
         if scenario == "scen_central_2013":
             expected = "scen_central"
+        elif scenario == "scen_noccsccgt_route":
+            # the one-change twin runs on the noccsccgt export
+            expected = "scen_noccsccgt"
         elif scenario.startswith("scen_nuctip_"):
             expected = "scen_nofixnuc"
         assert stem.endswith(expected), (
@@ -405,3 +412,60 @@ def test_scenario_copies_have_the_central_structure(scenario, kind):
         f"{path.name} has drifted from {kind}.csv; re-run "
         "`build_common_parameters.py --write --all-scenarios`"
     )
+
+
+# --------------------------------------------------------------------------- #
+# The TIMES-priced CO2 disposal route (decided 2026-10-04)
+# --------------------------------------------------------------------------- #
+ROUTE = {2025: 0.0, 2030: 0.0, 2035: 4000.0, 2040: 6000.0, 2045: 7000.0, 2050: 8000.0}
+ROUTE_PRICE = {2030: 83.8, 2035: 83.8, 2040: 71.8, 2045: 67.8, 2050: 63.8}
+
+
+def _route(path: Path) -> dict[str, dict[int, float]]:
+    df = pd.read_csv(path)
+    df = df[(df["bus"].fillna("BEWAL") == "BEWAL") & (df["technology"] == "co2 disposal service")]
+    return {
+        par: {int(y): float(v) for y, v in zip(g["year"], g["value"])}
+        for par, g in df.groupby("parameter")
+    }
+
+
+def test_central_route_is_the_times_ceiling_and_tariff():
+    """CO2STG01: closed until 2030, then TIMES's own volume bound and tariff."""
+    r = _route(WAL / "custom_potentials.csv")
+    assert r["e_nom_max"] == ROUTE
+    for year, price in ROUTE_PRICE.items():
+        assert r["vom_downstream"][year] + r["vom_onshore"][year] == pytest.approx(price), year
+
+
+def test_noccsccgt_closes_the_route_and_the_twin_keeps_it():
+    """noccsccgt - noccsccgt_route is the disposal price alone, nothing else."""
+    closed = _route(WAL / "custom_potentials_scen_noccsccgt.csv")
+    # 2035/2045 rows of a copy are patched only by a 5-year write (inert on the
+    # 10-year grid; `--check` with the 5-year overlay is the guard before one).
+    assert {closed["e_nom_max"][y] for y in (2025, 2030, 2040, 2050)} == {0.0}
+    twin = _route(WAL / "custom_potentials_scen_noccsccgt_route.csv")
+    assert twin == _route(WAL / "custom_potentials.csv")
+    a = pd.read_csv(WAL / "custom_potentials_scen_noccsccgt.csv")
+    b = pd.read_csv(WAL / "custom_potentials_scen_noccsccgt_route.csv")
+    route = a["technology"].eq("co2 disposal service") & a["parameter"].eq("e_nom_max")
+    assert a[~route].equals(b[~route.values]), "the twin differs beyond the route"
+    for kind in ("custom_costs", "agg_p_nom_minmax"):
+        x = (WAL / f"{kind}_scen_noccsccgt.csv").read_text()
+        y = (WAL / f"{kind}_scen_noccsccgt_route.csv").read_text()
+        assert x == y, kind
+
+
+@pytest.mark.parametrize("scenario", ["scen_retardnucleaire", "scen_realiste"])
+def test_other_sensitivities_keep_the_route(scenario):
+    assert _route(WAL / f"custom_potentials_{scenario}.csv") == _route(WAL / "custom_potentials.csv")
+
+
+def test_bewal_2040_national_cap_is_the_times_tonnage():
+    """BEWAL 2040 on TIMES-WAL's 6 826 kt (15 % of 45 600); everyone else 25 %."""
+    budget = yaml.safe_load(CONFIG.read_text())["budget_national"]
+    assert budget[2040]["BEWAL"] == 0.15
+    assert {r: v for r, v in budget[2040].items() if r != "BEWAL"} == {
+        r: 0.25 for r in budget[2040] if r != "BEWAL"
+    }
+    assert budget[2030]["BEWAL"] == 0.45 and budget[2050]["BEWAL"] == 0.05

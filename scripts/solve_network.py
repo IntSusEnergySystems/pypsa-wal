@@ -46,6 +46,7 @@ from pypsa.descriptors import get_activity_mask
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 from scripts.prepare_sector_network import determine_emission_sectors
 from scripts.walloon_scripts.named_pins import (
+    add_co2_disposal_own_capture,
     add_co2_export_limit,
     add_industry_cc_floor,
     add_rooftop_floor_constraint,
@@ -2276,6 +2277,12 @@ def extra_functionality(
                 float(kt),
                 export_cfg.get("overage_price"),
             )
+    disposal_cfg = sector_cfg.get("co2_disposal_service") or {}
+    if disposal_cfg.get("own_capture_only", True):
+        # The priced route of BEWAL_potentials.apply_co2_disposal_service
+        # (TIMES-WAL CO2STG01) takes Walloon-captured CO2 only. No-op while the
+        # node's co2 sequestered Store has no capacity (the documented zero).
+        add_co2_disposal_own_capture(n, disposal_cfg.get("node", "BEWAL"))
     if n.config["co2_budget_national"]:
         # prepare co2 constraint
         nhours = n.snapshot_weightings.generators.sum()

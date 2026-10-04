@@ -364,11 +364,11 @@ scen_evflex:
 
 scen_central:
   sector:
-    # 30 Sep batch: the last central export, uploaded 2026-09-30 15:43
-    # (s3://intervectoriel/test/scenarios/times_20260930_scen_central_v01/).
-    # The two side files below were re-extracted from THIS file; the 24 and
-    # 29 Sep runs still carried the 11 Sep ones.
-    times_file: data/walloon/scen_central_v01_260929_3009.vd
+    # 2 Oct export (ICEDD's minor corrections, uploaded 2026-10-02 18:27,
+    # s3://intervectoriel/test/scenarios/times_20261002_scen_central_v01/).
+    # The two side files below were re-extracted from THIS file on 2026-10-04.
+    # docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md §2.
+    times_file: data/walloon/scen_central_v01_261002_0210.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -408,7 +408,7 @@ scen_central_6h:
   sector:
     # Same export as scen_central, so that its side files (extracted from it)
     # describe the demands this twin actually runs on.
-    times_file: data/walloon/scen_central_v01_260929_3009.vd
+    times_file: data/walloon/scen_central_v01_261002_0210.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -486,7 +486,7 @@ scen_taxshift_plus:
 
 scen_biomethane_industrie:
   sector:
-    times_file: data/walloon/scen_sensibilite_biomethane_industrie_v01_260929_3009.vd
+    times_file: data/walloon/scen_sensibilite_biomethane_industrie_v01_261002_0210.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -635,7 +635,7 @@ scen_realiste_nobnd30:
 # docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §2.6.
 scen_retardnucleaire:
   sector:
-    times_file: data/walloon/scen_sensibilite_retardnucleaire_260929_3009.vd
+    times_file: data/walloon/scen_sensibilite_retardnucleaire_261002_0210.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -669,7 +669,7 @@ scen_central_2013:
   atlite:
     default_cutout: europe-2013-sarah3-era5
   sector:
-    times_file: data/walloon/scen_central_v01_260929_3009.vd
+    times_file: data/walloon/scen_central_v01_261002_0210.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -873,6 +873,11 @@ scen_nuctip_4500:
 # scen_central, scen_biomethane_industrie and scen_retardnucleaire above were
 # moved onto these exports; the two blocks below are new. Run log and recipe:
 #   docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md
+#
+# 2 OCTOBER 2026 EXPORTS (times_20261002_*, next batch): central, noccsccgt,
+# retardnucleaire and biomethane_industrie moved onto them on 2026-10-04;
+# scen_noccsccgt_route is new; scen_realiste stays on 30 Sep (not re-exported).
+#   docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md
 # ===========================================================================
 
 # No carbon capture on Walloon gas-fired power plants (decided with the cabinet
@@ -887,12 +892,17 @@ scen_nuctip_4500:
 # (`process emissions CC`, `gas for industry CC`, `solid biomass for industry
 # CC`), hydrogen from `SMR CC`, and every non-Walloon node, as in TIMES-WAL.
 #
-# CAVEAT: this export (…_260929_2909) was built on the central BEFORE ICEDD's
-# last change of 30 Sep 15:43; its 2025 differs from the final central in 405
-# flows. Read NoCCSCCGT against the central with that in mind (batch log §2.2).
+# SINCE 2026-10-04 IT ALSO CLOSES THE TIMES-PRICED DISPOSAL ROUTE (Sylvain's
+# decision): the central disposes of Walloon CO2 through TIMES-WAL's CO2STG01
+# service (13.8 + 58 / 50 EUR/t in 2040 / 2050, 6 / 8 Mt/a), this scenario only
+# through the endogenous pipeline route (~63 / ~347 EUR/t on 1 Oct). So
+# noccsccgt - central is TWO changes: the power-CC ban and dearer disposal for
+# every Walloon capture. TIMES's own NoCCSCCGT keeps CO2STG01 at the central's
+# tariff. `scen_noccsccgt_route` below is the one-change twin.
+# Export of 2026-10-02 (…_261002_0210): same 2025 as the 2 Oct central, row for row.
 scen_noccsccgt:
   sector:
-    times_file: data/walloon/scen_sensibilite_central_noccsccgt_260929_2909.vd
+    times_file: data/walloon/scen_sensibilite_central_noccsccgt_261002_0210.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -919,6 +929,41 @@ scen_noccsccgt:
       2040: 6.47
       2050: 10.0
 
+# One-change twin of scen_noccsccgt (2026-10-04): the same power-CC ban on the
+# same export and side files, but the TIMES-priced disposal route stays open,
+# as in TIMES-WAL's own NoCCSCCGT. noccsccgt_route - central = the ban alone;
+# noccsccgt - noccsccgt_route = the disposal price alone. Override file
+# config/scenarios/scen_noccsccgt_route.csv = scen_noccsccgt.csv without the
+# `co2 disposal service` rows.
+scen_noccsccgt_route:
+  sector:
+    times_file: data/walloon/scen_sensibilite_central_noccsccgt_261002_0210.vd
+    rooftop_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_noccsccgt.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_noccsccgt.csv
+  electricity:
+    retrofit_nuclear_once: false
+    walloon_potentials: data/walloon/custom_potentials_scen_noccsccgt_route.csv
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_scen_noccsccgt_route.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_scen_noccsccgt_route.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
 # Realistic 2030 deployment (ICEDD's single "réaliste" export of 30 Sep; "non
 # publiable dans le rapport"). PyPSA side = the September realiste pair, which
 # ICEDD specified as PyPSA-identical: ICEDD's config/scen_realiste.csv 2030
@@ -926,6 +971,8 @@ scen_noccsccgt:
 # Walloon floors 5 % below them, the Belgian 2030 floors dropped, and the 2030
 # CO2 cap lifted for the three Belgian regions only. Its rooftop side file has
 # no 2030 row, for the reason given in that file.
+# 2026-10-04: ICEDD did not re-export it on 2 Oct, so it stays on the 30 Sep
+# export (2025 differs from the 2 Oct central; not comparable row for row).
 scen_realiste:
   sector:
     times_file: data/walloon/scen_sensibilite_realiste_260929_3009.vd
@@ -1003,7 +1050,7 @@ scen_realiste:
 # `sector: dac: true` (a prepare-time key too).
 scen_test_lowccs_ptx:
   sector:
-    times_file: data/walloon/scen_central_v01_260929_3009.vd
+    times_file: data/walloon/scen_central_v01_261002_0210.vd
     rooftop_floor:
       enable: true
       node: BEWAL
