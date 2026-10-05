@@ -29,7 +29,7 @@ import pandas as pd
 import pypsa
 import pytest
 
-from scripts.add_brownfield import carry_forward_built_grid
+from scripts.add_brownfield import built_grid, carry_forward_built_grid
 from scripts.prepare_network import set_transmission_limit
 
 # rows set_transmission_costs looks up; the values do not matter here
@@ -142,3 +142,87 @@ def test_no_inverted_bounds_survive_the_brownfield_sequence():
     assert not (n.lines.s_nom_min > n.lines.s_nom_max + 1e-6).any()
     dc = n.links.carrier == "DC"
     assert not (n.links.loc[dc, "p_nom_min"] > n.links.loc[dc, "p_nom_max"] + 1e-6).any()
+
+
+def _with_hvdc(p_nom_max: float = 3200.0) -> pypsa.Network:
+    """The derated grid plus an unvintaged HVDC, as ALEGrO (BEWAL-DE) is."""
+    n = _derated_network()
+    n.add(
+        "Link",
+        "DE-NL-dc",
+        bus0="DE",
+        bus1="NL",
+        carrier="DC",
+        length=300.0,
+        underwater_fraction=0.0,
+        p_nom=1000.0,
+        p_nom_max=p_nom_max,
+        lifetime=np.inf,       # DC links are not vintaged
+        reversed=False,
+    )
+    return n
+
+
+def test_dc_floor_survives_the_brownfield_pruning():
+    """Regression, 2026-10-06: the DC carry-forward read a pruned network.
+
+    `add_brownfield` removes every Link with an infinite lifetime from the
+    previous network -- all DC links -- before `main` re-applies the
+    carry-forward after `set_transmission_limit`. Read from that pruned
+    network, the 2040 build of 2 000 MW came back as 0 and the 2050 floor
+    stayed at today's 1 000 MW (5 Oct central, BEWAL-DE).
+    """
+    n = _with_hvdc()
+    n_p = n.copy()
+    n_p.links["p_nom_opt"] = 2000.0
+    snapshot = built_grid(n_p)
+
+    # what add_brownfield does to n_p before main's second carry-forward
+    n_p.remove("Link", n_p.links.index[n_p.links.lifetime == np.inf])
+    set_transmission_limit(n, "v", "opt", COSTS)
+
+    stale = n.copy()
+    carry_forward_built_grid(stale, n_p)
+    assert stale.links.at["DE-NL-dc", "p_nom_min"] == pytest.approx(1000.0), (
+        "premise: the pruned network has lost the DC build"
+    )
+
+    carry_forward_built_grid(n, snapshot)
+    assert n.links.at["DE-NL-dc", "p_nom_min"] == pytest.approx(2000.0)
+
+
+def test_carried_capacity_is_existing_capacity():
+    """What earlier horizons built is sunk, so it is not paid again.
+
+    PyPSA charges an extendable branch capital_cost * (nom_opt - nom); the
+    carried capacity therefore has to be in s_nom / p_nom, not only in the
+    lower bound.
+    """
+    n = _with_hvdc()
+    n.lines.loc["DE-NL", ["s_nom_min", "s_nom_max"]] = [0.0, 12000.0]
+    set_transmission_limit(n, "v", "opt", COSTS)
+    n_p = n.copy()
+    n_p.lines["s_nom_opt"] = 11000.0
+    n_p.links["p_nom_opt"] = 2000.0
+
+    carry_forward_built_grid(n, built_grid(n_p))
+
+    assert n.lines.at["DE-NL", "s_nom"] == pytest.approx(11000.0)
+    assert n.lines.at["DE-NL", "s_nom_min"] == pytest.approx(11000.0)
+    assert n.links.at["DE-NL-dc", "p_nom"] == pytest.approx(2000.0)
+    assert n.links.at["DE-NL-dc", "p_nom_min"] == pytest.approx(2000.0)
+
+
+def test_existing_capacity_never_exceeds_the_ceiling():
+    """A previous optimum above a since-lowered cap is clipped in both."""
+    n = _with_hvdc(p_nom_max=1500.0)
+    set_transmission_limit(n, "v", "opt", COSTS)
+    n_p = n.copy()
+    n_p.lines["s_nom_opt"] = 9000.0       # above the 7 142.9 MW line ceiling
+    n_p.links["p_nom_opt"] = 2000.0       # above the 1 500 MW DC ceiling
+
+    carry_forward_built_grid(n, built_grid(n_p))
+
+    assert n.lines.at["DE-NL", "s_nom"] <= n.lines.at["DE-NL", "s_nom_max"] + 1e-6
+    assert n.links.at["DE-NL-dc", "p_nom"] == pytest.approx(1500.0)
+    assert n.links.at["DE-NL-dc", "p_nom_min"] == pytest.approx(1500.0)

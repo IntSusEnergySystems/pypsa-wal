@@ -76,7 +76,8 @@ def add_brownfield(
     """
     logger.info(f"Preparing brownfield for the year {year}")
 
-    carry_forward_built_grid(n, n_p)
+    # n_p is still whole here; the loop below prunes it (see built_grid).
+    carry_forward_built_grid(n, built_grid(n_p))
 
     decomissioned_assets = {"Link": None, "Generator": None, "Store": None}
     for c in n_p.iterate_components(["Link", "Generator", "Store"]):
@@ -206,8 +207,33 @@ def add_brownfield(
     return decomissioned_assets
 
 
-def carry_forward_built_grid(n, n_p):
+def built_grid(n_p):
+    """Transmission capacity the previous horizon ended with.
+
+    Returns ``{"lines": s_nom_opt, "dc": p_nom_opt}`` for every AC line and DC
+    link of the solved previous network.
+
+    Read it **before** :func:`add_brownfield` prunes ``n_p``. That loop removes
+    every Link with an infinite lifetime, and DC links are not vintaged, so
+    they all go. Until 2026-10-06 the second :func:`carry_forward_built_grid`
+    call in ``main`` (after ``set_transmission_limit``) read the pruned
+    network, found no DC link, and left every DC floor at today's grid: the
+    BEWAL-DE HVDC built to 2 000 MW in 2040 restarted 2050 at 1 000 MW, and
+    FR-GB went 1 400 -> 1 000 -> 1 400 MW across 2030 / 2040 / 2050. AC lines
+    were unaffected (the pruning loop does not touch them).
+    """
+    dc = n_p.links.index[n_p.links.carrier == "DC"]
+    return {
+        "lines": n_p.lines.s_nom_opt.copy(),
+        "dc": n_p.links.loc[dc, "p_nom_opt"].copy(),
+    }
+
+
+def carry_forward_built_grid(n, built):
     """Make the previous horizon's optimised grid the floor for this one.
+
+    ``built`` is :func:`built_grid` of the previous network, or that network
+    itself (only safe before :func:`add_brownfield` has pruned it).
 
     Transmission is not vintaged, so a corridor is carried forward by raising
     its lower bound rather than by copying an asset. The maximum guards against
@@ -220,20 +246,36 @@ def carry_forward_built_grid(n, n_p):
     (`n.lines.type` is non-empty here) and so does not know about the derating
     `apply_ntc_limits` wrote into `s_nom` / `s_nom_max`. PyPSA only warns about
     the resulting inverted bounds; Gurobi returns `infeasible_or_unbounded`.
+
+    The carried capacity also becomes the branch's *existing* capacity
+    (``s_nom`` / ``p_nom``). PyPSA charges an extendable branch
+    ``capital_cost * (s_nom_opt - s_nom)`` in the objective, so with ``s_nom``
+    left at today's grid every horizon paid again for what the earlier ones had
+    built: a constant offset for AC lines, whose floor held, but for DC links,
+    whose floor was lost (see :func:`built_grid`), a real penalty on keeping
+    them. Sunk transmission is now free in the objective, like every other
+    brownfield asset; the reported costs (``capital_cost * p_nom_opt``) do not
+    change. This is the convention `apply_ntc_floors` already uses for the
+    committed Boucle du Hainaut.
     """
-    prev_lines = n_p.lines.s_nom_opt.reindex(n.lines.index).fillna(0.0)
+    if not isinstance(built, dict):
+        built = built_grid(built)
+
+    prev_lines = built["lines"].reindex(n.lines.index).fillna(0.0)
+    s_max = n.lines.s_nom_max.fillna(np.inf)
     floor_lines = np.maximum(n.lines.s_nom_min.fillna(0.0), prev_lines)
-    n.lines["s_nom_min"] = np.minimum(
-        floor_lines, n.lines.s_nom_max.fillna(np.inf)
-    )
+    n.lines["s_nom_min"] = np.minimum(floor_lines, s_max)
+    n.lines["s_nom"] = np.maximum(n.lines.s_nom, np.minimum(prev_lines, s_max))
 
     dc_i = n.links.index[n.links.carrier == "DC"]
-    prev_links = n_p.links.p_nom_opt.reindex(dc_i).fillna(0.0)
+    prev_links = built["dc"].reindex(dc_i).fillna(0.0)
+    p_max = n.links.loc[dc_i, "p_nom_max"].fillna(np.inf)
     floor_links = np.maximum(
         n.links.loc[dc_i, "p_nom_min"].fillna(0.0), prev_links
     )
-    n.links.loc[dc_i, "p_nom_min"] = np.minimum(
-        floor_links, n.links.loc[dc_i, "p_nom_max"].fillna(np.inf)
+    n.links.loc[dc_i, "p_nom_min"] = np.minimum(floor_links, p_max)
+    n.links.loc[dc_i, "p_nom"] = np.maximum(
+        n.links.loc[dc_i, "p_nom"], np.minimum(prev_links, p_max)
     )
 
 
@@ -436,6 +478,8 @@ if __name__ == "__main__":
     add_build_year_to_new_assets(n, year)
 
     n_p = pypsa.Network(snakemake.input.network_p)
+    # Before add_brownfield prunes n_p of its DC links (see built_grid).
+    previous_grid = built_grid(n_p)
 
     update_heat_pump_efficiency(n, n_p, year)
 
@@ -526,7 +570,9 @@ if __name__ == "__main__":
     # set_transmission_limit rewrites s_nom_min/p_nom_min from today's grid,
     # undoing the carry-forward add_brownfield established above. Re-apply it,
     # or every horizon would be free to tear down what the last one built.
-    carry_forward_built_grid(n, n_p)
+    # From the snapshot taken before add_brownfield pruned n_p: the pruned
+    # network has no DC links left (see built_grid).
+    carry_forward_built_grid(n, previous_grid)
 
     # Committed NTC floor (Boucle du Hainaut). Must follow the clip above:
     # carry_forward caps s_nom_min at s_nom_max, then the floor raises both
