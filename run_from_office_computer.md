@@ -48,6 +48,9 @@ Rules:
 | `extract` + `upload`/`publish` (Explorer CSVs → S3) | local | `./cluster/nic5.sh publish` |
 | pypsa2html report + `html_publish` | local (postprocess targets) | part of `postprocess` |
 
+**Every local step that is not `prepare`/`push` (post-processing, extraction, review,
+ad-hoc network reading) is heavy for this 15.9 GB machine: follow §7 (one at a time, capped).**
+
 `./cluster/nic5.sh run` chains all of the above. NIC5 compute nodes have
 **no internet**, so `prepare` must succeed locally first; Snakemake itself
 runs on the NIC5 **login node** and submits each rule to Slurm.
@@ -143,6 +146,11 @@ someone asked for it in chat. (Cursor's background agents on this same
 machine did support unattended follow-up; opencode does not — Sep 2026.)
 Do not rely on "the next probe is armed" assurances; ask `status?` instead.
 
+*Exception (4–5 Oct 2026):* the Claude desktop agent can arm `Monitor` loops that report
+back on their own (a state watcher every 5 min, a probe every ~25 min). They expire after
+~30 min and **die with the session**, so re-arm them, and never treat a silent monitor as a
+healthy run: check `squeue` yourself after any crash (§7.3).
+
 Each `status?` collects the same four signals:
 
 ```bash
@@ -194,7 +202,114 @@ remotely, and clear stale `.snakemake/locks/*.lock` only once nothing runs.
    results/walloon/<scenario>` and `check_heat_profile_fidelity.py`) before
    any result leaves the team. A run without its log is not finished.
 
+## 7. Local memory budget — how not to crash the desktop
+
+**What happened.** On 5 Oct 2026 the Claude desktop app died twice while heavy local steps
+ran (08:05 at the end of an extraction/publication sequence, 15:14 as a review script started
+right after a post-processing); a third time on 1 Oct 08:54. Every time the signature is the
+same and **is not in the kernel log**:
+
+```bash
+coredumpctl list --no-pager | tail -5        # SIGILL in /usr/lib/claude-desktop/claude-desktop
+journalctl -b 0 -k | grep -i -E "oom|killed process"      # empty: it is not the kernel OOM killer
+```
+
+SIGILL is how Chromium/Electron aborts on a failed allocation. This is a **diagnosis by
+elimination, not a proof**: the application aborts itself, so no kernel line says "memory".
+What is certain is the budget below, and that the swap makes it worse.
+
+**The budget** (15.9 GB RAM):
+
+| Consumer | Resident |
+|---|---|
+| desktop baseline: Claude desktop ~1.9 GB, Cursor ~1.9 GB, opencode ~0.7 GB, Firefox ~0.6 GB, agents ~0.6 GB | **4–4.5 GB** |
+| free for a heavy step | **~11 GB** |
+| **swap: 100 GB on a spinning disk (`/dev/sdb2`)** | *not* extra memory: a step that spills there stalls the whole machine |
+
+**Measured peaks** (cgroup `memory.peak`, one 1 h four-horizon tree, 5 Oct):
+
+| Step | Peak |
+|---|---|
+| `nic5.sh prepare` (with `--resources mem_mb=20000`) | 5–6 GB |
+| `nic5.sh postprocess`, pypsa2html report (with the `mem_mb=14000` cap) | 9–13 GB |
+| **`nic5.sh extract` (ClimAct extraction)** | **8.5 GB** |
+| `review_run.py` | 4.7 GB |
+| `ptx_report.py` | 3.1 GB |
+| `network_cost_report.py`, `bill_harmonisation.py`, `check_heat_profile_fidelity.py` | 2–3 GB (not separately measured) |
+| one network loaded in `python` for an ad-hoc look | 2–3 GB |
+
+### 7.1 Rules
+
+1. **One heavy step at a time. Never two.** Extraction (8.5 GB) plus a review script
+   (4.7 GB) plus the desktop baseline is 17 GB: more than the RAM. Drivers must run steps
+   strictly in sequence, with no `&` between heavy steps.
+2. **Wrap every heavy local step in `cluster/capped.sh`.** It runs the step in its own cgroup
+   with a hard cap and **no swap**, so a runaway step is killed alone (exit 137) instead of
+   dragging the desktop into swap. It prints the real peak at the end.
+
+   ```bash
+   RUN_NAME=scen_central cluster/capped.sh 10G extract -- ./cluster/nic5.sh extract
+   PYTHONPATH=. cluster/capped.sh 8G review -- conda run --no-capture-output -n pypsa-eur \
+       python scripts/walloon_scripts/review_run.py results/walloon/scen_central
+   SKIP_S3_UPLOAD=1 HTML_PUBLISH=0 LOCAL_CORES=4 cluster/capped.sh 14G post -- \
+       ./cluster/nic5.sh postprocess
+   ```
+
+   Suggested caps: extraction 10G, pypsa2html / postprocess 14G, review 8G, ad-hoc network
+   reading 6G. Tested 5 Oct: a 900 MB allocation in a 300 MB scope is killed with exit 137 and
+   the swap does not move.
+3. **Check before you start**: `free -m` column *available* must be at least the step's peak
+   plus 3 GB. If not, close Cursor and Firefox (3 GB between them) before an extraction or a
+   post-processing; do not start the step on a hope.
+4. **Keep the number of resident helpers small.** No second agent session, no second editor,
+   no browser tabs of the published reports while a heavy step runs.
+5. **`nic5.sh extract` refuses to run while `review_run.py` runs, and without swap** (it
+   checks `SwapTotal`). Do not bypass it with `NIC5_ALLOW_NO_SWAP=1`; use the cap instead.
+
+### 7.2 Drivers and scratch files must survive a crash
+
+The agent's scratchpad (`/tmp/claude-…/scratchpad`) is **wiped when the session restarts**.
+On 5 Oct a publication driver kept there silently did nothing after the crash
+(`nohup: failed to run command … No such file or directory`) and 30 minutes were lost.
+
+* Keep every driver, wrapper and helper under `/sylvain/mount/pypsa-wal-data/<batch>_scripts/`
+  (this batch: `batch_20261004_scripts/`), never in `/tmp` or the scratchpad.
+* Start long local jobs with `setsid nohup <script> > cluster/logs/<name>.out 2>&1 < /dev/null &`
+  and give every step a log in `cluster/logs/`.
+* Make a driver print one line per step (`### HH:MM step`, `exit=N`) and a final marker
+  (`ALL_..._DONE`). After a crash the last marker tells where it stopped.
+* **A launch is not a success until its first output line exists**: check the `.out` file
+  30 seconds later.
+
+### 7.3 What to do first when the app dies
+
+1. `uptime; who -b; free -m; coredumpctl list --no-pager | tail -3`: did the machine reboot,
+   or only the app?
+2. `pgrep -af 'snakemake|gurobi|extract|upload|publish_seq|post_seq|test_all'`: did the
+   detached drivers survive? `setsid` jobs do; the agent's monitors do not.
+3. **The cluster side is untouched by a local crash.** Slurm jobs and the orchestrator run on
+   the NIC5 login node:
+   `ssh nic5 "squeue --me -h; ps -u \$USER -o pid,etime,cmd | grep snakemake | grep -v grep"`.
+4. Check the last marker of each driver in `cluster/logs/*.out` and re-run only the missing
+   steps. `postprocess` and `extract` are idempotent; `upload` overwrites the same S3 keys.
+5. Re-arm the monitors (they have no memory of the previous session).
+
+### 7.4 Verifying an interrupted publication
+
+```bash
+export AWS_PROFILE=intervectoriel
+for s in <scenarios>; do
+  aws s3 ls s3://intervectoriel/test/scenarios/times-pypsa__${s}-2010-1h__$(date +%Y%m%d)/ --recursive \
+    | awk -v s=$s '{n++; if($3==0)z++} END{print s": "n" files, "z+0" empty"}'   # expect 53, 0
+  curl -s -o /dev/null -w "$s %{http_code}\n" https://pypsa.squoilin.eu/${s}_$(date +%Y%m%d)/pypsa/index.html
+done
+```
+
+A half-written Explorer set looks valid on S3 (the extraction is not atomic). 53 files, none
+empty, and the log of the extraction ending with `Extraction complete` are the checks; if in
+doubt, re-run `extract` (about 4 min per scenario) and `upload`.
+
 Reference for everything above: `instructions.md` (operational guide),
 `cluster/config.sh` (defaults), `cluster/config_cluster.yaml` (solve
 resources), `docs/run-review-checklist.md` (is the run *right*, not just
-finished).
+finished), `cluster/capped.sh` (memory-capped local steps).
