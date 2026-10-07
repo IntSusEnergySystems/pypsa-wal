@@ -1,0 +1,4 @@
+[1;34m[nic5][0m Launching Slurm orchestrator on the login node (partition=batch, cpus=16)
+[1;34m[nic5][0m   scratch caches: XDG_CACHE_HOME=/scratch/ulg/thermlab/squoilin/pypsa-wal/.cache  TMPDIR=/scratch/ulg/thermlab/squoilin/pypsa-wal/tmp
+[1;34m[nic5][0m   orchestrator pid 2071782 (log: cluster/logs/orchestrate.log)
+[1;34m[nic5][0m Track with: ./cluster/nic5.sh status

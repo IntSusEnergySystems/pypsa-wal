@@ -237,6 +237,22 @@ What is certain is the budget below, and that the swap makes it worse.
 | `ptx_report.py` | 3.1 GB |
 | `network_cost_report.py`, `bill_harmonisation.py`, `check_heat_profile_fidelity.py` | 2–3 GB (not separately measured) |
 | one network loaded in `python` for an ad-hoc look | 2–3 GB |
+| pypsa2html alone, **network caches bounded to 2** (`batch_20261006_scripts/html_lowmem.py`, 6 Oct) | **7.8 GB** (36 min) |
+| pypsa2html inside `postprocess`, unbounded (6 Oct, other scenario trees on disk) | **> 10 GB**: OOM-killed in a 10 GB cap |
+
+**pypsa2html (6–7 Oct).**
+* **Fixed in pypsa2html on 7 Oct:** `model.network_cache_size` is now a real process-wide bound.
+  `config/pypsa2html.yaml` sets it to **2** for this machine, so the normal
+  `generate_html_report` rule fits: about 7.8 GB, about 36 min per scenario.
+* The single-scenario rule still reads every scenario of `config/pypsa2html.yaml` whose tree is
+  on disk. **List only scenarios of the same vintage there.**
+* **With an older pypsa2html (before the fix):**
+  * The process-wide `_PATH_CACHE` kept every network whatever the setting, so `postprocess` was
+    OOM-killed in `generate_html_report`.
+  * Workaround: `batch_20261006_scripts/html_lowmem.py <scenario> 2`, then
+    `snakemake --cleanup-metadata <…/html/pypsa/index.html>`.
+  * Then build the `write_html_hub` target alone. Dry-run it first: it must show 1 job.
+  * Do not re-run `postprocess` after that: its `--touch` makes the report stale and rebuilds it.
 
 ### 7.1 Rules
 

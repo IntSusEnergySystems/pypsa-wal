@@ -15,6 +15,13 @@ model:
   opts: ""
   sector_opts: ""
   planning_horizons: null      # discovered from the solved networks
+  # Process-wide bound on solved networks kept in RAM (pypsa2html, 2026-10-06).
+  # The office computer (16 GB) cannot hold four 1 h networks (~2.5 GB each)
+  # plus the other scenarios' networks the comparison charts read: unbounded,
+  # `generate_html_report` was OOM-killed in a 10 GB cap; at 2 it peaks at
+  # 7.8 GB and takes ~36 min per scenario instead of a few minutes. null on a
+  # big machine. docs/logs/2026-10-06_scen_central_2010_1h_noroute_biogas.md I1.
+  network_cache_size: 2
 
 nodes:
   detect: true
@@ -89,6 +96,11 @@ scenarios:
     label: Central
     results_dir: results/walloon/scen_central
     resources_dir: resources/walloon/scen_central
+  # 2026-10-06: the five sensitivities below are the 4 Oct vintage (TIMES route
+  # open in the central, no transmission fix f6d0f7aa, old biogas cap), while
+  # scen_central is the 6 Oct re-run (route closed, ICEDD biogas cap in every
+  # horizon). Commented out so the central's comparison charts do not draw them
+  # as comparable; re-enable each one once it is re-run on the 6 Oct inputs.
   # - name: scen_taxshift
   #   label: Tax shift — single surcharge
   #   results_dir: results/walloon/scen_taxshift
@@ -97,10 +109,10 @@ scenarios:
   #   label: Tax shift — full regional
   #   results_dir: results/walloon/scen_taxshift_plus
   #   resources_dir: resources/walloon/scen_taxshift_plus
-  - name: scen_biomethane_industrie
-    label: Biomethane reserved for industry
-    results_dir: results/walloon/scen_biomethane_industrie
-    resources_dir: resources/walloon/scen_biomethane_industrie
+  # - name: scen_biomethane_industrie
+  #   label: Biomethane reserved for industry
+  #   results_dir: results/walloon/scen_biomethane_industrie
+  #   resources_dir: resources/walloon/scen_biomethane_industrie
   # - name: scen_realiste_nets
   #   label: Realistic 2030 — non-ETS kept
   #   results_dir: results/walloon/scen_realiste_nets
@@ -109,22 +121,22 @@ scenarios:
   #   label: Realistic 2030 — no 2030 target
   #   results_dir: results/walloon/scen_realiste_nobnd30
   #   resources_dir: resources/walloon/scen_realiste_nobnd30
-  - name: scen_retardnucleaire
-    label: New nuclear deferred beyond 2050
-    results_dir: results/walloon/scen_retardnucleaire
-    resources_dir: resources/walloon/scen_retardnucleaire
-  - name: scen_noccsccgt
-    label: No capture on power plants, endogenous CO2 disposal
-    results_dir: results/walloon/scen_noccsccgt
-    resources_dir: resources/walloon/scen_noccsccgt
-  - name: scen_noccsccgt_route
-    label: No capture on power plants, TIMES disposal route kept
-    results_dir: results/walloon/scen_noccsccgt_route
-    resources_dir: resources/walloon/scen_noccsccgt_route
-  - name: scen_realiste
-    label: Realistic 2030 deployment (not for publication)
-    results_dir: results/walloon/scen_realiste
-    resources_dir: resources/walloon/scen_realiste
+  # - name: scen_retardnucleaire
+  #   label: New nuclear deferred beyond 2050
+  #   results_dir: results/walloon/scen_retardnucleaire
+  #   resources_dir: resources/walloon/scen_retardnucleaire
+  # - name: scen_noccsccgt
+  #   label: No capture on power plants, endogenous CO2 disposal
+  #   results_dir: results/walloon/scen_noccsccgt
+  #   resources_dir: resources/walloon/scen_noccsccgt
+  # - name: scen_noccsccgt_route
+  #   label: No capture on power plants, TIMES disposal route kept
+  #   results_dir: results/walloon/scen_noccsccgt_route
+  #   resources_dir: resources/walloon/scen_noccsccgt_route
+  # - name: scen_realiste
+  #   label: Realistic 2030 deployment (not for publication)
+  #   results_dir: results/walloon/scen_realiste
+  #   resources_dir: resources/walloon/scen_realiste
   # TEST, not a cabinet scenario (30 Sep batch log §12). Shown next to the 1 Oct
   # central on Sylvain's request; commented out for the October batch because
   # its tree is the 1 Oct vintage (30 Sep exports, must-runs on in the central).

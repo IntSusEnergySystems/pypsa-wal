@@ -415,9 +415,15 @@ def test_scenario_copies_have_the_central_structure(scenario, kind):
 
 
 # --------------------------------------------------------------------------- #
-# The TIMES-priced CO2 disposal route (decided 2026-10-04)
+# The TIMES-priced CO2 disposal route (decided 2026-10-04; closed in the central
+# from 2026-10-06, re-opened only in scen_noccsccgt_route)
 # --------------------------------------------------------------------------- #
-ROUTE = {2025: 0.0, 2030: 0.0, 2035: 4000.0, 2040: 6000.0, 2045: 7000.0, 2050: 8000.0}
+# Every row, the 5-year grid's 2035/2045 included: on 4 Oct scen_noccsccgt had the
+# route closed in the four solved years but open in 2035/2045, because a 10-year
+# `--write` left those rows as seeded from the central.
+YEARS = (2025, 2030, 2035, 2040, 2045, 2050)
+CLOSED = dict.fromkeys(YEARS, 0.0)
+ROUTE_TIMES = {2025: 0.0, 2030: 0.0, 2035: 4000.0, 2040: 6000.0, 2045: 7000.0, 2050: 8000.0}
 ROUTE_PRICE = {2030: 83.8, 2035: 83.8, 2040: 71.8, 2045: 67.8, 2050: 63.8}
 
 
@@ -430,22 +436,34 @@ def _route(path: Path) -> dict[str, dict[int, float]]:
     }
 
 
-def test_central_route_is_the_times_ceiling_and_tariff():
-    """CO2STG01: closed until 2030, then TIMES's own volume bound and tariff."""
+def test_central_route_is_closed_in_every_horizon():
+    """Closed 2025-2050 (decided 2026-10-06); the tariff rows stay, inert at volume 0."""
     r = _route(WAL / "custom_potentials.csv")
-    assert r["e_nom_max"] == ROUTE
+    assert r["e_nom_max"] == CLOSED
     for year, price in ROUTE_PRICE.items():
         assert r["vom_downstream"][year] + r["vom_onshore"][year] == pytest.approx(price), year
 
 
-def test_noccsccgt_closes_the_route_and_the_twin_keeps_it():
-    """noccsccgt - noccsccgt_route is the disposal price alone, nothing else."""
+@pytest.mark.parametrize(
+    "path",
+    sorted(p.name for p in WAL.glob("custom_potentials_scen_*.csv")),
+)
+def test_route_closed_in_every_copy_but_the_twin(path):
+    """A scenario copy re-seeded from the central must not keep an old route row."""
+    r = _route(WAL / path)["e_nom_max"]
+    want = ROUTE_TIMES if path == "custom_potentials_scen_noccsccgt_route.csv" else CLOSED
+    assert r == want
+
+
+def test_noccsccgt_closes_the_route_and_the_twin_opens_it():
+    """noccsccgt_route - noccsccgt is the TIMES route alone, nothing else."""
     closed = _route(WAL / "custom_potentials_scen_noccsccgt.csv")
-    # 2035/2045 rows of a copy are patched only by a 5-year write (inert on the
-    # 10-year grid; `--check` with the 5-year overlay is the guard before one).
-    assert {closed["e_nom_max"][y] for y in (2025, 2030, 2040, 2050)} == {0.0}
+    assert closed["e_nom_max"] == CLOSED
     twin = _route(WAL / "custom_potentials_scen_noccsccgt_route.csv")
-    assert twin == _route(WAL / "custom_potentials.csv")
+    assert twin["e_nom_max"] == ROUTE_TIMES
+    assert {k: v for k, v in twin.items() if k != "e_nom_max"} == {
+        k: v for k, v in _route(WAL / "custom_potentials.csv").items() if k != "e_nom_max"
+    }
     a = pd.read_csv(WAL / "custom_potentials_scen_noccsccgt.csv")
     b = pd.read_csv(WAL / "custom_potentials_scen_noccsccgt_route.csv")
     route = a["technology"].eq("co2 disposal service") & a["parameter"].eq("e_nom_max")
@@ -457,7 +475,7 @@ def test_noccsccgt_closes_the_route_and_the_twin_keeps_it():
 
 
 @pytest.mark.parametrize("scenario", ["scen_retardnucleaire", "scen_realiste"])
-def test_other_sensitivities_keep_the_route(scenario):
+def test_other_sensitivities_follow_the_central_route(scenario):
     assert _route(WAL / f"custom_potentials_{scenario}.csv") == _route(WAL / "custom_potentials.csv")
 
 

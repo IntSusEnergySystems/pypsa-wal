@@ -629,7 +629,15 @@ def patch_potentials(
 ) -> Patch:
     """Patch data/walloon/custom_potentials.csv from `potential:...` targets."""
     patch = Patch(path=POTENTIALS_FILE)
-    targets = collect_targets(df, "potential", horizons, nparts=3)
+    # Expanded over EVERY grid's horizons, not only this run's. The file is shared
+    # by config.walloon.yaml [2025, 2030, 2040, 2050] and config.walloon_5y.yaml
+    # (+2035/2045). Until 2026-10-06 a 10-year `--write` left the 2035/2045 rows
+    # untouched, so a scenario copy re-seeded from the central kept the central's
+    # values there: scen_noccsccgt had the CO2 route open and the power-CC caps
+    # at inf in 2035/2045 while closed in the four solved years. `expand_years`
+    # depends on the anchors only, so the 10-year values are unchanged.
+    grid = tuple(sorted(set(horizons) | known_horizons()))
+    targets = collect_targets(df, "potential", grid, nparts=3)
     # BEWAL_potentials.py matches `year` exactly; wildcard geographies are unresolved.
     targets = {k: v for k, v in targets.items() if "*" not in k[0]}
     frame = _read_str(POTENTIALS_FILE)
@@ -660,22 +668,14 @@ def patch_potentials(
 
         year = int(row["year"])
         if year not in tgt.values:
-            # The file is shared by every planning grid: config.walloon.yaml runs
-            # [2025, 2030, 2040, 2050] and config.walloon_5y.yaml adds 2035/2045.
-            # BEWAL_potentials.py selects `year == planning_horizons` exactly, so a
-            # row for a horizon this run does not solve is inert — carry it through
-            # unpatched instead of failing the run that does not need it. A year no
-            # config solves at all is still an error: that is a typo, not a grid.
-            if year in known_horizons():
-                patch.notes.append(
-                    f"row {'/'.join(key)}@{year} is outside this run's horizons "
-                    f"{list(horizons)} — left untouched (another planning grid uses it)"
-                )
-            else:
-                patch.errors.append(
-                    f"{POTENTIALS_FILE.name}: row {'/'.join(key)}@{year} is not a "
-                    "planning horizon of any config/config.walloon*.yaml"
-                )
+            # A row for a horizon this run does not solve is inert in the solve
+            # (BEWAL_potentials.py selects `year == planning_horizons`) but is
+            # still patched above, from the same anchors. A year no config solves
+            # at all is an error: that is a typo, not a grid.
+            patch.errors.append(
+                f"{POTENTIALS_FILE.name}: row {'/'.join(key)}@{year} is not a "
+                "planning horizon of any config/config.walloon*.yaml"
+            )
             continue
         new = tgt.values[year]
         if same_value(row["value"], new):

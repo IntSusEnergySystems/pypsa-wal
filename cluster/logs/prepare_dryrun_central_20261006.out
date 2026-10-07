@@ -1,0 +1,115 @@
+[1;34m[nic5][0m Preparing un-solved solve inputs locally (16 cores) — DRY RUN
+[1;34m[nic5][0m   config: config/config.walloon.yaml
+[1;34m[nic5][0m   targets: resources/walloon/scen_central/networks/base_s_adm___2025_brownfield.nc resources/walloon/scen_central/networks/base_s_adm___2030.nc resources/walloon/scen_central/networks/base_s_adm___2040.nc resources/walloon/scen_central/networks/base_s_adm___2050.nc 
+[1;34m[nic5][0m   log: /sylvain/git/pypsa-wal/cluster/logs/prepare_dryrun.log  (also: /sylvain/git/pypsa-wal/.snakemake/log/ and /sylvain/git/pypsa-wal/logs/walloon/scen_central/)
+Using workflow specific profile profiles/default for setting default command line arguments.
+Config file config/config.default.yaml is extended by additional config specified via the command line.
+Config file config/plotting.default.yaml is extended by additional config specified via the command line.
+
+SNAKEMAKE
+=========
+  Date: 2026-10-06 14:45:56
+  Workflow ID: 8c39170f-9ed6-4b08-a3b3-576bcb8cdcde
+  Platform: Linux-6.14.0-33-generic-x86_64-with-glibc2.39
+  Host: pcbureau
+  User: sylvain
+  Snakemake version: 9.25.1
+  Python version: 3.14.6 | packaged by conda-forge | (main, Aug 11 2026, 10:26:15) [GCC 14.4.0]
+  Command: /home/anaconda/envs/pypsa-eur/bin/snakemake --resources mem_mb=20000 --configfile config/config.walloon.yaml --cores 16 --rerun-triggers mtime --rerun-incomplete --printshellcmds -n -- resources/walloon/scen_central/networks/base_s_adm___2025_brownfield.nc resources/walloon/scen_central/networks/base_s_adm___2030.nc resources/walloon/scen_central/networks/base_s_adm___2040.nc resources/walloon/scen_central/networks/base_s_adm___2050.nc
+  Snakefile: /sylvain/git/pypsa-wal/Snakefile
+  Base directory: /sylvain/git/pypsa-wal
+  Run directory: /sylvain/git/pypsa-wal
+  Working directory: /sylvain/git/pypsa-wal
+  Config file(s): [PosixPath('/sylvain/git/pypsa-wal/config/config.walloon.yaml'), 'config/config.default.yaml', 'config/plotting.default.yaml']
+  Config MD5: 5c76edbe632ea19d413d8fbe552e7863
+
+Building DAG of jobs...
+Job stats:
+job                       count
+----------------------  -------
+prepare_sector_network        4
+add_existing_baseyear         1
+total                         5
+
+
+[Tue Oct  6 14:46:34 2026]
+Preparing integrated sector-coupled energy network for adm clusters, 2025 planning horizon,  electric options and  sector options
+rule prepare_sector_network:
+    input: resources/profile_adm_offwind-ac.nc, resources/profile_adm_offwind-dc.nc, resources/profile_adm_offwind-float.nc, resources/walloon/scen_central/gas_network_base_s_adm.csv, resources/walloon/scen_central/gas_input_locations_s_adm.geojson, resources/walloon/scen_central/gas_input_locations_s_adm_simplified.csv, resources/walloon/scen_central/snapshot_weightings_base_s_adm_elec__.csv, data/walloon/custom_potentials.csv, resources/biomass_transport_costs.csv, resources/walloon/scen_central/co2_sequestration_potential_base_s_adm.csv, resources/walloon/scen_central/networks/base_s_adm_elec_.nc, resources/eurostat_energy_balances.csv, resources/walloon/scen_central/pop_weighted_energy_totals_s_adm_2025.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/road_transport_2025_shares.csv, resources/walloon/scen_central/pop_weighted_heat_totals_s_adm_2025.csv, resources/walloon/scen_central/shipping_demand_s_adm_2025.csv, resources/walloon/scen_central/transport_demand_s_adm_2025.csv, resources/walloon/scen_central/transport_data_s_adm_2025.csv, resources/walloon/scen_central/avail_profile_s_adm_2025.csv, resources/walloon/scen_central/dsm_profile_s_adm_2025.csv, resources/walloon/scen_central/natural_charging_shape_s_adm_2025.csv, resources/walloon/scen_central/co2_totals_adm_2025.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv, resources/walloon/scen_central/biomass_potentials_s_adm_2025.csv, resources/walloon/scen_central/costs_2025_processed.csv, resources/walloon/scen_central/salt_cavern_potentials_s_adm.csv, resources/busmap_base_s.csv, resources/busmap_base_s_adm.csv, resources/walloon/scen_central/pop_layout_base_s_adm.csv, resources/walloon/scen_central/industrial_energy_demand_base_s_adm_2025.csv, resources/walloon/scen_central/hourly_heat_demand_total_base_s_adm.nc, resources/walloon/scen_central/industrial_production_base_s_adm_2025.csv, resources/walloon/scen_central/district_heat_share_base_s_adm_2025.csv, resources/walloon/scen_central/heating_efficiencies_adm_2025.csv, resources/walloon/scen_central/temp_soil_total_base_s_adm.nc, resources/walloon/scen_central/temp_air_total_base_s_adm.nc, resources/walloon/scen_central/cop_profiles_base_s_adm_2025.nc, resources/solar_thermal_total_base_s_adm.nc, resources/walloon/scen_central/solar_rooftop_potentials_s_adm.csv, resources/walloon/scen_central/direct_heat_source_utilisation_profiles_base_s_adm_2025.nc, data/walloon/ntc_2025.csv, data/walloon/ntc_floors.csv, data/walloon/transmission_cost_overrides.csv, resources/walloon/scen_central/clever_Transport_adm_2025.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2025.nc
+    log: logs/walloon/scen_central/prepare_sector_network_base_s_adm___2025.log
+    jobid: 136
+    benchmark: benchmarks/walloon/scen_central/prepare_sector_network/base_s_adm___2025
+    reason: Updated input files: data/walloon/custom_potentials.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2025
+    resources: tmpdir=/tmp, mem_mb=2000, mem=2 GB, mem_mib=1908
+Shell command: None
+
+[Tue Oct  6 14:46:34 2026]
+Preparing integrated sector-coupled energy network for adm clusters, 2050 planning horizon,  electric options and  sector options
+rule prepare_sector_network:
+    input: resources/profile_adm_offwind-ac.nc, resources/profile_adm_offwind-dc.nc, resources/profile_adm_offwind-float.nc, resources/walloon/scen_central/gas_network_base_s_adm.csv, resources/walloon/scen_central/gas_input_locations_s_adm.geojson, resources/walloon/scen_central/gas_input_locations_s_adm_simplified.csv, resources/walloon/scen_central/snapshot_weightings_base_s_adm_elec__.csv, data/walloon/custom_potentials.csv, resources/biomass_transport_costs.csv, resources/walloon/scen_central/co2_sequestration_potential_base_s_adm.csv, resources/walloon/scen_central/networks/base_s_adm_elec_.nc, resources/eurostat_energy_balances.csv, resources/walloon/scen_central/pop_weighted_energy_totals_s_adm_2050.csv, resources/walloon/scen_central/wallon_demands_2050.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/road_transport_2050_shares.csv, resources/walloon/scen_central/pop_weighted_heat_totals_s_adm_2050.csv, resources/walloon/scen_central/shipping_demand_s_adm_2050.csv, resources/walloon/scen_central/transport_demand_s_adm_2050.csv, resources/walloon/scen_central/transport_data_s_adm_2050.csv, resources/walloon/scen_central/avail_profile_s_adm_2050.csv, resources/walloon/scen_central/dsm_profile_s_adm_2050.csv, resources/walloon/scen_central/natural_charging_shape_s_adm_2050.csv, resources/walloon/scen_central/co2_totals_adm_2050.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv, resources/walloon/scen_central/biomass_potentials_s_adm_2050.csv, resources/walloon/scen_central/costs_2050_processed.csv, resources/walloon/scen_central/salt_cavern_potentials_s_adm.csv, resources/busmap_base_s.csv, resources/busmap_base_s_adm.csv, resources/walloon/scen_central/pop_layout_base_s_adm.csv, resources/walloon/scen_central/industrial_energy_demand_base_s_adm_2050.csv, resources/walloon/scen_central/hourly_heat_demand_total_base_s_adm.nc, resources/walloon/scen_central/industrial_production_base_s_adm_2050.csv, resources/walloon/scen_central/district_heat_share_base_s_adm_2050.csv, resources/walloon/scen_central/heating_efficiencies_adm_2050.csv, resources/walloon/scen_central/temp_soil_total_base_s_adm.nc, resources/walloon/scen_central/temp_air_total_base_s_adm.nc, resources/walloon/scen_central/cop_profiles_base_s_adm_2050.nc, resources/solar_thermal_total_base_s_adm.nc, resources/walloon/scen_central/solar_rooftop_potentials_s_adm.csv, resources/walloon/scen_central/direct_heat_source_utilisation_profiles_base_s_adm_2050.nc, data/walloon/ntc_2050.csv, data/walloon/ntc_floors.csv, data/walloon/transmission_cost_overrides.csv, resources/walloon/scen_central/clever_Transport_adm_2050.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2050.nc
+    log: logs/walloon/scen_central/prepare_sector_network_base_s_adm___2050.log
+    jobid: 0
+    benchmark: benchmarks/walloon/scen_central/prepare_sector_network/base_s_adm___2050
+    reason: Updated input files: data/walloon/custom_potentials.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2050
+    resources: tmpdir=/tmp, mem_mb=2000, mem=2 GB, mem_mib=1908
+Shell command: None
+
+[Tue Oct  6 14:46:34 2026]
+Preparing integrated sector-coupled energy network for adm clusters, 2030 planning horizon,  electric options and  sector options
+rule prepare_sector_network:
+    input: resources/profile_adm_offwind-ac.nc, resources/profile_adm_offwind-dc.nc, resources/profile_adm_offwind-float.nc, resources/walloon/scen_central/gas_network_base_s_adm.csv, resources/walloon/scen_central/gas_input_locations_s_adm.geojson, resources/walloon/scen_central/gas_input_locations_s_adm_simplified.csv, resources/walloon/scen_central/snapshot_weightings_base_s_adm_elec__.csv, data/walloon/custom_potentials.csv, resources/biomass_transport_costs.csv, resources/walloon/scen_central/co2_sequestration_potential_base_s_adm.csv, resources/walloon/scen_central/networks/base_s_adm_elec_.nc, resources/eurostat_energy_balances.csv, resources/walloon/scen_central/pop_weighted_energy_totals_s_adm_2030.csv, resources/walloon/scen_central/wallon_demands_2030.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/road_transport_2030_shares.csv, resources/walloon/scen_central/pop_weighted_heat_totals_s_adm_2030.csv, resources/walloon/scen_central/shipping_demand_s_adm_2030.csv, resources/walloon/scen_central/transport_demand_s_adm_2030.csv, resources/walloon/scen_central/transport_data_s_adm_2030.csv, resources/walloon/scen_central/avail_profile_s_adm_2030.csv, resources/walloon/scen_central/dsm_profile_s_adm_2030.csv, resources/walloon/scen_central/natural_charging_shape_s_adm_2030.csv, resources/walloon/scen_central/co2_totals_adm_2030.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv, resources/walloon/scen_central/biomass_potentials_s_adm_2030.csv, resources/walloon/scen_central/costs_2030_processed.csv, resources/walloon/scen_central/salt_cavern_potentials_s_adm.csv, resources/busmap_base_s.csv, resources/busmap_base_s_adm.csv, resources/walloon/scen_central/pop_layout_base_s_adm.csv, resources/walloon/scen_central/industrial_energy_demand_base_s_adm_2030.csv, resources/walloon/scen_central/hourly_heat_demand_total_base_s_adm.nc, resources/walloon/scen_central/industrial_production_base_s_adm_2030.csv, resources/walloon/scen_central/district_heat_share_base_s_adm_2030.csv, resources/walloon/scen_central/heating_efficiencies_adm_2030.csv, resources/walloon/scen_central/temp_soil_total_base_s_adm.nc, resources/walloon/scen_central/temp_air_total_base_s_adm.nc, resources/walloon/scen_central/cop_profiles_base_s_adm_2030.nc, resources/solar_thermal_total_base_s_adm.nc, resources/walloon/scen_central/solar_rooftop_potentials_s_adm.csv, resources/walloon/scen_central/direct_heat_source_utilisation_profiles_base_s_adm_2030.nc, data/walloon/ntc_2030.csv, data/walloon/ntc_floors.csv, data/walloon/transmission_cost_overrides.csv, resources/walloon/scen_central/clever_Transport_adm_2030.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2030.nc
+    log: logs/walloon/scen_central/prepare_sector_network_base_s_adm___2030.log
+    jobid: 113
+    benchmark: benchmarks/walloon/scen_central/prepare_sector_network/base_s_adm___2030
+    reason: Updated input files: data/walloon/custom_potentials.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2030
+    resources: tmpdir=/tmp, mem_mb=2000, mem=2 GB, mem_mib=1908
+Shell command: None
+
+[Tue Oct  6 14:46:34 2026]
+Preparing integrated sector-coupled energy network for adm clusters, 2040 planning horizon,  electric options and  sector options
+rule prepare_sector_network:
+    input: resources/profile_adm_offwind-ac.nc, resources/profile_adm_offwind-dc.nc, resources/profile_adm_offwind-float.nc, resources/walloon/scen_central/gas_network_base_s_adm.csv, resources/walloon/scen_central/gas_input_locations_s_adm.geojson, resources/walloon/scen_central/gas_input_locations_s_adm_simplified.csv, resources/walloon/scen_central/snapshot_weightings_base_s_adm_elec__.csv, data/walloon/custom_potentials.csv, resources/biomass_transport_costs.csv, resources/walloon/scen_central/co2_sequestration_potential_base_s_adm.csv, resources/walloon/scen_central/networks/base_s_adm_elec_.nc, resources/eurostat_energy_balances.csv, resources/walloon/scen_central/pop_weighted_energy_totals_s_adm_2040.csv, resources/walloon/scen_central/wallon_demands_2040.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/road_transport_2040_shares.csv, resources/walloon/scen_central/pop_weighted_heat_totals_s_adm_2040.csv, resources/walloon/scen_central/shipping_demand_s_adm_2040.csv, resources/walloon/scen_central/transport_demand_s_adm_2040.csv, resources/walloon/scen_central/transport_data_s_adm_2040.csv, resources/walloon/scen_central/avail_profile_s_adm_2040.csv, resources/walloon/scen_central/dsm_profile_s_adm_2040.csv, resources/walloon/scen_central/natural_charging_shape_s_adm_2040.csv, resources/walloon/scen_central/co2_totals_adm_2040.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv, resources/walloon/scen_central/biomass_potentials_s_adm_2040.csv, resources/walloon/scen_central/costs_2040_processed.csv, resources/walloon/scen_central/salt_cavern_potentials_s_adm.csv, resources/busmap_base_s.csv, resources/busmap_base_s_adm.csv, resources/walloon/scen_central/pop_layout_base_s_adm.csv, resources/walloon/scen_central/industrial_energy_demand_base_s_adm_2040.csv, resources/walloon/scen_central/hourly_heat_demand_total_base_s_adm.nc, resources/walloon/scen_central/industrial_production_base_s_adm_2040.csv, resources/walloon/scen_central/district_heat_share_base_s_adm_2040.csv, resources/walloon/scen_central/heating_efficiencies_adm_2040.csv, resources/walloon/scen_central/temp_soil_total_base_s_adm.nc, resources/walloon/scen_central/temp_air_total_base_s_adm.nc, resources/walloon/scen_central/cop_profiles_base_s_adm_2040.nc, resources/solar_thermal_total_base_s_adm.nc, resources/walloon/scen_central/solar_rooftop_potentials_s_adm.csv, resources/walloon/scen_central/direct_heat_source_utilisation_profiles_base_s_adm_2040.nc, data/walloon/ntc_2040.csv, data/walloon/ntc_floors.csv, data/walloon/transmission_cost_overrides.csv, resources/walloon/scen_central/clever_Transport_adm_2040.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2040.nc
+    log: logs/walloon/scen_central/prepare_sector_network_base_s_adm___2040.log
+    jobid: 158
+    benchmark: benchmarks/walloon/scen_central/prepare_sector_network/base_s_adm___2040
+    reason: Updated input files: data/walloon/custom_potentials.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2040
+    resources: tmpdir=/tmp, mem_mb=2000, mem=2 GB, mem_mib=1908
+Shell command: None
+
+[Tue Oct  6 14:46:34 2026]
+Adding existing infrastructure for base year for adm clusters, 2025 planning horizons,  electric options and  sector options
+rule add_existing_baseyear:
+    input: resources/walloon/scen_central/networks/base_s_adm___2025.nc, resources/walloon/scen_central/powerplants_s_adm.csv, data/walloon/custom_potentials.csv, data/walloon/agg_p_nom_minmax_demande_haute.csv, data/nuclear_p_max_pu.csv, resources/walloon/scen_central/costs_2025_processed.csv, resources/walloon/scen_central/cop_profiles_base_s_adm_2025.nc, resources/walloon/scen_central/existing_heating_distribution_base_s_adm_2025.csv, resources/walloon/scen_central/heating_efficiencies_adm_2025.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2025_brownfield.nc
+    log: logs/walloon/scen_central/add_existing_baseyear_base_s_adm___2025.log
+    jobid: 135
+    benchmark: benchmarks/walloon/scen_central/add_existing_baseyear/base_s_adm___2025
+    reason: Input files updated by another job: resources/walloon/scen_central/networks/base_s_adm___2025.nc
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2025
+    resources: tmpdir=/tmp, mem_mb=3000, mem=3 GB, mem_mib=2862
+Shell command: None
+Job stats:
+job                       count
+----------------------  -------
+prepare_sector_network        4
+add_existing_baseyear         1
+total                         5
+
+Reasons:
+    (check individual jobs above for details)
+    input files updated by another job:
+        add_existing_baseyear
+    updated input files:
+        prepare_sector_network
+3 jobs have missing provenance/metadata so that it in part cannot be used to trigger re-runs.
+Rules with missing metadata: retrieve_co2stop retrieve_cutout retrieve_electricity_demand_entsoe
+This was a dry-run (flag -n). The order of jobs does not reflect the order of execution.
+[1;34m[nic5][0m Local preparation complete (dry run: nothing was built).

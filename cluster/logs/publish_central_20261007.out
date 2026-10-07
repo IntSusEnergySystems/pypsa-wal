@@ -1,0 +1,10 @@
+### 07:29 html (available 11987 MB, cap 9940 MB)
+html exit=0 peak_GB=8,0
+url: https://pypsa.squoilin.eu/scen_central_20261007/
+### 08:04 extract (available 11961 MB, cap 9913 MB)
+extract exit=0 peak_GB=8,1
+### 08:08 plot (available 11962 MB, cap 4000 MB)
+plot exit=0 peak_GB=0,0
+### 08:08 upload (available 11864 MB, cap 4000 MB)
+upload exit=0 peak_GB=0,9
+### 08:09 ALL_PUBLISH_DONE

@@ -368,6 +368,10 @@ scen_central:
     # s3://intervectoriel/test/scenarios/times_20261002_scen_central_v01/).
     # The two side files below were re-extracted from THIS file on 2026-10-04.
     # docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md §2.
+    # 2026-10-06 re-run on the SAME export, with two input changes in the
+    # central data files (no key of this block changed): the TIMES CO2 route
+    # closed in every horizon, and the ICEDD biogas cap on total Walloon
+    # biogas from 2025. docs/logs/2026-10-06_scen_central_2010_1h_noroute_biogas.md.
     times_file: data/walloon/scen_central_v01_261002_0210.vd
     rooftop_floor:
       enable: true
@@ -899,6 +903,9 @@ scen_nuctip_4500:
 # noccsccgt - central is TWO changes: the power-CC ban and dearer disposal for
 # every Walloon capture. TIMES's own NoCCSCCGT keeps CO2STG01 at the central's
 # tariff. `scen_noccsccgt_route` below is the one-change twin.
+# 2026-10-06: the central closed the route too (every horizon), so noccsccgt -
+# central is the power-CC ban alone again (plus its own TIMES export). The
+# route rows of config/scenarios/scen_noccsccgt.csv now equal the central's.
 # Export of 2026-10-02 (…_261002_0210): same 2025 as the 2 Oct central, row for row.
 scen_noccsccgt:
   sector:
@@ -931,10 +938,12 @@ scen_noccsccgt:
 
 # One-change twin of scen_noccsccgt (2026-10-04): the same power-CC ban on the
 # same export and side files, but the TIMES-priced disposal route stays open,
-# as in TIMES-WAL's own NoCCSCCGT. noccsccgt_route - central = the ban alone;
-# noccsccgt - noccsccgt_route = the disposal price alone. Override file
-# config/scenarios/scen_noccsccgt_route.csv = scen_noccsccgt.csv without the
-# `co2 disposal service` rows.
+# as in TIMES-WAL's own NoCCSCCGT. noccsccgt - noccsccgt_route = the disposal
+# price alone. 2026-10-06: the central closed the route, so the override file
+# config/scenarios/scen_noccsccgt_route.csv = the CC caps of scen_noccsccgt.csv
+# PLUS three rows re-opening the route at TIMES's 4 000 / 6 000 / 8 000 kt
+# (2035 / 40 / 50; 2045 interpolates to 7 000). It no longer isolates "the ban
+# alone" against the central: noccsccgt - central does that now.
 scen_noccsccgt_route:
   sector:
     times_file: data/walloon/scen_sensibilite_central_noccsccgt_261002_0210.vd

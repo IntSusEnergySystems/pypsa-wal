@@ -1,0 +1,13 @@
+### 22:54 postprocess (available 12028 MB, cap 9981 MB, log cluster/logs/postprocess_scen_central_20261006.out)
+postprocess exit=143 peak_GB=9
+### 23:01 netcost (available 12935 MB, cap 6000 MB, log cluster/logs/netcost_scen_central_20261006.log)
+netcost exit=0 peak_GB=3
+### 23:01 bill (available 12619 MB, cap 6000 MB, log cluster/logs/netcost_scen_central_20261006.log)
+bill exit=0 peak_GB=2
+### 23:02 review (available 12764 MB, cap 8000 MB, log cluster/logs/review_scen_central_20261006.log)
+review exit=1 peak_GB=4
+### 23:02 heatfid (available 12661 MB, cap 6000 MB, log cluster/logs/heatfid_scen_central_20261006.log)
+heatfid exit=0 peak_GB=2
+### 23:02 ptx (available 12690 MB, cap 6000 MB, log cluster/logs/ptx_scen_central_20261006.log)
+ptx exit=0 peak_GB=3
+### 23:03 ALL_POST_DONE
