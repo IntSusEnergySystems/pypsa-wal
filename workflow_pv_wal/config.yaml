@@ -838,7 +838,7 @@ infographic:
   publish:
     ssh_host: "negawatt.squoilin.eu"
     ssh_user: "pypsa"
-    identity_file: "~/.ssh/rsa_nopasswd"
+    identity_file: "~/.ssh/rsa_labothap"
     remote_dir: "/home/pypsa/public_html"
     public_url: "https://pypsa.squoilin.eu"
     folder: "pv_sol_wallonie"

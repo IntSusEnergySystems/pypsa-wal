@@ -1355,7 +1355,7 @@ snakemake --configfile config/config.walloon.yaml --cores 1 \
 
 `rule publish_html` rsyncs the whole `html/` folder (pypsa2html pages + TIMES
 Sankey diagrams) to the labothap/negawatt host, as user `pypsa`, using
-`~/.ssh/rsa_nopasswd`. The public URL is:
+`~/.ssh/rsa_labothap`. The public URL is:
 
 ```
 https://pypsa.squoilin.eu/<scenario>_<YYYYMMDD>/
@@ -1956,7 +1956,7 @@ removed — see [HTML report (pypsa2html)](#html-report-pypsa2html).
 | S3 upload dies on the `.nc` networks (`Could not connect to the endpoint URL`, `SSL validation failed`), and the Explorer folder stays empty | The four networks are ~250 MB of multipart upload; on a slow link they fail and **abort the sync before the Explorer steps run**, so `scenarios/<id>/` is never populated even though `pypsa_raw_results/` looks full. Publish in two passes: `UPLOAD_SKIP_NETWORKS=1 ./cluster/nic5.sh upload` first (small files, and the Explorer reads only those), then sync `networks/` on its own with `AWS_MAX_ATTEMPTS=10 AWS_RETRY_MODE=standard`. Always verify with `aws s3 ls s3://intervectoriel/test/scenarios/<id>/pypsa/ \| wc -l` (expect 49) rather than trusting the exit code |
 | Explorer scenario not in dropdown | See **Troubleshooting Explorer** under Publishing to Wallonie Explorer (S3) |
 | `pypsa2html: command not found`, or report sections empty | See **Troubleshooting** under [HTML report (pypsa2html)](#html-report-pypsa2html) |
-| `html_published.url` says `skipped: no passwordless SSH` | User `negawatt` does not yet have `rsa_nopasswd` in `authorized_keys`, or this machine cannot reach the server. On the server: `sudo bash /home/sylvain/scripts/add-pypsa-alias.sh`. To skip: `HTML_PUBLISH=0`. |
+| `html_published.url` says `skipped: no passwordless SSH` | User `negawatt` does not yet have `rsa_labothap` in `authorized_keys`, or this machine cannot reach the server. On the server: `sudo bash /home/sylvain/scripts/add-pypsa-alias.sh`. To skip: `HTML_PUBLISH=0`. |
 | No `times_sankey_*.html` in `html/`, no error | The rule is gated at parse time. Check for a warning naming `sector.times_file` or `times_pypsa` (`pip install -e ../TIMES_PyPSA`), then that `sector.times_sankey.enable` is `true`. `snakemake --configfile config/config.walloon.yaml --list-rules \| grep build_times_sankey` says whether the rule exists at all — see [`docs/times-sankey.md`](docs/times-sankey.md) §4 |
 | No `times_indicators_*.html` in `html/`, no error | Same parse-time gate as the Sankeys: check for a warning naming `sector.times_file` or `times_pypsa`, then that `sector.times_indicators.enable` is `true`. `snakemake --configfile config/config.walloon.yaml --list-rules \| grep build_times_indicators` says whether the rule exists at all — see [`docs/times-indicators.md`](docs/times-indicators.md) §3 |
 | An indicator chart is missing a technology, and the log says `matches no indicator_power.csv rule` | A new plant type. Add a row to `TIMES_PyPSA/data/indicator_power.csv` above the fallbacks; the log line names the process code. Same for a carrier absent from `indicator_fuels.csv` |

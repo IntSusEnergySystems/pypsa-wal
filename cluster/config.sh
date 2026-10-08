@@ -248,7 +248,7 @@ S3_ENV="${S3_ENV:-test}"                       # test → explorer.test… ; pro
 AUTO_UPLOAD_S3="${AUTO_UPLOAD_S3:-1}"           # 1 = upload after nic5.sh postprocess/run
 SKIP_S3_UPLOAD="${SKIP_S3_UPLOAD:-0}"          # 1 = skip upload even when AUTO_UPLOAD_S3=1
 # HTML report → https://pypsa.squoilin.eu/intervec/<scenario>_<YYYYMMDD>/
-# (rules/publish_html.smk, passwordless SSH as negawatt with rsa_nopasswd).
+# (rules/publish_html.smk, passwordless SSH as negawatt with rsa_labothap).
 HTML_PUBLISH="${HTML_PUBLISH:-1}"               # 0 = do not ask postprocess for the publish sentinel
 PYPSA2HTML="${PYPSA2HTML:-1}"                   # 0 = do not ask postprocess for html/pypsa/index.html
 UPLOAD_SKIP_NETWORKS="${UPLOAD_SKIP_NETWORKS:-0}"  # 1 = omit large .nc files

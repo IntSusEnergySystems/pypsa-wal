@@ -129,7 +129,7 @@ if _publish_html_enabled() and _publish_html_inputs():
             ),
             ssh_user=lambda w: _publish_html_cfg().get("ssh_user", "negawatt"),
             identity_file=lambda w: _publish_html_cfg().get(
-                "identity_file", "~/.ssh/rsa_nopasswd"
+                "identity_file", "~/.ssh/rsa_labothap"
             ),
             remote_dir=lambda w: _publish_html_cfg().get(
                 "remote_dir", "/home/negawatt/public_html/intervec"

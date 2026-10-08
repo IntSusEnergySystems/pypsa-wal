@@ -92,14 +92,14 @@ pypsa2html:
 # DocumentRoot /home/pypsa/public_html; the old /intervec/ path on the
 # negawatt vhost 301-redirects to the root URLs, so publishing there
 # produces 404s (seen 2026-09-03). Requires passwordless login as pypsa
-# with ~/.ssh/rsa_nopasswd. If the key cannot log in, the rule writes a
+# with ~/.ssh/rsa_labothap. If the key cannot log in, the rule writes a
 # skip marker and the rest of the workflow is unaffected.
 # Override the stamp with html_publish.date or HTML_PUBLISH_DATE=YYYYMMDD.
 html_publish:
   enable: true
   ssh_host: negawatt.squoilin.eu
   ssh_user: pypsa
-  identity_file: ~/.ssh/rsa_nopasswd
+  identity_file: ~/.ssh/rsa_labothap
   remote_dir: /home/pypsa/public_html
   public_url: https://pypsa.squoilin.eu
 

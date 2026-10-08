@@ -204,7 +204,7 @@ landing:
 
 output:
   dir: results/walloon/{scenario}/html/pypsa
-  pages: [overview, emissions, sankeys, fec, demands, costs, capacities, dispatch, maps]
+  pages: [overview, emissions, sankeys, fec, demands, heat, costs, capacities, dispatch, maps]
   shared_maps: true
   plotly: cdn
 
@@ -239,6 +239,39 @@ features:
     - biomass to liquid
     exclude_patterns:
     - kerosene for aviation
+  # Network costs as the users pay for them (cabinet review, Sept–Oct 2026):
+  # the table is written by scripts/walloon_scripts/network_cost_report.py
+  # (`nic5.sh postprocess`) for BEWAL only, so the distribution section and
+  # the tariff view of transmission exist on the Wallonia pages alone; every
+  # node gets the per-neighbour branch view. Method:
+  # docs/network-costs-review-20260928.md. References are the CWaPE totals
+  # (data/walloon/network_cost_calibration.csv), which include losses and
+  # add-ons, so they compare with the full stack of the chart.
+  network_costs:
+    node: BEWAL
+    file: csvs/network_costs_calibrated.csv
+    segments_file: csvs/network_cost_segments.csv
+    references:
+      electricity_distribution:
+      - {year: 2025, value: 896.3, label: "CWaPE allowed revenue 2025"}
+      - {year: 2030, value: 892.5, label: "CWaPE allowed revenue 2029 (981.3 M€ nominal, in €2025)"}
+      gas_distribution:
+      - {year: 2025, value: 335.0, label: "CWaPE allowed revenue 2025"}
+
+# Section notes (HTML), shown above the chart. Keyed by the section id of
+# pypsa2html's pages.yaml; `default` applies to every node.
+texts:
+  annual_costs:
+    default: >
+      Costs as the optimiser sees them (annuities plus operating costs). The
+      <i>distribution network</i> and <i>transmission lines</i> rows are the
+      model's own valuation of the grid capacity, not what the grids cost the
+      users: for that, see the <b>Distribution network costs</b> and
+      <b>Transmission network costs</b> sections at the bottom of this page.
+  investment_costs:
+    default: >
+      Annuities of the installed capacity. Grid rows are a model valuation;
+      the regulated network costs are in the network-cost sections below.
 
 # --- Parameter sweeps -------------------------------------------------------
 #
