@@ -1,0 +1,366 @@
+........................................................................ [ 11%]
+........................................................................ [ 22%]
+........................................................................ [ 33%]
+.........................................s.............................. [ 45%]
+........................................................................ [ 56%]
+........................................................................ [ 67%]
+........................................................................ [ 78%]
+........................................................................ [ 90%]
+...............................................................          [100%]
+=============================== warnings summary ===============================
+../../../home/anaconda/envs/pypsa-eur/lib/python3.14/site-packages/xarray/core/dtypes.py:98
+../../../home/anaconda/envs/pypsa-eur/lib/python3.14/site-packages/xarray/core/dtypes.py:98
+  /home/anaconda/envs/pypsa-eur/lib/python3.14/site-packages/xarray/core/dtypes.py:98: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    NAT_TYPES = {np.datetime64("NaT").dtype, np.timedelta64("NaT").dtype}
+
+test/test_ccl_region_rows.py::test_be_row_still_covers_flanders_when_a_region_row_names_another_carrier
+test/test_ccl_region_rows.py::test_region_row_is_subtracted_from_its_parent
+test/test_ccl_region_rows.py::test_region_row_still_wins_for_its_own_carrier
+test/test_ccl_region_rows.py::test_bus_countries_are_not_mutated
+test/test_ccl_region_rows.py::test_a_standing_fleet_above_its_cap_is_reported
+  /sylvain/git/pypsa-wal/test/test_ccl_region_rows.py:117: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_ccl_region_rows.py::test_offshore_cannot_exceed_the_belgian_cap
+test/test_ccl_region_rows.py::test_a_nuclear_region_row_does_not_free_flemish_onshore_wind
+  /sylvain/git/pypsa-wal/test/test_ccl_region_rows.py:130: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_co2_disposal_service.py::test_closed_route_keeps_the_documented_zero
+test/test_co2_disposal_service.py::test_open_route_is_priced_per_tonne_and_capped
+test/test_co2_disposal_service.py::test_inherited_vintages_count_against_the_ceiling
+test/test_co2_disposal_service.py::test_flemish_co2_cannot_use_the_walloon_route
+test/test_co2_disposal_service.py::test_flemish_co2_cannot_use_the_walloon_route
+test/test_co2_disposal_service.py::test_no_row_while_the_route_is_closed
+  /sylvain/git/pypsa-wal/test/test_co2_disposal_service.py:74: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, _ = n.optimize(solver_name="highs", extra_functionality=extra)
+
+test/test_co2_export_limit.py::test_hard_cap_sends_the_rest_to_local_use
+test/test_co2_export_limit.py::test_slack_cap_has_a_zero_dual
+test/test_co2_export_limit.py::test_cheap_overage_is_paid_instead
+test/test_co2_export_limit.py::test_dear_overage_acts_as_the_cap
+test/test_co2_export_limit.py::test_transit_does_not_use_up_the_cap
+test/test_co2_export_limit.py::test_transit_alone_leaves_the_cap_slack
+test/test_co2_export_limit.py::test_ptx_report_reads_cap_dual_and_overage
+  /sylvain/git/pypsa-wal/test/test_co2_export_limit.py:52: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, _ = n.optimize(
+
+test/test_cost_learning.py: 8 warnings
+test/test_discount_rates.py: 8 warnings
+  /sylvain/git/pypsa-wal/scripts/process_cost_data.py:304: DeprecationWarning: Config-based cost overwrites is deprecated. Use external file instead (by default 'data/custom_costs.csv').
+    warnings.warn(
+
+test/test_gas_store_potential.py::test_capped_store_solves_and_stays_empty
+  /sylvain/git/pypsa-wal/test/test_gas_store_potential.py:131: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, _ = n.optimize(solver_name="highs")
+
+test/test_gas_store_potential.py::test_capped_store_solves_and_stays_empty
+  /sylvain/git/pypsa-wal/test/test_gas_store_potential.py:137: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, _ = n.optimize(solver_name="highs")
+
+test/test_import_limit.py::test_absolute_cap_rhs_is_twh_not_a_fraction
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:67: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_year_without_a_cap_is_skipped
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:87: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_import_variable_cannot_go_negative
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:102: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_cap_is_respected_when_solved
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:114: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_ac_and_dc_share_one_constraint
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:169: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_dc_imports_are_counted
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:180: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_line_flow_is_not_inflated_by_s_max_pu
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:201: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_cap_is_registered_as_a_global_constraint
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:228: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_missing_horizon_is_warned_not_whispered
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:239: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_import_limit.py::test_line_losses_enter_the_import_expression
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:265: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model(transmission_losses=2)
+
+test/test_import_limit.py::test_line_losses_enter_the_import_expression
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:265: FutureWarning: Passing an int for `transmission_losses` is deprecated and will be removed in PyPSA 2.0. Explicitly pass {'mode': 'tangents', 'segments': 2} (current behavior) or use the new secant-based losses via `transmission_losses=True`.
+    n.optimize.create_model(transmission_losses=2)
+
+test/test_import_limit.py::test_import_expression_ignores_losses_when_they_are_off
+  /sylvain/git/pypsa-wal/test/test_import_limit.py:279: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()  # transmission_losses defaults to 0
+
+test/test_industry_cc_floor.py::test_floor_is_annual_tonnes
+  /sylvain/git/pypsa-wal/test/test_industry_cc_floor.py:82: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_industry_cc_floor.py::test_zero_or_missing_volume_is_a_noop
+  /sylvain/git/pypsa-wal/test/test_industry_cc_floor.py:91: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_national_co2_scope.py::test_aviation_is_dropped_from_the_national_expression
+test/test_national_co2_scope.py::test_aviation_toggle_puts_kerosene_on_the_national_lhs
+  /home/anaconda/envs/pypsa-eur/lib/python3.14/site-packages/linopy/expressions.py:1350: DeprecationWarning: The `dims` argument in `.sum` is deprecated. Use `dim` instead.
+    warn(
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:83: DeprecatedWarning: iterate_components is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `for component in n.components` instead.
+    for c in n_p.iterate_components(["Link", "Generator", "Store"]):
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:88: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    n_p.remove(c.name, c.df.index[c.df.lifetime == np.inf])
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:91: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    decomissioned_assets_index = c.df.index[c.df.build_year + c.df.lifetime <= year]
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:92: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    decomissioned_assets[c.name] = c.df.loc[decomissioned_assets_index]
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:97: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    chp_heat = c.df.index[
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:98: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    (c.df[f"{attr}_nom_extendable"] & c.df.index.str.contains("urban central"))
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:99: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    & c.df.index.str.contains("CHP")
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:100: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    & c.df.index.str.contains("heat")
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:122: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    c.df[f"{attr}_nom_extendable"]
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:123: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    & ~c.df.index.isin(chp_heat)
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:124: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    & (c.df[f"{attr}_nom_opt"] < capacity_threshold)
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:126: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    if c.name == "Link" and "carrier" in c.df.columns:
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:127: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    below &= c.df.carrier != "nuclear"
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:128: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    n_p.remove(c.name, c.df.index[below])
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:131: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    c.df[f"{attr}_nom"] = c.df[f"{attr}_nom_opt"]
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:132: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    c.df[f"{attr}_nom_extendable"] = False
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:134: DeprecatedWarning: df is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.static` instead.
+    n.add(c.name, c.df.index, **c.df)
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:137: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+    selection = n.component_attrs[c.name].type.str.contains(
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:139: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+    ) & n.component_attrs[c.name].status.str.contains("Input")
+
+test/test_nuclear_seed_threshold.py::test_brownfield_keeps_an_unbuilt_nuclear_link
+test/test_nuclear_seed_threshold.py::test_brownfield_restarts_nuclear_dust_from_zero
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:140: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+    for tattr in n.component_attrs[c.name].index[selection]:
+
+test/test_nuclear_seed_threshold.py: 18 warnings
+  /sylvain/git/pypsa-wal/scripts/add_brownfield.py:142: DeprecatedWarning: pnl is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `c.dynamic` instead.
+    n._import_series_from_df(c.pnl[tattr], c.name, tattr)
+
+test/test_rooftop_floor.py::test_floor_forces_the_times_capacity
+  /sylvain/git/pypsa-wal/test/test_rooftop_floor.py:89: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_rooftop_floor.py::test_ground_mounted_pv_is_not_dragged_by_the_floor
+test/test_rooftop_floor.py::test_ground_mounted_pv_is_not_dragged_by_the_floor
+  /sylvain/git/pypsa-wal/test/test_rooftop_floor.py:113: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_rooftop_floor.py::test_standing_vintages_count_towards_the_floor
+  /sylvain/git/pypsa-wal/test/test_rooftop_floor.py:139: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_rooftop_floor.py::test_zero_or_missing_floor_adds_nothing
+  /sylvain/git/pypsa-wal/test/test_rooftop_floor.py:153: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_rooftop_floor.py::test_unreachable_floor_on_a_frozen_fleet_raises_rather_than_going_infeasible
+  /sylvain/git/pypsa-wal/test/test_rooftop_floor.py:164: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_profiles.py::test_pinned_profiles_deliver_the_times_mix_at_every_snapshot
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:430: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    free.optimize(solver_name="highs")
+
+test/test_times_heat_profiles.py::test_pinned_profiles_deliver_the_times_mix_at_every_snapshot
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:438: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, condition = n.optimize(
+
+test/test_times_heat_profiles.py::test_a_sink_on_the_heat_bus_cannot_inflate_the_absorber
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:493: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, condition = n.optimize(
+
+test/test_times_heat_profiles.py::test_total_decentral_supply_equals_the_load_at_every_snapshot
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:518: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize(
+
+test/test_times_heat_profiles.py::test_every_vintage_of_a_carrier_counts_towards_the_profile
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:533: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, condition = n.optimize(
+
+test/test_times_heat_profiles.py::test_every_group_including_the_absorber_gets_a_row
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:555: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_profiles.py::test_free_groups_are_not_pinned
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:568: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_profiles.py::test_disabled_option_adds_no_constraint
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:580: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_profiles.py::test_an_absorber_that_is_not_a_group_is_refused
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:599: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_profiles.py::test_a_group_with_no_component_is_refused
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:609: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_profiles.py::test_penalty_turns_an_impossible_mix_into_a_priced_relaxation
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:630: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, _ = hard.optimize(
+
+test/test_times_heat_profiles.py::test_penalty_turns_an_impossible_mix_into_a_priced_relaxation
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:641: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, condition = soft.optimize(
+
+test/test_times_heat_profiles.py::test_no_relaxation_is_used_when_the_mix_is_deliverable
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:659: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize(
+
+test/test_times_heat_profiles.py::test_relaxation_is_spread_over_the_year_not_concentrated
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:675: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize(
+
+test/test_times_heat_profiles.py::test_a_pin_the_fuel_cannot_meet_is_reported_after_the_solve
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:720: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, condition = n.optimize(
+
+test/test_times_heat_profiles.py::test_a_pin_that_was_met_reports_nothing
+  /sylvain/git/pypsa-wal/test/test_times_heat_profiles.py:744: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize(
+
+test/test_times_heat_softlink.py::test_constraints_deliver_the_times_mix[share]
+test/test_times_heat_softlink.py::test_constraints_deliver_the_times_mix[absolute]
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:509: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    free.optimize(solver_name="highs")
+
+test/test_times_heat_softlink.py::test_constraints_deliver_the_times_mix[share]
+test/test_times_heat_softlink.py::test_constraints_deliver_the_times_mix[absolute]
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:527: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, condition = n.optimize(
+
+test/test_times_heat_softlink.py::test_disabled_option_adds_no_constraint
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:549: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_softlink.py::test_slack_group_is_left_unconstrained
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:572: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_softlink.py::test_penalty_turns_an_impossible_mix_into_a_priced_relaxation
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:598: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, _ = hard.optimize(
+
+test/test_times_heat_softlink.py::test_penalty_turns_an_impossible_mix_into_a_priced_relaxation
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:609: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, condition = soft.optimize(
+
+test/test_times_heat_softlink.py::test_no_slack_variable_when_penalty_is_zero
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:633: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_softlink.py::test_zero_target_forbids_the_technology_by_default
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:656: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_softlink.py::test_zero_target_can_be_left_free
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:666: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    n.optimize.create_model()
+
+test/test_times_heat_softlink.py::test_forbidden_technology_is_actually_not_used
+  /sylvain/git/pypsa-wal/test/test_times_heat_softlink.py:678: FutureWarning: The default value of `include_objective_constant` will change from True to False in version 2.0. Set `include_objective_constant` explicitly to suppress this warning. Using False improves LP numerical conditioning by not including the objective constant as a variable.
+    status, condition = n.optimize(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+638 passed, 1 skipped, 160 warnings in 143.85s (0:02:23)

@@ -6,6 +6,12 @@ How biogas enters the model, where each number comes from, what the "sustainable
 Batch-log context: [`logs/2026-09-30_cabinet_batch_20260930_2010_1h.md`](logs/2026-09-30_cabinet_batch_20260930_2010_1h.md)
 §11.8 and R1.
 
+> **Update — 6 Oct 2026: the Walloon cap now holds in every horizon (§3.2).** ICEDD's TIMES
+> bound on new digesters, which TIMES had read for 2040 and 2050 only, applies from 2025;
+> the PyPSA row is that bound **plus** TIMES's existing biogas and landfill gas, and it caps
+> the sustainable and the forced generator **together**. 1.02 / 2.15 / 3.36 / 4.67 / 5.80 /
+> 6.93 TWh in 2025 … 2050. Sections 3.1, 4.4, 6 and 7 are amended accordingly.
+
 ---
 
 ## 1. Summary
@@ -20,13 +26,15 @@ Batch-log context: [`logs/2026-09-30_cabinet_batch_20260930_2010_1h.md`](logs/20
   * It is split between the three Belgian nodes by their share of the *total* biomass
     potential (§4).
 * **"Sustainable biogas" is a future resource, phased in by 2040.** Upstream it is the JRC
-  ENSPRESO potential of manure and sewage sludge only. In Wallonia it is overwritten: the
-  Valbiom 8.3 TWh in 2025–2030, then 4.0 / 6.9 TWh in 2040 / 2050 (§3).
-* **The Walloon 2040 / 2050 figures are a cap agreed between ICEDD and Valbiom** and applied
-  to both TIMES and PyPSA (confirmed 1 Oct 2026, §3.1).
-  * They bound **total** Walloon biogas, sustainable and unsustainable together.
-  * The 2025 / 2030 Valbiom 8.3 TWh is a loose ceiling. Production in those years is
-    roughly known and will not come near it.
+  ENSPRESO potential of manure and sewage sludge only. In Wallonia it is overwritten by the
+  Walloon cap (§3).
+* **The Walloon cap bounds total Walloon biogas in every horizon** (6 Oct 2026, §3.2):
+  * ICEDD's TIMES bound on new digesters (`BWBIOGAZ100`), the ICEDD–Valbiom figure of 2040 /
+    2050 (§3.1) extended to 2025–2035, plus TIMES's existing biogas and landfill gas;
+  * 1.02 / 2.15 / 3.36 / 4.67 / 6.93 TWh in 2025 / 30 / 35 / 40 / 50;
+  * applied to the sustainable and the forced "unsustainable" generator together.
+  * Until 6 Oct the 2025 / 2030 cap was the Valbiom 8.3 TWh, read as loose. It was not: with
+    the cost fix the 4 Oct central burnt all of it in 2030, against TIMES's 2.1 TWh.
 * **The label does not describe Belgian feedstock** (§5). Belgian biogas comes mostly from
   agro-food residues, manure and crop residues. Energy crops are a minor share: in Wallonia,
   10.6 % of the tonnage in 2024 and 1 % of the "current mix" in the 2021 Gas.be study.
@@ -85,10 +93,14 @@ sets the BEWAL sustainable generator from `data/walloon/custom_potentials.csv` (
 
 | | 2025 | 2030 | 2035 | 2040 | 2045 | 2050 |
 |---|---:|---:|---:|---:|---:|---:|
-| `BEWAL biogas` cap | 8 300 | 8 300 | 6 150 | **4 000** | 5 450 | **6 900** |
-| source | Valbiom | Valbiom | interpolated | ICEDD–Valbiom cap | interpolated | ICEDD–Valbiom cap |
+| Walloon cap, since 6 Oct 2026 (§3.2) | **1 019** | **2 145** | **3 363** | **4 667** | 5 800 | **6 933** |
+| *until 6 Oct 2026* | *8 300* | *8 300* | *6 150* | *4 000* | *5 450* | *6 900* |
+| source (since 6 Oct) | ICEDD | ICEDD | ICEDD | ICEDD–Valbiom | interpolated | ICEDD–Valbiom |
 
-### 3.1 What the 2040 / 2050 figures are (decision of 1 Oct 2026)
+The cap is on the *total*, so `update_BEWAL_potentials` gives the sustainable generator what
+the forced one leaves (§4.4).
+
+### 3.1 What the 2040 / 2050 figures are (decision of 1 Oct 2026; amended 6 Oct, §3.2)
 
 * **A cap, not a result.** 4.0 TWh in 2040 and 6.9 TWh in 2050 come out of a discussion
   between ICEDD and Valbiom, and **both models apply them**: TIMES and PyPSA.
@@ -108,6 +120,42 @@ sets the BEWAL sustainable generator from `data/walloon/custom_potentials.csv` (
     constrain anything before 2040.
 * **Recorded in** `config/input_parameters_for_models.csv` rows 280–283 and
   `data/walloon/custom_potentials.csv` rows `BEWAL,biogas`.
+
+### 3.2 Every horizon, and the existing biogas on top (decision of 6 Oct 2026)
+
+**ICEDD's message** (A. Lempereur, 5 Oct 2026): her bound on the new-digester process
+`BWBIOGAZ100` (`~TFM_INS`, `BNDACT UP`, region RW, PJ) had been read for 2040 and 2050 only.
+She aligns the earlier years on TIMES's results and adds 2035:
+
+| PJ | 2022 | 2025 | 2030 | 2035 | 2040 | 2050 |
+|---|---:|---:|---:|---:|---:|---:|
+| `BNDACT UP BWBIOGAZ100` | 0 | 1.00 | **5.15** | 9.62 | 14.40 | 22.64 |
+
+* Interpolation option 5 (interpolate, extrapolate forward), so 2045 = 18.52 PJ.
+* 2030 sits a little above a straight line, consistent with the +1.1 PJ the energy balances
+  show between 2021 and 2024.
+* **The bound excludes the base-year production**, "environ 2.7 PJ en plus".
+
+**The PyPSA row is the bound plus TIMES's existing production.** The existing part is read
+from the 2 Oct central (`scen_central_v01_261002_0210.vd`, `VAR_Act`, RW):
+
+| PJ | 2022 | 2025 | 2030 | 2035 | 2040 | 2045 | 2050 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `MINBIOGAS` (existing digesters) | 2.232 | 2.232 | 2.232 | 2.232 | 2.232 | 2.232 | 2.232 |
+| `MINCETGAS` (landfill gas, declining) | 0.492 | 0.435 | 0.341 | 0.256 | 0.170 | 0.128 | 0.085 |
+| **PyPSA cap** = bound + existing, PJ | | 3.668 | 7.723 | 12.108 | 16.802 | 20.880 | 24.957 |
+| **PyPSA cap, GWh** | | **1 019** | **2 145** | **3 363** | **4 667** | 5 800 | **6 933** |
+| TIMES total produced, 2 Oct central, GWh | 757 | 987 | 2 132 | 3 321 | 4 667 | 5 800 | 6 933 |
+
+* The base-year 2.72 PJ is Annick's 2.7. Taking TIMES's own declining landfill gas instead
+  of a flat 2.7 PJ makes the cap equal TIMES's total exactly where the bound binds (2040–2050)
+  and costs 0.01–0.11 TWh against the flat figure.
+* **2040 moves from 4.0 to 4.67 TWh.** The 1 Oct figure was the new-digester bound alone,
+  0.67 TWh below TIMES's total (§8.2). 2050 moves from 6.90 to 6.93 TWh.
+* **Applied to the total.** The forced generator counts against the cap; where it alone
+  exceeds it (2025: 1.45 against 1.02 TWh) it is clipped (§4.4).
+* Master CSV `potential:BEWAL:biogas:p_nom`, anchors 2025 / 30 / 35 / 40 / 50, `interp`.
+  Tests: `test/test_bewal_biogas_cap.py`.
 
 **Neighbours keep the JRC definition.** BEVLG, for instance, has 2.36 TWh in 2030 and
 7.11 TWh in 2040. "Sustainable biogas" therefore means different things in Wallonia and
@@ -160,9 +208,15 @@ The BEWAL `biogas to gas` capacity built in 2025 is **166 MW**, and 1.452 TWh / 
 needs, run at 100 % load. That plant is the "existing 166 MW" that carries into 2030–2050
 (batch log §11.8).
 
-### 4.4 The Walloon override does not touch it
+### 4.4 The Walloon override and the forced volume
 
-* For biogas, `update_BEWAL_potentials` rewrites only the sustainable generator.
+> **Since 6 Oct 2026** the biogas cap bounds the two generators together.
+> `update_BEWAL_potentials` gives the sustainable generator `cap − forced`, and clips the
+> forced generator (`p_nom`, `e_sum_min`, `e_sum_max`) to the cap where it exceeds it. In
+> 2025 the forced 1.45 TWh becomes 1.02 TWh, TIMES's level. In 2030 the split is 0.93 forced
+> + up to 1.22 optional. The bullets below describe the behaviour until then.
+
+* For biogas, `update_BEWAL_potentials` rewrote only the sustainable generator.
 * The F8 fix of 5 Sep 2026, which books "potential − upstream" on the unsustainable
   generator, applies to `solid biomass` only.
 * So in 2025–2030 the Walloon biogas bus can take the Valbiom 8.3 TWh **plus** the forced
@@ -210,7 +264,7 @@ Walloon biogas, TWh of raw biogas:
 | PyPSA, forced "unsustainable" | **1.45** | 0.93 | 0 | 0 |
 | PyPSA, optional "sustainable", used | 0 | 0 | **0** | 6.90 (on its cap) |
 | PyPSA, total used | 1.45 | 0.93 | **0** | 6.90 |
-| **ICEDD–Valbiom cap on the total** (both models, §3.1) | 8.3 (loose) | 8.3 (loose) | **4.0** | **6.9** |
+| **Walloon cap on the total** (§3.2, since 6 Oct; was 8.3 / 8.3 / 4.0 / 6.9) | **1.02** | **2.15** | **4.67** | **6.93** |
 
 *Note:* the observed row is an estimate. It converts Valbiom's 279 GWh of electricity at a
 40 % CHP electrical efficiency (the ratio the Gas.be study uses for Flanders: 2 TWh of biogas
@@ -240,9 +294,9 @@ key puts **1.45 TWh in Wallonia and 1.13 TWh in Flanders**, about 0.5 TWh too mu
 | 1 | Forced volume split by **total biomass potential**, not by biogas production | Wallonia +0.5 TWh, Flanders −0.9 TWh in 2025 (§6) | per-node override from regional data: TIMES 0.99 / 2.18 TWh, or Valbiom observed ≈ 0.9 TWh |
 | 2 | Eurostat year frozen at **2019** for every horizon | −10 % against 2023 for Belgium | minor; follows from 1 once overridden |
 | 3 | The label implies crops; Belgian inputs are mostly residues (§5) | reading only: "unsustainable" must not be reported as crop biogas | document; report it as "existing production" |
-| 4 | Valbiom cap **plus** forced volume in 2025–2030 (§4.4) | none: the 2025 / 2030 ceiling is loose by design (§3.1); from 2040 the forced part is 0 and the cap covers the total | none needed. Optional tidy-up: apply the cap to the sum of both generators |
+| 4 | ~~Valbiom cap **plus** forced volume in 2025–2030 (§4.4)~~ **Fixed 6 Oct 2026** | the 8.3 TWh "loose" ceiling was used in full in 2030 once biogas was cheap (4 Oct central), forced volume on top | cap on the sum of both generators, forced volume clipped to the cap (§3.2, §4.4) |
 | 5 | ~~**Cost double count**: generator at the all-in 78.81 €/MWh `biogas` fuel, and digester capex again on `biogas to gas`~~ **Fixed 1 Oct 2026** (§8.1) | biogas uneconomic until 2050; Walloon gas mix 2040 (R1). Every run solved before the fix carries it | `cost:biogas:fuel` = feedstock-only `biogas manure` fuel (25.16–25.33 €/MWh). The Valbiom digester and upgrading capex stay on the link. **Not yet solved:** a 6 h test, then the next central |
-| 6 | ~~2040 / 2050 caps read as TIMES output~~ **Settled 1 Oct 2026:** an ICEDD–Valbiom cap on total biogas, common to TIMES and PyPSA (§3.1) | 2040 cap not reached in PyPSA (nothing used, item 5); the 2050 cap binds at a 125 €/MWh rent, as it binds in TIMES | none: keep as is |
+| 6 | ~~2040 / 2050 caps read as TIMES output~~ **Settled 1 Oct 2026:** an ICEDD–Valbiom cap on total biogas, common to TIMES and PyPSA (§3.1). **Extended to every horizon on 6 Oct, with the existing biogas added (§3.2)** | 2040 cap not reached in PyPSA (nothing used, item 5); the 2050 cap binds at a 125 €/MWh rent, as it binds in TIMES | none: keep as is |
 
 Item 5 was the one that changed published numbers. It is fixed in the inputs from 1 Oct
 2026; every run solved before that date carries it. Item 1 matters for the 2025–2030
@@ -371,7 +425,8 @@ the activity of the new digester, `BWBIOGAZ100`:
 In PyPSA, the same 4.0 / 6.9 TWh caps *all* Walloon biogas, because the forced part is 0
 from 2040. **So in 2040 PyPSA's cap is 0.67 TWh tighter than TIMES's total.** 2050 matches
 (6.9 against 6.93). This is worth a word with ICEDD: §3.1 records the cap as a maximum on
-the total.
+the total. *(Answered 5 Oct 2026: the bound excludes the base-year production; the PyPSA cap
+is now bound + existing, 4.67 / 6.93 TWh, §3.2.)*
 
 ### 8.3 PyPSA against TIMES after the fix
 
@@ -407,7 +462,7 @@ VEDA columns), from attributes `Cost_Flo`, `Cost_Inv`, `Cost_Act`, `Cap_New`
   `share_sustainable_potential_available` (effective values in
   `results/<run>/configs/config.base_s_adm___<year>.yaml`).
 * Data: `data/walloon/custom_potentials.csv` rows `BEWAL,biogas`;
-  `config/input_parameters_for_models.csv` rows 280–283;
+  `config/input_parameters_for_models.csv`, target `potential:BEWAL:biogas:p_nom` (five anchors);
   `resources/<run>/biomass_potentials_s_adm_<year>.csv`.
 * Related docs:
   * [`renewable-potentials.md`](renewable-potentials.md) §9.5;

@@ -499,10 +499,13 @@ sector:
   # subscribes to a shared export chain (collection, Antwerp terminal,
   # shipping, offshore storage such as Northern Lights), paid per tonne and
   # capped in volume. Volume and tariff are `co2 disposal service` rows of the
-  # potentials file, so a scenario switches the route off with its own copy
-  # (scen_noccsccgt: volume 0). The endogenous route (pipelines to the CO2StoP
-  # stores) stays open above the cap. `own_capture_only` keeps other nodes'
-  # CO2 out of the route (GlobalConstraint `co2_disposal_own_capture_<node>`).
+  # potentials file, so a scenario switches the route on or off with its own
+  # copy. CLOSED in the central since 2026-10-06 (volume 0 in every row,
+  # 2035/2045 included) and hence in every scenario but scen_noccsccgt_route,
+  # which re-opens it at TIMES's 4 / 6 / 7 / 8 Mt. When open, the endogenous
+  # route (pipelines to the CO2StoP stores) stays open above the cap, and
+  # `own_capture_only` keeps other nodes' CO2 out of the route
+  # (GlobalConstraint `co2_disposal_own_capture_<node>`; no row while closed).
   # docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md §3.
   co2_disposal_service:
     node: BEWAL

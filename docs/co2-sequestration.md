@@ -1190,6 +1190,13 @@ double-count if applied together.**
 > * **Code:** `BEWAL_potentials.apply_co2_disposal_service`,
 >   `named_pins.add_co2_disposal_own_capture`.
 > * Design, TIMES reading and expectations: `logs/2026-10-04_cabinet_batch_20261002_2010_1h.md` §3.
+>
+> **Update — 2026-10-06: the route is closed in the central** (Sylvain's decision), in every
+> horizon including the 2035/2045 rows of the 5-year grid. Every scenario inherits it except
+> `scen_noccsccgt_route`, whose override re-opens it at TIMES's volumes. Walloon CO₂ leaves
+> through the endogenous pipeline route only, as before 4 Oct. The code, the tariff rows and
+> the own-capture guard stay in place and are inert at volume 0.
+> `logs/2026-10-06_scen_central_2010_1h_noroute_biogas.md`.
 
 | # | change | why it sits here |
 |---|---|---|

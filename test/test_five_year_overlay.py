@@ -85,15 +85,34 @@ def test_out_of_horizon_rows_are_inert_for_the_ten_year_run():
     patch = bcp.patch_potentials(bcp.load_master(), H10, dry_run=True)
     assert patch.errors == [], patch.errors
     assert patch.changes == [], patch.changes
-    # 40 managed rows (20 groups; the three power-CC caps of scen_noccsccgt
-    # were added on 2026-09-30, the three `co2 disposal service` parameters on
-    # 2026-10-04) are skipped as out-of-horizon; the other 12 (6 unmanaged
-    # groups: co2/gas storage, process emissions, biomass import) never reach
-    # that branch — they are reported as unmanaged first.
-    out_of_horizon = [n for n in patch.notes if "outside this run's horizons" in n]
-    assert len(out_of_horizon) == 40, out_of_horizon
+    # Since 2026-10-06 a 10-year write patches the 2035/2045 rows too (they are
+    # in sync, hence no change above); only the 12 rows of the 6 unmanaged
+    # groups (co2/gas storage, process emissions, biomass import) are notes.
+    assert not [n for n in patch.notes if "outside this run's horizons" in n]
     touched = [n for n in patch.notes if "@2035" in n or "@2045" in n]
-    assert len(touched) == 52, f"expected all 52 new rows accounted for, got {len(touched)}"
+    assert len(touched) == 12, touched
+
+
+def test_ten_year_write_keeps_the_five_year_rows_in_sync(tmp_path, monkeypatch):
+    """A stale 2035/2045 row is patched by a 10-year write, not carried through.
+
+    On 2026-10-04 scen_noccsccgt's copy, re-seeded from the central, kept the
+    route open (4 000 / 7 000 kt) and the power-CC caps at inf in 2035/2045,
+    closed in the four solved years only.
+    """
+    rows = pd.read_csv(bcp.POTENTIALS_FILE)
+    route = (rows["technology"] == "co2 disposal service") & (rows["parameter"] == "e_nom_max")
+    stale = rows.copy()
+    stale.loc[route & stale["year"].isin(NEW), "value"] = 4000
+    path = tmp_path / "custom_potentials.csv"
+    stale.to_csv(path, index=False)
+
+    monkeypatch.setattr(bcp, "POTENTIALS_FILE", path)
+    patch = bcp.patch_potentials(bcp.load_master(), H10, dry_run=True)
+    assert patch.errors == [], patch.errors
+    fixed = sorted(c for c in patch.changes if "co2 disposal service/e_nom_max" in c)
+    assert len(fixed) == len(NEW), patch.changes
+    assert all(c.split()[0] in {str(y) for y in NEW} for c in fixed), fixed
 
 
 def test_a_year_no_config_solves_is_still_an_error(tmp_path, monkeypatch):
@@ -278,7 +297,9 @@ def test_ntc_and_agg_files_exist_for_the_new_horizons():
 
 
 @pytest.mark.parametrize("target,expected", [
-    ("potential:BEWAL:biogas:p_nom", {2035: 6150.0, 2045: 5450.0}),
+    # 2026-10-06: 2035 is an anchor now (ICEDD's TIMES bound + existing biogas,
+    # 3 363 GWh); 2045 interpolates 4 667 / 6 933 to TIMES's own 2045 total.
+    ("potential:BEWAL:biogas:p_nom", {2035: 3363.0, 2045: 5800.0}),
     # ICEDD 4a4116aa (2026-09-10) set every anchor to 0 ("no solid biomass
     # imports" in the central scenario), so `interp` interpolates a flat zero.
     # The trajectory this used to check (2125 / 2625) belonged to the previous

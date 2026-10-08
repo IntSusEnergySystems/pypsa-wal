@@ -1,0 +1,497 @@
+[1;33m[nic5] WARNING:[0m postprocess runs LOCALLY after pull.
+[1;33m[nic5] WARNING:[0m Step 1 uses Snakemake --touch on solved networks only (does NOT re-run Gurobi).
+[1;34m[nic5][0m Touching solved networks (Snakemake --touch)
+Using workflow specific profile profiles/default for setting default command line arguments.
+Config file config/config.default.yaml is extended by additional config specified via the command line.
+Config file config/plotting.default.yaml is extended by additional config specified via the command line.
+Assuming unrestricted shared filesystem usage.
+
+SNAKEMAKE
+=========
+  Date: 2026-10-06 22:54:40
+  Workflow ID: a3295ad0-c96a-434e-8da9-c88dd036c231
+  Platform: Linux-6.14.0-33-generic-x86_64-with-glibc2.39
+  Host: pcbureau
+  User: sylvain
+  Snakemake version: 9.25.1
+  Python version: 3.14.6 | packaged by conda-forge | (main, Aug 11 2026, 10:26:15) [GCC 14.4.0]
+  Command: /home/anaconda/envs/pypsa-eur/bin/snakemake --resources mem_mb=9981 --configfile config/config.walloon.yaml --cores 1 --rerun-triggers mtime --touch -- results/walloon/scen_central/networks/base_s_adm___2025.nc results/walloon/scen_central/networks/base_s_adm___2030.nc results/walloon/scen_central/networks/base_s_adm___2040.nc results/walloon/scen_central/networks/base_s_adm___2050.nc
+  Snakefile: /sylvain/git/pypsa-wal/Snakefile
+  Base directory: /sylvain/git/pypsa-wal
+  Run directory: /sylvain/git/pypsa-wal
+  Working directory: /sylvain/git/pypsa-wal
+  Config file(s): [PosixPath('/sylvain/git/pypsa-wal/config/config.walloon.yaml'), 'config/config.default.yaml', 'config/plotting.default.yaml']
+  Config MD5: 5c76edbe632ea19d413d8fbe552e7863
+
+Building DAG of jobs...
+Nothing to be done (all requested files are present and up to date).
+[1;34m[nic5][0m Running summary plots and CSVs
+Using workflow specific profile profiles/default for setting default command line arguments.
+Config file config/config.default.yaml is extended by additional config specified via the command line.
+Config file config/plotting.default.yaml is extended by additional config specified via the command line.
+Assuming unrestricted shared filesystem usage.
+
+SNAKEMAKE
+=========
+  Date: 2026-10-06 22:54:56
+  Workflow ID: c28b4e17-e703-4503-bd30-7b4d4c8da04d
+  Platform: Linux-6.14.0-33-generic-x86_64-with-glibc2.39
+  Host: pcbureau
+  User: sylvain
+  Snakemake version: 9.25.1
+  Python version: 3.14.6 | packaged by conda-forge | (main, Aug 11 2026, 10:26:15) [GCC 14.4.0]
+  Command: /home/anaconda/envs/pypsa-eur/bin/snakemake --resources mem_mb=9981 --configfile config/config.walloon.yaml --cores 4 --rerun-triggers mtime --printshellcmds -- results/walloon/scen_central/csvs/costs.csv results/walloon/scen_central/graphs/costs.svg results/walloon/scen_central/csvs/cumulative_costs.csv results/walloon/scen_central/html/times/times_sankey_index.html results/walloon/scen_central/html/pypsa/index.html results/walloon/scen_central/html/index.html
+  Snakefile: /sylvain/git/pypsa-wal/Snakefile
+  Base directory: /sylvain/git/pypsa-wal
+  Run directory: /sylvain/git/pypsa-wal
+  Working directory: /sylvain/git/pypsa-wal
+  Config file(s): [PosixPath('/sylvain/git/pypsa-wal/config/config.walloon.yaml'), 'config/config.default.yaml', 'config/plotting.default.yaml']
+  Config MD5: 5c76edbe632ea19d413d8fbe552e7863
+
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 4
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=Resource("mem_mb", 9981)
+Conda environments: ignored
+Job stats:
+job                       count
+----------------------  -------
+build_times_indicators        1
+build_times_sankey            1
+make_summary                  4
+make_global_summary           1
+generate_html_report          1
+make_cumulative_costs         1
+plot_summary                  1
+write_html_hub                1
+total                        11
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Tue Oct  6 22:55:05 2026]
+Creating optimization results summary statistics
+localrule make_summary:
+    input: results/walloon/scen_central/networks/base_s_adm___2030.nc
+    output: results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2030.csv
+    log: results/walloon/scen_central/logs/make_summary_s_adm___2030.log
+    jobid: 119
+    benchmark: results/walloon/scen_central/benchmarks/make_summary_s_adm___2030
+    reason: Missing output files: results/walloon/scen_central/csvs/individual/energy_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2030.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2030
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+Select jobs to execute...
+WARNING:pypsa.network.io:Importing network from PyPSA version v1.2.1 while current version is v1.2.4. Read the release notes at `https://go.pypsa.org/release-notes` to prepare your network for import.
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+[Tue Oct  6 22:55:46 2026]
+Finished jobid: 119 (Rule: make_summary)
+1 of 11 steps (9%) done
+Execute 1 jobs...
+
+[Tue Oct  6 22:55:46 2026]
+Rendering TIMES scenario indicators for scen_central
+localrule build_times_indicators:
+    input: data/walloon/scen_central_v01_261002_0210.vd, /sylvain/git/TIMES_PyPSA/data/indicator_fuels.csv, /sylvain/git/TIMES_PyPSA/data/indicator_heat.csv, /sylvain/git/TIMES_PyPSA/data/indicator_power.csv, /sylvain/git/TIMES_PyPSA/data/mapping_processes.csv, /sylvain/git/TIMES_PyPSA/data/AllCommodities.csv
+    output: results/walloon/scen_central/html/indicators/times_indicators_index.html, results/walloon/scen_central/html/indicators/times_indicators_catalogue.html, results/walloon/scen_central/html/indicators/times_indicators_demand.html, results/walloon/scen_central/html/indicators/times_indicators_emissions.html, results/walloon/scen_central/html/indicators/times_indicators_heat.html, results/walloon/scen_central/html/indicators/times_indicators_power.html
+    log: results/walloon/scen_central/logs/build_times_indicators.log
+    jobid: 199
+    benchmark: results/walloon/scen_central/benchmarks/build_times_indicators
+    reason: Missing output files: results/walloon/scen_central/html/indicators/times_indicators_index.html
+    wildcards: run=scen_central
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+Select jobs to execute...
+INFO:times_pypsa.pipeline:Processing data/walloon/scen_central_v01_261002_0210.vd (all variables, all commodities)...
+INFO:times_pypsa.pipeline:Total lines scanned: 748073
+INFO:times_pypsa.pipeline:Total records kept (year >= 2021 and non-zero): 746642
+INFO:times_pypsa.descriptions:Loaded 1173 commodity descriptions from /sylvain/git/TIMES_PyPSA/data/AllCommodities.csv
+INFO:times_pypsa.descriptions:Loaded 2599 process descriptions from /sylvain/git/TIMES_PyPSA/data/AllProcesses.csv
+INFO:times_pypsa.indicator_pages:Wrote results/walloon/scen_central/html/indicators/times_indicators_catalogue.html (86 series)
+INFO:times_pypsa.indicator_pages:Wrote results/walloon/scen_central/html/indicators/times_indicators_demand.html
+INFO:times_pypsa.indicator_pages:Wrote results/walloon/scen_central/html/indicators/times_indicators_emissions.html
+INFO:times_pypsa.indicator_pages:Wrote results/walloon/scen_central/html/indicators/times_indicators_heat.html
+INFO:times_pypsa.indicator_pages:Wrote results/walloon/scen_central/html/indicators/times_indicators_power.html
+INFO:times_pypsa.indicator_pages:Wrote results/walloon/scen_central/html/indicators/times_indicators_index.html
+[Tue Oct  6 22:55:59 2026]
+Finished jobid: 199 (Rule: build_times_indicators)
+2 of 11 steps (18%) done
+Execute 1 jobs...
+
+[Tue Oct  6 22:55:59 2026]
+Creating optimization results summary statistics
+localrule make_summary:
+    input: results/walloon/scen_central/networks/base_s_adm___2050.nc
+    output: results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2050.csv
+    log: results/walloon/scen_central/logs/make_summary_s_adm___2050.log
+    jobid: 169
+    benchmark: results/walloon/scen_central/benchmarks/make_summary_s_adm___2050
+    reason: Missing output files: results/walloon/scen_central/csvs/individual/prices_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2050.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2050
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+Select jobs to execute...
+WARNING:pypsa.network.io:Importing network from PyPSA version v1.2.1 while current version is v1.2.4. Read the release notes at `https://go.pypsa.org/release-notes` to prepare your network for import.
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+[Tue Oct  6 22:56:35 2026]
+Finished jobid: 169 (Rule: make_summary)
+3 of 11 steps (27%) done
+Execute 1 jobs...
+
+[Tue Oct  6 22:56:35 2026]
+Creating optimization results summary statistics
+localrule make_summary:
+    input: results/walloon/scen_central/networks/base_s_adm___2025.nc
+    output: results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2025.csv
+    log: results/walloon/scen_central/logs/make_summary_s_adm___2025.log
+    jobid: 1
+    benchmark: results/walloon/scen_central/benchmarks/make_summary_s_adm___2025
+    reason: Missing output files: results/walloon/scen_central/csvs/individual/energy_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2025.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2025
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+Select jobs to execute...
+WARNING:pypsa.network.io:Importing network from PyPSA version v1.2.1 while current version is v1.2.4. Read the release notes at `https://go.pypsa.org/release-notes` to prepare your network for import.
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+[Tue Oct  6 22:57:13 2026]
+Finished jobid: 1 (Rule: make_summary)
+4 of 11 steps (36%) done
+Execute 1 jobs...
+
+[Tue Oct  6 22:57:13 2026]
+Rendering TIMES Sankey diagrams for scen_central (8 pages, aggregation levels: custom Aggregation Level 2)
+localrule build_times_sankey:
+    input: data/walloon/scen_central_v01_261002_0210.vd, /sylvain/git/TIMES_PyPSA/data/mapping_processes.csv, /sylvain/git/TIMES_PyPSA/data/mapping_commodities.csv, /sylvain/git/TIMES_PyPSA/data/extraction_rules.csv, /sylvain/git/TIMES_PyPSA/data/heat_softlink_groups.csv, /sylvain/git/TIMES_PyPSA/data/transport_softlink_groups.csv
+    output: results/walloon/scen_central/html/times/times_sankey_index.html, results/walloon/scen_central/html/times/times_sankey_custom_2025.html, results/walloon/scen_central/html/times/times_sankey_custom_2030.html, results/walloon/scen_central/html/times/times_sankey_custom_2040.html, results/walloon/scen_central/html/times/times_sankey_custom_2050.html, results/walloon/scen_central/html/times/times_sankey_mapping_2025.html, results/walloon/scen_central/html/times/times_sankey_mapping_2030.html, results/walloon/scen_central/html/times/times_sankey_mapping_2040.html, results/walloon/scen_central/html/times/times_sankey_mapping_2050.html
+    log: results/walloon/scen_central/logs/build_times_sankey.log
+    jobid: 198
+    benchmark: results/walloon/scen_central/benchmarks/build_times_sankey
+    reason: Missing output files: results/walloon/scen_central/html/times/times_sankey_index.html
+    wildcards: run=scen_central
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+Select jobs to execute...
+INFO:times_pypsa.pipeline:Processing data/walloon/scen_central_v01_261002_0210.vd (all variables, all commodities)...
+INFO:times_pypsa.pipeline:Total lines scanned: 748073
+INFO:times_pypsa.pipeline:Total records kept (year >= 2025 and non-zero): 576948
+INFO:times_pypsa.descriptions:Loaded 1173 commodity descriptions from /sylvain/git/TIMES_PyPSA/data/AllCommodities.csv
+INFO:times_pypsa.descriptions:Loaded 2599 process descriptions from /sylvain/git/TIMES_PyPSA/data/AllProcesses.csv
+INFO:times_pypsa.aggregation:Aggregated to custom: 379 rows, 90 process nodes, 116 commodity nodes
+ERROR:times_pypsa.aggregation:Commodity hub 'Chaleur fatale (IND)' is unbalanced by ≥10% (rel_err=99.2%, FOut=4.075, FIn=0.03111); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Chaleur fatale (IND) (FOut>FIn, 99.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial appliance services' residual is expected (final_demand): FOut=13.13, FIn=0; routing to magenta sink 'Commercial appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' residual is expected (final_demand): FOut=0.2275, FIn=5.551e-17; routing to magenta sink 'Fuel tech · electricity'.
+INFO:times_pypsa.aggregation:Commodity hub 'Household appliance services' residual is expected (final_demand): FOut=20.28, FIn=0; routing to magenta sink 'Household appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04186, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.553, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=0.4428, FIn=0; routing to magenta sink 'Household electrical appliances'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=14.38, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Biodiesel (TRA)': soft-linked VAR_FIn 6.315 PJ vs anchorable output 0.0005414 PJ (ratio 0.000) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.aggregation:Aggregated to custom: 1186 rows, 90 process nodes, 118 commodity nodes
+ERROR:times_pypsa.aggregation:Commodity hub 'Chaleur fatale (IND)' is unbalanced by ≥10% (rel_err=99.2%, FOut=4.075, FIn=0.03111); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Chaleur fatale (IND) (FOut>FIn, 99.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial appliance services' residual is expected (final_demand): FOut=13.13, FIn=0; routing to magenta sink 'Commercial appliance services'.
+ERROR:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' is unbalanced by ≥10% (rel_err=50.0%, FOut=0.455, FIn=0.2275); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Electricity for agriculture (FOut>FIn, 50.0%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Household appliance services' residual is expected (final_demand): FOut=20.28, FIn=0; routing to magenta sink 'Household appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04186, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.553, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=0.4428, FIn=0; routing to magenta sink 'Household electrical appliances'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=14.38, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Biodiesel (TRA)': soft-linked VAR_FIn 6.315 PJ vs anchorable output 0.0005414 PJ (ratio 0.000) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_custom_2025.html
+INFO:times_pypsa.aggregation:Aggregated to Aggregation Level 2: 392 rows, 139 process nodes, 102 commodity nodes
+ERROR:times_pypsa.aggregation:Commodity hub 'Chaleur fatale (IND)' is unbalanced by ≥10% (rel_err=99.2%, FOut=4.075, FIn=0.03111); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Chaleur fatale (IND) (FOut>FIn, 99.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Other Electric Existing' residual is expected (final_demand): FOut=6.592, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Public Lighting Existing' residual is expected (final_demand): FOut=0.9538, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Refrigeration Existing' residual is expected (final_demand): FOut=1.564, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Serveur DATA CENTER Existing' residual is expected (final_demand): FOut=4.02, FIn=0; routing to magenta sink 'Commercial data centres'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity' is unbalanced (rel_err=8.3%, FOut=137.4, FIn=126); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity (FOut>FIn, 8.3%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' residual is expected (final_demand): FOut=0.2275, FIn=5.551e-17; routing to magenta sink 'Fuel Tech - Electricity'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04186, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.553, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=9.374, FIn=0; routing to magenta sink 'residential other'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=14.38, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Aggregated to Aggregation Level 2: 1186 rows, 140 process nodes, 102 commodity nodes
+ERROR:times_pypsa.aggregation:Commodity hub 'Chaleur fatale (IND)' is unbalanced by ≥10% (rel_err=99.2%, FOut=4.075, FIn=0.03111); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Chaleur fatale (IND) (FOut>FIn, 99.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Other Electric Existing' residual is expected (final_demand): FOut=6.592, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Public Lighting Existing' residual is expected (final_demand): FOut=0.9538, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Refrigeration Existing' residual is expected (final_demand): FOut=1.564, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Serveur DATA CENTER Existing' residual is expected (final_demand): FOut=4.02, FIn=0; routing to magenta sink 'Commercial data centres'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity' is unbalanced (rel_err=4.6%, FOut=245, FIn=233.7); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity (FOut>FIn, 4.6%)'.
+ERROR:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' is unbalanced by ≥10% (rel_err=50.0%, FOut=0.455, FIn=0.2275); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Electricity for agriculture (FOut>FIn, 50.0%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04186, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.553, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=9.374, FIn=0; routing to magenta sink 'residential other'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=14.38, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_mapping_2025.html
+INFO:times_pypsa.aggregation:Aggregated to custom: 364 rows, 88 process nodes, 118 commodity nodes
+ERROR:times_pypsa.aggregation:Commodity hub 'Chaleur fatale (IND)' is unbalanced by ≥10% (rel_err=98.2%, FOut=3.869, FIn=0.07); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Chaleur fatale (IND) (FOut>FIn, 98.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial appliance services' residual is expected (final_demand): FOut=18.74, FIn=0; routing to magenta sink 'Commercial appliance services'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity for Commercial sector' is unbalanced (rel_err=0.5%, FOut=38.26, FIn=38.08); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity for Commercial sector (FOut>FIn, 0.5%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' residual is expected (final_demand): FOut=0.2275, FIn=5.551e-17; routing to magenta sink 'Fuel tech · electricity'.
+INFO:times_pypsa.aggregation:Commodity hub 'Household appliance services' residual is expected (final_demand): FOut=20.79, FIn=0; routing to magenta sink 'Household appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04233, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.617, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=0.454, FIn=0; routing to magenta sink 'Household electrical appliances'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30.33, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Biodiesel (TRA)': soft-linked VAR_FIn 4.341 PJ vs anchorable output 0.1865 PJ (ratio 0.043) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.aggregation:Aggregated to custom: 1167 rows, 88 process nodes, 120 commodity nodes
+ERROR:times_pypsa.aggregation:Commodity hub 'Chaleur fatale (IND)' is unbalanced by ≥10% (rel_err=98.2%, FOut=3.869, FIn=0.07); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Chaleur fatale (IND) (FOut>FIn, 98.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial appliance services' residual is expected (final_demand): FOut=18.74, FIn=0; routing to magenta sink 'Commercial appliance services'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity for Commercial sector' is unbalanced (rel_err=0.5%, FOut=38.26, FIn=38.08); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity for Commercial sector (FOut>FIn, 0.5%)'.
+ERROR:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' is unbalanced by ≥10% (rel_err=50.0%, FOut=0.455, FIn=0.2275); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Electricity for agriculture (FOut>FIn, 50.0%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Household appliance services' residual is expected (final_demand): FOut=20.79, FIn=0; routing to magenta sink 'Household appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04233, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.617, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=0.454, FIn=0; routing to magenta sink 'Household electrical appliances'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30.33, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Biodiesel (TRA)': soft-linked VAR_FIn 4.341 PJ vs anchorable output 0.1865 PJ (ratio 0.043) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_custom_2030.html
+INFO:times_pypsa.aggregation:Aggregated to Aggregation Level 2: 384 rows, 136 process nodes, 103 commodity nodes
+ERROR:times_pypsa.aggregation:Commodity hub 'Chaleur fatale (IND)' is unbalanced by ≥10% (rel_err=98.2%, FOut=3.869, FIn=0.07); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Chaleur fatale (IND) (FOut>FIn, 98.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Other Electric Existing' residual is expected (final_demand): FOut=6.791, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Public Lighting Existing' residual is expected (final_demand): FOut=0.9644, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Refrigeration Existing' residual is expected (final_demand): FOut=1.611, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Serveur DATA CENTER Existing' residual is expected (final_demand): FOut=9.374, FIn=0; routing to magenta sink 'Commercial data centres'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity' is unbalanced (rel_err=6.7%, FOut=175.3, FIn=163.4); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity (FOut>FIn, 6.7%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' residual is expected (final_demand): FOut=0.2275, FIn=5.551e-17; routing to magenta sink 'Fuel Tech - Electricity'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04233, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.617, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=9.611, FIn=0; routing to magenta sink 'residential other'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30.33, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Aggregated to Aggregation Level 2: 1167 rows, 137 process nodes, 104 commodity nodes
+ERROR:times_pypsa.aggregation:Commodity hub 'Chaleur fatale (IND)' is unbalanced by ≥10% (rel_err=98.2%, FOut=3.869, FIn=0.07); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Chaleur fatale (IND) (FOut>FIn, 98.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Other Electric Existing' residual is expected (final_demand): FOut=6.791, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Public Lighting Existing' residual is expected (final_demand): FOut=0.9644, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Refrigeration Existing' residual is expected (final_demand): FOut=1.611, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Serveur DATA CENTER Existing' residual is expected (final_demand): FOut=9.374, FIn=0; routing to magenta sink 'Commercial data centres'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity' is unbalanced (rel_err=3.7%, FOut=316.3, FIn=304.5); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity (FOut>FIn, 3.7%)'.
+ERROR:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' is unbalanced by ≥10% (rel_err=50.0%, FOut=0.455, FIn=0.2275); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Electricity for agriculture (FOut>FIn, 50.0%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04233, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.617, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=9.611, FIn=0; routing to magenta sink 'residential other'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30.33, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_mapping_2030.html
+INFO:times_pypsa.aggregation:Aggregated to custom: 368 rows, 93 process nodes, 115 commodity nodes
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial appliance services' residual is expected (final_demand): FOut=26.57, FIn=0; routing to magenta sink 'Commercial appliance services'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity for Commercial sector' is unbalanced (rel_err=0.4%, FOut=58.92, FIn=58.71); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity for Commercial sector (FOut>FIn, 0.4%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' residual is expected (final_demand): FOut=0.2275, FIn=5.551e-17; routing to magenta sink 'Fuel tech · electricity'.
+INFO:times_pypsa.aggregation:Commodity hub 'Household appliance services' residual is expected (final_demand): FOut=21.57, FIn=0; routing to magenta sink 'Household appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04316, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.752, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=0.471, FIn=0; routing to magenta sink 'Household electrical appliances'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30.93, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Biodiesel (TRA)': soft-linked VAR_FIn 6.18 PJ vs anchorable output 4.364 PJ (ratio 0.706) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.aggregation:Aggregated to custom: 1001 rows, 93 process nodes, 119 commodity nodes
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial appliance services' residual is expected (final_demand): FOut=26.57, FIn=0; routing to magenta sink 'Commercial appliance services'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity for Commercial sector' is unbalanced (rel_err=0.4%, FOut=58.92, FIn=58.71); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity for Commercial sector (FOut>FIn, 0.4%)'.
+ERROR:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' is unbalanced by ≥10% (rel_err=50.0%, FOut=0.455, FIn=0.2275); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Electricity for agriculture (FOut>FIn, 50.0%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Household appliance services' residual is expected (final_demand): FOut=21.57, FIn=0; routing to magenta sink 'Household appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04316, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.752, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=0.471, FIn=0; routing to magenta sink 'Household electrical appliances'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30.93, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Biodiesel (TRA)': soft-linked VAR_FIn 6.18 PJ vs anchorable output 4.364 PJ (ratio 0.706) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - H2': soft-linked VAR_FIn 0.1748 PJ vs anchorable output 0.1513 PJ (ratio 0.866) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_custom_2040.html
+INFO:times_pypsa.aggregation:Aggregated to Aggregation Level 2: 386 rows, 142 process nodes, 106 commodity nodes
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Other Electric Existing' residual is expected (final_demand): FOut=7.204, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Public Lighting Existing' residual is expected (final_demand): FOut=0.9834, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Refrigeration Existing' residual is expected (final_demand): FOut=1.709, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Serveur DATA CENTER Existing' residual is expected (final_demand): FOut=16.67, FIn=0; routing to magenta sink 'Commercial data centres'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity' is unbalanced (rel_err=4.1%, FOut=298.9, FIn=286.7); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity (FOut>FIn, 4.1%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' residual is expected (final_demand): FOut=0.2275, FIn=5.551e-17; routing to magenta sink 'Fuel Tech - Electricity'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04316, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.752, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=9.971, FIn=0; routing to magenta sink 'residential other'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30.93, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Aggregated to Aggregation Level 2: 1001 rows, 143 process nodes, 106 commodity nodes
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Other Electric Existing' residual is expected (final_demand): FOut=7.204, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Public Lighting Existing' residual is expected (final_demand): FOut=0.9834, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Refrigeration Existing' residual is expected (final_demand): FOut=1.709, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Serveur DATA CENTER Existing' residual is expected (final_demand): FOut=16.67, FIn=0; routing to magenta sink 'Commercial data centres'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity' is unbalanced (rel_err=2.2%, FOut=561, FIn=548.7); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity (FOut>FIn, 2.2%)'.
+ERROR:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' is unbalanced by ≥10% (rel_err=50.0%, FOut=0.455, FIn=0.2275); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Electricity for agriculture (FOut>FIn, 50.0%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04316, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.752, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=9.971, FIn=0; routing to magenta sink 'residential other'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=30.93, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - H2': soft-linked VAR_FIn 0.1748 PJ vs anchorable output 0.1513 PJ (ratio 0.866) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_mapping_2040.html
+INFO:times_pypsa.aggregation:Aggregated to custom: 283 rows, 74 process nodes, 104 commodity nodes
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial appliance services' residual is expected (final_demand): FOut=35.18, FIn=0; routing to magenta sink 'Commercial appliance services'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity for Commercial sector' is unbalanced (rel_err=0.1%, FOut=70.77, FIn=70.67); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity for Commercial sector (FOut>FIn, 0.1%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' residual is expected (final_demand): FOut=0.2275, FIn=5.551e-17; routing to magenta sink 'Fuel tech · electricity'.
+INFO:times_pypsa.aggregation:Commodity hub 'Household appliance services' residual is expected (final_demand): FOut=21.88, FIn=0; routing to magenta sink 'Household appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04351, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.898, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=0.4779, FIn=0; routing to magenta sink 'Household electrical appliances'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=31.18, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Coke (IND)': soft-linked VAR_FIn 2.931e-07 PJ vs anchorable output 0 PJ (ratio 0.000) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.aggregation:Aggregated to custom: 708 rows, 74 process nodes, 109 commodity nodes
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial appliance services' residual is expected (final_demand): FOut=35.18, FIn=0; routing to magenta sink 'Commercial appliance services'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity for Commercial sector' is unbalanced (rel_err=0.1%, FOut=70.77, FIn=70.67); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity for Commercial sector (FOut>FIn, 0.1%)'.
+ERROR:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' is unbalanced by ≥10% (rel_err=50.0%, FOut=0.455, FIn=0.2275); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Electricity for agriculture (FOut>FIn, 50.0%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Household appliance services' residual is expected (final_demand): FOut=21.88, FIn=0; routing to magenta sink 'Household appliance services'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04351, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.898, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=0.4779, FIn=0; routing to magenta sink 'Household electrical appliances'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=31.18, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Coke (IND)': soft-linked VAR_FIn 2.931e-07 PJ vs anchorable output 0 PJ (ratio 0.000) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - H2': soft-linked VAR_FIn 0.3136 PJ vs anchorable output 0.2752 PJ (ratio 0.878) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_custom_2050.html
+INFO:times_pypsa.aggregation:Aggregated to Aggregation Level 2: 325 rows, 119 process nodes, 96 commodity nodes
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Other Electric Existing' residual is expected (final_demand): FOut=7.643, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Public Lighting Existing' residual is expected (final_demand): FOut=0.9913, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Refrigeration Existing' residual is expected (final_demand): FOut=1.813, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Serveur DATA CENTER Existing' residual is expected (final_demand): FOut=24.73, FIn=0; routing to magenta sink 'Commercial data centres'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity' is unbalanced (rel_err=3.2%, FOut=391.4, FIn=379.1); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity (FOut>FIn, 3.2%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' residual is expected (final_demand): FOut=0.2275, FIn=5.551e-17; routing to magenta sink 'Fuel Tech - Electricity'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04351, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.898, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=10.12, FIn=0; routing to magenta sink 'residential other'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=31.18, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Coke (IND)': soft-linked VAR_FIn 2.931e-07 PJ vs anchorable output 0 PJ (ratio 0.000) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.aggregation:Aggregated to Aggregation Level 2: 708 rows, 120 process nodes, 97 commodity nodes
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Other Electric Existing' residual is expected (final_demand): FOut=7.643, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Public Lighting Existing' residual is expected (final_demand): FOut=0.9913, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Refrigeration Existing' residual is expected (final_demand): FOut=1.813, FIn=0; routing to magenta sink 'commercial other'.
+INFO:times_pypsa.aggregation:Commodity hub 'Commercial Serveur DATA CENTER Existing' residual is expected (final_demand): FOut=24.73, FIn=0; routing to magenta sink 'Commercial data centres'.
+WARNING:times_pypsa.aggregation:Commodity hub 'Electricity' is unbalanced (rel_err=1.7%, FOut=723.7, FIn=711.4); collapsing matched flows and routing residual to 'Unbalanced <10%: Electricity (FOut>FIn, 1.7%)'.
+ERROR:times_pypsa.aggregation:Commodity hub 'Electricity for agriculture' is unbalanced by ≥10% (rel_err=50.0%, FOut=0.455, FIn=0.2275); collapsing matched flows anyway and routing residual to 'Unbalanced ≥10%: Electricity for agriculture (FOut>FIn, 50.0%)'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic aviation' residual is expected (final_demand): FOut=0.04351, FIn=0; routing to magenta sink 'domestic aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'domestic navigation' residual is expected (final_demand): FOut=1.898, FIn=0; routing to magenta sink 'domestic navigation'.
+INFO:times_pypsa.aggregation:Commodity hub 'electricity for residential' residual is expected (final_demand): FOut=10.12, FIn=0; routing to magenta sink 'residential other'.
+INFO:times_pypsa.aggregation:Commodity hub 'international aviation' residual is expected (final_demand): FOut=31.18, FIn=0; routing to magenta sink 'international aviation'.
+INFO:times_pypsa.aggregation:Commodity hub 'naphtha' residual is expected (final_demand): FOut=6.064, FIn=0; routing to magenta sink 'Non-energy'.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - Coke (IND)': soft-linked VAR_FIn 2.931e-07 PJ vs anchorable output 0 PJ (ratio 0.000) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.aggregation:Not anchoring 'Fuel Tech - H2': soft-linked VAR_FIn 0.3136 PJ vs anchorable output 0.2752 PJ (ratio 0.878) — highlight stays on the fuel-supply link to keep coloured energy conserved.
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_mapping_2050.html
+INFO:times_pypsa.sankey_pages:Wrote results/walloon/scen_central/html/times/times_sankey_index.html
+[Tue Oct  6 22:57:34 2026]
+Finished jobid: 198 (Rule: build_times_sankey)
+5 of 11 steps (45%) done
+Execute 1 jobs...
+
+[Tue Oct  6 22:57:34 2026]
+Creating optimization results summary statistics
+localrule make_summary:
+    input: results/walloon/scen_central/networks/base_s_adm___2040.nc
+    output: results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2040.csv
+    log: results/walloon/scen_central/logs/make_summary_s_adm___2040.log
+    jobid: 144
+    benchmark: results/walloon/scen_central/benchmarks/make_summary_s_adm___2040
+    reason: Missing output files: results/walloon/scen_central/csvs/individual/prices_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2040.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2040
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+WARNING:pypsa.network.io:Importing network from PyPSA version v1.2.1 while current version is v1.2.4. Read the release notes at `https://go.pypsa.org/release-notes` to prepare your network for import.
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+[Tue Oct  6 22:58:10 2026]
+Finished jobid: 144 (Rule: make_summary)
+6 of 11 steps (55%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Tue Oct  6 22:58:10 2026]
+Creating global summary of optimization results for all scenarios
+localrule make_global_summary:
+    input: results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2050.csv
+    output: results/walloon/scen_central/csvs/costs.csv, results/walloon/scen_central/csvs/capacities.csv, results/walloon/scen_central/csvs/energy.csv, results/walloon/scen_central/csvs/energy_balance.csv, results/walloon/scen_central/csvs/capacity_factors.csv, results/walloon/scen_central/csvs/metrics.csv, results/walloon/scen_central/csvs/curtailment.csv, results/walloon/scen_central/csvs/prices.csv, results/walloon/scen_central/csvs/weighted_prices.csv, results/walloon/scen_central/csvs/market_values.csv, results/walloon/scen_central/csvs/nodal_costs.csv, results/walloon/scen_central/csvs/nodal_capacities.csv, results/walloon/scen_central/csvs/nodal_energy_balance.csv, results/walloon/scen_central/csvs/nodal_capacity_factors.csv
+    log: results/walloon/scen_central/logs/make_global_summary.log
+    jobid: 0
+    benchmark: results/walloon/scen_central/benchmarks/make_global_summary
+    reason: Missing output files: results/walloon/scen_central/csvs/costs.csv, results/walloon/scen_central/csvs/energy.csv, results/walloon/scen_central/csvs/nodal_energy_balance.csv, results/walloon/scen_central/csvs/energy_balance.csv, results/walloon/scen_central/csvs/nodal_capacities.csv, results/walloon/scen_central/csvs/metrics.csv, results/walloon/scen_central/csvs/nodal_costs.csv, results/walloon/scen_central/csvs/nodal_capacity_factors.csv, results/walloon/scen_central/csvs/capacities.csv; Input files updated by another job: results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/metrics_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacities_s_adm___2050.csv, results/walloon/scen_central/csvs/individual/capacity_factors_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/curtailment_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_capacities_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/nodal_energy_balance_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/weighted_prices_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/nodal_costs_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/energy_balance_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/market_values_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/prices_s_adm___2025.csv, results/walloon/scen_central/csvs/individual/nodal_capacity_factors_s_adm___2030.csv, results/walloon/scen_central/csvs/individual/energy_s_adm___2040.csv, results/walloon/scen_central/csvs/individual/costs_s_adm___2025.csv
+    wildcards: run=scen_central
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+INFO:__main__:Creating global summary for costs
+INFO:__main__:Creating global summary for capacities
+INFO:__main__:Creating global summary for energy
+INFO:__main__:Creating global summary for energy_balance
+INFO:__main__:Creating global summary for capacity_factors
+INFO:__main__:Creating global summary for metrics
+INFO:__main__:Creating global summary for curtailment
+INFO:__main__:Creating global summary for prices
+INFO:__main__:Creating global summary for weighted_prices
+INFO:__main__:Creating global summary for market_values
+INFO:__main__:Creating global summary for nodal_costs
+INFO:__main__:Creating global summary for nodal_capacities
+INFO:__main__:Creating global summary for nodal_energy_balance
+INFO:__main__:Creating global summary for nodal_capacity_factors
+[Tue Oct  6 22:58:14 2026]
+Finished jobid: 0 (Rule: make_global_summary)
+7 of 11 steps (64%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Tue Oct  6 22:58:14 2026]
+Plotting summary statistics and results
+localrule plot_summary:
+    input: results/walloon/scen_central/csvs/costs.csv, results/walloon/scen_central/csvs/energy.csv, results/walloon/scen_central/csvs/energy_balance.csv, resources/eurostat_energy_balances.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv
+    output: results/walloon/scen_central/graphs/costs.svg, results/walloon/scen_central/graphs/energy.svg, results/walloon/scen_central/graphs/balances-energy.svg
+    log: results/walloon/scen_central/logs/plot_summary.log
+    jobid: 201
+    reason: Input files updated by another job: results/walloon/scen_central/csvs/energy_balance.csv, results/walloon/scen_central/csvs/costs.csv, results/walloon/scen_central/csvs/energy.csv
+    wildcards: run=scen_central
+    threads: 2
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=9981, mem=9.98 GB, mem_mib=9519
+Shell command: None
+Select jobs to execute...
+INFO:__main__:Dropping technology with costs below 1 EUR billion per year
+INFO:__main__:Total system cost of 546 EUR billion per year
+INFO:__main__:Dropping all technology with energy consumption or production below 50.0 TWh/a
+INFO:__main__:Total energy of 114 TWh/a
+[Tue Oct  6 22:58:25 2026]
+Finished jobid: 201 (Rule: plot_summary)
+8 of 11 steps (73%) done
+Execute 1 jobs...
+
+[Tue Oct  6 22:58:25 2026]
+Calculating cumulative costs over time horizon
+localrule make_cumulative_costs:
+    input: results/walloon/scen_central/csvs/costs.csv
+    output: results/walloon/scen_central/csvs/cumulative_costs.csv
+    log: results/walloon/scen_central/logs/make_cumulative_costs.log
+    jobid: 200
+    benchmark: results/walloon/scen_central/benchmarks/make_cumulative_costs
+    reason: Input files updated by another job: results/walloon/scen_central/csvs/costs.csv
+    wildcards: run=scen_central
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=4000, mem=4 GB, mem_mib=3815
+Shell command: None
+Select jobs to execute...
+[Tue Oct  6 22:58:29 2026]
+Finished jobid: 200 (Rule: make_cumulative_costs)
+9 of 11 steps (82%) done
+Execute 1 jobs...
+
+[Tue Oct  6 22:58:29 2026]
+localrule generate_html_report:
+    input: results/walloon/scen_central/networks/base_s_adm___2025.nc, results/walloon/scen_central/networks/base_s_adm___2030.nc, results/walloon/scen_central/networks/base_s_adm___2040.nc, results/walloon/scen_central/networks/base_s_adm___2050.nc, results/walloon/scen_central/csvs/nodal_capacities.csv, results/walloon/scen_central/csvs/nodal_costs.csv, results/walloon/scen_central/csvs/nodal_energy_balance.csv, results/walloon/scen_central/csvs/nodal_capacity_factors.csv, results/walloon/scen_central/csvs/costs.csv, results/walloon/scen_central/csvs/capacities.csv, results/walloon/scen_central/csvs/energy_balance.csv, results/walloon/scen_central/csvs/metrics.csv, resources/walloon/scen_central/ev_charging_mode_split_s_adm_2025.csv, resources/walloon/scen_central/ev_charging_mode_split_s_adm_2030.csv, resources/walloon/scen_central/ev_charging_mode_split_s_adm_2040.csv, resources/walloon/scen_central/ev_charging_mode_split_s_adm_2050.csv, config/pypsa2html.yaml
+    output: results/walloon/scen_central/html/pypsa/index.html
+    log: results/walloon/scen_central/logs/pypsa2html.log
+    jobid: 193
+    benchmark: results/walloon/scen_central/benchmarks/pypsa2html
+    reason: Missing output files: results/walloon/scen_central/html/pypsa/index.html; Input files updated by another job: results/walloon/scen_central/csvs/costs.csv, results/walloon/scen_central/csvs/nodal_energy_balance.csv, results/walloon/scen_central/csvs/energy_balance.csv, results/walloon/scen_central/csvs/nodal_capacities.csv, results/walloon/scen_central/csvs/metrics.csv, results/walloon/scen_central/csvs/nodal_costs.csv, results/walloon/scen_central/csvs/nodal_capacity_factors.csv, results/walloon/scen_central/csvs/capacities.csv
+    wildcards: run=scen_central
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+CAPPED label=postprocess limit=9981M exit=143 peak_GB=9,7

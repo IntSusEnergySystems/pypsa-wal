@@ -1,0 +1,675 @@
+[1;34m[nic5][0m Preparing un-solved solve inputs locally (16 cores)
+[1;34m[nic5][0m   config: config/config.walloon.yaml
+[1;34m[nic5][0m   targets: resources/walloon/scen_central/networks/base_s_adm___2025_brownfield.nc resources/walloon/scen_central/networks/base_s_adm___2030.nc resources/walloon/scen_central/networks/base_s_adm___2040.nc resources/walloon/scen_central/networks/base_s_adm___2050.nc 
+[1;34m[nic5][0m   log: /sylvain/git/pypsa-wal/cluster/logs/prepare.log  (also: /sylvain/git/pypsa-wal/.snakemake/log/ and /sylvain/git/pypsa-wal/logs/walloon/scen_central/)
+Using workflow specific profile profiles/default for setting default command line arguments.
+Config file config/config.default.yaml is extended by additional config specified via the command line.
+Config file config/plotting.default.yaml is extended by additional config specified via the command line.
+Assuming unrestricted shared filesystem usage.
+
+SNAKEMAKE
+=========
+  Date: 2026-10-06 16:26:43
+  Workflow ID: 141e50b4-3d95-4649-98a4-96cec99feaf5
+  Platform: Linux-6.14.0-33-generic-x86_64-with-glibc2.39
+  Host: pcbureau
+  User: sylvain
+  Snakemake version: 9.25.1
+  Python version: 3.14.6 | packaged by conda-forge | (main, Aug 11 2026, 10:26:15) [GCC 14.4.0]
+  Command: /home/anaconda/envs/pypsa-eur/bin/snakemake --resources mem_mb=20000 --configfile config/config.walloon.yaml --cores 16 --rerun-triggers mtime --rerun-incomplete --printshellcmds -- resources/walloon/scen_central/networks/base_s_adm___2025_brownfield.nc resources/walloon/scen_central/networks/base_s_adm___2030.nc resources/walloon/scen_central/networks/base_s_adm___2040.nc resources/walloon/scen_central/networks/base_s_adm___2050.nc
+  Snakefile: /sylvain/git/pypsa-wal/Snakefile
+  Base directory: /sylvain/git/pypsa-wal
+  Run directory: /sylvain/git/pypsa-wal
+  Working directory: /sylvain/git/pypsa-wal
+  Config file(s): [PosixPath('/sylvain/git/pypsa-wal/config/config.walloon.yaml'), 'config/config.default.yaml', 'config/plotting.default.yaml']
+  Config MD5: 5c76edbe632ea19d413d8fbe552e7863
+
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 16
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=Resource("mem_mb", 20000)
+Conda environments: ignored
+Job stats:
+job                       count
+----------------------  -------
+prepare_sector_network        4
+add_existing_baseyear         1
+total                         5
+
+Select jobs to execute...
+Execute 4 jobs...
+
+[Tue Oct  6 16:26:52 2026]
+Preparing integrated sector-coupled energy network for adm clusters, 2030 planning horizon,  electric options and  sector options
+localrule prepare_sector_network:
+    input: resources/profile_adm_offwind-ac.nc, resources/profile_adm_offwind-dc.nc, resources/profile_adm_offwind-float.nc, resources/walloon/scen_central/gas_network_base_s_adm.csv, resources/walloon/scen_central/gas_input_locations_s_adm.geojson, resources/walloon/scen_central/gas_input_locations_s_adm_simplified.csv, resources/walloon/scen_central/snapshot_weightings_base_s_adm_elec__.csv, data/walloon/custom_potentials.csv, resources/biomass_transport_costs.csv, resources/walloon/scen_central/co2_sequestration_potential_base_s_adm.csv, resources/walloon/scen_central/networks/base_s_adm_elec_.nc, resources/eurostat_energy_balances.csv, resources/walloon/scen_central/pop_weighted_energy_totals_s_adm_2030.csv, resources/walloon/scen_central/wallon_demands_2030.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/road_transport_2030_shares.csv, resources/walloon/scen_central/pop_weighted_heat_totals_s_adm_2030.csv, resources/walloon/scen_central/shipping_demand_s_adm_2030.csv, resources/walloon/scen_central/transport_demand_s_adm_2030.csv, resources/walloon/scen_central/transport_data_s_adm_2030.csv, resources/walloon/scen_central/avail_profile_s_adm_2030.csv, resources/walloon/scen_central/dsm_profile_s_adm_2030.csv, resources/walloon/scen_central/natural_charging_shape_s_adm_2030.csv, resources/walloon/scen_central/co2_totals_adm_2030.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv, resources/walloon/scen_central/biomass_potentials_s_adm_2030.csv, resources/walloon/scen_central/costs_2030_processed.csv, resources/walloon/scen_central/salt_cavern_potentials_s_adm.csv, resources/busmap_base_s.csv, resources/busmap_base_s_adm.csv, resources/walloon/scen_central/pop_layout_base_s_adm.csv, resources/walloon/scen_central/industrial_energy_demand_base_s_adm_2030.csv, resources/walloon/scen_central/hourly_heat_demand_total_base_s_adm.nc, resources/walloon/scen_central/industrial_production_base_s_adm_2030.csv, resources/walloon/scen_central/district_heat_share_base_s_adm_2030.csv, resources/walloon/scen_central/heating_efficiencies_adm_2030.csv, resources/walloon/scen_central/temp_soil_total_base_s_adm.nc, resources/walloon/scen_central/temp_air_total_base_s_adm.nc, resources/walloon/scen_central/cop_profiles_base_s_adm_2030.nc, resources/solar_thermal_total_base_s_adm.nc, resources/walloon/scen_central/solar_rooftop_potentials_s_adm.csv, resources/walloon/scen_central/direct_heat_source_utilisation_profiles_base_s_adm_2030.nc, data/walloon/ntc_2030.csv, data/walloon/ntc_floors.csv, data/walloon/transmission_cost_overrides.csv, resources/walloon/scen_central/clever_Transport_adm_2030.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2030.nc
+    log: logs/walloon/scen_central/prepare_sector_network_base_s_adm___2030.log
+    jobid: 135
+    benchmark: benchmarks/walloon/scen_central/prepare_sector_network/base_s_adm___2030
+    reason: Updated input files: data/walloon/custom_potentials.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2030
+    resources: tmpdir=/tmp, mem_mb=2000, mem=2 GB, mem_mib=1908
+Shell command: None
+
+[Tue Oct  6 16:26:52 2026]
+Preparing integrated sector-coupled energy network for adm clusters, 2040 planning horizon,  electric options and  sector options
+localrule prepare_sector_network:
+    input: resources/profile_adm_offwind-ac.nc, resources/profile_adm_offwind-dc.nc, resources/profile_adm_offwind-float.nc, resources/walloon/scen_central/gas_network_base_s_adm.csv, resources/walloon/scen_central/gas_input_locations_s_adm.geojson, resources/walloon/scen_central/gas_input_locations_s_adm_simplified.csv, resources/walloon/scen_central/snapshot_weightings_base_s_adm_elec__.csv, data/walloon/custom_potentials.csv, resources/biomass_transport_costs.csv, resources/walloon/scen_central/co2_sequestration_potential_base_s_adm.csv, resources/walloon/scen_central/networks/base_s_adm_elec_.nc, resources/eurostat_energy_balances.csv, resources/walloon/scen_central/pop_weighted_energy_totals_s_adm_2040.csv, resources/walloon/scen_central/wallon_demands_2040.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/road_transport_2040_shares.csv, resources/walloon/scen_central/pop_weighted_heat_totals_s_adm_2040.csv, resources/walloon/scen_central/shipping_demand_s_adm_2040.csv, resources/walloon/scen_central/transport_demand_s_adm_2040.csv, resources/walloon/scen_central/transport_data_s_adm_2040.csv, resources/walloon/scen_central/avail_profile_s_adm_2040.csv, resources/walloon/scen_central/dsm_profile_s_adm_2040.csv, resources/walloon/scen_central/natural_charging_shape_s_adm_2040.csv, resources/walloon/scen_central/co2_totals_adm_2040.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv, resources/walloon/scen_central/biomass_potentials_s_adm_2040.csv, resources/walloon/scen_central/costs_2040_processed.csv, resources/walloon/scen_central/salt_cavern_potentials_s_adm.csv, resources/busmap_base_s.csv, resources/busmap_base_s_adm.csv, resources/walloon/scen_central/pop_layout_base_s_adm.csv, resources/walloon/scen_central/industrial_energy_demand_base_s_adm_2040.csv, resources/walloon/scen_central/hourly_heat_demand_total_base_s_adm.nc, resources/walloon/scen_central/industrial_production_base_s_adm_2040.csv, resources/walloon/scen_central/district_heat_share_base_s_adm_2040.csv, resources/walloon/scen_central/heating_efficiencies_adm_2040.csv, resources/walloon/scen_central/temp_soil_total_base_s_adm.nc, resources/walloon/scen_central/temp_air_total_base_s_adm.nc, resources/walloon/scen_central/cop_profiles_base_s_adm_2040.nc, resources/solar_thermal_total_base_s_adm.nc, resources/walloon/scen_central/solar_rooftop_potentials_s_adm.csv, resources/walloon/scen_central/direct_heat_source_utilisation_profiles_base_s_adm_2040.nc, data/walloon/ntc_2040.csv, data/walloon/ntc_floors.csv, data/walloon/transmission_cost_overrides.csv, resources/walloon/scen_central/clever_Transport_adm_2040.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2040.nc
+    log: logs/walloon/scen_central/prepare_sector_network_base_s_adm___2040.log
+    jobid: 0
+    benchmark: benchmarks/walloon/scen_central/prepare_sector_network/base_s_adm___2040
+    reason: Updated input files: data/walloon/custom_potentials.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2040
+    resources: tmpdir=/tmp, mem_mb=2000, mem=2 GB, mem_mib=1908
+Shell command: None
+
+[Tue Oct  6 16:26:52 2026]
+Preparing integrated sector-coupled energy network for adm clusters, 2025 planning horizon,  electric options and  sector options
+localrule prepare_sector_network:
+    input: resources/profile_adm_offwind-ac.nc, resources/profile_adm_offwind-dc.nc, resources/profile_adm_offwind-float.nc, resources/walloon/scen_central/gas_network_base_s_adm.csv, resources/walloon/scen_central/gas_input_locations_s_adm.geojson, resources/walloon/scen_central/gas_input_locations_s_adm_simplified.csv, resources/walloon/scen_central/snapshot_weightings_base_s_adm_elec__.csv, data/walloon/custom_potentials.csv, resources/biomass_transport_costs.csv, resources/walloon/scen_central/co2_sequestration_potential_base_s_adm.csv, resources/walloon/scen_central/networks/base_s_adm_elec_.nc, resources/eurostat_energy_balances.csv, resources/walloon/scen_central/pop_weighted_energy_totals_s_adm_2025.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/road_transport_2025_shares.csv, resources/walloon/scen_central/pop_weighted_heat_totals_s_adm_2025.csv, resources/walloon/scen_central/shipping_demand_s_adm_2025.csv, resources/walloon/scen_central/transport_demand_s_adm_2025.csv, resources/walloon/scen_central/transport_data_s_adm_2025.csv, resources/walloon/scen_central/avail_profile_s_adm_2025.csv, resources/walloon/scen_central/dsm_profile_s_adm_2025.csv, resources/walloon/scen_central/natural_charging_shape_s_adm_2025.csv, resources/walloon/scen_central/co2_totals_adm_2025.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv, resources/walloon/scen_central/biomass_potentials_s_adm_2025.csv, resources/walloon/scen_central/costs_2025_processed.csv, resources/walloon/scen_central/salt_cavern_potentials_s_adm.csv, resources/busmap_base_s.csv, resources/busmap_base_s_adm.csv, resources/walloon/scen_central/pop_layout_base_s_adm.csv, resources/walloon/scen_central/industrial_energy_demand_base_s_adm_2025.csv, resources/walloon/scen_central/hourly_heat_demand_total_base_s_adm.nc, resources/walloon/scen_central/industrial_production_base_s_adm_2025.csv, resources/walloon/scen_central/district_heat_share_base_s_adm_2025.csv, resources/walloon/scen_central/heating_efficiencies_adm_2025.csv, resources/walloon/scen_central/temp_soil_total_base_s_adm.nc, resources/walloon/scen_central/temp_air_total_base_s_adm.nc, resources/walloon/scen_central/cop_profiles_base_s_adm_2025.nc, resources/solar_thermal_total_base_s_adm.nc, resources/walloon/scen_central/solar_rooftop_potentials_s_adm.csv, resources/walloon/scen_central/direct_heat_source_utilisation_profiles_base_s_adm_2025.nc, data/walloon/ntc_2025.csv, data/walloon/ntc_floors.csv, data/walloon/transmission_cost_overrides.csv, resources/walloon/scen_central/clever_Transport_adm_2025.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2025.nc
+    log: logs/walloon/scen_central/prepare_sector_network_base_s_adm___2025.log
+    jobid: 158
+    benchmark: benchmarks/walloon/scen_central/prepare_sector_network/base_s_adm___2025
+    reason: Updated input files: data/walloon/custom_potentials.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2025
+    resources: tmpdir=/tmp, mem_mb=2000, mem=2 GB, mem_mib=1908
+Shell command: None
+
+[Tue Oct  6 16:26:52 2026]
+Preparing integrated sector-coupled energy network for adm clusters, 2050 planning horizon,  electric options and  sector options
+localrule prepare_sector_network:
+    input: resources/profile_adm_offwind-ac.nc, resources/profile_adm_offwind-dc.nc, resources/profile_adm_offwind-float.nc, resources/walloon/scen_central/gas_network_base_s_adm.csv, resources/walloon/scen_central/gas_input_locations_s_adm.geojson, resources/walloon/scen_central/gas_input_locations_s_adm_simplified.csv, resources/walloon/scen_central/snapshot_weightings_base_s_adm_elec__.csv, data/walloon/custom_potentials.csv, resources/biomass_transport_costs.csv, resources/walloon/scen_central/co2_sequestration_potential_base_s_adm.csv, resources/walloon/scen_central/networks/base_s_adm_elec_.nc, resources/eurostat_energy_balances.csv, resources/walloon/scen_central/pop_weighted_energy_totals_s_adm_2050.csv, resources/walloon/scen_central/wallon_demands_2050.csv, resources/walloon/scen_central/wallon_demands_2025.csv, resources/walloon/scen_central/road_transport_2050_shares.csv, resources/walloon/scen_central/pop_weighted_heat_totals_s_adm_2050.csv, resources/walloon/scen_central/shipping_demand_s_adm_2050.csv, resources/walloon/scen_central/transport_demand_s_adm_2050.csv, resources/walloon/scen_central/transport_data_s_adm_2050.csv, resources/walloon/scen_central/avail_profile_s_adm_2050.csv, resources/walloon/scen_central/dsm_profile_s_adm_2050.csv, resources/walloon/scen_central/natural_charging_shape_s_adm_2050.csv, resources/walloon/scen_central/co2_totals_adm_2050.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv, resources/walloon/scen_central/biomass_potentials_s_adm_2050.csv, resources/walloon/scen_central/costs_2050_processed.csv, resources/walloon/scen_central/salt_cavern_potentials_s_adm.csv, resources/busmap_base_s.csv, resources/busmap_base_s_adm.csv, resources/walloon/scen_central/pop_layout_base_s_adm.csv, resources/walloon/scen_central/industrial_energy_demand_base_s_adm_2050.csv, resources/walloon/scen_central/hourly_heat_demand_total_base_s_adm.nc, resources/walloon/scen_central/industrial_production_base_s_adm_2050.csv, resources/walloon/scen_central/district_heat_share_base_s_adm_2050.csv, resources/walloon/scen_central/heating_efficiencies_adm_2050.csv, resources/walloon/scen_central/temp_soil_total_base_s_adm.nc, resources/walloon/scen_central/temp_air_total_base_s_adm.nc, resources/walloon/scen_central/cop_profiles_base_s_adm_2050.nc, resources/solar_thermal_total_base_s_adm.nc, resources/walloon/scen_central/solar_rooftop_potentials_s_adm.csv, resources/walloon/scen_central/direct_heat_source_utilisation_profiles_base_s_adm_2050.nc, data/walloon/ntc_2050.csv, data/walloon/ntc_floors.csv, data/walloon/transmission_cost_overrides.csv, resources/walloon/scen_central/clever_Transport_adm_2050.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2050.nc
+    log: logs/walloon/scen_central/prepare_sector_network_base_s_adm___2050.log
+    jobid: 115
+    benchmark: benchmarks/walloon/scen_central/prepare_sector_network/base_s_adm___2050
+    reason: Updated input files: data/walloon/custom_potentials.csv
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2050
+    resources: tmpdir=/tmp, mem_mb=2000, mem=2 GB, mem_mib=1908
+Shell command: None
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, lines, links, loads, storage_units, stores, sub_networks
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, lines, links, loads, storage_units, stores, sub_networks
+INFO:__main__:Removing generators with carrier ['CCGT', 'OCGT', 'biomass', 'coal', 'geothermal', 'lignite', 'nuclear', 'oil']
+INFO:__main__:Removing generators with carrier ['CCGT', 'OCGT', 'biomass', 'coal', 'geothermal', 'lignite', 'nuclear', 'oil']
+INFO:__main__:Removing buses with carrier ['H2', 'battery']
+INFO:__main__:Removing buses with carrier ['H2', 'battery']
+INFO:__main__:Removing links with carrier ['H2 Electrolysis', 'H2 Fuel Cell', 'battery charger', 'battery discharger']
+INFO:__main__:Removing links with carrier ['H2 Electrolysis', 'H2 Fuel Cell', 'battery charger', 'battery discharger']
+INFO:__main__:Removing stores with carrier ['H2', 'battery']
+INFO:__main__:Removing stores with carrier ['H2', 'battery']
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, lines, links, loads, storage_units, stores, sub_networks
+INFO:__main__:Added connection cost of 14625-19758 Eur/MW/a to offwind-ac
+INFO:__main__:Added connection cost of 15971-21576 Eur/MW/a to offwind-ac
+INFO:__main__:Added connection cost of 23364-35371 Eur/MW/a to offwind-dc
+INFO:__main__:Added connection cost of 25464-38570 Eur/MW/a to offwind-dc
+INFO:__main__:Removing generators with carrier ['CCGT', 'OCGT', 'biomass', 'coal', 'geothermal', 'lignite', 'nuclear', 'oil']
+INFO:__main__:Removing buses with carrier ['H2', 'battery']
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, lines, links, loads, storage_units, stores, sub_networks
+INFO:__main__:Added connection cost of 20630-46380 Eur/MW/a to offwind-float
+INFO:__main__:Removing links with carrier ['H2 Electrolysis', 'H2 Fuel Cell', 'battery charger', 'battery discharger']
+INFO:__main__:Added connection cost of 22466-50574 Eur/MW/a to offwind-float
+INFO:__main__:Removing stores with carrier ['H2', 'battery']
+INFO:__main__:Removing generators with carrier ['CCGT', 'OCGT', 'biomass', 'coal', 'geothermal', 'lignite', 'nuclear', 'oil']
+INFO:__main__:Removing buses with carrier ['H2', 'battery']
+INFO:__main__:Removing links with carrier ['H2 Electrolysis', 'H2 Fuel Cell', 'battery charger', 'battery discharger']
+INFO:__main__:Removing stores with carrier ['H2', 'battery']
+INFO:__main__:Added connection cost of 15971-21576 Eur/MW/a to offwind-ac
+INFO:__main__:Added connection cost of 25464-38570 Eur/MW/a to offwind-dc
+INFO:__main__:Added connection cost of 13279-17940 Eur/MW/a to offwind-ac
+INFO:__main__:Added connection cost of 21233-32141 Eur/MW/a to offwind-dc
+INFO:__main__:Added connection cost of 22466-50574 Eur/MW/a to offwind-float
+INFO:__main__:Added connection cost of 18751-42145 Eur/MW/a to offwind-float
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['EU oil refining'], dtype='object', name='name')
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['EU oil refining'], dtype='object', name='name')
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['EU oil refining'], dtype='object', name='name')
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['EU oil refining'], dtype='object', name='name')
+INFO:__main__:Adding electricity generation
+INFO:__main__:Adding electricity generation
+INFO:__main__:Adding CCGT power plants with post-combustion carbon capture (capture tech: biomass CHP capture).
+INFO:__main__:Adding electricity generation
+INFO:__main__:Adding CCGT power plants with post-combustion carbon capture (capture tech: biomass CHP capture).
+INFO:__main__:Add hydrogen storage
+INFO:__main__:Adding electricity generation
+INFO:__main__:Add hydrogen storage
+INFO:__main__:Adding hydrogen fuel cell for re-electrification.
+INFO:__main__:Adding hydrogen fuel cell for re-electrification.
+INFO:__main__:Adding hydrogen turbine for re-electrification. Assuming OCGT technology costs.
+INFO:__main__:Adding CCGT power plants with post-combustion carbon capture (capture tech: biomass CHP capture).
+INFO:__main__:Adding hydrogen turbine for re-electrification. Assuming OCGT technology costs.
+INFO:__main__:Add hydrogen underground storage
+INFO:__main__:Adding CCGT power plants with post-combustion carbon capture (capture tech: biomass CHP capture).
+INFO:__main__:Add hydrogen underground storage
+INFO:__main__:Add hydrogen storage
+INFO:__main__:Add natural gas infrastructure, incl. LNG terminals, production, storage and entry-points.
+INFO:__main__:Add natural gas infrastructure, incl. LNG terminals, production, storage and entry-points.
+INFO:__main__:Add hydrogen storage
+INFO:__main__:Adding hydrogen fuel cell for re-electrification.
+INFO:__main__:Existing gas storage floors (TWh_LHV): {'BEVLG gas Store': 8.18, 'DE gas Store': 320.08, 'FR gas Store': 116.39, 'GB gas Store': 50.73, 'NL gas Store': 103.62}
+INFO:__main__:Adding hydrogen turbine for re-electrification. Assuming OCGT technology costs.
+INFO:__main__:Existing gas storage floors (TWh_LHV): {'BEVLG gas Store': 8.18, 'DE gas Store': 320.08, 'FR gas Store': 116.39, 'GB gas Store': 50.73, 'NL gas Store': 103.62}
+INFO:__main__:Adding hydrogen fuel cell for re-electrification.
+INFO:__main__:Add hydrogen underground storage
+INFO:__main__:Adding hydrogen turbine for re-electrification. Assuming OCGT technology costs.
+INFO:__main__:Add options for new hydrogen pipelines.
+INFO:__main__:Add hydrogen underground storage
+INFO:__main__:Add options for new hydrogen pipelines.
+INFO:__main__:Add natural gas infrastructure, incl. LNG terminals, production, storage and entry-points.
+INFO:__main__:Add natural gas infrastructure, incl. LNG terminals, production, storage and entry-points.
+INFO:__main__:Existing gas storage floors (TWh_LHV): {'BEVLG gas Store': 8.18, 'DE gas Store': 320.08, 'FR gas Store': 116.39, 'GB gas Store': 50.73, 'NL gas Store': 103.62}
+INFO:__main__:Existing gas storage floors (TWh_LHV): {'BEVLG gas Store': 8.18, 'DE gas Store': 320.08, 'FR gas Store': 116.39, 'GB gas Store': 50.73, 'NL gas Store': 103.62}
+INFO:__main__:Add options for new hydrogen pipelines.
+INFO:scripts.add_electricity:Add the following technologies as storage units:
+ - 
+INFO:scripts.add_electricity:Add the following technologies as storage units:
+ - 
+INFO:__main__:Add options for new hydrogen pipelines.
+INFO:scripts.add_electricity:Add the following storage technologies as stores and links:
+ - battery
+INFO:__main__:Add land transport
+INFO:scripts.add_electricity:Add the following storage technologies as stores and links:
+ - battery
+INFO:__main__:Add land transport
+INFO:scripts.add_electricity:Add the following technologies as storage units:
+ - 
+INFO:scripts.add_electricity:Add the following technologies as storage units:
+ - 
+INFO:scripts.add_electricity:Add the following storage technologies as stores and links:
+ - battery
+INFO:__main__:Add land transport
+INFO:scripts.add_electricity:Add the following storage technologies as stores and links:
+ - battery
+INFO:__main__:Add land transport
+INFO:__main__:fuel_cell share: 0%
+INFO:__main__:electric share: 81.0%
+INFO:__main__:ice share: 19.0%
+INFO:__main__:BEWAL: TIMES fleet replaces the population-scaled car count (1946792 -> 2080144) and the energy ratio for p_nom/e_nom (0.6523 -> 1.0000).
+INFO:__main__:fuel_cell share: 0%
+INFO:__main__:electric share: 15.0%
+INFO:__main__:ice share: 85.0%
+INFO:__main__:fuel_cell share: 0%
+INFO:__main__:BEWAL: TIMES fleet replaces the population-scaled car count (1946792 -> 1799384) and the energy ratio for p_nom/e_nom (0.0158 -> 0.0546).
+INFO:__main__:electric share: 100%
+INFO:__main__:ice share: 0%
+INFO:__main__:BEWAL: TIMES fleet replaces the population-scaled car count (1946792 -> 2118330) and the energy ratio for p_nom/e_nom (0.8448 -> 1.0000).
+INFO:__main__:fuel_cell share: 0%
+INFO:__main__:electric share: 35.0%
+INFO:__main__:ice share: 65.0%
+INFO:__main__:BEWAL: TIMES fleet replaces the population-scaled car count (1946792 -> 1908403) and the energy ratio for p_nom/e_nom (0.2152 -> 0.4109).
+INFO:__main__:Add heat sector
+INFO:__main__:Add heat sector
+INFO:__main__:Add heat sector
+INFO:__main__:Add heat sector
+INFO:__main__:Assumed space heat reduction of 16.00%
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:__main__:Assumed space heat reduction of 9.00%
+INFO:__main__:Assumed space heat reduction of 29.00%
+INFO:__main__:Assumed space heat reduction of 9.00%
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:__main__:Add biomass
+INFO:__main__:Add biomass
+INFO:__main__:Add biomass
+INFO:__main__:Add biomass
+INFO:__main__:Adding ammonia carrier with synthesis, cracking and storage
+INFO:__main__:Adding ammonia carrier with synthesis, cracking and storage
+INFO:__main__:Add methanol
+INFO:__main__:Add methanol
+INFO:__main__:Adding methanol OCGT power plants.
+INFO:__main__:Adding methanol OCGT power plants.
+INFO:__main__:Add industrial demand
+INFO:__main__:Adding ammonia carrier with synthesis, cracking and storage
+INFO:__main__:Add industrial demand
+INFO:__main__:Adding ammonia carrier with synthesis, cracking and storage
+INFO:__main__:Add methanol
+INFO:__main__:Add methanol
+INFO:__main__:Adding methanol OCGT power plants.
+INFO:__main__:Adding methanol OCGT power plants.
+INFO:__main__:Add industrial demand
+INFO:__main__:Add industrial demand
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['BEBRU naphtha for industry', 'BEVLG naphtha for industry',
+       'BEWAL naphtha for industry', 'DE naphtha for industry',
+       'FR naphtha for industry', 'GB naphtha for industry',
+       'LU naphtha for industry', 'NL naphtha for industry'],
+      dtype='object', name='name')
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['BEBRU naphtha for industry', 'BEVLG naphtha for industry',
+       'BEWAL naphtha for industry', 'DE naphtha for industry',
+       'FR naphtha for industry', 'GB naphtha for industry',
+       'LU naphtha for industry', 'NL naphtha for industry'],
+      dtype='object', name='name')
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['BEBRU naphtha for industry', 'BEVLG naphtha for industry',
+       'BEWAL naphtha for industry', 'DE naphtha for industry',
+       'FR naphtha for industry', 'GB naphtha for industry',
+       'LU naphtha for industry', 'NL naphtha for industry'],
+      dtype='object', name='name')
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['BEBRU naphtha for industry', 'BEVLG naphtha for industry',
+       'BEWAL naphtha for industry', 'DE naphtha for industry',
+       'FR naphtha for industry', 'GB naphtha for industry',
+       'LU naphtha for industry', 'NL naphtha for industry'],
+      dtype='object', name='name')
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['BEBRU naphtha for industry', 'BEVLG naphtha for industry',
+       'BEWAL naphtha for industry', 'DE naphtha for industry',
+       'FR naphtha for industry', 'GB naphtha for industry',
+       'LU naphtha for industry', 'NL naphtha for industry'],
+      dtype='object', name='name')
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['BEBRU naphtha for industry', 'BEVLG naphtha for industry',
+       'BEWAL naphtha for industry', 'DE naphtha for industry',
+       'FR naphtha for industry', 'GB naphtha for industry',
+       'LU naphtha for industry', 'NL naphtha for industry'],
+      dtype='object', name='name')
+INFO:__main__:Add shipping
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['BEBRU naphtha for industry', 'BEVLG naphtha for industry',
+       'BEWAL naphtha for industry', 'DE naphtha for industry',
+       'FR naphtha for industry', 'GB naphtha for industry',
+       'LU naphtha for industry', 'NL naphtha for industry'],
+      dtype='object', name='name')
+INFO:__main__:Add shipping
+WARNING:pypsa.consistency:The following links have buses which are not defined. Add them using n.add() or run n.sanitize() to add them automatically. Components with undefined buses:
+Index(['BEBRU naphtha for industry', 'BEVLG naphtha for industry',
+       'BEWAL naphtha for industry', 'DE naphtha for industry',
+       'FR naphtha for industry', 'GB naphtha for industry',
+       'LU naphtha for industry', 'NL naphtha for industry'],
+      dtype='object', name='name')
+INFO:__main__:Add aviation
+INFO:__main__:Add possibility to use industrial waste heat in district heating
+INFO:__main__:Add aviation
+INFO:__main__:Add agriculture, forestry and fishing sector.
+INFO:__main__:Add possibility to use industrial waste heat in district heating
+INFO:__main__:Add agriculture, forestry and fishing sector.
+INFO:__main__:Add shipping
+INFO:__main__:Add shipping
+INFO:__main__:Residential decentral heat split (times_base_year): {'BEWAL residential urban decentral heat': np.float64(11.3197), 'BEWAL residential rural heat': np.float64(6.78)} → {'BEWAL residential urban decentral heat': np.float64(7.3175), 'BEWAL residential rural heat': np.float64(10.7822)} TWh (total 18.0997 TWh unchanged).
+INFO:__main__:Walloon decentral heat also carries 0.181 TWh of non-electric cooking fuel and 0.243 TWh of tertiary other-energy fuel.
+INFO:__main__:Adding CO2 network.
+INFO:__main__:Residential decentral heat split (times_base_year): {'BEWAL residential urban decentral heat': np.float64(11.7504), 'BEWAL residential rural heat': np.float64(7.5958)} → {'BEWAL residential urban decentral heat': np.float64(7.8215), 'BEWAL residential rural heat': np.float64(11.5248)} TWh (total 19.3462 TWh unchanged).
+INFO:__main__:Walloon decentral heat also carries 0.181 TWh of non-electric cooking fuel and 0.253 TWh of tertiary other-energy fuel.
+INFO:__main__:Adding CO2 network.
+INFO:__main__:Add aviation
+INFO:__main__:Add aviation
+INFO:__main__:Add possibility to use industrial waste heat in district heating
+INFO:__main__:Add agriculture, forestry and fishing sector.
+INFO:__main__:Add possibility to use industrial waste heat in district heating
+INFO:__main__:Add agriculture, forestry and fishing sector.
+INFO:__main__:Residential decentral heat split (times_base_year): {'BEWAL residential urban decentral heat': np.float64(8.5217), 'BEWAL residential rural heat': np.float64(12.5565)} → {'BEWAL residential urban decentral heat': np.float64(8.5217), 'BEWAL residential rural heat': np.float64(12.5565)} TWh (total 21.0782 TWh unchanged).
+INFO:__main__:Walloon decentral heat also carries 0.333 TWh of non-electric cooking fuel and 0.232 TWh of tertiary other-energy fuel.
+INFO:__main__:Adding CO2 network.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:__main__:Residential decentral heat split (times_base_year): {'BEWAL residential urban decentral heat': np.float64(8.1825), 'BEWAL residential rural heat': np.float64(12.4816)} → {'BEWAL residential urban decentral heat': np.float64(8.3543), 'BEWAL residential rural heat': np.float64(12.3098)} TWh (total 20.6640 TWh unchanged).
+INFO:__main__:Walloon decentral heat also carries 0.264 TWh of non-electric cooking fuel and 0.239 TWh of tertiary other-energy fuel.
+INFO:__main__:Adding CO2 network.
+WARNING:pypsa.network.transform:The attribute 'v_nom' is a standard attribute for other components but not for lines. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'i_nom' is a standard attribute for other components but not for lines. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'geometry' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'i_nom' is a standard attribute for other components but not for lines. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'v_nom' is a standard attribute for other components but not for lines. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'geometry' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'v_nom' is a standard attribute for other components but not for lines. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'i_nom' is a standard attribute for other components but not for lines. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'i_nom' is a standard attribute for other components but not for lines. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'v_nom' is a standard attribute for other components but not for lines. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'geometry' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'geometry' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:__main__:Adding CO2 budget limit as per unit of 1990 levels of 0.05
+INFO:__main__:Limiting new HVAC and HVDC extensions to 20000 MW
+INFO:__main__:Adding CO2 budget limit as per unit of 1990 levels of 0.25
+INFO:__main__:Limiting new HVAC and HVDC extensions to 20000 MW
+INFO:__main__:Deducting distribution losses from electricity demand: 5.0%
+INFO:__main__:TIMES soft link: BEWAL keeps its full electricity load (already a low-voltage delivery in TIMES)
+INFO:__main__:Deducting distribution losses from electricity demand: 5.0%
+INFO:__main__:TIMES soft link: BEWAL keeps its full electricity load (already a low-voltage delivery in TIMES)
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for stores. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for stores. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:scripts.walloon_scripts.network_calibration:Moved 70 % of industry electricity to the transmission bus at 8 node(s)
+INFO:scripts.walloon_scripts.network_calibration:Rooftop PV hosting cost: +8019 EUR/MW/a on 8 generator(s) (120 EUR/kWp)
+INFO:__main__:Inserting gas distribution grid with investment cost factor of 0.12
+INFO:__main__:Specified losses for electricity distribution grid transmission (static: 0.95, per 1000km: 1, compression per 1000km: 0). Splitting bidirectional links.
+INFO:scripts.walloon_scripts.network_calibration:Moved 70 % of industry electricity to the transmission bus at 8 node(s)
+INFO:scripts.walloon_scripts.network_calibration:Rooftop PV hosting cost: +8019 EUR/MW/a on 8 generator(s) (120 EUR/kWp)
+INFO:__main__:Inserting gas distribution grid with investment cost factor of 0.12
+INFO:__main__:Adding CO2 budget limit as per unit of 1990 levels of 0.648
+INFO:__main__:Adding CO2 budget limit as per unit of 1990 levels of 0.45
+INFO:__main__:Specified losses for electricity distribution grid transmission (static: 0.95, per 1000km: 1, compression per 1000km: 0). Splitting bidirectional links.
+INFO:__main__:Specified losses for DC transmission (static: 0.98, per 1000km: 0.977, compression per 1000km: 0). Splitting bidirectional links.
+INFO:__main__:Limiting new HVAC and HVDC extensions to 20000 MW
+INFO:__main__:Limiting new HVAC and HVDC extensions to 20000 MW
+INFO:__main__:Specified losses for DC transmission (static: 0.98, per 1000km: 0.977, compression per 1000km: 0). Splitting bidirectional links.
+INFO:__main__:Specified losses for H2 pipeline transmission (static: 1, per 1000km: 1, compression per 1000km: 0.018). Splitting bidirectional links.
+INFO:__main__:Deducting distribution losses from electricity demand: 5.0%
+INFO:__main__:TIMES soft link: BEWAL keeps its full electricity load (already a low-voltage delivery in TIMES)
+INFO:__main__:Deducting distribution losses from electricity demand: 5.0%
+INFO:__main__:TIMES soft link: BEWAL keeps its full electricity load (already a low-voltage delivery in TIMES)
+INFO:__main__:Specified losses for H2 pipeline transmission (static: 1, per 1000km: 1, compression per 1000km: 0.018). Splitting bidirectional links.
+INFO:__main__:Specified losses for gas pipeline transmission (static: 1, per 1000km: 1, compression per 1000km: 0.01). Splitting bidirectional links.
+INFO:__main__:Specified losses for gas pipeline transmission (static: 1, per 1000km: 1, compression per 1000km: 0.01). Splitting bidirectional links.
+INFO:__main__:Removing 0 line(s) with properties conflicting with transmission losses functionality.
+INFO:__main__:Cluster residential and service heat buses.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for stores. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for stores. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:__main__:Removing 0 line(s) with properties conflicting with transmission losses functionality.
+INFO:__main__:Cluster residential and service heat buses.
+INFO:scripts.walloon_scripts.network_calibration:Moved 70 % of industry electricity to the transmission bus at 8 node(s)
+INFO:scripts.walloon_scripts.network_calibration:Rooftop PV hosting cost: +8019 EUR/MW/a on 8 generator(s) (120 EUR/kWp)
+INFO:__main__:Inserting gas distribution grid with investment cost factor of 0.12
+INFO:scripts.walloon_scripts.network_calibration:Moved 70 % of industry electricity to the transmission bus at 8 node(s)
+INFO:scripts.walloon_scripts.network_calibration:Rooftop PV hosting cost: +8019 EUR/MW/a on 8 generator(s) (120 EUR/kWp)
+INFO:__main__:Inserting gas distribution grid with investment cost factor of 0.12
+INFO:__main__:Specified losses for electricity distribution grid transmission (static: 0.95, per 1000km: 1, compression per 1000km: 0). Splitting bidirectional links.
+INFO:__main__:Specified losses for electricity distribution grid transmission (static: 0.95, per 1000km: 1, compression per 1000km: 0). Splitting bidirectional links.
+INFO:__main__:Specified losses for DC transmission (static: 0.98, per 1000km: 0.977, compression per 1000km: 0). Splitting bidirectional links.
+INFO:__main__:Specified losses for DC transmission (static: 0.98, per 1000km: 0.977, compression per 1000km: 0). Splitting bidirectional links.
+INFO:__main__:Specified losses for H2 pipeline transmission (static: 1, per 1000km: 1, compression per 1000km: 0.018). Splitting bidirectional links.
+INFO:__main__:Specified losses for H2 pipeline transmission (static: 1, per 1000km: 1, compression per 1000km: 0.018). Splitting bidirectional links.
+INFO:__main__:Specified losses for gas pipeline transmission (static: 1, per 1000km: 1, compression per 1000km: 0.01). Splitting bidirectional links.
+INFO:__main__:Specified losses for gas pipeline transmission (static: 1, per 1000km: 1, compression per 1000km: 0.01). Splitting bidirectional links.
+INFO:__main__:Removing 0 line(s) with properties conflicting with transmission losses functionality.
+INFO:__main__:Cluster residential and service heat buses.
+INFO:__main__:Removing 0 line(s) with properties conflicting with transmission losses functionality.
+INFO:scripts.prepare_network:Modify capital_cost of electricity distribution grid by factor 1.0 
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:scripts.add_electricity:tech_colors for carriers ['', 'none'] not defined in config.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:scripts.walloon_scripts.set_NTCs:NTC file addresses region buses directly: [np.str_('BEBRU'), np.str_('BEVLG'), np.str_('BEWAL')]
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEBRU-BEVLG at 2400 MW usable (3429 MW nominal at s_max_pu=0.70; base 2377 MW usable).
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEBRU-BEWAL at 2400 MW usable (3429 MW nominal at s_max_pu=0.70; base 2377 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border BEL-DEU at 1000 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-FRA at 3550 MW usable (5071 MW nominal at s_max_pu=0.70; base 4809 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border BEL-GBR at 1000 MW per direction (base 1000 MW).
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'geometry' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-LUX at 240 MW usable (343 MW nominal at s_max_pu=0.70; base 688 MW usable).
+WARNING:pypsa.network.transform:The attribute 'geometry' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-NLD at 3400 MW usable (4857 MW nominal at s_max_pu=0.70; base 4755 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEVLG-BEWAL at 3600 MW usable (5143 MW nominal at s_max_pu=0.70; base 3566 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-FRA at 4800 MW usable (6857 MW nominal at s_max_pu=0.70; base 4379 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Holding candidate DC links ['DC2', 'DC2-reversed'] at 0 MW on the DEU-FRA border: the AC lines carry the NTC.
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border DEU-GBR at 1400 MW per direction (base 0 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-LUX at 3700 MW usable (5286 MW nominal at s_max_pu=0.70; base 2753 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-NLD at 5000 MW usable (7143 MW nominal at s_max_pu=0.70; base 9509 MW usable).
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for stores. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'geometry' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for stores. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border FRA-GBR at 5600 MW per direction (base 4000 MW).
+INFO:scripts.prepare_network:Modify capital_cost of electricity distribution grid by factor 1.0 
+INFO:scripts.prepare_network:Modify capital_cost of electricity distribution grid by factor 1.0 
+WARNING:scripts.add_electricity:tech_colors for carriers ['', 'none'] not defined in config.
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border FRA-LUX at 190 MW usable (271 MW nominal at s_max_pu=0.70; base 352 MW usable).
+WARNING:scripts.add_electricity:tech_colors for carriers ['', 'none'] not defined in config.
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border GBR-NLD at 2800 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.network_calibration:Override investment on Link DC BEWAL–DE (1 branch(es)): 692600.0
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–BEWAL (1 branch(es)): 0.5277
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–FR (1 branch(es)): 0.8719
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–GB (1 branch(es)): 0.4586
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–NL (1 branch(es)): 0.5596
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEWAL–DE (1 branch(es)): 0.597
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEWAL–LU (1 branch(es)): 0.8157
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline DE–FR (1 branch(es)): 0.3245
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline FR–GB (1 branch(es)): 0.3093
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for stores. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+INFO:scripts.prepare_network:Modify capital_cost of electricity distribution grid by factor 1.0 
+WARNING:scripts.add_electricity:tech_colors for carriers ['', 'none'] not defined in config.
+INFO:scripts.walloon_scripts.set_NTCs:NTC file addresses region buses directly: [np.str_('BEBRU'), np.str_('BEVLG'), np.str_('BEWAL')]
+INFO:scripts.walloon_scripts.set_NTCs:NTC file addresses region buses directly: [np.str_('BEBRU'), np.str_('BEVLG'), np.str_('BEWAL')]
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEBRU-BEVLG at 3400 MW usable (4857 MW nominal at s_max_pu=0.70; base 2377 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEBRU-BEVLG at 4800 MW usable (6857 MW nominal at s_max_pu=0.70; base 2377 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEBRU-BEWAL at 2400 MW usable (3429 MW nominal at s_max_pu=0.70; base 2377 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEBRU-BEWAL at 2400 MW usable (3429 MW nominal at s_max_pu=0.70; base 2377 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border BEL-DEU at 2000 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border BEL-DEU at 3200 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-FRA at 4550 MW usable (6500 MW nominal at s_max_pu=0.70; base 4809 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-FRA at 7300 MW usable (10429 MW nominal at s_max_pu=0.70; base 4809 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border BEL-GBR at 2400 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border BEL-GBR at 3800 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-LUX at 740 MW usable (1057 MW nominal at s_max_pu=0.70; base 688 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:NTC file addresses region buses directly: [np.str_('BEBRU'), np.str_('BEVLG'), np.str_('BEWAL')]
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-LUX at 1200 MW usable (1714 MW nominal at s_max_pu=0.70; base 688 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-NLD at 5400 MW usable (7714 MW nominal at s_max_pu=0.70; base 4755 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEBRU-BEVLG at 2400 MW usable (3429 MW nominal at s_max_pu=0.70; base 2377 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-NLD at 8600 MW usable (12286 MW nominal at s_max_pu=0.70; base 4755 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEVLG-BEWAL at 13200 MW usable (18857 MW nominal at s_max_pu=0.70; base 3566 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEBRU-BEWAL at 2400 MW usable (3429 MW nominal at s_max_pu=0.70; base 2377 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEVLG-BEWAL at 14400 MW usable (20571 MW nominal at s_max_pu=0.70; base 3566 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-FRA at 4800 MW usable (6857 MW nominal at s_max_pu=0.70; base 4379 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Holding candidate DC links ['DC2', 'DC2-reversed'] at 0 MW on the DEU-FRA border: the AC lines carry the NTC.
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-FRA at 4800 MW usable (6857 MW nominal at s_max_pu=0.70; base 4379 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Holding candidate DC links ['DC2', 'DC2-reversed'] at 0 MW on the DEU-FRA border: the AC lines carry the NTC.
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border BEL-DEU at 1000 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border DEU-GBR at 1400 MW per direction (base 0 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-FRA at 3550 MW usable (5071 MW nominal at s_max_pu=0.70; base 4809 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border DEU-GBR at 1400 MW per direction (base 0 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-LUX at 3700 MW usable (5286 MW nominal at s_max_pu=0.70; base 2753 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-LUX at 3700 MW usable (5286 MW nominal at s_max_pu=0.70; base 2753 MW usable).
+INFO:pypsa.network.io:Exported network 'Unnamed Network' saved to 'resources/walloon/scen_central/networks/base_s_adm___2025.nc contains: stores, loads, generators, storage_units, links, global_constraints, carriers, sub_networks, lines, buses
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-NLD at 5000 MW usable (7143 MW nominal at s_max_pu=0.70; base 9509 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-NLD at 5000 MW usable (7143 MW nominal at s_max_pu=0.70; base 9509 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border BEL-GBR at 1000 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-LUX at 240 MW usable (343 MW nominal at s_max_pu=0.70; base 688 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border FRA-GBR at 5600 MW per direction (base 4000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEL-NLD at 3400 MW usable (4857 MW nominal at s_max_pu=0.70; base 4755 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border FRA-GBR at 5600 MW per direction (base 4000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border FRA-LUX at 190 MW usable (271 MW nominal at s_max_pu=0.70; base 352 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border BEVLG-BEWAL at 3600 MW usable (5143 MW nominal at s_max_pu=0.70; base 3566 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border FRA-LUX at 190 MW usable (271 MW nominal at s_max_pu=0.70; base 352 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-FRA at 4800 MW usable (6857 MW nominal at s_max_pu=0.70; base 4379 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Holding candidate DC links ['DC2', 'DC2-reversed'] at 0 MW on the DEU-FRA border: the AC lines carry the NTC.
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border GBR-NLD at 2800 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border GBR-NLD at 2800 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:NTC floors address region buses directly: [np.str_('BEVLG'), np.str_('BEWAL')]
+INFO:scripts.walloon_scripts.set_NTCs:NTC floors address region buses directly: [np.str_('BEVLG'), np.str_('BEWAL')]
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border DEU-GBR at 1400 MW per direction (base 0 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Floored AC border BEVLG-BEWAL at 9600 MW usable (13714 MW nominal at s_max_pu=0.70).
+INFO:scripts.walloon_scripts.network_calibration:Override investment on Link DC BEWAL–DE (1 branch(es)): 692600.0
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–BEWAL (1 branch(es)): 0.5277
+INFO:scripts.walloon_scripts.set_NTCs:Floored AC border BEVLG-BEWAL at 9600 MW usable (13714 MW nominal at s_max_pu=0.70).
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–FR (1 branch(es)): 0.8719
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–GB (1 branch(es)): 0.4586
+INFO:scripts.walloon_scripts.network_calibration:Override investment on Link DC BEWAL–DE (1 branch(es)): 692600.0
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-LUX at 3700 MW usable (5286 MW nominal at s_max_pu=0.70; base 2753 MW usable).
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–NL (1 branch(es)): 0.5596
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–BEWAL (1 branch(es)): 0.5277
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEWAL–DE (1 branch(es)): 0.597
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–FR (1 branch(es)): 0.8719
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–GB (1 branch(es)): 0.4586
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEWAL–LU (1 branch(es)): 0.8157
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline DE–FR (1 branch(es)): 0.3245
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–NL (1 branch(es)): 0.5596
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEWAL–DE (1 branch(es)): 0.597
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline FR–GB (1 branch(es)): 0.3093
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEWAL–LU (1 branch(es)): 0.8157
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline DE–FR (1 branch(es)): 0.3245
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline FR–GB (1 branch(es)): 0.3093
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border DEU-NLD at 5000 MW usable (7143 MW nominal at s_max_pu=0.70; base 9509 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border FRA-GBR at 5600 MW per direction (base 4000 MW).
+INFO:scripts.walloon_scripts.set_NTCs:Capped AC border FRA-LUX at 190 MW usable (271 MW nominal at s_max_pu=0.70; base 352 MW usable).
+INFO:scripts.walloon_scripts.set_NTCs:Capped DC border GBR-NLD at 2800 MW per direction (base 1000 MW).
+INFO:scripts.walloon_scripts.network_calibration:Override investment on Link DC BEWAL–DE (1 branch(es)): 692600.0
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–BEWAL (1 branch(es)): 0.5277
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–FR (1 branch(es)): 0.8719
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–GB (1 branch(es)): 0.4586
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEVLG–NL (1 branch(es)): 0.5596
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEWAL–DE (1 branch(es)): 0.597
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline BEWAL–LU (1 branch(es)): 0.8157
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline DE–FR (1 branch(es)): 0.3245
+INFO:scripts.walloon_scripts.network_calibration:Override capital_cost_factor on Link CO2 pipeline FR–GB (1 branch(es)): 0.3093
+INFO:pypsa.network.io:Exported network 'Unnamed Network' saved to 'resources/walloon/scen_central/networks/base_s_adm___2040.nc contains: carriers, sub_networks, loads, buses, lines, stores, links, global_constraints, generators, storage_units
+INFO:pypsa.network.io:Exported network 'Unnamed Network' saved to 'resources/walloon/scen_central/networks/base_s_adm___2050.nc contains: global_constraints, storage_units, generators, stores, lines, carriers, links, buses, loads, sub_networks
+INFO:pypsa.network.io:Exported network 'Unnamed Network' saved to 'resources/walloon/scen_central/networks/base_s_adm___2030.nc contains: storage_units, sub_networks, global_constraints, buses, lines, links, carriers, generators, stores, loads
+[Tue Oct  6 16:27:04 2026]
+Finished jobid: 158 (Rule: prepare_sector_network)
+1 of 5 steps (20%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Tue Oct  6 16:27:04 2026]
+Adding existing infrastructure for base year for adm clusters, 2025 planning horizons,  electric options and  sector options
+localrule add_existing_baseyear:
+    input: resources/walloon/scen_central/networks/base_s_adm___2025.nc, resources/walloon/scen_central/powerplants_s_adm.csv, data/walloon/custom_potentials.csv, data/walloon/agg_p_nom_minmax_demande_haute.csv, data/nuclear_p_max_pu.csv, resources/walloon/scen_central/costs_2025_processed.csv, resources/walloon/scen_central/cop_profiles_base_s_adm_2025.nc, resources/walloon/scen_central/existing_heating_distribution_base_s_adm_2025.csv, resources/walloon/scen_central/heating_efficiencies_adm_2025.csv
+    output: resources/walloon/scen_central/networks/base_s_adm___2025_brownfield.nc
+    log: logs/walloon/scen_central/add_existing_baseyear_base_s_adm___2025.log
+    jobid: 157
+    benchmark: benchmarks/walloon/scen_central/add_existing_baseyear/base_s_adm___2025
+    reason: Input files updated by another job: resources/walloon/scen_central/networks/base_s_adm___2025.nc
+    wildcards: run=scen_central, clusters=adm, opts=, sector_opts=, planning_horizons=2025
+    resources: tmpdir=/tmp, mem_mb=3000, mem=3 GB, mem_mib=2862
+Shell command: None
+[Tue Oct  6 16:27:05 2026]
+Finished jobid: 0 (Rule: prepare_sector_network)
+2 of 5 steps (40%) done
+[Tue Oct  6 16:27:05 2026]
+Finished jobid: 115 (Rule: prepare_sector_network)
+3 of 5 steps (60%) done
+[Tue Oct  6 16:27:05 2026]
+Finished jobid: 135 (Rule: prepare_sector_network)
+4 of 5 steps (80%) done
+INFO:pypsa.network.io:New version 1.3.0 available! (Current: 1.2.4)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:104: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  selection = n.component_attrs[c.name].type.str.contains(
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:106: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  ) & n.component_attrs[c.name].status.str.contains("Input")
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:107: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  for attr in n.component_attrs[c.name].index[selection]:
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:104: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  selection = n.component_attrs[c.name].type.str.contains(
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:106: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  ) & n.component_attrs[c.name].status.str.contains("Input")
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:107: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  for attr in n.component_attrs[c.name].index[selection]:
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:104: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  selection = n.component_attrs[c.name].type.str.contains(
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:106: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  ) & n.component_attrs[c.name].status.str.contains("Input")
+/sylvain/git/pypsa-wal/.snakemake/scripts/tmpvo_toxa8.add_existing_baseyear.py:107: DeprecatedWarning: component_attrs is deprecated as of 1.0.0 and will be removed in 2.0.0. Use `self.components.<component>.defaults` instead.
+  for attr in n.component_attrs[c.name].index[selection]:
+WARNING:scripts.walloon_scripts.baseyear_forced_build:Base-year reconciliation: standing BEWAL onwind (1694 MW) already covers the 1560 MW pin — dropping 655 MW of forced 2025 additions. Check the pin against the fleet source.
+WARNING:scripts.walloon_scripts.baseyear_forced_build:Base-year reconciliation: scaling the standing BEWAL onwind fleet by 0.9207 (1694 MW -> 1560 MW) to meet the measured pin. The 134 MW excess is the IRENASTAT country total split by land potential, not a regional observation.
+INFO:scripts.walloon_scripts.baseyear_forced_build:Base-year reconciliation: scaling BEWAL solar 2025 additions by 0.212 (382 MW of 2668 MW headroom under the pin).
+INFO:scripts.walloon_scripts.baseyear_forced_build:Base-year reconciliation: scaling FR offwind-ac 2025 additions by 1.000 (1472 MW of 1486 MW headroom under the pin).
+INFO:scripts.walloon_scripts.baseyear_forced_build:Base-year reconciliation: scaling FR solar 2025 additions by 1.000 (10395 MW of 21521 MW headroom under the pin).
+INFO:scripts.walloon_scripts.baseyear_forced_build:Base-year reconciliation: scaling GB solar 2025 additions by 1.000 (4011 MW of 17879 MW headroom under the pin).
+INFO:scripts.walloon_scripts.baseyear_forced_build:Base-year reconciliation: scaling NL solar 2025 additions by 1.000 (12938 MW of 24035 MW headroom under the pin).
+INFO:scripts.prepare_sector_network:Cluster residential and service heat buses.
+WARNING:pypsa.network.transform:The attribute 'unit' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for generators. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'geometry' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for links. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:pypsa.network.transform:The attribute 'location' is a standard attribute for other components but not for stores. This could cause confusion and it should be renamed. See also: https://go.pypsa.org/warning-attr-misleading.
+WARNING:scripts.add_electricity:tech_colors for carriers ['', 'none'] not defined in config.
+INFO:scripts.walloon_scripts.nuclear_helper:Nuclear Link without a CSV availability (LU); using p_max_pu=1.0.
+INFO:scripts.walloon_scripts.nuclear_helper:Nuclear inflexibility applied on 20 link(s) and 0 generator(s) (margin=0.10 p.u.).
+WARNING:scripts.walloon_scripts.BEWAL_potentials:Potential row 'solid biomass import' on bus BEWAL (e_nom = 4000000.0) matches no Store in the network and was NOT applied; `sector.solid_biomass_import.enable` is off, so the binding import cap is the `solid biomass transported` row.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for solid biomass transported on bus BEWAL.
+WARNING:scripts.walloon_scripts.BEWAL_potentials:solid biomass transported is currently not a supported or valid technology.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for onwind on bus BEWAL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for solar on bus BEWAL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for solar rooftop on bus BEWAL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for solid biomass on bus BEWAL.
+WARNING:scripts.walloon_scripts.BEWAL_potentials:solid biomass is currently not a supported or valid technology.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for biogas on bus BEWAL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:BEWAL biogas cap on the total: 1.019 TWh = 1.019 forced (unsustainable) + 0.000 optional.
+WARNING:scripts.walloon_scripts.BEWAL_potentials:biogas is currently not a supported or valid technology.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for battery on bus BEWAL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Battery floor at BEWAL: 286 MW total (existing 0 MW, current-horizon p_nom_min 286 MW, e_nom_min 1144 MWh).
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for battery on bus BEVLG.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Battery floor at BEVLG: 250 MW total (existing 0 MW, current-horizon p_nom_min 250 MW, e_nom_min 1000 MWh).
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for battery on bus BEBRU.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Battery floor at BEBRU: 0 MW total (existing 0 MW, current-horizon p_nom_min 0 MW, e_nom_min 0 MWh).
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for offwind on bus BEVLG.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for offwind on bus DE.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for offwind on bus FR.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for offwind on bus GB.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for offwind on bus NL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for gas storage on bus BEWAL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Gas store at BEWAL: e_nom_max = 0.0 MWh_LHV.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for co2 storage on bus BEWAL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:CO2 sequestered store at BEWAL: e_nom_max = 0 t (documented zero).
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for co2 storage on bus BEVLG.
+INFO:scripts.walloon_scripts.BEWAL_potentials:CO2 sequestered store at BEVLG: e_nom_max = 0 t (documented zero).
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for co2 storage on bus BEBRU.
+INFO:scripts.walloon_scripts.BEWAL_potentials:CO2 sequestered store at BEBRU: e_nom_max = 0 t (documented zero).
+INFO:scripts.walloon_scripts.BEWAL_potentials:Overwriting exogenously given potentials for process emissions on bus BEWAL.
+INFO:scripts.walloon_scripts.BEWAL_potentials:Process-emissions load at BEWAL: 4411.62 kt/a (p_set = -503.6096 t/h).
+INFO:scripts.walloon_scripts.BEWAL_potentials:CO2 disposal service at BEWAL: closed this horizon.
+INFO:scripts.walloon_scripts.baseyear_pv_split:Base-year PV split: BEWAL rooftop <- 983.1 MW of BEWAL 0 solar-2020.
+INFO:scripts.walloon_scripts.baseyear_pv_split:Base-year PV split: BEWAL rooftop <- 786.9 MW of BEWAL 0 solar-2015.
+INFO:pypsa.network.io:Exported network 'Unnamed Network' saved to 'resources/walloon/scen_central/networks/base_s_adm___2025_brownfield.nc contains: stores, sub_networks, links, carriers, lines, loads, generators, buses, storage_units, global_constraints
+[Tue Oct  6 16:27:24 2026]
+Finished jobid: 157 (Rule: add_existing_baseyear)
+5 of 5 steps (100%) done
+Complete log(s): /sylvain/git/pypsa-wal/.snakemake/log/2026-10-06T162640.873555.snakemake.log
+[1;34m[nic5][0m Local preparation complete.

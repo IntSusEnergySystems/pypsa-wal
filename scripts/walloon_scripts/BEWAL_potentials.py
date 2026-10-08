@@ -524,6 +524,31 @@ def update_BEWAL_potentials(n, planning_horizons, walloon_potentials=None):
                     ] = limit - n.generators.loc[unsustainable_idx, attr]
                 if unsustainable_idx in n.generators.index:
                     n.generators.loc[unsustainable_idx, [attr, "e_sum_max"]] = 0
+            elif carrier == "biogas" and unsustainable_idx in n.generators.index:
+                # 2026-10-06: the biogas row caps TOTAL Walloon biogas in every
+                # horizon (ICEDD's TIMES bound on new digesters + TIMES's
+                # existing biogas), so the forced "unsustainable" generator
+                # (Eurostat 2019 x biomass key x phase-out: 1.45 / 0.93 / 0.48
+                # TWh in 2025 / 30 / 35, 0 from 2040) counts against it. Until
+                # then the cap sat on the sustainable generator alone and the
+                # two added up, harmless only while the 2025/2030 cap was the
+                # loose Valbiom 8.3 TWh. Where the forced volume alone exceeds
+                # the cap (2025: 1.45 vs 1.02 TWh) it is clipped to the cap; the
+                # biomass key over-allocates Wallonia anyway (docs/biogas.md §6).
+                forced = float(n.generators.at[unsustainable_idx, "e_sum_max"])
+                if forced > potential:
+                    n.generators.loc[
+                        unsustainable_idx, [attr, "e_sum_min", "e_sum_max"]
+                    ] = potential
+                    forced = potential
+                sustainable_potential = potential - forced
+                logger.info(
+                    "BEWAL biogas cap on the total: %.3f TWh = %.3f forced "
+                    "(unsustainable) + %.3f optional.",
+                    potential / 1e6,
+                    forced / 1e6,
+                    sustainable_potential / 1e6,
+                )
             n.generators.loc[f"BEWAL {carrier}", [attr, "e_sum_max"]] = (
                 sustainable_potential
             )
