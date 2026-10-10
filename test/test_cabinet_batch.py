@@ -23,25 +23,52 @@ SCENARIOS = ROOT / "config" / "scenarios.walloon.yaml"
 WAL = ROOT / "data" / "walloon"
 CENTRAL_AGG = WAL / "agg_p_nom_minmax_demande_haute.csv"
 
-# The batch in run.name: ICEDD's times_20261002_* exports, central first;
-# scen_realiste stays on its 30 Sep export (not re-exported on 2 Oct).
+# The batch in run.name (prepared 2026-10-10): the cabinet's two scenarios,
+# 3 GW (S1) and 4 GW (S2), each with its biomethane and no-CCGT-CCS
+# sensitivities, then the internal S1 runs. Central first.
 BATCH = [
     "scen_central",
-    "scen_noccsccgt",
-    "scen_noccsccgt_route",
-    "scen_retardnucleaire",
     "scen_biomethane_industrie",
+    "scen_noccsccgt",
+    "scen_nuc4gw",
+    "scen_nuc4gw_biomethane_industrie",
+    "scen_nuc4gw_noccsccgt",
     "scen_realiste",
+    "scen_retardnucleaire",
+    "scen_noco2cap",
+    "scen_test_lowccs_ptx",
 ]
 # The .vd each batch scenario must read. A block left on an older export runs
-# without complaint and is a different scenario.
+# without complaint and is a different scenario. Until ICEDD exports the
+# October batch, every entry is a 2 Oct export (scen_realiste: 30 Sep) and the
+# S2 / noco2cap entries are their S1 counterpart's (PLACEHOLDER_OF below).
+# Update this table together with the blocks when the new exports land.
 BATCH_VD = {
     "scen_central": "scen_central_v01_261002_0210.vd",
-    "scen_noccsccgt": "scen_sensibilite_central_noccsccgt_261002_0210.vd",
-    "scen_noccsccgt_route": "scen_sensibilite_central_noccsccgt_261002_0210.vd",
-    "scen_retardnucleaire": "scen_sensibilite_retardnucleaire_261002_0210.vd",
     "scen_biomethane_industrie": "scen_sensibilite_biomethane_industrie_v01_261002_0210.vd",
+    "scen_noccsccgt": "scen_sensibilite_central_noccsccgt_261002_0210.vd",
+    "scen_nuc4gw": "scen_central_v01_261002_0210.vd",
+    "scen_nuc4gw_biomethane_industrie": "scen_sensibilite_biomethane_industrie_v01_261002_0210.vd",
+    "scen_nuc4gw_noccsccgt": "scen_sensibilite_central_noccsccgt_261002_0210.vd",
     "scen_realiste": "scen_sensibilite_realiste_260929_3009.vd",
+    "scen_retardnucleaire": "scen_sensibilite_retardnucleaire_261002_0210.vd",
+    "scen_noco2cap": "scen_central_v01_261002_0210.vd",
+    "scen_test_lowccs_ptx": "scen_central_v01_261002_0210.vd",
+}
+# Scenarios with no TIMES export yet, reading their S1 counterpart's .vd and
+# side files. Remove an entry when its own export is wired in: the side-file
+# test then requires the scenario's own extracted files again.
+PLACEHOLDER_OF = {
+    "scen_nuc4gw": "scen_central",
+    "scen_nuc4gw_biomethane_industrie": "scen_biomethane_industrie",
+    "scen_nuc4gw_noccsccgt": "scen_noccsccgt",
+    "scen_noco2cap": "scen_central",
+}
+# S2 = S1 + Tihange 1: each 4 GW scenario and the 3 GW one it mirrors.
+S2_OF_S1 = {
+    "scen_nuc4gw": "scen_central",
+    "scen_nuc4gw_biomethane_industrie": "scen_biomethane_industrie",
+    "scen_nuc4gw_noccsccgt": "scen_noccsccgt",
 }
 # September-only scenarios: their blocks and generated files stay in the tree
 # for reproducibility, so the file-level invariants below still apply to them.
@@ -78,7 +105,7 @@ def test_run_name_is_the_batch(run_names):
     """
     assert run_names == BATCH, (
         "run.name in config/config.walloon.yaml has drifted from the batch "
-        "documented in docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md §1"
+        "documented in docs/logs/2026-10-10_cabinet_batch_nuc3_nuc4_2010_1h.md §1"
     )
 
 
@@ -150,6 +177,12 @@ def test_softlink_files_are_scenario_specific(scenario, scenarios):
             expected = "scen_noccsccgt"
         elif scenario.startswith("scen_nuctip_"):
             expected = "scen_nofixnuc"
+        elif scenario == "scen_test_lowccs_ptx":
+            # the central plus three levers, by design on the central's export
+            expected = "scen_central"
+        elif scenario in PLACEHOLDER_OF:
+            # no TIMES export of its own yet: its S1 counterpart's files
+            expected = PLACEHOLDER_OF[scenario]
         assert stem.endswith(expected), (
             f"{scenario}: {key} points at {path}, which belongs to another "
             "scenario. Regenerate with extract_times_softlink_values.py."
@@ -487,3 +520,83 @@ def test_bewal_2040_national_cap_is_the_times_tonnage():
         r: 0.25 for r in budget[2040] if r != "BEWAL"
     }
     assert budget[2030]["BEWAL"] == 0.45 and budget[2050]["BEWAL"] == 0.05
+
+
+# --- 4 GW family and no-CO2-cap run (2026-10-10) -----------------------------
+
+T1_MW = 962  # Tihange 1, data/walloon/wal_2021_existing_capacities_2.csv
+
+
+@pytest.mark.parametrize("scenario", list(S2_OF_S1))
+@pytest.mark.parametrize("year", ["2035", "2040", "2045", "2050"])
+@pytest.mark.parametrize("bound", ["min", "max"])
+def test_nuc4gw_is_the_central_plus_tihange_1(scenario, year, bound):
+    """S2 − S1 must be the restart alone: every Walloon row + 962 MW, new build unchanged.
+
+    The BE parent row moves by the same amount, because add_CCL_constraints
+    subtracts the regional rows from BE. Before 2035 nothing is pinned.
+    """
+    path = WAL / f"agg_p_nom_minmax_{scenario}.csv"
+    for loc in ("BEWAL", "BE"):
+        central = float(_agg_cell(CENTRAL_AGG, loc, "nuclear-all", year, bound))
+        assert float(_agg_cell(path, loc, "nuclear-all", year, bound)) == central + T1_MW
+    for year0 in ("2025", "2030"):
+        assert _agg_cell(path, "BEWAL", "nuclear-all", year0, bound) == ""
+
+
+def test_nuc4gw_overrides_match_the_generator():
+    """The three override tables are generated; a hand edit would drift silently."""
+    from scripts.walloon_scripts.make_nuc4gw_scenarios import (
+        FAMILY,
+        MASTER,
+        NOCCSCCGT,
+        build_family,
+    )
+
+    family = build_family(pd.read_csv(MASTER), pd.read_csv(NOCCSCCGT))
+    assert tuple(family) == FAMILY
+    cols = ["pypsa_wal_target", "year", "value", "status"]
+    for name, frame in family.items():
+        on_disk = pd.read_csv(ROOT / "config" / "scenarios" / f"{name}.csv")
+        assert on_disk[cols].reset_index(drop=True).equals(frame[cols].reset_index(drop=True)), (
+            f"config/scenarios/{name}.csv differs from make_nuc4gw_scenarios.py; re-run it"
+        )
+
+
+@pytest.mark.parametrize("s2,s1", list(S2_OF_S1.items()))
+def test_s2_block_mirrors_s1(scenarios, s2, s1):
+    """Same TIMES side, same soft-link blocks; only the nuclear files and the restart differ."""
+    a, b = dict(scenarios[s2]), dict(scenarios[s1])
+    assert a["electricity"]["nuclear_restart"] == {"enable": True}
+    assert "nuclear_restart" not in (b.get("electricity") or {})
+    assert a["sector"] == b["sector"], f"{s2} must read {s1}'s export and side files (for now)"
+    assert a["self_sufficiency"] == b["self_sufficiency"]
+    assert a["electricity"]["retrofit_nuclear_once"] is False
+    for block, key in (("solving", "agg_p_nom_limits"), ("costs", "custom_cost_fn"),
+                       ("electricity", "walloon_potentials")):
+        val = a[block][key]
+        path = val["file"] if isinstance(val, dict) else val
+        assert Path(path).stem.endswith(s2), f"{s2}: {block}.{key} -> {path}"
+
+
+@pytest.mark.parametrize("scenario", [s for s in BATCH if s not in S2_OF_S1])
+def test_restart_only_in_the_4gw_family(scenario, scenarios):
+    elec = scenarios[scenario].get("electricity") or {}
+    assert not (elec.get("nuclear_restart") or {}).get("enable"), (
+        f"{scenario} offers the Tihange 1 restart; only the 4 GW family may"
+    )
+
+
+def test_noco2cap_lifts_the_belgian_caps_only(scenarios):
+    """Belgian national caps lifted 2030-2050; the system cap (ETS analogue) stays."""
+    block = scenarios["scen_noco2cap"]
+    assert "co2_budget" not in block, "the system-wide cap is the ETS analogue and must stay"
+    base = yaml.safe_load(CONFIG.read_text())["budget_national"]
+    for year in (2030, 2040, 2050):
+        lifted = block["budget_national"][year]
+        assert set(lifted) == {"BEBRU", "BEVLG", "BEWAL"}
+        assert all(v >= 1.0 for v in lifted.values())
+        assert base[year]["BEWAL"] < 1.0
+    # nothing else moves against the central
+    rest = {k: v for k, v in block.items() if k != "budget_national"}
+    assert rest == scenarios["scen_central"]

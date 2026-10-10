@@ -6,8 +6,10 @@
 
 It must be the central scenario plus exactly three changes (lever D, no TIMES
 capture floor, no power-to-X must-runs), or a difference against the central
-cannot be attributed to them. It must also stay out of the cabinet batch and
-out of publication. Design: docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §12.
+cannot be attributed to them. Since 2026-10-10 it runs with the cabinet batch
+but is never presented as a cabinet scenario. Design:
+docs/logs/2026-09-30_cabinet_batch_20260930_2010_1h.md §12; the capture cap it
+inherits from the central: docs/logs/2026-10-10_cabinet_batch_nuc3_nuc4_2010_1h.md §3.
 """
 
 from __future__ import annotations
@@ -87,10 +89,15 @@ def test_the_run_layer_selects_it_and_cannot_publish():
     assert layer["html_publish"]["enable"] is False
 
 
-def test_it_is_not_part_of_the_cabinet_batch():
-    assert NAME not in _load("config.walloon.yaml")["run"]["name"]
-    # It may sit in the combined report (decided 1 Oct 2026), but only marked as a
-    # test, so it is never read as a cabinet scenario.
+def test_it_runs_with_the_batch_but_never_as_a_cabinet_scenario():
+    """Kept in the batch on 2026-10-10 ("old but interesting", S. Quoilin).
+
+    Until then it stayed out of `run.name`. It now runs with the cabinet batch,
+    last, and is still not a cabinet scenario: in the combined report (decided
+    1 Oct 2026) it must be labelled as a test.
+    """
+    names = _load("config.walloon.yaml")["run"]["name"]
+    assert names[-1] == NAME, "the test runs last, after the cabinet scenarios"
     listed = {s["name"]: s.get("label", "") for s in _load("pypsa2html.yaml")["scenarios"]}
     if NAME in listed:
         assert listed[NAME].startswith("TEST"), "a test run in the report must be labelled TEST"

@@ -9,23 +9,38 @@ run:
   # a single run and several are a multi-scenario run — the only difference is how
   # many names are listed. Every name must be a key of run.scenarios.file;
   # `name: all` expands to all of them.
-  # Cabinet batch on ICEDD's 2 October 2026 exports (times_20261002_*). Every
-  # name here is a key of config/scenarios.walloon.yaml, and cluster/config.sh
-  # DERIVES its scenario list from this block, so this is the single place that
-  # decides what runs. Comment a line out to drop that scenario from the batch;
-  # `RUN_NAME=<name> ./cluster/nic5.sh …` runs a subset (the central goes first,
-  # docs/logs/2026-10-04_cabinet_batch_20261002_2010_1h.md §5).
+  # Cabinet batch of 2026-10-10 (prepared, NOT launched): the two cabinet
+  # scenarios on an equal footing, 3 GW (S1) and 4 GW (S2, + Tihange 1), each
+  # with its biomethane and no-CCGT-CCS sensitivities (the six report runs),
+  # then the internal S1 sensitivities. Every name here is a key of
+  # config/scenarios.walloon.yaml, and cluster/config.sh DERIVES its scenario
+  # list from this block, so this is the single place that decides what runs.
+  # Comment a line out to drop that scenario from the batch;
+  # `RUN_NAME=<name> ./cluster/nic5.sh …` runs a subset (the central goes first).
+  # Plan, inputs still missing and runbook:
+  # docs/logs/2026-10-10_cabinet_batch_nuc3_nuc4_2010_1h.md.
   #
-  # The September batch (taxshift pair, realiste_nets / realiste_nobnd30, the
-  # scen_nuctip_* CAPEX sweep) and the 30 Sep test scen_test_lowccs_ptx keep
-  # their blocks in the scenarios file but are not re-run.
+  # Waiting for ICEDD's new exports: every scenario still reads a 2 Oct export
+  # (the S2 ones and scen_noco2cap read their S1 counterpart's, as placeholders).
+  # PEB A has no block yet (TIMES-side scenario, to be built by ICEDD).
+  # Earlier batches' blocks (scen_noccsccgt_route, the taxshift pair,
+  # realiste_nets / nobnd30, the scen_nuctip_* sweep) stay in the scenarios
+  # file but are not re-run.
   name:
-  - scen_central                 # reference case — run first
-  - scen_noccsccgt               # no capture on Walloon power plants, endogenous disposal only
-  - scen_noccsccgt_route         # same ban, TIMES disposal route kept (one-change twin)
-  - scen_retardnucleaire         # new nuclear delayed by five years
-  - scen_biomethane_industrie    # biogas volume reserved for industry
-  - scen_realiste                # realistic 2030 PV/wind, 30 Sep export (not for publication)
+  # report: S1, 3 GW nuclear (Tihange 3 + 2 GW new)
+  - scen_central                      # reference case, CCS on CCGT allowed — run first
+  - scen_biomethane_industrie         # biogas volume reserved for industry
+  - scen_noccsccgt                    # no capture on Walloon power plants
+  # report: S2, 4 GW nuclear (S1 + Tihange 1 restarted from 2035)
+  - scen_nuc4gw
+  - scen_nuc4gw_biomethane_industrie
+  - scen_nuc4gw_noccsccgt
+  # internal, S1 only (not in the report)
+  - scen_realiste                     # realistic 2030 PV/wind (30 Sep export until re-exported)
+  - scen_retardnucleaire              # new nuclear delayed: Tihange 3 only in 2050
+  - scen_noco2cap                     # Belgian CO2 caps lifted, system cap (ETS analogue) kept
+  # test, not a cabinet scenario (kept on 2026-10-10: "old but interesting")
+  - scen_test_lowccs_ptx              # less CCS, power-to-fuel: lever D 3 Mt + floor off
   wallon_node: BEWAL
   flemish_node: BEVLG
   scenarios:
@@ -153,6 +168,25 @@ electricity:
   walloon_reassignment: True
   walloon_potentials: data/walloon/custom_potentials.csv
   retrofit_nuclear_once: true
+  # Restart of a reactor that has already left the network (2026-10-10, the
+  # 4 GW scenario family). Tihange 1 (962 MW_e) stopped in 2025, so the
+  # retrofit of `retrofit_retired_nuclear` cannot reach it. With `enable`,
+  # add_brownfield offers ONE extendable restart link per plant, in the first
+  # planning horizon >= `from_year` (2040 on the 10-year grid, 2035 on the
+  # 5-year grid), at the `cost_key` cost row: `nuclear retrofit` = the Tihange 3
+  # extension (1 800 EUR/kW, 10 years), as agreed with ICEDD and the cabinet on
+  # 6-7 Oct ("coût de prolongation : celui de Tihange 3, 10 ans renouvelable").
+  # The renewal at the end of those 10 years is the ordinary retrofit. How much
+  # is built is set by the BEWAL `nuclear-all` rows of the scenario's
+  # agg_p_nom_minmax file. scripts/walloon_scripts/nuclear_helper.py.
+  nuclear_restart:
+    enable: false
+    plants:
+      Tihange 1:
+        node: BEWAL
+        p_nom_e: 962
+        from_year: 2035
+        cost_key: nuclear retrofit
 
   # 2025 Walloon PV fleet: relabel rooftop_mw of the standing `solar`
   # vintages as non-extendable `solar rooftop` on the LV bus (item 8 / plan
@@ -275,6 +309,15 @@ existing_capacities:
   # 2026-09-24 central run dropped them and 2050 BEWAL nuclear stayed at the
   # 1.03 GW retrofit instead of the 3 GW floor.
   threshold_capacity: 10
+  # Lifetime used to estimate the closing date of an existing plant that has
+  # none (add_existing_baseyear), instead of the cost table's lifetime of NEW
+  # build. 2026-10-10: new nuclear went 40 -> 60 years (`cost:nuclear:lifetime`,
+  # the EPR); without this key 64 of the 80 foreign reactors (no DateOut in
+  # powerplantmatching: Belleville, Blayais, Cattenom, ...) would also live 20
+  # years longer and push FR/GB nuclear further above their pins. 40 keeps the
+  # existing fleets exactly as in every run before that date.
+  fill_lifetime:
+    nuclear: 40
   # Age distribution of the inherited heat-pump stock, overriding the linear
   # 1980-2019 spread that PyPSA-Eur assumes for every heating technology.
   # `decentral air-sourced heat pump` has an 18-year technology-data lifetime
@@ -495,6 +538,38 @@ sector:
     node: BEWAL
     kt: {}
     overage_price: null
+  # Cap on ALL CO2 captured at the node, kt/a per horizon (2026-10-10). TIMES-WAL
+  # bounds what Wallonia captures and stores ("tout ce qui est capturé", meeting
+  # of 8 Oct): 2 / 6 / 8 Mt in 2030 / 2040 / 2050. PyPSA had no such bound and
+  # captured 1.28 / 10.57 / 8.42 Mt in the 6 Oct central. Counts every capture
+  # port into `<node> co2 stored` (industry, power, CHP, SMR CC, DAC), whatever
+  # happens to the CO2 next, so local use does not free room (unlike lever D).
+  # A horizon missing from `kt` is uncapped; 2035/2045 (5-year grid only) are
+  # TIMES's CO2STG01 bounds of the 2 Oct export. `overage_price` (EUR/t) lets tonnes above the cap
+  # through at that price so the row cannot make the LP infeasible; a non-zero
+  # overage in a solved network means the cap is tighter than the model can
+  # meet. It must sit ABOVE every carbon price at which the cap should bind:
+  # 1 000 EUR/t, against a system CO2 dual of 654 EUR/t in the 6 Oct central's
+  # 2050 (lever D's 500 EUR/t would be paid instead of respected there). The
+  # dual is GlobalConstraint `co2_capture_limit_<node>`. The solve
+  # refuses an `industry_cc_floor` above the cap. Expected effect and
+  # feasibility: docs/logs/2026-10-10_cabinet_batch_nuc3_nuc4_2010_1h.md §3.
+  # ON since 2026-10-10 (S. Quoilin): set here, so every scenario inherits it
+  # and each sensitivity stays a one-change delta on the central. A scenario
+  # opts out with `sector: co2_capture_limit: enable: false`. The volumes are
+  # the convergence table's `config:sector.co2_capture_limit.kt` rows
+  # (config/input_parameters_for_models.csv); test_co2_capture_limit.py keeps
+  # the two equal.
+  co2_capture_limit:
+    enable: true
+    node: BEWAL
+    kt:
+      2030: 2000
+      2035: 4000
+      2040: 6000
+      2045: 7000
+      2050: 8000
+    overage_price: 1000
   # TIMES-WAL's CO2 disposal route (CO2STG01, decided 2026-10-04): Wallonia
   # subscribes to a shared export chain (collection, Antwerp terminal,
   # shipping, offshore storage such as Northern Lights), paid per tonne and

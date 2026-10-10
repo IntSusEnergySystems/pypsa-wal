@@ -364,28 +364,49 @@ in the code refer to that worklist and are kept as labels.
 ### 11.1 The process-emissions Load is **gross**, not the atmosphere residual (item 12 / B4)
 
 TIMES splits process CO₂ into two commodities: `INDCO2P`, emitted to the
-atmosphere, and `INDCO2c`, produced by the CC process variants (`ICMPRDCC_02`,
-`ILMQLMPRCC02`, `IGFFLATOXYCC01`, `IGHHOLLOWOXYCC01`, `IGHOTOCC01`) and consumed
-by `STORAGEMININD`. In PyPSA the Load is the input to the process-emissions bus,
-**upstream** of `process emissions CC`, so the gross figure is what belongs there.
+atmosphere, and `INDCO2c`, produced by the CC process variants (`ICMPRC22`,
+`ICMPRDCC_02`, `ILMQLMPRCC02`, `IGFFLATOXYCC01`, `IGHHOLLOWOXYCC01`, `IGHOTOCC01`)
+and consumed by `STORAGEMININD`. In PyPSA the Load is the input to the
+process-emissions bus, **upstream** of `process emissions CC`, so the gross
+figure is what belongs there.
 
-| kt/a | 2025 | 2030 | 2035 | 2040 | 2045 | 2050 |
+**Revised 2026-10-10: `INDCO2c` is not all process CO₂.** A cement kiln or
+oxy-fuel glass furnace with capture also captures the CO₂ of the fuel it burns.
+It books that part as a negative `INDCO2N` on the same process. In the 2 Oct
+central, `ICMPRC22` captures 3 220 kt in 2040, of which 1 294 kt is the
+(biogenic) fuel; the glass units capture 58 + 14 + 17 kt of fuel CO₂.
+
+In PyPSA that CO₂ arises from the industrial fuel demand and is captured by
+`solid biomass / gas for industry CC`. Leaving it on the process bus counted it
+twice, as phantom *fossil* process CO₂. So:
+
+    gross process CO₂ = INDCO2P + INDCO2c − (−INDCO2N of the processes producing INDCO2c)
+
+The formula is implemented in
+`scripts/walloon_scripts/extract_times_softlink_values.py`
+(`process_emissions_breakdown`), which prints it for any export.
+
+| kt/a, 2 Oct central | 2025 | 2030 | 2035 | 2040 | 2045 | 2050 |
 |---|---:|---:|---:|---:|---:|---:|
-| emitted `INDCO2P` | 4 411.6 | 3 946.1 | 964.4 | 357.0 | 327.5 | 281.6 |
-| captured `INDCO2c` = `STORAGEMININD` | 0 | 0 | 4 364.6 | 5 076.9 | 5 120.0 | 4 826.4 |
-| **gross = the BEWAL Load** | **4 411.6** | **3 946.1** | **5 329.0** | **5 433.9** | **5 447.5** | **5 108.0** |
+| emitted `INDCO2P` | 4 411.6 | 3 946.1 | 2 053.7 | 1 112.1 | 322.4 | 353.1 |
+| captured `INDCO2c` = `STORAGEMININD` | 0 | 0 | 2 543.8 | 4 145.3 | 5 147.2 | 5 119.6 |
+| of which fuel CO₂ (`−INDCO2N`) | 0 | 0 | 724.5 | 1 382.1 | 1 585.6 | 1 592.6 |
+| **gross process CO₂ = the BEWAL Load** | **4 411.6** | **3 946.1** | **3 873.0** | **3 875.3** | **3 884.0** | **3 880.1** |
+| *Load before 2026-10-10 (3 Sep export, fuel CO₂ included)* | *4 411.6* | *3 946.1* | *5 329.0* | *5 433.9* | *5 447.5* | *5 108.0* |
 
-Using the emitted figure alone made 2040/2050 15–18× too low and put the §11.2
-floor out of reach. The gross load also restores a Walloon process inventory of
-the right order — PyPSA-Eur's own default is ~2.0 Mt in every horizon, so TIMES is
-~2.7× higher, not 5–6× lower. Guard: `test/test_process_emissions_load.py`.
+How robust the figure is:
+* **Across exports.** The gross is demand-driven. In all four 2 Oct exports it
+  agrees within 0.3 % (3 873 – 3 891 kt from 2035), so one central row set
+  serves every scenario.
+* **Physically.** About 3.9 Mt is the calcination CO₂ of Walloon cement and lime
+  (`ILMQLMPRCC02` alone is 776 kt). The PyPSA-Eur default is about 2.0 Mt.
 
-**Two checks still outstanding.** (i) `INDCO2N` (6.0 → 0.4 Mt) is the *combustion*
-CO₂ of the same industrial processes and is correctly excluded, but it has never
-been checked against the industrial energy PyPSA imports. (ii) Part of `INDCO2c`
-comes from oxy-fuel glass and cement units and may mix process with combustion
-carbon; that split has to be settled on the TIMES side before the Load is final
-([`co2-sequestration.md`](co2-sequestration.md) §12 item 7).
+Guards: `test/test_process_emissions_load.py`, including a check against the
+central `.vd`.
+
+**Still outstanding:** `INDCO2N` (6.0 → 0.4 Mt) is the combustion CO₂ of the
+industrial processes. It is correctly excluded, but it has never been checked
+against the industrial energy PyPSA imports.
 
 ### 11.2 The capture floor (item 9 / B3)
 
@@ -394,13 +415,21 @@ carbon; that split has to be settled on the TIMES side before the Load is final
 from `data/walloon/times_industrial_capture.csv` (4 365 / 5 077 / 5 120 / 4 826 kt
 in 2035/40/45/50). Port mapping and units are in `named_pins.py`.
 
-The floor is only reachable **because** the inventory is gross: process capture
-alone gives 5 434 × 0.95 = 5 162 ≥ 5 077 kt in 2040 and 5 108 × 0.95 = 4 853 ≥
-4 826 in 2050, which is how TIMES builds it; biomass and gas CC add ~3.5 Mt of
-headroom. Against the *net* inventory the ceiling was 4.45 Mt in 2040 and 3.77 in
-2050 even with 100 % of Walloon industrial gas and biomass routed through capture
-— short by 0.6 and 1.1 Mt, and it failed the run at 2040. Guard:
-`test/test_industry_cc_floor.py::test_floor_fits_the_process_inventory`.
+The floor is TIMES's whole industrial capture, process **and** fuel CO₂ (§11.1).
+
+* **Since 2026-10-10.** Process capture covers 0.95 × the gross process
+  inventory: 3 681 kt in 2040, against a floor of 4 145 kt in the 2 Oct central
+  and 5 160 kt in NoCCSCCGT. The remainder comes from
+  `solid biomass / gas for industry CC`, which delivered 3.5 Mt in the 6 Oct 1 h
+  central. TIMES itself splits it the same way (1.38 Mt of fuel CO₂ in 2040).
+* **Earlier failure (B4).** Against an emitted-only inventory, the ceiling was
+  4.45 Mt in 2040 and 3.77 Mt in 2050, even with 100 % of Walloon industrial gas
+  and biomass routed through capture. That was short by 0.6 and 1.1 Mt, and it
+  failed the run at 2040.
+
+Guard: `test/test_industry_cc_floor.py::test_floor_fits_the_process_inventory`.
+It checks that the floor minus process capture stays within the fuel CC links'
+headroom, in every floor file.
 
 > Like the PV rooftop share, this CSV is extracted from the `.vd` **by hand and is
 > not a declared output of any rule**. Re-extract it whenever `sector.times_file`
@@ -568,9 +597,9 @@ Technology side only; the disposal-side plan is in
    to ~20 %; TIMES puts ~2× more on power and PyPSA ~60 % more on industry. That
    is a difference in *where the capture infrastructure goes*, not in ambition,
    and it is the one worth resolving.
-7. **Settle the oxy-fuel process/combustion split** on the TIMES side (§11.1): it
-   changes the gross `process emissions` Load PyPSA receives and hence the
-   reachability of the §11.2 floor.
+7. ~~**Settle the oxy-fuel process/combustion split**~~ **Done 2026-10-10**
+   (§11.1). The fuel CO₂ captured by the kilns is read from the `.vd` (negative
+   `INDCO2N`) and taken off the process Load: 5 434 → 3 875 kt in 2040.
 8. **Decide whether DAC stays off.** It is off purely for menu alignment, but it
    is also the only technology that can close the 2050 net-zero gap (§7, §14
    item 5). If net zero is a deliverable, the alignment argument loses.

@@ -280,3 +280,73 @@ def retrofit_retired_nuclear(
     for name, row in retrofit_nuclear.iterrows():
         attrs = row.dropna().to_dict()
         n.add("Link", name=name, **attrs)
+
+
+def restart_options(config: dict | None) -> dict:
+    """``electricity.nuclear_restart.plants`` when enabled, else ``{}``."""
+    opts = ((config or {}).get("electricity") or {}).get("nuclear_restart") or {}
+    if not opts.get("enable"):
+        return {}
+    return opts.get("plants") or {}
+
+
+def restart_retired_nuclear(n, planning_horizon, planning_horizons, costs, plants: dict) -> list:
+    """Offer the restart of a reactor that has already left the network.
+
+    `retrofit_retired_nuclear` only extends a plant in the step where it
+    retires. A reactor shut down earlier (Tihange 1, 2025) has no link left by
+    the time a restart is decided, so this adds one: an extendable ``nuclear``
+    link at ``node``, capped at ``p_nom_e`` MW_e, offered **once**, in the first
+    planning horizon at or after ``from_year``. It is priced with the cost row
+    ``cost_key`` (default ``nuclear retrofit``, i.e. the Tihange 3 extension:
+    capital cost and lifetime). When that lifetime runs out, the restarted unit
+    is an ordinary retiring link and `retrofit_retired_nuclear` offers its
+    renewal, as for Tihange 3 (``retrofit_nuclear_once: false``).
+
+    Uranium bus, efficiency and marginal cost are copied from a nuclear link
+    already at ``node`` (the ``<node> nuclear-2025`` new-build option when it
+    exists). The 4 GW scenario family uses it (2026-10-10).
+
+    Returns the names of the links added.
+    """
+    added = []
+    horizons = sorted(int(y) for y in planning_horizons)
+    for label, spec in (plants or {}).items():
+        node = spec["node"]
+        from_year = int(spec["from_year"])
+        eligible = [y for y in horizons if y >= from_year]
+        if not eligible or int(planning_horizon) != eligible[0]:
+            continue
+        nuclear = n.links.loc[(n.links.carrier == "nuclear") & (n.links.bus1 == node)]
+        if nuclear.empty:
+            raise ValueError(
+                f"Nuclear restart '{label}': no nuclear link at {node} to copy "
+                "the uranium bus and efficiency from."
+            )
+        seed = f"{node} nuclear-2025"
+        template = nuclear.loc[seed] if seed in nuclear.index else nuclear.iloc[-1]
+        cost_key = spec.get("cost_key", "nuclear retrofit")
+        lifetime = float(costs.at[cost_key, "lifetime"])
+        capital_cost = float(costs.at[cost_key, "capital_cost"])
+        efficiency = float(template["efficiency"])
+        name = spec.get("link_name") or f"{node} nuclear {label} restart"
+        attrs = template.dropna().to_dict()
+        attrs.update(
+            p_nom=0.0,
+            p_nom_min=0.0,
+            p_nom_opt=0.0,
+            p_nom_max=float(spec["p_nom_e"]) / efficiency,
+            p_nom_extendable=True,
+            build_year=int(planning_horizon),
+            lifetime=lifetime,
+            capital_cost=capital_cost * efficiency,
+        )
+        n.add("Link", name=name, **attrs)
+        added.append(name)
+        logger.info(
+            "Offering the restart of %s at %s in %s: up to %.0f MW_e, %s cost "
+            "(%.0f EUR/MW_e/a, %.0f years).",
+            label, node, planning_horizon, float(spec["p_nom_e"]), cost_key,
+            capital_cost, lifetime,
+        )
+    return added

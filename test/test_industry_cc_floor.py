@@ -29,6 +29,10 @@ CSV = ROOT / "data" / "walloon" / "times_industrial_capture.csv"
 POTENTIALS = ROOT / "data" / "walloon" / "custom_potentials.csv"
 #: `cement capture` capture_rate in the processed cost table
 CAPTURE_RATE = 0.95
+WAL = ROOT / "data" / "walloon"
+#: kt/a the fuel CC links must be able to add to process capture; they
+#: delivered 3.5 Mt in the 6 Oct 1 h central's 2040 (1.82 biomass + 1.65 gas)
+FUEL_CC_HEADROOM_KT = 3000.0
 
 
 def _network() -> pypsa.Network:
@@ -94,26 +98,34 @@ def test_zero_or_missing_volume_is_a_noop():
 
 
 def test_floor_fits_the_process_inventory():
-    """B3: process capture alone must be able to reach the floor.
+    """B3: the floor must be reachable from what the inventory and the fuel CC links supply.
 
-    That is how TIMES builds it — the captured tonnes come from the same
-    industrial processes the inventory counts — so this also catches an
-    inventory that has silently become net-of-capture again (B4).
+    The floor is TIMES's STORAGEMININD, i.e. process CO2 AND the fuel CO2 its
+    kilns and oxy-fuel furnaces capture (1.4 Mt of the 4.1 Mt in 2040). Since
+    2026-10-10 the process inventory is gross *process* CO2 only, so process
+    capture covers 0.95 x the inventory and the rest must come from
+    `solid biomass for industry CC` + `gas for industry CC`. That remainder must
+    stay below what those links can deliver: 3.5 Mt in the 6 Oct 1 h central
+    (1.82 + 1.65), so FUEL_CC_HEADROOM_KT with margin. Also catches an inventory
+    that has silently become net-of-capture again (B4): the remainder then
+    exceeds the headroom.
     """
     import pandas as pd
 
-    floors = year_map(CSV, "kt")
     pot = pd.read_csv(POTENTIALS)
     load = pot[(pot["bus"] == "BEWAL") & (pot["technology"] == "process emissions")]
     inventory = {
         int(y): float(v) for y, v in zip(load["year"], load["value"])
     }
-    for year, kt in floors.items():
-        if year not in inventory:
-            continue  # not a planning horizon of this run
-        ceiling = inventory[year] * CAPTURE_RATE
-        assert ceiling >= kt, (
-            f"{year}: the industry-CC floor is {kt:,.0f} kt but the BEWAL "
-            f"process-emissions inventory only allows {ceiling:,.0f} kt of "
-            "capture — the floor cannot be met from process CO2 (B3)"
-        )
+    floors = sorted(WAL.glob("times_industrial_capture*.csv"))
+    assert floors
+    for path in floors:
+        for year, kt in year_map(path, "kt").items():
+            if year not in inventory:
+                continue  # not a planning horizon of this run
+            remainder = kt - inventory[year] * CAPTURE_RATE
+            assert remainder <= FUEL_CC_HEADROOM_KT, (
+                f"{path.name} {year}: the industry-CC floor is {kt:,.0f} kt; "
+                f"process capture gives {inventory[year] * CAPTURE_RATE:,.0f} kt, "
+                f"leaving {remainder:,.0f} kt for the fuel CC links (B3)"
+            )

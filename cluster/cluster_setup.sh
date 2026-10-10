@@ -19,7 +19,7 @@ ENV_NAME="pypsa-eur"
 MINIFORGE="$HOME/miniforge3"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
-GUROBI_MODULE_LIC="/opt/cecisw/arch/easybuild/2023b/software/Gurobi/13.0.0-GCCcore-13.2.0/gurobi.lic"
+GUROBI_MODULE_LIC="/opt/cecisw/arch/easybuild/2023b/software/Gurobi/13.0.0-GCCcore-13.2.0/gurobi.lic"   # NIC5
 
 echo "=== [1/4] Miniforge ==="
 if [ ! -x "$MINIFORGE/bin/conda" ]; then
@@ -65,6 +65,18 @@ else
 fi
 
 echo "=== [3/4] Gurobi licence (token server) ==="
+# NIC6 (2026-10-10): no fixed path; the licence is the one the Gurobi module
+# exports. `nic5.sh setup` passes GUROBI_MODULE when REMOTE=nic6.
+if [ ! -r "$GUROBI_MODULE_LIC" ] && [ -n "${GUROBI_MODULE:-}" ]; then
+    if type module >/dev/null 2>&1; then
+        # shellcheck disable=SC2086
+        ( module load $GUROBI_MODULE && echo "$GRB_LICENSE_FILE" ) > /tmp/grb_lic_path.$$ 2>/dev/null || true
+        lic="$(tail -n1 /tmp/grb_lic_path.$$ 2>/dev/null || true)"; rm -f /tmp/grb_lic_path.$$
+        [ -n "$lic" ] && GUROBI_MODULE_LIC="$lic"
+    else
+        echo "WARNING: no Lmod 'module' command in this shell; cannot load $GUROBI_MODULE"
+    fi
+fi
 if [ -r "$GUROBI_MODULE_LIC" ]; then
     cp -f "$GUROBI_MODULE_LIC" "$HOME/gurobi.lic"
     echo "Copied $GUROBI_MODULE_LIC -> $HOME/gurobi.lic"

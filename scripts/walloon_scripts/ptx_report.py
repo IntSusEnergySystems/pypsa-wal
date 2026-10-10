@@ -107,6 +107,7 @@ def co2_balance(n, node) -> dict:
             t = energy(n, link) * eff / 1e6
             key = f"capture {row.carrier}" if eff > 0 else f"use {row.carrier}"
             rec[key] = rec.get(key, 0.0) + abs(t)
+    captured = sum(v for k, v in rec.items() if k.startswith("capture "))
     links = n.links[n.links.carrier.isin(CO2_EXPORT_CARRIERS)]
     net = sum(energy(n, l) for l in links.index[links.bus0 == stored])
     net -= sum(energy(n, l) * links.at[l, "efficiency"] for l in links.index[links.bus1 == stored])
@@ -118,6 +119,13 @@ def co2_balance(n, node) -> dict:
         rec["export cap"] = cap
         rec["export cap dual EUR/t"] = gc.at[name, "mu"]
         rec["overage"] = max(0.0, rec["net export (lever D)"] - cap)
+    rec["capture total"] = captured
+    name = f"co2_capture_limit_{node}"
+    if name in gc.index:
+        cap = gc.at[name, "constant"] / 1e6
+        rec["capture cap"] = cap
+        rec["capture cap dual EUR/t"] = gc.at[name, "mu"]
+        rec["capture overage"] = max(0.0, captured - cap)
     return {k: round(v, 3) for k, v in rec.items()}
 
 

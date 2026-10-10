@@ -18,6 +18,10 @@ inheriting the central scenario's numbers turns a sensitivity into a hybrid.
     sector.industry_cc_floor     VAR_FOut of CO2STOCK at `STORAGEMININD`
                                  (industrial CO2 captured, kt/a)
 
+It also prints the gross process-CO2 inventory (`process_emissions_breakdown`),
+the BEWAL `process emissions` Load of custom_potentials.csv. That one is not
+written per scenario: it is the same in every export to 0.3 %.
+
 Usage:
     # one scenario, print the YAML/CSV to paste or write
     python scripts/walloon_scripts/extract_times_softlink_values.py \
@@ -164,6 +168,62 @@ def industrial_capture_kt(vd: pd.DataFrame) -> dict[int, float]:
     return _sum_by_period(sel)
 
 
+#: Captured industrial CO2 and process CO2 emitted to the atmosphere.
+CAPTURED_INDUSTRIAL = "INDCO2c"
+PROCESS_EMITTED = "INDCO2P"
+#: The credit a capture process books for the fuel CO2 it captures.
+COMBUSTION_CREDIT = "INDCO2N"
+
+
+def process_emissions_breakdown(vd: pd.DataFrame) -> pd.DataFrame:
+    """Gross fossil process CO2 of Walloon industry, kt/a, and its parts.
+
+    The BEWAL `process emissions` Load is the CO2 injected UPSTREAM of
+    `process emissions CC` (docs/ccs_alignment.md §11.1), so it is the gross
+    process inventory: what TIMES emits (`INDCO2P`) plus the PROCESS part of
+    what its CC process variants capture (`INDCO2c`).
+
+    `INDCO2c` is not all process CO2. A kiln or oxy-fuel furnace with capture
+    also captures the CO2 of the fuel it burns, and books that part as a
+    negative `INDCO2N` (the cement unit ICMPRC22 in the 2 Oct central: 3 220 kt
+    captured of which 1 294 kt is the biogenic fuel). In PyPSA that fuel CO2
+    belongs to the industrial fuel demand and its capture to `solid biomass /
+    gas for industry CC`; keeping it on the process bus counted it twice, as
+    phantom fossil process CO2 (5 434 instead of 3 875 kt in 2040). So
+
+        gross = INDCO2P + INDCO2c - (-INDCO2N of the processes producing INDCO2c)
+
+    Settled 2026-10-10 (§11.1 check ii). Across the four 2 Oct exports the
+    result agrees within 0.3 %.
+    """
+    out = vd[(vd["Attribute"] == "VAR_FOut") & (vd["Region"] == REGION)]
+    emitted = _sum_by_period(out[out["Commodity"] == PROCESS_EMITTED])
+    capt = out[out["Commodity"] == CAPTURED_INDUSTRIAL]
+    captured = _sum_by_period(capt)
+    credit = out[
+        (out["Commodity"] == COMBUSTION_CREDIT) & out["Process"].isin(capt["Process"].unique())
+    ]
+    combustion = {y: -v for y, v in _sum_by_period(credit).items()}
+    years = sorted(set(emitted) | set(captured))
+    rows = {
+        y: {
+            "emitted": emitted.get(y, 0.0),
+            "captured": captured.get(y, 0.0),
+            "combustion_captured": combustion.get(y, 0.0),
+        }
+        for y in years
+    }
+    df = pd.DataFrame.from_dict(rows, orient="index")
+    df["gross"] = df["emitted"] + df["captured"] - df["combustion_captured"]
+    df.index.name = "year"
+    return df
+
+
+def process_emissions_gross_kt(vd: pd.DataFrame) -> dict[int, float]:
+    """The BEWAL `process emissions` Load, kt/a — see `process_emissions_breakdown`."""
+    return {int(y): float(v) for y, v in process_emissions_breakdown(vd)["gross"].items()}
+
+
 def _fmt(d: dict[int, float], nd: int) -> str:
     return "\n".join(f"      {y}: {v:.{nd}f}" for y, v in sorted(d.items()))
 
@@ -227,6 +287,14 @@ def main() -> int:
 
     print("\n# industrial capture (kt/a)")
     print(_fmt(capture, 2))
+
+    # Not a per-scenario side file: one central row set in custom_potentials.csv
+    # (`BEWAL,process emissions,p_set`), because the gross process inventory is
+    # demand-driven and the same in every export to 0.3 %. Compare and update
+    # that file by hand when it moves.
+    print("\n# process emissions Load, gross fossil process CO2 (kt/a) — "
+          "custom_potentials.csv `BEWAL,process emissions,p_set`")
+    print(process_emissions_breakdown(vd).round(1).to_string())
 
     if args.self_test:
         bad = []

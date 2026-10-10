@@ -216,6 +216,7 @@ def add_power_capacities_installed_before_baseyear(
     agg_limits_file: str | None = None,
     reconcile_baseyear_forced_build: bool = False,
     reconcile_standing_fleet: bool = False,
+    fill_lifetime: dict[str, float] | None = None,
 ) -> None:
     """
     Add power generation capacities installed before base year.
@@ -240,6 +241,13 @@ def add_power_capacities_installed_before_baseyear(
         Default values for missing data
     renewable_carriers: list
         List of renewable carriers in the network
+    fill_lifetime : dict, optional
+        Lifetime (years) per fuel type used to estimate a missing ``DateOut``
+        instead of ``costs.lifetime`` — ``existing_capacities.fill_lifetime``.
+        Keeps the closing dates of existing plants independent of the economic
+        lifetime of new build (2026-10-10: new nuclear 40 -> 60 years would
+        otherwise keep 64 foreign reactors without a closing date 20 years
+        longer).
     """
     logger.debug(f"Adding power capacities installed before {baseyear}")
 
@@ -286,9 +294,10 @@ def add_power_capacities_installed_before_baseyear(
     df_agg.dropna(subset="DateIn", inplace=True)
 
     # Estimate missing DateOut
-    df_agg["DateOut"] = df_agg.DateOut.combine_first(
-        df_agg.DateIn + df_agg.Fueltype.map(costs.lifetime).fillna(30)
-    )
+    fill = df_agg.Fueltype.map(costs.lifetime)
+    if fill_lifetime:
+        fill = df_agg.Fueltype.map(pd.Series(fill_lifetime, dtype=float)).combine_first(fill)
+    df_agg["DateOut"] = df_agg.DateOut.combine_first(df_agg.DateIn + fill.fillna(30))
 
     # include renewables in df_agg
     add_existing_renewables(
@@ -951,6 +960,7 @@ if __name__ == "__main__":
         capacity_threshold=snakemake.params.existing_capacities["threshold_capacity"],
         lifetime_values=snakemake.params.costs["fill_values"],
         renewable_carriers=renewable_carriers,
+        fill_lifetime=snakemake.params.existing_capacities.get("fill_lifetime"),
         agg_limits_file=getattr(
             snakemake.input,
             "agg_p_nom_limits",

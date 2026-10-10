@@ -327,9 +327,13 @@ def test_interpolated_trajectories(target, expected):
 
 
 def test_process_emissions_match_the_times_extraction():
-    """2035/2045 are published in docs/ccs_alignment.md, not a modeller's guess."""
+    """2035/2045 are published in docs/ccs_alignment.md, not a modeller's guess.
+
+    Gross process CO2 of the 2 Oct central (fuel CO2 captured by the kilns
+    taken off, 2026-10-10; was 5 329.0 / 5 447.5 from the 3 Sep export).
+    """
     df = pd.read_csv(ROOT / "data" / "walloon" / "custom_potentials.csv")
     rows = df[(df["technology"] == "process emissions") & (df["parameter"] == "p_set")]
     got = dict(zip(rows["year"].astype(int), rows["value"].astype(float)))
-    assert got[2035] == pytest.approx(5329.0)
-    assert got[2045] == pytest.approx(5447.5)
+    assert got[2035] == pytest.approx(3872.98)
+    assert got[2045] == pytest.approx(3883.98)

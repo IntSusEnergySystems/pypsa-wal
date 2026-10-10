@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# NIC6 cluster overrides (merged last by `REMOTE=nic6 nic5.sh solve`; selected
+# by CLUSTER_CONFIG in cluster/config.sh). Added 2026-10-10 for the batch split
+# between NIC5 and NIC6.
+#
+# NIC6 enforces 1 900 MB per allocated core at submit, so the 80 GB / 16 cores
+# of cluster/config_cluster.yaml (5 000 MB per core) would be rejected. The 1 h
+# solve peaks at ~34 GB (NIC5, 4 Oct batch): 32 cores x 1 875 MB = 60 GB covers
+# it with margin, and Gurobi gets the 32 threads (it would take 32 regardless of
+# the allocation; ~/llm/env-nic6-ceci.md). Keep cpus = threads.
+solving:
+  mem_mb: 60000
+  cpus: &cluster_cpus 32
+  solver_options:
+    gurobi-default:
+      threads: *cluster_cpus
+      BarHomogeneous: 1

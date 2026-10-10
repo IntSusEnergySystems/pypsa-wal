@@ -213,6 +213,49 @@ def add_co2_export_limit(n, node: str, kt: float, overage_price=None) -> None:
 CO2_TRANSPORT_CARRIERS = ("CO2 pipeline", "co2 sequestered")
 
 
+def captured_co2_expr(n, node: str, label: str = "CO2 capture"):
+    """Annual tCO₂ that ``node``'s own links put on its `co2 stored` bus.
+
+    Every non-transport link port ``bus<k>`` (k ≥ 1) into the bus with a
+    positive efficiency: industry, power and CHP capture, SMR CC, DAC. Ports
+    with a negative efficiency are local *use* (Fischer-Tropsch,
+    methanolisation, Sabatier) and are not subtracted; pipelines and the
+    node's ``co2 sequestered`` link are transport. No carrier list, so a
+    capture technology added later is counted without an edit here.
+
+    Returns a linopy expression, or ``None`` when nothing captures at the node.
+    """
+    bus = f"{node} co2 stored"
+    weights = n.snapshot_weightings.generators
+    p = n.model["Link-p"]
+    link_dim = p.dims[1]
+    others = n.links.loc[~n.links.carrier.astype(str).isin(CO2_TRANSPORT_CARRIERS)]
+    ports = [c[3:] for c in others.columns if c.startswith("bus") and c[3:].isdigit()]
+    captured = None
+    for k in ports:
+        if k == "0":
+            continue
+        eff_col = "efficiency" if k == "1" else f"efficiency{k}"
+        if eff_col not in others:
+            continue
+        sel = others.index[(others[f"bus{k}"] == bus) & (others[eff_col].astype(float) > 0)]
+        if sel.empty:
+            continue
+        if eff_col in n.links_t and not n.links_t[eff_col].columns.intersection(sel).empty:
+            logger.warning(
+                "%s: time-varying %s on %s; static value used.",
+                label, eff_col, list(n.links_t[eff_col].columns.intersection(sel)),
+            )
+        eff = xr.DataArray(
+            others.loc[sel, eff_col].astype(float).values,
+            coords={link_dim: sel},
+            dims=[link_dim],
+        )
+        term = (p.loc[:, sel] * eff * weights).sum()
+        captured = term if captured is None else captured + term
+    return captured
+
+
 def add_co2_disposal_own_capture(n, node: str) -> None:
     """Annual CO₂ into ``node``'s disposal route ≤ CO₂ captured at ``node``.
 
@@ -247,33 +290,9 @@ def add_co2_disposal_own_capture(n, node: str) -> None:
         return
     weights = n.snapshot_weightings.generators
     p = n.model["Link-p"]
-    link_dim = p.dims[1]
     disposed = (p.loc[:, seq_links] * weights).sum()
 
-    others = n.links.loc[~n.links.carrier.astype(str).isin(CO2_TRANSPORT_CARRIERS)]
-    ports = [c[3:] for c in others.columns if c.startswith("bus") and c[3:].isdigit()]
-    captured = None
-    for k in ports:
-        if k == "0":
-            continue
-        eff_col = "efficiency" if k == "1" else f"efficiency{k}"
-        if eff_col not in others:
-            continue
-        sel = others.index[(others[f"bus{k}"] == bus) & (others[eff_col].astype(float) > 0)]
-        if sel.empty:
-            continue
-        if eff_col in n.links_t and not n.links_t[eff_col].columns.intersection(sel).empty:
-            logger.warning(
-                "CO2 disposal own-capture: time-varying %s on %s; static value used.",
-                eff_col, list(n.links_t[eff_col].columns.intersection(sel)),
-            )
-        eff = xr.DataArray(
-            others.loc[sel, eff_col].astype(float).values,
-            coords={link_dim: sel},
-            dims=[link_dim],
-        )
-        term = (p.loc[:, sel] * eff * weights).sum()
-        captured = term if captured is None else captured + term
+    captured = captured_co2_expr(n, node, "CO2 disposal own-capture")
     name = f"co2_disposal_own_capture_{node}"
     if captured is None:
         n.model.add_constraints(disposed <= 0, name=f"GlobalConstraint-{name}")
@@ -281,6 +300,44 @@ def add_co2_disposal_own_capture(n, node: str) -> None:
         n.model.add_constraints(disposed - captured <= 0, name=f"GlobalConstraint-{name}")
     n.add("GlobalConstraint", name, constant=0.0, sense="<=", type="")
     logger.info("CO2 disposal route at %s limited to the node's own capture.", node)
+
+
+def add_co2_capture_limit(n, node: str, kt: float, overage_price=None) -> None:
+    """Annual CO₂ captured at ``node`` ≤ ``kt`` × 1000 t (2026-10-10).
+
+    Aligns PyPSA with TIMES-WAL, which bounds what Wallonia captures and sends
+    to storage (the ``CO2STG01`` bound: "tout ce qui est capturé"). The sum is
+    :func:`captured_co2_expr`: every capture port into ``<node> co2 stored``,
+    industry, power, CHP, SMR CC and DAC alike, whatever happens to the CO₂
+    next (pipeline, route or local use). Unlike lever D
+    (:func:`add_co2_export_limit`), local use does not free room under the cap.
+
+    With ``overage_price`` (EUR/t) tonnes above the cap are allowed at that
+    price, so the row can never make the LP infeasible; a non-zero overage in a
+    solved network says the cap is tighter than the rest of the model can
+    meet. Without it the cap is hard.
+
+    Registered as ``GlobalConstraint`` ``co2_capture_limit_<node>``: its dual
+    (EUR/t, ≤ 0 when binding) is the scarcity rent of a captured tonne.
+    """
+    captured = captured_co2_expr(n, node, "CO2 capture limit")
+    if captured is None:
+        logger.warning("CO2 capture limit: nothing captures at %s, skip.", node)
+        return
+    cap_t = float(kt) * 1e3
+    name = f"co2_capture_limit_{node}"
+    if overage_price:
+        over = n.model.add_variables(lower=0, name=f"co2_capture_overage_{node}")
+        n.model.add_constraints(captured - over <= cap_t, name=f"GlobalConstraint-{name}")
+        n.model.objective = n.model.objective + float(overage_price) * over
+        logger.info(
+            "Capped %s CO2 capture at %.0f kt/a, overage at %.0f EUR/t.",
+            node, kt, float(overage_price),
+        )
+    else:
+        n.model.add_constraints(captured <= cap_t, name=f"GlobalConstraint-{name}")
+        logger.info("Capped %s CO2 capture at %.0f kt/a (hard).", node, kt)
+    n.add("GlobalConstraint", name, constant=cap_t, sense="<=", type="")
 
 
 def _p_nom_sum(n, names: pd.Index):

@@ -13,6 +13,32 @@ REMOTE="${REMOTE:-nic5}"
 # Use the cluster login name here — not the local workstation user (`whoami`).
 REMOTE_DIR="${REMOTE_DIR:-/scratch/ulg/thermlab/squoilin/pypsa-wal}"
 
+# --- per-cluster defaults (NIC6 added 2026-10-10) ---------------------------
+# `REMOTE=nic6 ./cluster/nic5.sh <command>` targets NIC6 with the values below;
+# every one can still be overridden by exporting it. NIC5 keeps the values it
+# always had. NIC6 (~/llm/env-nic6-ceci.md): `batch` only, no hmem, and a HARD
+# 1 900 MB per allocated core, enforced at submit — so memory is bought with
+# cores. Its $HOME and $GLOBALSCRATCH are separate filesystems from NIC5's
+# (same path strings), and Gurobi comes from a module.
+case "$REMOTE" in
+    nic6)
+        # 32 cores x 1 875 MB = 60 GB for the solve (1 h peak 34 GB on NIC5).
+        CLUSTER_CONFIG="${CLUSTER_CONFIG:-cluster/config_cluster_nic6.yaml}"
+        # add_brownfield asks DEFAULT_MEM_MB (16 GB): 9 cores x 1 900 MB covers it.
+        LIGHT_CPUS="${LIGHT_CPUS:-9}"
+        GUROBI_MODULE="${GUROBI_MODULE:-releases/2025b Gurobi/13.0.1-GCCcore-14.3.0}"
+        ;;
+esac
+# Solver overlay merged last by `solve` (cpus, mem_mb, Gurobi threads).
+CLUSTER_CONFIG="${CLUSTER_CONFIG:-cluster/config_cluster.yaml}"
+# Cores of the light rules (add_brownfield). NIC5: 1 core with 16 GB.
+LIGHT_CPUS="${LIGHT_CPUS:-1}"
+# Slurm account passed to every job (both clusters: ceci).
+SLURM_ACCOUNT="${SLURM_ACCOUNT:-ceci}"
+# Lmod module whose licence `setup` copies to ~/gurobi.lic, when the fixed
+# GUROBI_MODULE_LIC path below does not exist on the cluster (NIC6).
+GUROBI_MODULE="${GUROBI_MODULE:-}"
+
 # Cluster workflow is headless. Override ~/.ssh/config ForwardX11=yes to avoid
 # "No xauth data" warnings without loading modules or setting up xauth.
 SSH_OPTS="${SSH_OPTS:--o ForwardX11=no}"

@@ -46,6 +46,7 @@ from pypsa.descriptors import get_activity_mask
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 from scripts.prepare_sector_network import determine_emission_sectors
 from scripts.walloon_scripts.named_pins import (
+    add_co2_capture_limit,
     add_co2_disposal_own_capture,
     add_co2_export_limit,
     add_industry_cc_floor,
@@ -2277,6 +2278,26 @@ def extra_functionality(
                 float(kt),
                 export_cfg.get("overage_price"),
             )
+    capture_cfg = sector_cfg.get("co2_capture_limit") or {}
+    if capture_cfg.get("enable"):
+        year = planning_year(planning_horizons)
+        kt = lookup_year_value(capture_cfg, year, "kt", "kt")
+        node = capture_cfg.get("node", "BEWAL")
+        if kt is not None:
+            floor_kt = (
+                lookup_year_value(cc_cfg, year, "kt", "kt")
+                if cc_cfg.get("enable") and cc_cfg.get("node", "BEWAL") == node
+                else None
+            )
+            if floor_kt is not None and float(floor_kt) > float(kt):
+                # The floor is a subset of what the cap counts: a floor above
+                # the cap is infeasible without the overage and meaningless
+                # with it. A configuration error, so fail before the solve.
+                raise ValueError(
+                    f"sector.industry_cc_floor ({float(floor_kt):.0f} kt) is above "
+                    f"sector.co2_capture_limit ({float(kt):.0f} kt) at {node} in {year}."
+                )
+            add_co2_capture_limit(n, node, float(kt), capture_cfg.get("overage_price"))
     disposal_cfg = sector_cfg.get("co2_disposal_service") or {}
     if disposal_cfg.get("own_capture_only", True):
         # The priced route of BEWAL_potentials.apply_co2_disposal_service

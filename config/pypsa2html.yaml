@@ -137,6 +137,25 @@ scenarios:
   #   label: Realistic 2030 deployment (not for publication)
   #   results_dir: results/walloon/scen_realiste
   #   resources_dir: resources/walloon/scen_realiste
+  # 2026-10-10 batch (docs/logs/2026-10-10_cabinet_batch_nuc3_nuc4_2010_1h.md):
+  # the 4 GW family and the internal no-CO2-cap run. Uncomment each entry, and
+  # the 3 GW sensitivities above, once its 10 Oct-vintage tree is pulled.
+  # - name: scen_nuc4gw
+  #   label: 4 GW nuclear (Tihange 1 restarted)
+  #   results_dir: results/walloon/scen_nuc4gw
+  #   resources_dir: resources/walloon/scen_nuc4gw
+  # - name: scen_nuc4gw_biomethane_industrie
+  #   label: 4 GW nuclear, biomethane reserved for industry
+  #   results_dir: results/walloon/scen_nuc4gw_biomethane_industrie
+  #   resources_dir: resources/walloon/scen_nuc4gw_biomethane_industrie
+  # - name: scen_nuc4gw_noccsccgt
+  #   label: 4 GW nuclear, no capture on power plants
+  #   results_dir: results/walloon/scen_nuc4gw_noccsccgt
+  #   resources_dir: resources/walloon/scen_nuc4gw_noccsccgt
+  # - name: scen_noco2cap
+  #   label: No Belgian CO2 cap, system cap kept (internal)
+  #   results_dir: results/walloon/scen_noco2cap
+  #   resources_dir: resources/walloon/scen_noco2cap
   # TEST, not a cabinet scenario (30 Sep batch log §12). Shown next to the 1 Oct
   # central on Sylvain's request; commented out for the October batch because
   # its tree is the 1 Oct vintage (30 Sep exports, must-runs on in the central).

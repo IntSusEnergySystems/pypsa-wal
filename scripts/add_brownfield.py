@@ -27,6 +27,8 @@ from scripts.add_existing_baseyear import add_build_year_to_new_assets
 from scripts.walloon_scripts.nuclear_helper import (
     add_BEWAL_nuclear,
     apply_nuclear_inflexibility,
+    restart_options,
+    restart_retired_nuclear,
     retrofit_retired_nuclear,
 )
 from scripts.walloon_scripts.BEWAL_potentials import update_BEWAL_potentials
@@ -515,13 +517,21 @@ if __name__ == "__main__":
         decomissioned_assets["Link"].query("carrier == 'nuclear'")
     )
 
+    costs = load_costs(snakemake.input.costs)
     retrofit_retired_nuclear(
         n,
         decomissioned_nuclear,
         int(snakemake.wildcards.planning_horizons),
-        costs = load_costs(snakemake.input.costs),
+        costs = costs,
         retrofit_nuclear_once=snakemake.config["electricity"].get("retrofit_nuclear_once", False),
         MILP = False,
+    )
+    restart_retired_nuclear(
+        n,
+        planning_horizon,
+        snakemake.config["scenario"]["planning_horizons"],
+        costs=costs,
+        plants=restart_options(snakemake.config),
     )
     apply_nuclear_inflexibility(n, snakemake.config)
 

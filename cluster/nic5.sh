@@ -54,7 +54,9 @@ run_dirs() {
 # First scenario only — for messages and the single-tree log paths. Every
 # target/verification helper loops over run_dirs() instead.
 RUN_DIR_REL="${RUN_PREFIX:+${RUN_PREFIX}/}${RUN_NAME_FIRST}"
-JOBFILE="$HERE/.last_jobs"
+# One record per cluster, so a batch split between NIC5 and NIC6 can `wait` /
+# `status` on each without one `solve` erasing the other's orchestrator pid.
+JOBFILE="$HERE/.last_jobs_${REMOTE}"
 mkdir -p "$HERE/logs"
 
 msg()  { printf '\033[1;34m[nic5]\033[0m %s\n' "$*"; }
@@ -75,7 +77,7 @@ snakemake_local() {
 }
 
 cluster_cpus() {
-    awk '/^solving:/{s=1} s && /^  cpus:/{print $NF; exit}' "$HERE/config_cluster.yaml"
+    awk '/^solving:/{s=1} s && /^  cpus:/{print $NF; exit}' "$REPO/$CLUSTER_CONFIG"
 }
 
 network_basename() {
@@ -267,9 +269,9 @@ REMOTE_ENV='source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate '"$
 cmd_solve() {
     local solve_cpus targets log pidf pid
     solve_cpus=$(cluster_cpus)
-    [ -n "$solve_cpus" ] || die "solving.cpus not set in cluster/config_cluster.yaml"
+    [ -n "$solve_cpus" ] || die "solving.cpus not set in $CLUSTER_CONFIG"
     : > "$JOBFILE"
-    msg "Launching Slurm orchestrator on the login node (partition=$SOLVE_PARTITION, cpus=$solve_cpus)"
+    msg "Launching Slurm orchestrator on $REMOTE (partition=$SOLVE_PARTITION, cpus=$solve_cpus, overlay=$CLUSTER_CONFIG)"
     msg "  scratch caches: XDG_CACHE_HOME=$REMOTE_DIR/.cache  TMPDIR=$REMOTE_DIR/tmp"
     targets=$(solved_targets | tr '\n' ' ')
     log="cluster/logs/orchestrate.log"
@@ -293,14 +295,14 @@ cmd_solve() {
     # Written as three flags it kept only the last (add_brownfield), so the
     # solve's cpus_per_task and runtime were silently dropped.
     rssh "cd '$REMOTE_DIR' && $REMOTE_ENV && mkdir -p cluster/logs && \
-        setsid bash -c \"snakemake --configfile $CONFIGFILE cluster/config_cluster.yaml \
+        setsid bash -c \"snakemake --configfile $CONFIGFILE $CLUSTER_CONFIG \
             --executor slurm --jobs $MAX_SLURM_JOBS \
             --rerun-triggers mtime --rerun-incomplete --keep-going --printshellcmds \
             --envvars XDG_CACHE_HOME TMPDIR GRB_LICENSE_FILE \
-            --default-resources slurm_partition=$SOLVE_PARTITION runtime=$SOLVE_RUNTIME mem_mb=$DEFAULT_MEM_MB slurm_account=ceci \
+            --default-resources slurm_partition=$SOLVE_PARTITION runtime=$SOLVE_RUNTIME mem_mb=$DEFAULT_MEM_MB slurm_account=$SLURM_ACCOUNT \
             --set-resources solve_sector_network_myopic:cpus_per_task=$solve_cpus \
                 solve_sector_network_myopic:runtime=$SOLVE_RUNTIME \
-                add_brownfield:cpus_per_task=1 \
+                add_brownfield:cpus_per_task=$LIGHT_CPUS \
             --set-threads solve_sector_network_myopic=$solve_cpus \
             -- $targets </dev/null >'$log' 2>&1 & echo \\\$! >'$pidf'\" </dev/null >/dev/null 2>&1"
     sleep 2
@@ -556,7 +558,7 @@ cmd_setup() {
     rssh "mkdir -p '$REMOTE_DIR/cluster'"
     rssync -arh --no-g "$HERE/cluster_setup.sh" "${REMOTE}:${REMOTE_DIR}/cluster/cluster_setup.sh"
     rssync -arh --no-g "$REPO/envs/environment.yaml" "${REMOTE}:${REMOTE_DIR}/envs/environment.yaml"
-    rssh "bash '$REMOTE_DIR/cluster/cluster_setup.sh'"
+    rssh "GUROBI_MODULE='$GUROBI_MODULE' bash -l '$REMOTE_DIR/cluster/cluster_setup.sh'"
     msg "Setup finished."
 }
 
