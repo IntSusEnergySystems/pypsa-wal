@@ -1,0 +1,82 @@
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 1.2.1)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 1.2.1)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 1.2.1)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 1.2.1)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+year                                                                        2025         2030         2040         2050
+run                                                                 scen_central scen_central scen_central scen_central
+section                  metric                                                                                        
+system                   objective (bn EUR)                             335.3315     372.8775     263.7439     284.7585
+BEWAL CO2 (Mt/a)         use Sabatier                                     0.0000       0.0000       0.0000       0.0000
+                         use Fischer-Tropsch                              0.0000       0.0000       0.0000       0.2360
+                         capture process emissions CC                     0.0000       1.2810       3.6740       3.6780
+                         capture CCGT CC                                  0.0000       0.0000       0.5100       0.4070
+                         capture SMR CC                                   0.0000       0.0000       0.0000       0.0000
+                         capture solid biomass for industry CC            0.0000       0.0000       1.8150       1.8150
+                         capture gas for industry CC                      0.0000       0.0000       0.0000       0.5300
+                         use methanolisation                              0.0000       0.0000       0.0000       0.0000
+                         capture urban central gas CHP CC                 0.0000       0.0000       0.0000       0.5530
+                         capture urban central solid biomass CHP CC       0.0000       0.0000       0.0000       0.0000
+                         net export (lever D)                            -0.0000       1.2810       6.0000       6.7480
+                         capture total                                    0.0000       1.2810       6.0000       6.9840
+                         capture cap                                         NaN       2.0000       6.0000       8.0000
+                         capture cap dual EUR/t                              NaN      -0.0000    -117.6490      -0.0000
+                         capture overage                                     NaN       0.0000       0.0000       0.0000
+BEWAL H2 (TWh/a)         H2 Electrolysis                                  0.0000       0.0000       0.0000       0.0000
+                         SMR                                              0.0000       0.0000       0.0000       0.0000
+                         SMR CC                                           0.0000       0.0000       0.0000       0.0000
+                         net pipeline import                              0.0000       0.0000       1.8270       1.8400
+PtX MW                   methanolisation @ GB                           357.8000     928.7000     928.7000     928.7000
+                         SMR @ BEVLG                                   2502.4000    2502.4000    2502.4000    2502.4000
+                         SMR @ GB                                      4544.0000    5453.3000    5453.3000    5453.3000
+                         SMR CC @ GB                                    437.5000     437.5000     800.8000     800.8000
+                         SMR @ DE                                            NaN    2798.0000    2798.0000    2798.0000
+                         SMR @ LU                                            NaN     132.7000     132.7000     132.7000
+                         SMR CC @ FR                                         NaN          NaN     596.4000     596.4000
+                         SMR CC @ NL                                         NaN          NaN     311.8000     311.8000
+                         H2 Electrolysis @ FR                                NaN          NaN          NaN   10057.2000
+                         H2 Electrolysis @ DE                                NaN          NaN          NaN   14428.4000
+                         H2 Electrolysis @ NL                                NaN          NaN          NaN   11322.9000
+                         H2 Electrolysis @ GB                                NaN          NaN          NaN   27303.5000
+                         H2 Electrolysis @ LU                                NaN          NaN          NaN    1582.2000
+                         Fischer-Tropsch @ BEWAL                             NaN          NaN          NaN     206.6000
+                         Fischer-Tropsch @ FR                                NaN          NaN          NaN    2430.9000
+                         Fischer-Tropsch @ DE                                NaN          NaN          NaN    4302.6000
+                         Fischer-Tropsch @ NL                                NaN          NaN          NaN    4976.7000
+                         Fischer-Tropsch @ GB                                NaN          NaN          NaN    6383.0000
+                         methanolisation @ FR                                NaN          NaN          NaN    3140.9000
+                         methanolisation @ DE                                NaN          NaN          NaN    1306.2000
+PtX TWh in               methanolisation @ GB                             3.1300       8.0300       3.3800       3.8300
+                         SMR @ BEVLG                                     21.9200       0.0000      11.9000       0.0000
+                         SMR @ GB                                        39.7900      47.6900      47.4200       0.0000
+                         SMR CC @ GB                                      3.8300       3.7000       7.0100       1.5600
+                         SMR @ DE                                            NaN      24.4700      24.4100       0.0000
+                         SMR @ LU                                            NaN       1.1600       0.3900       0.0000
+                         SMR CC @ FR                                         NaN          NaN       5.2200       1.4200
+                         SMR CC @ NL                                         NaN          NaN       2.7300       0.0000
+                         H2 Electrolysis @ FR                                NaN          NaN          NaN      50.0200
+                         H2 Electrolysis @ DE                                NaN          NaN          NaN      62.3600
+                         H2 Electrolysis @ NL                                NaN          NaN          NaN      55.7600
+                         H2 Electrolysis @ GB                                NaN          NaN          NaN     139.7800
+                         H2 Electrolysis @ LU                                NaN          NaN          NaN       6.0700
+                         Fischer-Tropsch @ BEWAL                             NaN          NaN          NaN       1.2200
+                         Fischer-Tropsch @ FR                                NaN          NaN          NaN      14.5900
+                         Fischer-Tropsch @ DE                                NaN          NaN          NaN      26.0200
+                         Fischer-Tropsch @ NL                                NaN          NaN          NaN      30.0900
+                         Fischer-Tropsch @ GB                                NaN          NaN          NaN      37.8000
+                         methanolisation @ FR                                NaN          NaN          NaN      15.0700
+                         methanolisation @ DE                                NaN          NaN          NaN       5.4500
+prices (EUR/unit)        co2 stored                                     -37.5900    -119.6000     -44.7700    -338.7100
+                         H2                                              82.3400      88.2300      78.3000     121.9300
+                         electricity                                    104.2100     118.8000     132.2000     120.4800
+                         EU oil                                          60.8600      61.0700      68.3500      93.3600
+                         EU methanol                                    133.2600     107.4700      97.4900      72.7700
+                         CO2Limit dual                                  -77.4600     -93.2300    -111.2300    -653.3200
+                         BEWAL national cap dual                             NaN     -84.4900    -140.6100      -0.0000
+BEWAL capex recovery (%) H2 Electrolysis                                     NaN      15.8000      11.7000      79.8000
+                         Fischer-Tropsch                                  0.2000       0.0000       0.0000     100.0000
+                         methanolisation                                 98.1000      49.2000      10.2000      89.9000
+CAPPED label=ptx limit=5G exit=0 peak_GB=3,2

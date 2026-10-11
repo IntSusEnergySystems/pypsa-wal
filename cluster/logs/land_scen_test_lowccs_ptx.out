@@ -1,0 +1,12 @@
+### 18:13 land scen_test_lowccs_ptx start (pull from: nic6) | RAM avail 12697 MB
+### 18:13 pull exit=0
+### verify: networks=4/4 optimal=4/4
+### 18:13 postprocess
+### 18:15 postprocess exit=0 7 of 7 steps (100%) done | CAPPED label=post limit=10G exit=0 peak_GB=3,4
+### 18:15 ptx_report
+### 18:15 ptx exit=0 CAPPED label=ptx limit=5G exit=0 peak_GB=3,2
+### 18:15 review_run
+### 18:16 review exit=1 Judgement calls (levels 5-8) stay with you — see docs/run-review-checklist.md ERROR conda.cli.main_run:execute(148): `conda run python scripts/walloon_scripts/review_run.py results/walloon/scen_test | CAPPED label=review limit=8G exit=1 peak_GB=5,2
+### 18:16 heat fidelity
+### 18:16 heatfid exit=0 Largest signed residual on any (year, bus) after summing groups: 2.81e-06 TWh — the total heat load closes; the mix is what moved. CAPPED label=heat limit=5G exit=0 peak_GB=3,1 
+LAND_DONE scen_test_lowccs_ptx

@@ -302,7 +302,7 @@ cmd_solve() {
             --default-resources slurm_partition=$SOLVE_PARTITION runtime=$SOLVE_RUNTIME mem_mb=$DEFAULT_MEM_MB slurm_account=$SLURM_ACCOUNT \
             --set-resources solve_sector_network_myopic:cpus_per_task=$solve_cpus \
                 solve_sector_network_myopic:runtime=$SOLVE_RUNTIME \
-                add_brownfield:cpus_per_task=$LIGHT_CPUS \
+                add_brownfield:cpus_per_task=$LIGHT_CPUS add_brownfield:runtime=$LIGHT_RUNTIME \
             --set-threads solve_sector_network_myopic=$solve_cpus \
             -- $targets </dev/null >'$log' 2>&1 & echo \\\$! >'$pidf'\" </dev/null >/dev/null 2>&1"
     sleep 2
@@ -555,9 +555,21 @@ cmd_publish() {
 
 cmd_setup() {
     msg "One-time cluster setup on $REMOTE"
-    rssh "mkdir -p '$REMOTE_DIR/cluster'"
+    rssh "mkdir -p '$REMOTE_DIR/cluster' '$REMOTE_DIR/envs'"
     rssync -arh --no-g "$HERE/cluster_setup.sh" "${REMOTE}:${REMOTE_DIR}/cluster/cluster_setup.sh"
     rssync -arh --no-g "$REPO/envs/environment.yaml" "${REMOTE}:${REMOTE_DIR}/envs/environment.yaml"
+    # times_pypsa must be importable on the cluster: Snakemake imports it while PLANNING the DAG
+    # (rules/build_sector.smk, input function of build_wallon_demands), even though no job there
+    # runs it. NIC5 has it as an editable install of a copy of TIMES_PyPSA; NIC6 had none and
+    # `snakemake -n` died with ModuleNotFoundError (10 Oct 2026). Sources only: no .git, no .vd.
+    if [ -d "$REPO/../TIMES_PyPSA" ]; then
+        rssh "mkdir -p '$(dirname "$REMOTE_DIR")/TIMES_PyPSA'"
+        rssync -arh --no-g --exclude .git --exclude '*.vd' --exclude '*.vdt' --exclude __pycache__ \
+            "$REPO/../TIMES_PyPSA/" "${REMOTE}:$(dirname "$REMOTE_DIR")/TIMES_PyPSA/"
+    fi
+    # Exact package lock (NIC5 env, 2026-10-10): cluster_setup.sh builds from it when present.
+    [ -r "$REPO/envs/pypsa-eur_nic5_explicit.txt" ] && \
+        rssync -arh --no-g "$REPO/envs/pypsa-eur_nic5_explicit.txt" "${REMOTE}:${REMOTE_DIR}/envs/pypsa-eur_nic5_explicit.txt"
     rssh "GUROBI_MODULE='$GUROBI_MODULE' bash -l '$REMOTE_DIR/cluster/cluster_setup.sh'"
     msg "Setup finished."
 }

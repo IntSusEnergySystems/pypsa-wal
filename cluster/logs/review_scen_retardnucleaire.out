@@ -1,0 +1,309 @@
+WARNING:pypsa2html.extract.flows:no 'total rail' column for 2025: rail demand set to 0
+WARNING:pypsa2html.extract.flows:no 'total rail' column for 2030: rail demand set to 0
+WARNING:pypsa2html.extract.flows:no 'total rail' column for 2040: rail demand set to 0
+WARNING:pypsa2html.extract.flows:no 'total rail' column for 2050: rail demand set to 0
+WARNING:pypsa2html.indicators:no nuclear efficiency in the cost table; nuclear thermal losses omitted
+WARNING:pypsa2html.indicators:domestic gas production: no region of ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'GB', 'LU', 'NL'] appears in the table; assuming no domestic production for node BEWAL
+WARNING:pypsa2html.indicators:domestic oil production: no region of ['BEBRU', 'BEVLG', 'BEWAL', 'DE', 'FR', 'GB', 'LU', 'NL'] appears in the table; assuming no domestic production for node BEWAL
+
+── 0 · provenance ──────────────────────────────────────────────────────────────
+[ info ] run.json absent (local run)
+[ info ] planning horizons this run is reviewed against: [2025, 2030, 2040, 2050]
+[  ok  ] all horizon configs identical apart from planning_horizons
+[ info ] clustering.temporal.resolution_sector = 1h
+[ info ] sector.times_file = data/walloon/scen_sensibilite_retardnucleaire_261002_0210.vd
+
+── 1 · solve ───────────────────────────────────────────────────────────────────
+[  ok  ] 2025: Optimal objective 3.353315e+11
+[ info ] 2025: Crossover 0 — interior solution; individual values carry solver-tolerance noise, do not read 3 significant figures
+[ WARN ] 2025: Gurobi conditioning warnings
+           large bounds, large rhs
+[ info ] 2025: bounds range [8e-02, 1e+10]
+[  ok  ] 2030: Optimal objective 3.728775e+11
+[ info ] 2030: Crossover 0 — interior solution; individual values carry solver-tolerance noise, do not read 3 significant figures
+[ WARN ] 2030: Gurobi conditioning warnings
+           large bounds, large rhs
+[ info ] 2030: bounds range [1e-01, 2e+09]
+[  ok  ] 2040: Optimal objective 2.637275e+11
+[ info ] 2040: Crossover 0 — interior solution; individual values carry solver-tolerance noise, do not read 3 significant figures
+[ WARN ] 2040: Gurobi conditioning warnings
+           large bounds
+[ info ] 2040: bounds range [8e-02, 4e+10]
+[  ok  ] 2050: Optimal objective 2.837590e+11
+[ info ] 2050: Crossover 0 — interior solution; individual values carry solver-tolerance noise, do not read 3 significant figures
+[ WARN ] 2050: Gurobi conditioning warnings
+           large bounds
+[ info ] 2050: bounds range [7e-02, 6e+10]
+
+── 2 · TIMES soft link ─────────────────────────────────────────────────────────
+[  ok  ] EV grid draw = TIMES `electricity road` — 2025: PyPSA 0.449 TWh vs TIMES 0.449 (-0.00%)
+[  ok  ] 2025: industry electricity 6.302 vs TIMES 6.302 (-0.00%)
+[  ok  ] 2025: gas for industry 23.622 vs TIMES 23.622 (+0.00%)
+[  ok  ] 2025: naphtha for industry 2.380 vs TIMES 2.380 (-0.00%)
+[  ok  ] 2025: solid biomass for industry 4.371 vs TIMES 4.371 (+0.00%)
+[  ok  ] 2025: kerosene for aviation 8.345 vs TIMES 8.345 (+0.00%)
+[  ok  ] 2025: coal for industry 3.706 vs TIMES 3.706 (+0.00%)
+[  ok  ] 2025: BEWAL electric load 18.087 TWh vs TIMES total 18.087 (-0.00%)
+           grid side: +0.000 TWh of BEV charger loss added back; 0.272 TWh excluded as having no TIMES row (agriculture machinery electric)
+[ info ] 2025: BEWAL electricity outside the TIMES rows 0.272 TWh (+1.50% of the TIMES total)
+           agriculture machinery electric
+[  ok  ] EV grid draw = TIMES `electricity road` — 2030: PyPSA 5.237 TWh vs TIMES 5.237 (-0.00%)
+[  ok  ] 2030: industry electricity 7.726 vs TIMES 7.726 (+0.00%)
+[  ok  ] 2030: gas for industry 18.686 vs TIMES 18.686 (+0.00%)
+[  ok  ] 2030: naphtha for industry 1.963 vs TIMES 1.963 (+0.00%)
+[  ok  ] 2030: solid biomass for industry 4.068 vs TIMES 4.068 (+0.00%)
+[  ok  ] 2030: kerosene for aviation 8.438 vs TIMES 8.438 (+0.00%)
+[  ok  ] 2030: coal for industry 3.051 vs TIMES 3.051 (+0.00%)
+[  ok  ] 2030: BEWAL electric load 26.192 TWh vs TIMES total 26.192 (+0.00%)
+           grid side: +0.037 TWh of BEV charger loss added back; 0.272 TWh excluded as having no TIMES row (agriculture machinery electric)
+[ info ] 2030: BEWAL electricity outside the TIMES rows 0.272 TWh (+1.04% of the TIMES total)
+           agriculture machinery electric
+[  ok  ] EV grid draw = TIMES `electricity road` — 2040: PyPSA 12.776 TWh vs TIMES 12.776 (-0.00%)
+[  ok  ] 2040: industry electricity 18.122 vs TIMES 18.122 (+0.00%)
+[  ok  ] 2040: gas for industry 7.962 vs TIMES 7.962 (+0.00%)
+[  ok  ] 2040: naphtha for industry 2.111 vs TIMES 2.111 (+0.00%)
+[  ok  ] 2040: solid biomass for industry 4.619 vs TIMES 4.619 (-0.00%)
+[  ok  ] 2040: kerosene for aviation 8.604 vs TIMES 8.604 (+0.00%)
+[  ok  ] 2040: coal for industry 1.184 vs TIMES 1.184 (+0.00%)
+[  ok  ] 2040: BEWAL electric load 47.189 TWh vs TIMES total 47.189 (+0.00%)
+           grid side: +0.230 TWh of BEV charger loss added back; 0.272 TWh excluded as having no TIMES row (agriculture machinery electric)
+[ info ] 2040: BEWAL electricity outside the TIMES rows 0.272 TWh (+0.58% of the TIMES total)
+           agriculture machinery electric
+[  ok  ] EV grid draw = TIMES `electricity road` — 2050: PyPSA 17.307 TWh vs TIMES 17.307 (-0.00%)
+[  ok  ] 2050: industry electricity 24.107 vs TIMES 24.107 (+0.00%)
+[  ok  ] 2050: gas for industry 2.501 vs TIMES 2.501 (+0.00%)
+[  ok  ] 2050: naphtha for industry 1.694 vs TIMES 1.694 (+0.00%)
+[  ok  ] 2050: solid biomass for industry 5.002 vs TIMES 5.002 (-0.00%)
+[  ok  ] 2050: kerosene for aviation 8.673 vs TIMES 8.673 (+0.00%)
+[  ok  ] 2050: BEWAL electric load 61.095 TWh vs TIMES total 61.095 (+0.00%)
+           grid side: +0.312 TWh of BEV charger loss added back; 0.272 TWh excluded as having no TIMES row (agriculture machinery electric)
+[ info ] 2050: BEWAL electricity outside the TIMES rows 0.272 TWh (+0.44% of the TIMES total)
+           agriculture machinery electric
+[  ok  ] BEWAL heat-pump capacity non-decreasing (MW: 2025: 1,039, 2030: 1,523, 2040: 4,797, 2050: 5,755)
+[  ok  ] 2.5 decentral heat load closes on every (year, bus) (largest signed residual 3.01e-06 TWh)
+[ WARN ] 2.5 2 TIMES heat group(s) delivered less than 98% of their profile (0.077 TWh_th in total)
+           2050 biomass boiler on urban decentral heat: 0.4707 of 0.5109 TWh_th pinned (7.9% undelivered)
+           2050 biomass boiler on rural heat: 0.4347 of 0.4717 TWh_th pinned (7.9% undelivered)
+           the absorber (heat pump) took the difference, so the heat load still closes and every aggregate check passes — read this as a mix that did not transfer, and check whether the fuel it needed existed at all (BEWAL `e_sum_max`, the EU `biomass limit` shadow price, the country CO2 cap). The solve log's `report_relaxed_profiles` line says what the relaxation cost.
+
+── 3 · accounting ──────────────────────────────────────────────────────────────
+[  ok  ] 2025 BEWAL 'AC': residual +0.0000 TWh on 29.8 TWh gross (0.00%)
+[  ok  ] 2025 BEWAL 'low voltage': residual -0.0000 TWh on 16.3 TWh gross (0.00%)
+[  ok  ] 2025 BEWAL 'EV battery': residual -0.0000 TWh on 0.0 TWh gross (0.00%)
+[  ok  ] 2025 Belgium AC+LV: residual -0.0000 TWh on 152.0 TWh gross (0.00%)
+[  ok  ] 2030 BEWAL 'AC': residual +0.0000 TWh on 35.1 TWh gross (0.00%)
+[  ok  ] 2030 BEWAL 'low voltage': residual -0.0000 TWh on 24.1 TWh gross (0.00%)
+[  ok  ] 2030 BEWAL 'EV battery': residual +0.0000 TWh on 0.3 TWh gross (0.00%)
+[  ok  ] 2030 Belgium AC+LV: residual -0.0000 TWh on 192.5 TWh gross (0.00%)
+[  ok  ] 2040 BEWAL 'AC': residual +0.0000 TWh on 54.0 TWh gross (0.00%)
+[  ok  ] 2040 BEWAL 'low voltage': residual +0.0000 TWh on 41.6 TWh gross (0.00%)
+[  ok  ] 2040 BEWAL 'EV battery': residual +0.0000 TWh on 2.1 TWh gross (0.00%)
+[  ok  ] 2040 Belgium AC+LV: residual +0.0000 TWh on 280.5 TWh gross (0.00%)
+[  ok  ] 2050 BEWAL 'AC': residual +0.0000 TWh on 76.1 TWh gross (0.00%)
+[  ok  ] 2050 BEWAL 'low voltage': residual -0.0000 TWh on 53.5 TWh gross (0.00%)
+[  ok  ] 2050 BEWAL 'EV battery': residual +0.0000 TWh on 2.8 TWh gross (0.00%)
+[  ok  ] 2050 Belgium AC+LV: residual -0.0000 TWh on 368.1 TWh gross (0.00%)
+[  ok  ] 2025 BEWAL biogas: 0.000 TWh used of e_sum_max 0.000 TWh
+[  ok  ] 2025 BEWAL solid biomass: 0.000 TWh used of e_sum_max 0.000 TWh
+[  ok  ] 2030 BEWAL biogas: 1.218 TWh used of e_sum_max 1.218 TWh
+[  ok  ] 2030 BEWAL solid biomass: 2.824 TWh used of e_sum_max 2.824 TWh
+[  ok  ] 2040 BEWAL biogas: 4.667 TWh used of e_sum_max 4.667 TWh
+[  ok  ] 2040 BEWAL solid biomass: 11.749 TWh used of e_sum_max 11.749 TWh
+[  ok  ] 2050 BEWAL biogas: 6.933 TWh used of e_sum_max 6.933 TWh
+[  ok  ] 2050 BEWAL solid biomass: 6.366 TWh used of e_sum_max 11.749 TWh
+
+── 3 · Sankey node balance ─────────────────────────────────────────────────────
+[  ok  ] 2025 BEWAL BEV node: smart 0.004 + natural 0.445 TWh in; EV demand 0.449 + V2G 0.000 TWh out; gap -0.000 TWh
+[  ok  ] 2030 BEWAL BEV node: smart 0.330 + natural 4.870 TWh in; EV demand 5.200 + V2G 0.000 TWh out; gap -0.000 TWh
+[  ok  ] 2040 BEWAL BEV node: smart 2.070 + natural 10.477 TWh in; EV demand 12.546 + V2G 0.000 TWh out; gap -0.000 TWh
+[  ok  ] 2050 BEWAL BEV node: smart 2.804 + natural 14.192 TWh in; EV demand 16.996 + V2G 0.000 TWh out; gap -0.000 TWh
+[ WARN ] 2025 enc_pe: in 0.000 out 7.154 gap +7.154 TWh
+           open the energy Sankey and check this node
+[ WARN ] 2030 enc_pe: in 0.000 out 9.744 gap +9.744 TWh
+           open the energy Sankey and check this node
+[ WARN ] 2040 enc_pe: in 0.000 out 9.970 gap +9.970 TWh
+           open the energy Sankey and check this node
+[ WARN ] 2050 enc_pe: in 0.000 out 6.043 gap +6.043 TWh
+           open the energy Sankey and check this node
+
+── 4.1 · aggregate capacity limits ─────────────────────────────────────────────
+[ info ] file: data/walloon/agg_p_nom_minmax_scen_retardnucleaire.csv (27 rows with a corridor tolerance)
+[  ok  ] 2025 BE/onwind: total 3,354 MW vs max 3,337 (extendable tranche 1,101, +0.50% corridor → 3,354)
+[  ok  ] 2025 BE/offwind-all: total 2,273 MW vs max 2,262 (extendable tranche 12, +0.50% corridor → 2,273)
+[  ok  ] 2025 BE/solar-all: total 9,800 MW vs max 9,751 (extendable tranche 4,349, +0.50% corridor → 9,800)
+[  ok  ] 2025 BEWAL/solar-all: total 2,681 MW vs max 2,668 (extendable tranche 396, +0.50% corridor → 2,681)
+[  ok  ] 2025 DE/offwind-all: total 9,261 MW vs max 9,215 (extendable tranche 1,474, +0.50% corridor → 9,261)
+[  ok  ] 2025 FR/offwind-all: total 1,493 MW vs max 1,486 (extendable tranche 1,483, +0.50% corridor → 1,493)
+[  ok  ] 2025 NL/offwind-all: total 4,772 MW vs max 4,748 (extendable tranche 2,312, +0.50% corridor → 4,772)
+[  ok  ] 2025 GB/offwind-all: total 15,996 MW vs max 15,916 (extendable tranche 5,617, +0.50% corridor → 15,996)
+[  ok  ] 2025 FR/nuclear-all: total 39,408 MW_e vs max 62,900 (extendable tranche 0, +1.00% corridor → 63,529)
+[ FAIL ] aggregate max exceeded — 2025 NL/nuclear-all: total 515 MW_e vs max 485 (extendable tranche 0, +1.00% corridor → 490)
+[ FAIL ] aggregate max exceeded — 2025 GB/nuclear-all: total 8,664 MW_e vs max 5,900 (extendable tranche 0, +1.00% corridor → 5,959)
+[ FAIL ] cap bound the EXTENDABLE tranche only — 2025 DE/nuclear-all: total 0 MW_e vs max 0 (extendable tranche 0, +1.00% corridor → 0)
+           add_CCL_constraints does not subtract existing capacity from the generator `max` RHS, so a myopic cap resets every horizon (docs/run-review-checklist.md §4.1)
+[  ok  ] 2025 LU/nuclear-all: total 0 MW_e vs max 0 (extendable tranche 0, +1.00% corridor → 0)
+[  ok  ] 2025 BEWAL/onwind: total 1,568 MW vs max 1,560 (extendable tranche 8, +0.50% corridor → 1,568)
+[  ok  ] 2025 DE/onwind: total 63,926 MW vs max 63,608 (extendable tranche 15,607, +0.50% corridor → 63,926)
+[  ok  ] 2025 DE/solar-all: total 90,278 MW vs max 89,829 (extendable tranche 38,609, +0.50% corridor → 90,278)
+[  ok  ] 2025 FR/onwind: total 23,221 MW vs max 23,105 (extendable tranche 5,738, +0.50% corridor → 23,221)
+[  ok  ] 2025 FR/solar-all: total 21,629 MW vs max 21,521 (extendable tranche 10,508, +0.50% corridor → 21,629)
+[  ok  ] 2025 GB/onwind: total 16,311 MW vs max 16,230 (extendable tranche 2,667, +0.50% corridor → 16,311)
+[  ok  ] 2025 GB/solar-all: total 17,968 MW vs max 17,879 (extendable tranche 4,109, +0.50% corridor → 17,968)
+[  ok  ] 2025 LU/onwind: total 228 MW vs max 227 (extendable tranche 98, +0.50% corridor → 228)
+[  ok  ] 2025 LU/solar-all: total 527 MW vs max 524 (extendable tranche 346, +0.50% corridor → 527)
+[  ok  ] 2025 NL/onwind: total 7,022 MW vs max 6,987 (extendable tranche 3,225, +0.50% corridor → 7,022)
+[  ok  ] 2025 NL/solar-all: total 24,155 MW vs max 24,035 (extendable tranche 13,058, +0.50% corridor → 24,155)
+[  ok  ] 2030 BE/offwind-all: total 2,273 MW vs max 2,262 (extendable tranche 0, +0.50% corridor → 2,273)
+[  ok  ] 2030 FR/nuclear-all: total 62,900 MW_e vs max 62,900 (extendable tranche 49,826, +1.00% corridor → 63,529)
+[ FAIL ] aggregate max exceeded — 2030 NL/nuclear-all: total 515 MW_e vs max 485 (extendable tranche 0, +1.00% corridor → 490)
+[ FAIL ] aggregate max exceeded — 2030 GB/nuclear-all: total 4,690 MW_e vs max 2,800 (extendable tranche 0, +1.00% corridor → 2,828)
+[ FAIL ] cap bound the EXTENDABLE tranche only — 2030 DE/nuclear-all: total 0 MW_e vs max 0 (extendable tranche 0, +1.00% corridor → 0)
+           add_CCL_constraints does not subtract existing capacity from the generator `max` RHS, so a myopic cap resets every horizon (docs/run-review-checklist.md §4.1)
+[  ok  ] 2030 LU/nuclear-all: total 0 MW_e vs max 0 (extendable tranche 0, +1.00% corridor → 0)
+[  ok  ] 2040 FR/nuclear-all: total 66,000 MW_e vs max 66,000 (extendable tranche 59,758, +1.00% corridor → 66,660)
+[  ok  ] 2040 NL/nuclear-all: total 2,100 MW_e vs max 2,100 (extendable tranche 2,100, +1.00% corridor → 2,121)
+[  ok  ] 2040 GB/nuclear-all: total 9,100 MW_e vs max 9,100 (extendable tranche 5,660, +1.00% corridor → 9,191)
+[ FAIL ] cap bound the EXTENDABLE tranche only — 2040 DE/nuclear-all: total 0 MW_e vs max 0 (extendable tranche 0, +1.00% corridor → 0)
+           add_CCL_constraints does not subtract existing capacity from the generator `max` RHS, so a myopic cap resets every horizon (docs/run-review-checklist.md §4.1)
+[  ok  ] 2040 LU/nuclear-all: total 0 MW_e vs max 0 (extendable tranche 0, +1.00% corridor → 0)
+[  ok  ] 2040 BE/nuclear-all: total 2,030 MW_e vs max 2,030 (extendable tranche 2,030, +0.50% corridor → 2,040)
+[  ok  ] 2040 BEWAL/nuclear-all: total 1,030 MW_e vs max 1,030 (extendable tranche 1,030, +0.50% corridor → 1,035)
+[  ok  ] 2040 BEVLG/nuclear-all: total 1,000 MW_e vs max 1,000 (extendable tranche 1,000, +0.50% corridor → 1,005)
+[ FAIL ] aggregate max exceeded — 2050 FR/nuclear-all: total 59,758 MW_e vs max 54,000 (extendable tranche 59,758, +1.00% corridor → 54,540)
+[  ok  ] 2050 NL/nuclear-all: total 7,000 MW_e vs max 7,000 (extendable tranche 7,000, +1.00% corridor → 7,070)
+[  ok  ] 2050 GB/nuclear-all: total 14,000 MW_e vs max 14,000 (extendable tranche 10,560, +1.00% corridor → 14,140)
+[ FAIL ] cap bound the EXTENDABLE tranche only — 2050 DE/nuclear-all: total 0 MW_e vs max 0 (extendable tranche 0, +1.00% corridor → 0)
+           add_CCL_constraints does not subtract existing capacity from the generator `max` RHS, so a myopic cap resets every horizon (docs/run-review-checklist.md §4.1)
+[  ok  ] 2050 LU/nuclear-all: total 0 MW_e vs max 0 (extendable tranche 0, +1.00% corridor → 0)
+[  ok  ] 2050 BE/nuclear-all: total 4,005 MW_e vs max 4,000 (extendable tranche 4,005, +0.50% corridor → 4,020)
+[  ok  ] 2050 BEWAL/nuclear-all: total 1,005 MW_e vs max 1,000 (extendable tranche 1,005, +0.50% corridor → 1,005)
+[  ok  ] 2050 BEVLG/nuclear-all: total 3,000 MW_e vs max 3,000 (extendable tranche 3,000, +0.50% corridor → 3,015)
+
+── 4.2 · Walloon potentials ────────────────────────────────────────────────────
+[  ok  ] 2025 BEWAL onwind: total 1,568 MW vs p_nom_max 6,500 (extendable 8)
+[  ok  ] 2030 BEWAL onwind: total 3,969 MW vs p_nom_max 6,500 (extendable 2,509)
+[  ok  ] 2040 BEWAL onwind: total 6,500 MW vs p_nom_max 6,500 (extendable 3,378)
+[  ok  ] 2050 BEWAL onwind: total 6,500 MW vs p_nom_max 6,500 (extendable 613)
+[  ok  ] 2025 BEWAL solar: total 911 MW vs p_nom_max 13,000 (extendable 396)
+[  ok  ] 2030 BEWAL solar: total 911 MW vs p_nom_max 13,000 (extendable 0)
+[  ok  ] 2040 BEWAL solar: total 7,463 MW vs p_nom_max 13,000 (extendable 7,067)
+[  ok  ] 2050 BEWAL solar: total 13,000 MW vs p_nom_max 13,000 (extendable 5,933)
+[  ok  ] 2025 BEWAL solar rooftop: total 1,770 MW vs p_nom_max 46,000 (extendable 0)
+[  ok  ] 2030 BEWAL solar rooftop: total 4,749 MW vs p_nom_max 46,000 (extendable 2,979)
+[  ok  ] 2040 BEWAL solar rooftop: total 10,065 MW vs p_nom_max 46,000 (extendable 6,103)
+[  ok  ] 2050 BEWAL solar rooftop: total 16,319 MW vs p_nom_max 46,000 (extendable 7,237)
+
+── 4.3 · interconnection / NTC ─────────────────────────────────────────────────
+[  ok  ] 2025 BE-DE: cap 1,000 MW | usable 1,000 (100%) | nominal 1,000 | at limit 49% of hours | rent 61 MEUR
+[  ok  ] 2025 BE-FR: cap 3,550 MW | usable 3,550 (100%) | nominal 5,071 | at limit 0% of hours | rent 73 MEUR
+[  ok  ] 2025 BE-GB: cap 1,000 MW | usable 1,000 (100%) | nominal 1,000 | at limit 36% of hours | rent 37 MEUR
+[  ok  ] 2025 BE-LU: cap 240 MW | usable 240 (100%) | nominal 343 | at limit 55% of hours | rent 29 MEUR
+[  ok  ] 2025 BE-NL: cap 3,400 MW | usable 3,400 (100%) | nominal 4,857 | at limit 0% of hours | rent 41 MEUR
+[  ok  ] 2025 BEWAL-BEVLG: cap 3,600 MW | usable 3,566 | at limit 0% of hours | rent 6 MEUR
+[  ok  ] 2025 BEWAL-BEBRU: cap 2,400 MW | usable 2,377 | at limit 0% of hours | rent 3 MEUR
+[  ok  ] 2025 BEBRU-BEVLG: cap 2,400 MW | usable 2,377 | at limit 0% of hours | rent 2 MEUR
+[  ok  ] 2030 BE-DE: cap 1,000 MW | usable 1,000 (100%) | nominal 1,000 | at limit 8% of hours | rent 19 MEUR
+[  ok  ] 2030 BE-FR: cap 3,550 MW | usable 3,550 (100%) | nominal 5,071 | at limit 0% of hours | rent 524 MEUR
+[  ok  ] 2030 BE-GB: cap 1,000 MW | usable 1,000 (100%) | nominal 1,000 | at limit 82% of hours | rent 371 MEUR
+[  ok  ] 2030 BE-LU: cap 240 MW | usable 240 (100%) | nominal 343 | at limit 13% of hours | rent 99 MEUR
+[  ok  ] 2030 BE-NL: cap 3,400 MW | usable 3,400 (100%) | nominal 4,857 | at limit 0% of hours | rent 520 MEUR
+[  ok  ] 2030 BEWAL-BEVLG: cap 3,600 MW | usable 3,566 | at limit 0% of hours | rent 31 MEUR
+[  ok  ] 2030 BEWAL-BEBRU: cap 2,400 MW | usable 2,377 | at limit 0% of hours | rent 16 MEUR
+[  ok  ] 2030 BEBRU-BEVLG: cap 2,400 MW | usable 2,377 | at limit 0% of hours | rent 6 MEUR
+[  ok  ] 2040 BE-DE: cap 2,000 MW | usable 2,000 (100%) | nominal 2,000 | at limit 17% of hours | rent 81 MEUR
+[  ok  ] 2040 BE-FR: cap 4,550 MW | usable 4,550 (100%) | nominal 6,500 | at limit 0% of hours | rent 731 MEUR
+[  ok  ] 2040 BE-GB: cap 2,400 MW | usable 2,400 (100%) | nominal 2,400 | at limit 51% of hours | rent 347 MEUR
+[  ok  ] 2040 BE-LU: cap 740 MW | usable 740 (100%) | nominal 1,057 | at limit 0% of hours | rent 190 MEUR
+[  ok  ] 2040 BE-NL: cap 5,400 MW | usable 5,400 (100%) | nominal 7,714 | at limit 0% of hours | rent 188 MEUR
+[  ok  ] 2040 BEWAL-BEVLG: cap 13,200 MW | usable 9,600 | at limit 0% of hours | rent 343 MEUR
+[  ok  ] 2040 BEWAL-BEBRU: cap 2,400 MW | usable 2,377 | at limit 0% of hours | rent 200 MEUR
+[  ok  ] 2040 BEBRU-BEVLG: cap 3,400 MW | usable 2,873 | at limit 0% of hours | rent 9 MEUR
+[  ok  ] 2050 BE-DE: cap 3,200 MW | usable 3,200 (100%) | nominal 3,200 | at limit 26% of hours | rent 369 MEUR
+[  ok  ] 2050 BE-FR: cap 7,300 MW | usable 5,030 (69%) | nominal 7,185 | at limit 0% of hours | rent 1,341 MEUR
+[  ok  ] 2050 BE-GB: cap 3,800 MW | usable 3,800 (100%) | nominal 3,800 | at limit 47% of hours | rent 951 MEUR
+[  ok  ] 2050 BE-LU: cap 1,200 MW | usable 1,200 (100%) | nominal 1,714 | at limit 0% of hours | rent 380 MEUR
+[  ok  ] 2050 BE-NL: cap 8,600 MW | usable 8,600 (100%) | nominal 12,286 | at limit 0% of hours | rent 879 MEUR
+[  ok  ] 2050 BEWAL-BEVLG: cap 14,400 MW | usable 9,600 | at limit 0% of hours | rent 858 MEUR
+[  ok  ] 2050 BEWAL-BEBRU: cap 2,400 MW | usable 2,400 | at limit 0% of hours | rent 396 MEUR
+[  ok  ] 2050 BEBRU-BEVLG: cap 4,800 MW | usable 4,314 | at limit 0% of hours | rent 31 MEUR
+
+── 4.3b · electricity import cap (item 6a) ─────────────────────────────────────
+[  ok  ] binding — 2030 BEWAL: one-way inflow 2.94 TWh vs cap 2.94 | net balance -1.11 TWh | mu -1.05 EUR/MWh
+[  ok  ] binding — 2040 BEWAL: one-way inflow 6.47 TWh vs cap 6.47 | net balance +4.87 TWh | mu -59.30 EUR/MWh
+[  ok  ] binding — 2050 BEWAL: one-way inflow 10.00 TWh vs cap 10.00 | net balance +7.90 TWh | mu -76.40 EUR/MWh
+
+── 4.4 · CO2 ───────────────────────────────────────────────────────────────────
+[ info ] 2025: co2_sequestration_limit >= -0.000e+00 mu=50.28 (BINDING)
+[ info ] 2025: biomass limit <= 0.000e+00 mu=-19.00 (BINDING)
+[ info ] 2025: unsustainable biomass limit == 3.641e+08 mu=-16.95 (BINDING)
+[ info ] 2030: effective BEWAL CO2 price = |-93.2| + |-84.5| = 178 EUR/t
+[ info ] 2030: co2_sequestration_limit >= -6.000e+07 mu=86.85 (BINDING)
+[ info ] 2030: biomass limit <= 1.138e+08 mu=-40.18 (BINDING)
+[ info ] 2030: unsustainable biomass limit == 2.416e+08 mu=-39.07 (BINDING)
+[ info ] 2040: effective BEWAL CO2 price = |-111.2| + |-140.4| = 252 EUR/t
+[ info ] 2040: co2_sequestration_limit >= -1.000e+09 mu=0.00 
+[ info ] 2040: biomass limit <= 3.272e+08 mu=-27.85 (BINDING)
+[ info ] 2050: effective BEWAL CO2 price = |-659.4| + |-0.0| = 659 EUR/t
+[ info ] 2050: co2_sequestration_limit >= -1.000e+09 mu=0.00 
+[ info ] 2050: biomass limit <= 3.309e+08 mu=-1,007.93 (BINDING)
+
+── 5 · plausibility (BEWAL) ────────────────────────────────────────────────────
+[  ok  ] 2025 onwind: 1,568 MW, 3.61 TWh, CF 26.3% (expected 18%-32%)
+[  ok  ] 2025 solar: 911 MW, 0.88 TWh, CF 11.1% (expected 8%-15%)
+[  ok  ] 2025 solar rooftop: 1,770 MW, 1.72 TWh, CF 11.1% (expected 7%-14%)
+[  ok  ] 2025 ror: 113 MW, 0.26 TWh, CF 26.3% (expected 15%-45%)
+[  ok  ] 2025 BEWAL heat pumps: effective COP 2.25 (1.16 TWh_th / 0.52 TWh_e)
+[  ok  ] 2030 onwind: 3,969 MW, 8.83 TWh, CF 25.4% (expected 18%-32%)
+[  ok  ] 2030 solar: 911 MW, 0.88 TWh, CF 11.0% (expected 8%-15%)
+[  ok  ] 2030 solar rooftop: 4,749 MW, 4.60 TWh, CF 11.1% (expected 7%-14%)
+[  ok  ] 2030 ror: 113 MW, 0.26 TWh, CF 26.3% (expected 15%-45%)
+[  ok  ] 2030 BEWAL heat pumps: effective COP 2.41 (3.63 TWh_th / 1.51 TWh_e)
+[  ok  ] 2040 onwind: 6,500 MW, 14.59 TWh, CF 25.6% (expected 18%-32%)
+[  ok  ] 2040 solar: 7,463 MW, 7.24 TWh, CF 11.1% (expected 8%-15%)
+[  ok  ] 2040 solar rooftop: 10,065 MW, 9.72 TWh, CF 11.0% (expected 7%-14%)
+[  ok  ] 2040 ror: 113 MW, 0.26 TWh, CF 26.3% (expected 15%-45%)
+[  ok  ] 2040 BEWAL heat pumps: effective COP 2.46 (11.52 TWh_th / 4.69 TWh_e)
+[  ok  ] 2050 onwind: 6,500 MW, 14.33 TWh, CF 25.2% (expected 18%-32%)
+[  ok  ] 2050 solar: 13,000 MW, 12.62 TWh, CF 11.1% (expected 8%-15%)
+[  ok  ] 2050 solar rooftop: 16,319 MW, 15.58 TWh, CF 10.9% (expected 7%-14%)
+[  ok  ] 2050 ror: 113 MW, 0.26 TWh, CF 26.3% (expected 15%-45%)
+[  ok  ] 2050 BEWAL heat pumps: effective COP 2.55 (14.00 TWh_th / 5.48 TWh_e)
+
+── 5.2 · build rates (BEWAL) ───────────────────────────────────────────────────
+[ WARN ] onwind 2025→2030: +480 MW/yr (1,568 → 3,969 MW)
+           historical Walloon additions are well below 300 MW/yr
+[ WARN ] solar 2030→2040: +655 MW/yr (911 → 7,463 MW)
+           historical Walloon additions are well below 400 MW/yr
+[ WARN ] solar 2040→2050: +554 MW/yr (7,463 → 13,000 MW)
+           historical Walloon additions are well below 400 MW/yr
+[ WARN ] solar rooftop 2025→2030: +596 MW/yr (1,770 → 4,749 MW)
+           historical Walloon additions are well below 400 MW/yr
+[ WARN ] solar rooftop 2030→2040: +532 MW/yr (4,749 → 10,065 MW)
+           historical Walloon additions are well below 400 MW/yr
+[ WARN ] solar rooftop 2040→2050: +625 MW/yr (10,065 → 16,319 MW)
+           historical Walloon additions are well below 400 MW/yr
+
+── 5.5 · degenerate (zero-capital-cost) capacities ─────────────────────────────
+[ WARN ] 2050: capacities with capital_cost = 0 — not a result, do not plot
+           carrier
+           battery discharger                     8328.0
+           gas pipeline                           7500.0
+           electricity distribution grid          7487.0
+           urban central water pits discharger    4481.0
+           urban central water pits charger       4481.0
+           BEV charger                            4194.0
+           DC                                     3200.0
+           H2 pipeline                            3111.0
+           home battery discharger                1149.0
+           kerosene for aviation                   990.0
+           land transport oil                      742.0
+           solid biomass for industry              303.0
+           naphtha for industry                    193.0
+           agriculture machinery oil                72.0
+
+────────────────────────────────────────────────────────────────────────────────
+PASS: 170  INFO: 30  WARN: 16  FAIL: 9
+
+Judgement calls (levels 5-8) stay with you — see docs/run-review-checklist.md
+ERROR conda.cli.main_run:execute(148): `conda run python scripts/walloon_scripts/review_run.py results/walloon/scen_retardnucleaire` failed. (See above for error)
+CAPPED label=review limit=8G exit=1 peak_GB=5,8

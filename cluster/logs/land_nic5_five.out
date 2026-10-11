@@ -1,0 +1,71 @@
+### 22:49 >>> scen_central | RAM avail 11513 MB | mount 39%
+### 22:49 land scen_central start (pull from: nic5) | RAM avail 11514 MB
+### 22:50 pull exit=0
+### verify: networks=4/4 optimal=4/4
+### 22:50 postprocess
+### 22:53 postprocess exit=0 7 of 7 steps (100%) done | CAPPED label=post limit=10G exit=0 peak_GB=3,5
+### 22:53 ptx_report
+### 22:53 ptx exit=0 CAPPED label=ptx limit=5G exit=0 peak_GB=3,2
+### 22:53 review_run
+### 22:54 review exit=1 Judgement calls (levels 5-8) stay with you — see docs/run-review-checklist.md ERROR conda.cli.main_run:execute(148): `conda run python scripts/walloon_scripts/review_run.py results/walloon/scen_cent | CAPPED label=review limit=8G exit=1 peak_GB=5,2
+### 22:54 heat fidelity
+### 22:55 heatfid exit=0 Largest signed residual on any (year, bus) after summing groups: 2.56e-06 TWh — the total heat load closes; the mix is what moved. CAPPED label=heat limit=5G exit=0 peak_GB=3,2 
+LAND_DONE scen_central
+### 22:55 <<< scen_central rc=0
+### 22:55 >>> scen_biomethane_industrie | RAM avail 11974 MB | mount 39%
+### 22:55 land scen_biomethane_industrie start (pull from: nic5) | RAM avail 11973 MB
+### 22:55 pull exit=0
+### verify: networks=4/4 optimal=4/4
+### 22:55 postprocess
+### 22:57 postprocess exit=0 7 of 7 steps (100%) done | CAPPED label=post limit=10G exit=0 peak_GB=3,5
+### 22:57 ptx_report
+### 22:58 ptx exit=0 CAPPED label=ptx limit=5G exit=0 peak_GB=3,1
+### 22:58 review_run
+### 22:58 review exit=1 Judgement calls (levels 5-8) stay with you — see docs/run-review-checklist.md ERROR conda.cli.main_run:execute(148): `conda run python scripts/walloon_scripts/review_run.py results/walloon/scen_biom | CAPPED label=review limit=8G exit=1 peak_GB=5,2
+### 22:58 heat fidelity
+### 22:59 heatfid exit=0 Largest signed residual on any (year, bus) after summing groups: 3.05e-06 TWh — the total heat load closes; the mix is what moved. CAPPED label=heat limit=5G exit=0 peak_GB=3,1 
+LAND_DONE scen_biomethane_industrie
+### 22:59 <<< scen_biomethane_industrie rc=0
+### 22:59 >>> scen_noccsccgt | RAM avail 12013 MB | mount 40%
+### 22:59 land scen_noccsccgt start (pull from: nic5) | RAM avail 12012 MB
+### 22:59 pull exit=0
+### verify: networks=4/4 optimal=4/4
+### 22:59 postprocess
+### 23:01 postprocess exit=0 7 of 7 steps (100%) done | CAPPED label=post limit=10G exit=0 peak_GB=3,5
+### 23:01 ptx_report
+### 23:01 ptx exit=0 CAPPED label=ptx limit=5G exit=0 peak_GB=3,2
+### 23:01 review_run
+### 23:02 review exit=1 Judgement calls (levels 5-8) stay with you — see docs/run-review-checklist.md ERROR conda.cli.main_run:execute(148): `conda run python scripts/walloon_scripts/review_run.py results/walloon/scen_nocc | CAPPED label=review limit=8G exit=1 peak_GB=5,2
+### 23:02 heat fidelity
+### 23:02 heatfid exit=0 Largest signed residual on any (year, bus) after summing groups: 1.18e-06 TWh — the total heat load closes; the mix is what moved. CAPPED label=heat limit=5G exit=0 peak_GB=3,1 
+LAND_DONE scen_noccsccgt
+### 23:02 <<< scen_noccsccgt rc=0
+### 23:02 >>> scen_realiste | RAM avail 12022 MB | mount 40%
+### 23:02 land scen_realiste start (pull from: nic5) | RAM avail 12022 MB
+### 23:03 pull exit=0
+### verify: networks=4/4 optimal=4/4
+### 23:03 postprocess
+### 23:05 postprocess exit=0 7 of 7 steps (100%) done | CAPPED label=post limit=10G exit=0 peak_GB=3,5
+### 23:05 ptx_report
+### 23:05 ptx exit=0 CAPPED label=ptx limit=5G exit=0 peak_GB=3,1
+### 23:05 review_run
+### 23:06 review exit=1 Judgement calls (levels 5-8) stay with you — see docs/run-review-checklist.md ERROR conda.cli.main_run:execute(148): `conda run python scripts/walloon_scripts/review_run.py results/walloon/scen_real | CAPPED label=review limit=8G exit=1 peak_GB=5,2
+### 23:06 heat fidelity
+### 23:06 heatfid exit=0 Largest signed residual on any (year, bus) after summing groups: 2.32e-06 TWh — the total heat load closes; the mix is what moved. CAPPED label=heat limit=5G exit=0 peak_GB=3,1 
+LAND_DONE scen_realiste
+### 23:06 <<< scen_realiste rc=0
+### 23:06 >>> scen_retardnucleaire | RAM avail 12250 MB | mount 40%
+### 23:06 land scen_retardnucleaire start (pull from: nic5) | RAM avail 12248 MB
+### 23:07 pull exit=0
+### verify: networks=4/4 optimal=4/4
+### 23:07 postprocess
+### 23:09 postprocess exit=0 7 of 7 steps (100%) done | CAPPED label=post limit=10G exit=0 peak_GB=4,0
+### 23:09 ptx_report
+### 23:10 ptx exit=0 CAPPED label=ptx limit=5G exit=0 peak_GB=3,6
+### 23:10 review_run
+### 23:11 review exit=1 Judgement calls (levels 5-8) stay with you — see docs/run-review-checklist.md ERROR conda.cli.main_run:execute(148): `conda run python scripts/walloon_scripts/review_run.py results/walloon/scen_reta | CAPPED label=review limit=8G exit=1 peak_GB=5,8
+### 23:11 heat fidelity
+### 23:11 heatfid exit=0 Largest signed residual on any (year, bus) after summing groups: 3.01e-06 TWh — the total heat load closes; the mix is what moved. CAPPED label=heat limit=5G exit=0 peak_GB=3,3 
+LAND_DONE scen_retardnucleaire
+### 23:11 <<< scen_retardnucleaire rc=0
+ALL_NIC5_LANDED 23:11

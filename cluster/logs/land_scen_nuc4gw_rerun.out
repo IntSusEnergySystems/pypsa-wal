@@ -1,0 +1,11 @@
+### 18:04 land scen_nuc4gw start (pull from: already local) | RAM avail 12741 MB
+### verify: networks=4/4 optimal=4/4
+### 18:04 postprocess
+### 18:06 postprocess exit=0 Nothing to be done (all requested files are present and up to date). | CAPPED label=post limit=10G exit=0 peak_GB=0,4
+### 18:06 ptx_report
+### 18:06 ptx exit=0 CAPPED label=ptx limit=5G exit=0 peak_GB=4,0
+### 18:06 review_run
+### 18:07 review exit=1 Judgement calls (levels 5-8) stay with you — see docs/run-review-checklist.md ERROR conda.cli.main_run:execute(148): `conda run python scripts/walloon_scripts/review_run.py results/walloon/scen_nuc4 | CAPPED label=review limit=8G exit=1 peak_GB=5,5
+### 18:07 heat fidelity
+### 18:08 heatfid exit=0 Largest signed residual on any (year, bus) after summing groups: 3.45e-06 TWh — the total heat load closes; the mix is what moved. CAPPED label=heat limit=5G exit=0 peak_GB=3,6 
+LAND_DONE scen_nuc4gw
