@@ -3,6 +3,16 @@
 #
 # Pages land in html/pypsa/ so html/index.html can stay a pypsa-wal hub that
 # also links the TIMES Sankeys (html/times/) without patching the library.
+#
+# Two reports (pypsa2html D24, 2026-10-12):
+#   generate_html_report      one run: its pages + html/pypsa/summary.{csv,json}.
+#                             It loads that run's networks only -- before the
+#                             split it also loaded every other configured run
+#                             with a tree on disk, for the overview page (the
+#                             single-bar central and the mixed vintages of the
+#                             6 Oct log, I1/I2).
+#   generate_html_comparison  the runs side by side, from their summary files
+#                             only: results/<prefix>/compare/.
 
 try:
     import pypsa2html as _pypsa2html  # noqa: F401
@@ -40,6 +50,15 @@ def pypsa2html_targets():
     return expand(RESULTS + "html/pypsa/index.html", run=config["run"]["name"])
 
 
+def _compared_runs():
+    """Runs of the comparison: `pypsa2html: compare:`, else every `run.name`."""
+    runs = config.get("pypsa2html", {}).get("compare") or config["run"]["name"]
+    return [runs] if isinstance(runs, str) else list(runs)
+
+
+COMPARE_DIR = "results/" + (config["run"].get("prefix") or "") + "/compare/"
+
+
 if HAVE_PYPSA2HTML:
 
     PYPSA2HTML_CONFIG = (
@@ -48,10 +67,41 @@ if HAVE_PYPSA2HTML:
 
     localrules:
         generate_html_report,
-        generate_html_report_all_scenarios,
+        generate_html_comparison,
+
+    rule ptx_report:
+        """The Walloon CO2 balance and power-to-X of one run, per horizon.
+
+        scripts/walloon_scripts/ptx_report.py as a rule, so its tidy table is
+        written for every run: the pypsa2html key figures read the CO2 export,
+        the capture-cap dual and overage and the PtX throughput from it
+        (`source: csv` KPIs of config/pypsa2html.yaml).
+        """
+        params:
+            run_dir=lambda w: RESULTS.format(run=_html_scenario_name(w)).rstrip("/"),
+            node="BEWAL",
+        input:
+            networks=expand(
+                RESULTS
+                + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
+                **config["scenario"],
+                allow_missing=True,
+            ),
+        output:
+            RESULTS + "csvs/ptx_report.csv",
+        log:
+            RESULTS + "logs/ptx_report.log",
+        threads: 1
+        resources:
+            mem_mb=6000,
+        conda:
+            "../envs/environment.yaml"
+        shell:
+            "PYTHONPATH=. python scripts/walloon_scripts/ptx_report.py {params.run_dir} "
+            "--node {params.node} --out {output} > {log} 2>&1"
 
     rule generate_html_report:
-        """Build the interactive HTML report from the solved networks."""
+        """One run's interactive HTML report and its summary files."""
         params:
             config_file=PYPSA2HTML_CONFIG,
             scenario=_html_scenario_name,
@@ -78,6 +128,8 @@ if HAVE_PYPSA2HTML:
             capacities=RESULTS + "csvs/capacities.csv",
             energy_balance=RESULTS + "csvs/energy_balance.csv",
             metrics=RESULTS + "csvs/metrics.csv",
+            # Key figures read the Walloon CO2 balance and PtX from it.
+            ptx_report=RESULTS + "csvs/ptx_report.csv",
             # Reporting-only: lets the EV charts show Elia's three charging
             # modes instead of two. pypsa2html reads it from resources_dir and
             # degrades to the old natural/smart split when it is absent, so an
@@ -93,6 +145,8 @@ if HAVE_PYPSA2HTML:
             config_file=PYPSA2HTML_CONFIG,
         output:
             index=RESULTS + "html/pypsa/index.html",
+            # What generate_html_comparison reads instead of the networks.
+            summary=RESULTS + "html/pypsa/summary.json",
         log:
             RESULTS + "logs/pypsa2html.log",
         benchmark:
@@ -126,104 +180,68 @@ if HAVE_PYPSA2HTML:
                 },
             )
             # This rule always reports the tree it was given (results_tree),
-            # even when config/pypsa2html.yaml already lists a scenario of
-            # the same name pointing elsewhere (e.g. scen_demande_haute on
-            # the 10-year tree while this run builds the 5-year overlay).
-            # A conditional inject-only-if-missing silently reports the wrong
-            # tree — seen 2026-09-09, 82 pages of 10-year content in the 5y
-            # folder. So replace any same-named entry, keeping its label.
-            from pypsa2html.config import ScenarioConfig
-
-            existing = next(
-                (s for s in cfg.scenarios if s.name == scenario), None
+            # even when config/pypsa2html.yaml lists a scenario of the same
+            # name pointing elsewhere (e.g. scen_demande_haute on the 10-year
+            # tree while this run builds the 5-year overlay) -- seen
+            # 2026-09-09, 82 pages of 10-year content in the 5y folder.
+            # `with_scenario` replaces any same-named entry, keeps its label
+            # and lands index.html on this run (the 2026-09-22 scen_central_6h
+            # 404 front door).
+            cfg = cfg.with_scenario(
+                scenario,
+                results_tree,
+                resources_dir=str(results_tree).replace("results/", "resources/", 1),
             )
-            cfg.scenarios = [s for s in cfg.scenarios if s.name != scenario]
-            cfg.scenarios.append(
-                ScenarioConfig(
-                    name=scenario,
-                    label=existing.label if existing is not None else scenario,
-                    results_dir=str(results_tree),
-                    resources_dir=str(results_tree).replace(
-                        "results/", "resources/", 1
-                    ),
-                )
-            )
-            # `landing.scenario` names the page html/pypsa/index.html
-            # redirects to. This rule builds ONE scenario, so the landing page
-            # must be that one; the value configured in config/pypsa2html.yaml
-            # is for the cross-scenario site. Left alone, a run whose name is
-            # not the configured landing scenario produced a report whose
-            # entry point 404s — index.html redirected to
-            # BEWAL_overview_scen_central.html while the pages on disk were
-            # ..._scen_central_6h.html (seen 2026-09-22 on scen_central_6h:
-            # all 82 pages present, only the front door wrong). Set here and
-            # not through `load_config` overrides, because load_config
-            # validates landing.scenario against the configured scenario list
-            # and this run's scenario is appended just above.
-            cfg.landing.scenario = scenario
             report = build_site(cfg, scenarios=[scenario])
             logging.info(report.summary())
 
 
-    rule generate_html_report_all_scenarios:
-        """Cross-scenario report, including the comparison overview page.
+    rule generate_html_comparison:
+        """The comparison report of the runs, from their summary files.
 
-        Not wired into `all`: sibling scenario trees are not a Snakemake
-        input of this rule.
+        Inputs are the runs' `summary.json` -- small, so the comparison is an
+        ordinary Snakemake dependency and is rebuilt when any run's report is.
+        It never loads a network. The runs are `pypsa2html: compare:` in the
+        workflow config, else every `run.name`. To compare whatever is solved
+        so far, without Snakemake:
+
+            pypsa2html compare -c config/pypsa2html.yaml results/walloon/scen_*
+
+        The pypsa2html config's `compare:` block sets the reference scenario
+        (scen_central); runs of another vintage are flagged on the report's
+        Scenarios page.
         """
         params:
             config_file=PYPSA2HTML_CONFIG,
+        input:
+            summaries=expand(
+                "results/" + (config["run"].get("prefix") or "") + "/{run}/html/pypsa/summary.json",
+                run=_compared_runs(),
+            ),
+            config_file=PYPSA2HTML_CONFIG,
         output:
-            index="results/walloon/index.html",
+            index=COMPARE_DIR + "index.html",
+            table=COMPARE_DIR + "comparison.csv",
         log:
-            "logs/pypsa2html_all.log",
+            "logs/pypsa2html_compare.log",
         threads: 1
+        resources:
+            mem_mb=2000,
         run:
             import logging
             from pathlib import Path
 
-            from pypsa2html import build_site, load_config
+            from pypsa2html import compare_site, load_config
 
-            logging.basicConfig(filename=log[0], level=logging.INFO)
-            cfg = load_config(
-                params.config_file,
-                overrides={"root": str(Path.cwd())},
+            logging.basicConfig(
+                filename=log[0],
+                level=logging.INFO,
+                format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
             )
-            # ADDITIVE: report every scenario that is SOLVED, skip the rest.
-            #
-            # config/pypsa2html.yaml lists every scenario the project knows
-            # about, including ones not run yet and retired ones whose trees
-            # were deleted. Handing that whole list to build_site aborts on the
-            # first missing tree, which would mean the combined report can only
-            # ever be built once, at the very end of a batch. Filtering here
-            # lets the same rule be re-run after each scenario lands, each time
-            # producing a report over everything finished so far — which is how
-            # a 14-scenario batch is actually watched.
-            #
-            # "Solved" = at least one network in <results_dir>/networks/. A
-            # scenario whose solve is still running has no network yet, so a
-            # half-written tree cannot enter the report.
-            available, skipped = [], []
-            for s in cfg.scenarios:
-                nets = Path(cfg.root) / s.results_dir / "networks"
-                if nets.is_dir() and any(nets.glob("*.nc")):
-                    available.append(s)
-                else:
-                    skipped.append(s.name)
-            if not available:
-                raise RuntimeError(
-                    "no solved scenario found for the combined report; "
-                    f"looked for */networks/*.nc under: "
-                    f"{', '.join(s.results_dir for s in cfg.scenarios)}"
-                )
-            cfg.scenarios = available
-            if skipped:
-                logging.info(
-                    "skipping %d scenario(s) with no solved network: %s",
-                    len(skipped), ", ".join(sorted(skipped)),
-                )
-            logging.info(
-                "building combined report over %d scenario(s): %s",
-                len(available), ", ".join(s.name for s in available),
+            cfg = load_config(params.config_file, overrides={"root": str(Path.cwd())})
+            report = compare_site(
+                cfg,
+                [Path(p).parent for p in input.summaries],
+                out_dir=Path(output.index).parent,
             )
-            logging.info(build_site(cfg).summary())
+            logging.info(report.summary())

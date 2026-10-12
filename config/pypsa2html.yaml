@@ -2,7 +2,16 @@
 # pypsa2html CLI). Paths are relative to this file's parent (the repo root)
 # via `root: ..`.
 #
-#     pypsa2html build --config config/pypsa2html.yaml
+# Two reports (pypsa2html D24):
+#   * one SCENARIO REPORT per run, results/walloon/<run>/html/pypsa/, built by
+#     `generate_html_report` -- it describes that run only and writes
+#     summary.csv / summary.json beside its pages;
+#   * one COMPARISON REPORT, results/walloon/compare/, built from those summary
+#     files (never from the networks) by `generate_html_comparison`, or by hand:
+#
+#     pypsa2html build   --config config/pypsa2html.yaml -s scen_central
+#     pypsa2html compare --config config/pypsa2html.yaml \
+#         results/walloon/scen_central results/walloon/scen_nuc4gw ...
 root: ..
 
 project:
@@ -16,11 +25,13 @@ model:
   sector_opts: ""
   planning_horizons: null      # discovered from the solved networks
   # Process-wide bound on solved networks kept in RAM (pypsa2html, 2026-10-06).
-  # The office computer (16 GB) cannot hold four 1 h networks (~2.5 GB each)
-  # plus the other scenarios' networks the comparison charts read: unbounded,
-  # `generate_html_report` was OOM-killed in a 10 GB cap; at 2 it peaks at
-  # 7.8 GB and takes ~36 min per scenario instead of a few minutes. null on a
-  # big machine. docs/logs/2026-10-06_scen_central_2010_1h_noroute_biogas.md I1.
+  # The office computer (16 GB) cannot hold four 1 h networks (~2.5 GB each):
+  # unbounded, `generate_html_report` was OOM-killed in a 10 GB cap; at 2 it
+  # peaks at 7.8 GB and takes ~36 min per scenario instead of a few minutes.
+  # null on a big machine. docs/logs/2026-10-06_scen_central_2010_1h_noroute_biogas.md I1.
+  # Since the split into scenario and comparison reports (2026-10-12) a
+  # scenario report no longer loads any other scenario's networks, so this
+  # bound only has to hold one run's horizons.
   network_cache_size: 2
 
 nodes:
@@ -231,13 +242,74 @@ scenarios:
 landing:
   scenario: scen_central
   node: BEWAL
-  page: overview
+  page: key_figures
 
 output:
   dir: results/walloon/{scenario}/html/pypsa
-  pages: [overview, emissions, sankeys, fec, demands, heat, costs, capacities, dispatch, maps]
+  pages: [key_figures, emissions, sankeys, fec, demands, heat, costs, capacities, dispatch, maps]
   shared_maps: true
   plotly: cdn
+  # From results/walloon/<run>/html/pypsa/ to the comparison report.
+  compare_url: ../../../compare/index.html
+
+# The comparison report: built from the scenarios' summary.csv/summary.json,
+# so a scenario listed above but not solved yet -- or solved on another
+# machine and not pulled -- is listed as "not compared" instead of breaking it.
+# Mixed vintages are flagged on its Scenarios page (the I2 issue of the
+# 6 Oct log) rather than silently drawn side by side.
+compare:
+  reference: scen_central
+  dir: results/walloon/compare
+  # [] = every scenario listed above, in that order.
+  scenarios: []
+
+# Key figures (scenario report landing page and the comparison table): the
+# packaged set of pypsa2html (data/kpis.yaml) plus the Walloon figures the
+# batch logs track by hand (§9.7 tables). Each one is read the same way for
+# every run, so the comparison's differences replace keys.py.
+kpis:
+  # -- duals the logs quote ----------------------------------------------------
+  - {id: wal_national_cap_dual, group: System, label: National CO2 cap dual,
+     source: global, kind: constraints, scope: node, nodes: [BEWAL, BEVLG, BEBRU],
+     rows: ["co2_limit_per_country{node}"], scale: -1.0, unit: EUR/tCO2, decimals: 1}
+  - {id: wal_import_cap_dual, group: System, label: Electricity import cap dual,
+     source: global, kind: constraints, scope: node, nodes: [BEWAL],
+     rows: ["import_limit_{node}"], scale: -1.0, unit: EUR/MWh, decimals: 1}
+  - {id: biomass_limit_dual, group: System, label: Biomass potential dual (EU),
+     source: global, kind: constraints, rows: ["biomass limit"], scale: -1.0,
+     unit: EUR/MWh, decimals: 0}
+  # -- power plants with and without capture -----------------------------------
+  - {id: wal_elec_ccgt_cc, group: Electricity, label: "  of which CCGT with capture", after: elec_gas,
+     source: balance, kind: electricity, rows: ["supply:CCGT CC"]}
+  - {id: wal_elec_ccgt, group: Electricity, label: "  of which unabated CCGT", after: elec_gas,
+     source: balance, kind: electricity, rows: ["supply:CCGT"]}
+  - {id: wal_elec_chp_cc, group: Electricity, label: "  of which gas CHP with capture", after: elec_gas,
+     source: balance, kind: electricity, rows: ["supply:urban central gas CHP CC"]}
+  # -- the Walloon CO2 balance, from scripts/walloon_scripts/ptx_report.py ------
+  # csvs/ptx_report.csv is written for BEWAL by the `ptx_report` rule; an older
+  # tree without it reads "–".
+  - {id: wal_co2_net_export, group: Carbon capture, label: Net CO2 export (lever D),
+     source: csv, file: csvs/ptx_report.csv, nodes: [BEWAL], unit: MtCO2/year,
+     filters: {section: "{node} CO2 (Mt/a)", metric: "net export (lever D)"}}
+  - {id: wal_co2_export_dual, group: Carbon capture, label: CO2 export cap dual,
+     source: csv, file: csvs/ptx_report.csv, nodes: [BEWAL], unit: EUR/tCO2,
+     filters: {section: "{node} CO2 (Mt/a)", metric: "export cap dual EUR/t"}}
+  - {id: wal_co2_capture_dual, group: Carbon capture, label: CO2 capture cap dual,
+     source: csv, file: csvs/ptx_report.csv, nodes: [BEWAL], unit: EUR/tCO2,
+     filters: {section: "{node} CO2 (Mt/a)", metric: "capture cap dual EUR/t"}}
+  - {id: wal_co2_capture_overage, group: Carbon capture, label: Capture above the cap,
+     source: csv, file: csvs/ptx_report.csv, nodes: [BEWAL], unit: MtCO2/year,
+     filters: {section: "{node} CO2 (Mt/a)", metric: "capture overage"}}
+  # -- power-to-X ------------------------------------------------------------------
+  - {id: wal_ptx_ft, group: Power-to-X, label: Fischer-Tropsch input,
+     source: csv, file: csvs/ptx_report.csv, nodes: [BEWAL], missing: zero, unit: TWh/year,
+     filters: {section: "PtX TWh in", metric: "Fischer-Tropsch @ {node}"}}
+  - {id: wal_ptx_methanol, group: Power-to-X, label: Methanolisation input,
+     source: csv, file: csvs/ptx_report.csv, nodes: [BEWAL], missing: zero, unit: TWh/year,
+     filters: {section: "PtX TWh in", metric: "methanolisation @ {node}"}}
+  - {id: wal_h2_net_import, group: Power-to-X, label: Net H2 pipeline import,
+     source: csv, file: csvs/ptx_report.csv, nodes: [BEWAL], unit: TWh/year,
+     filters: {section: "{node} H2 (TWh/a)", metric: "net pipeline import"}}
 
 features:
   # Primary-energy independence: how a reactor's output counts.
@@ -306,9 +378,10 @@ texts:
 
 # --- Parameter sweeps -------------------------------------------------------
 #
-# Each entry becomes one section of the "Sensitivity analyses" page, drawn from
-# the scenarios that carry a matching `sensitivity:` marker above. Those
-# scenarios have no pages of their own — see the comment on the sweep points.
+# Each entry becomes one section of the "Sensitivity analyses" page of the
+# COMPARISON report, drawn from the summary files of the scenarios that carry
+# a matching `sensitivity:` marker above. Those scenarios have no pages of
+# their own — see the comment on the sweep points.
 
 # sensitivities:
 #   - id: nuclear_capex
