@@ -26,6 +26,9 @@ case "$REMOTE" in
         CLUSTER_CONFIG="${CLUSTER_CONFIG:-cluster/config_cluster_nic6.yaml}"
         # add_brownfield asks DEFAULT_MEM_MB (16 GB): 9 cores x 1 900 MB covers it.
         LIGHT_CPUS="${LIGHT_CPUS:-9}"
+        # A 1 h solve takes 1.3-1.6 h here (2.5x faster than NIC5). 12 h made the 32-core solves wait for
+        # a slot on a full cluster; 6 h still leaves 4x margin and backfills.
+        SOLVE_RUNTIME="${SOLVE_RUNTIME:-360}"
         GUROBI_MODULE="${GUROBI_MODULE:-releases/2025b Gurobi/13.0.1-GCCcore-14.3.0}"
         ;;
 esac
@@ -33,6 +36,9 @@ esac
 CLUSTER_CONFIG="${CLUSTER_CONFIG:-cluster/config_cluster.yaml}"
 # Cores of the light rules (add_brownfield). NIC5: 1 core with 16 GB.
 LIGHT_CPUS="${LIGHT_CPUS:-1}"
+# Time limit (minutes) of the light rules. They take seconds, but inheriting SOLVE_RUNTIME (12 h) kept
+# `add_brownfield` PENDING for hours on a busy NIC6 (backfill cannot place a long job; 10 Oct 2026).
+LIGHT_RUNTIME="${LIGHT_RUNTIME:-30}"
 # Slurm account passed to every job (both clusters: ceci).
 SLURM_ACCOUNT="${SLURM_ACCOUNT:-ceci}"
 # Lmod module whose licence `setup` copies to ~/gurobi.lic, when the fixed

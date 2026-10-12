@@ -1,7 +1,9 @@
 # Cabinet batch — 3 GW / 4 GW nuclear scenarios (1 h, weather 2010)
 
-**Status: PREPARED 2026-10-10, NOT LAUNCHED.** The PyPSA side is ready: code, scenario blocks,
-generated data files and tests.
+**Status (11 Oct 2026): SOLVED on 10 Oct (40 of 40 horizons optimal, NIC5 + NIC6), pulled and post-processed 10–11 Oct, published
+to the internal sites on 11 Oct (§9.4), critical review in §11. Read §11 before pointing anyone at the published pages.**
+
+*Originally:* PREPARED 2026-10-10. The PyPSA side was ready: code, scenario blocks, generated data files and tests.
 
 **Decisions of 10 Oct (S. Quoilin):**
 * capture cap **on** in the central (§3);
@@ -581,10 +583,193 @@ Settled on 10 Oct: capture cap on; nuclear cost kept; S2 at 3 962 MW; PtX test k
 
 ## 9. Run record
 
-Not run. To be filled from the launch on, following the 6 Oct log's §5 runbook, adapted:
-* central first, with full post-processing;
-* then the other eight, split over two NIC5 clones (4 Oct pattern);
-* archive the 6 Oct trees first.
+### 9.0 Launch of 10 Oct (office computer, Claude desktop agent)
+
+**Status: SOLVING since 14:22 on 10 Oct.** The split of §5.0 was kept: 5 chains on NIC5, 5 on NIC6.
+Launch HEAD: `4f2a5d21` plus the uncommitted script changes of §9.1 (list in
+`/sylvain/mount/pypsa-wal-data/batch_20261010_scripts/batch_20261010_head_at_launch.txt`).
+TIMES_PyPSA at launch: `c6f93e2` (main, equal to origin).
+
+| step | when | result |
+|---|---|---|
+| access | 13:20 | `ssh nic5` OK. **`ssh nic6` did not resolve: no alias on this machine** (§9.1 item 1) |
+| NIC6 setup | 13:22–13:35 | needed three fixes, §9.1 items 2–4; licence check OK |
+| local env | 13:25–13:33 | **the local conda no longer existed** (§9.1 item 5); rebuilt, pinned |
+| tests | 13:35 | `pytest test -q`: 732 passed, 1 skipped (733 on 10 Oct at home); `--check --all-scenarios` passed |
+| archive | 13:38 | 6 stale trees to `results/_archive_pre20261010` (local) and `pypsa-wal-archive/pre20261010` (NIC5) |
+| `prepare`, all ten | 13:39–14:16 | **472 jobs, 37 min, exit 0, cgroup peak 7.5 GB** (8 GB cap). `Process-emissions load at BEWAL: 4411.62 kt/a` in all ten `add_existing_baseyear` 2025 logs |
+| push | 14:17–14:18 | NIC5 and NIC6 in parallel, 1 min (the bulk went in a pre-push, 13:27–13:40); sizes and mtimes verified against local |
+| cluster dry run | 14:20 | both clusters: **35 jobs = 20 solves + 15 `add_brownfield`**, nothing else |
+| `solve` | 14:22 | NIC5: pid 1438193, 16 cores / 80 GB; NIC6: pid 140181, 32 cores / 60 GB |
+
+### 9.1 What had to be fixed to run on NIC6 and on this machine
+
+1. **`~/.ssh/config` had no `nic6` alias** here. Added (backup `~/.ssh/config.bak-2026-10-10`); the host key
+   was accepted after matching the fingerprint in `~/llm/env-nic6-ceci.md`.
+2. **`nic5.sh setup` failed on a fresh cluster**: `rsync … envs/environment.yaml` into a directory that
+   did not exist. It now creates `$REMOTE_DIR/envs`.
+3. **The NIC6 env differed from NIC5's.** A fresh `conda env create` gave pypsa 1.3.0 / linopy 0.9.1 /
+   pandas 3.0.6 (NIC5: 1.2.1 / 0.6.1 / 2.3.3; gurobipy 13.0.3 vs 13.0.2). Rebuilt from
+   `envs/pypsa-eur_nic5_explicit.txt` (new file: `conda list --explicit` of the NIC5 env), which
+   `cluster_setup.sh` now uses when present. Same on the local env.
+4. **`snakemake -n` died on NIC6 with `ModuleNotFoundError: times_pypsa`.** The DAG planner imports it
+   (`rules/build_sector.smk`, input function of `build_wallon_demands`), so the setup comment
+   "the solve chain does not import times_pypsa" was wrong for planning. NIC5 has it as an editable install
+   of a scratch copy of `TIMES_PyPSA`. `setup` now ships `TIMES_PyPSA` (sources only) next to the repo and
+   installs it editable, no deps.
+5. **The local conda was gone** (`/home/anaconda` removed in the disk reorganisation; nothing on `PATH`,
+   no `snakemake` anywhere). With Sylvain's approval: Miniforge 26.7.2 installed to
+   `/sylvain/mount/pypsa-wal-data/miniforge3` (installer sha256 matched the GitHub release digest), env
+   `pypsa-eur` built from the lock of item 3, plus `pip install --no-deps` of `snakemake==9.25.1` and the
+   editable `TIMES_PyPSA` and `pypsa2html`. `~/.bashrc` was **not** touched: use
+   `export PATH=/sylvain/mount/pypsa-wal-data/miniforge3/bin:$PATH`.
+6. NIC6 job shapes checked with `sbatch --test-only`: 32 cores × 60 GB and 9 cores × 16 GB pass; the NIC5
+   shapes (16 × 80 GB, 1 × 16 GB) are rejected at submit (1 900 MB per core).
+
+7. **Pending forever on a busy NIC6 (16:00).** All rules ran with the 12 h limit; the 15-second
+   `add_brownfield` jobs and the next 32-core solves were quoted a start the next day while 224 cores were
+   idle. `scontrol update JobId=… TimeLimit=…` on the pending jobs started them within a backfill cycle.
+   `config.sh` now defaults `LIGHT_RUNTIME=30` (both clusters) and `SOLVE_RUNTIME=360` (NIC6). The running
+   orchestrators keep the old limits, so a loop per login node (`cluster/shorten_light_jobs.sh`) lowers
+   pending light jobs (and NIC6 solves) while they live.
+
+8. **NIC6 memory headroom (16:26). Superseded by §9.2 / §11 F9: the final `MaxRSS` peaks reached 58.0 GiB (99 % of the request).** With 32 Gurobi threads the peaks were 39-46.6 GiB in 2025 and, in 2030,
+   **49.2 GiB (`scen_nuc4gw`) and 50.4 GiB (`scen_nuc4gw_biomethane_industrie`)**, against the 60 000 MB (58.6 GiB)
+   request; `scen_nuc4gw_noccsccgt` stayed at 41.7 GiB. NIC5 at 16 threads peaks at 29 GiB. On NIC5's history 2040 is
+   about 6 % above 2030, which leaves 5 GiB of margin: probably enough, not safely. A user can raise the memory of a
+   PENDING job: `scontrol update JobId=<id> MinMemoryNode=75000`. The job still gets 32 cores (the 1.9 GB-per-core rule is
+   checked at submit only); `AllocTRES` showed `cpu=32,mem=75000M`. The NIC6 loop (`cluster/shorten_light_jobs.sh`)
+   does it for `scen_nuc4gw`, `scen_nuc4gw_biomethane_industrie` and `scen_test_lowccs_ptx` at 2040 and 2050 (the 2030
+   solves had already started with 60 GB: **a running job cannot be changed**). A first attempt with `NumCPUs=40` pended 30 minutes
+   and started within 2 minutes once put back at 32 cores, so ask for memory only; 75 GB at 32 cores started without extra wait. If a NIC6 job is OOM-killed anyway (`sacct`
+   `OUT_OF_MEMORY`), resubmit it with Gurobi `threads: 16` (about 30 GiB, and the same solver path as NIC5).
+
+**First results.** NIC6 2025 solves: 1 h 17 min (`scen_nuc4gw_noccsccgt`) to 1 h 37 min (`scen_nuc4gw`), 473–676
+barrier iterations, no crossover, peak 41.5–43.7 GB of the 60 GB. NIC5 (16 cores) is 2.6 h or more for the same
+horizon. 2025 optima of the two identical-by-construction models differ by 2e-7 (3.35331481e11 vs 3.35331537e11).
+
+**Comparability caveat.** The S1 family solves on NIC5 with 16 Gurobi threads, the S2 family on NIC6 with 32.
+Same LP, same package versions, but a different barrier path: where the optimum is nearly degenerate (CCGT
+CC at the margin in 2040, §8 Q2) a difference between a pair split across clusters can be a solver-path
+difference, not the Tihange 1 effect. The central reference for the S2 pairs is therefore only as clean as
+that. If a pair looks odd, re-solve one horizon of the S1 scenario on NIC6 before interpreting it.
+
+### 9.2 Outcome of the solves (read from `sacct` and the solver logs, 11 Oct)
+
+**40 of 40 horizons optimal, 35 of 35 jobs COMPLETED on each cluster, no failed, cancelled or OOM-killed job.**
+Both orchestrators ended with `35 of 35 steps (100%) done`
+(`cluster/logs/orchestrate_nic{5,6}_final_20261010.log`; the plain `orchestrate.log` is overwritten by every `pull`).
+Barrier iterations 181–720, `Crossover 0` everywhere.
+
+| scenario | cluster | 2025 / 2030 / 2040 / 2050, min | chain, min | done |
+|---|---|---|---:|---|
+| `scen_nuc4gw_noccsccgt` | NIC6 | 77 / 34 / 35 / 33 | 179 | 17:51 |
+| `scen_nuc4gw_biomethane_industrie` | NIC6 | 90 / 36 / 35 / 31 | 192 | 17:52 |
+| `scen_nuc4gw` | NIC6 | 97 / 36 / 32 / 28 | 193 | 17:46 |
+| `scen_test_lowccs_ptx` | NIC6 | 107 / 35 / 33 / 40 | 215 | 18:04 |
+| `scen_noco2cap` | NIC6 | 135 / 37 / 37 / 40 | 249 | 18:41 |
+| `scen_noccsccgt` | NIC5 | 122 / 69 / 70 / 66 | 327 | 20:02 |
+| `scen_biomethane_industrie` | NIC5 | 131 / 73 / 62 / 63 | 329 | 20:01 |
+| `scen_retardnucleaire` | NIC5 | 177 / 60 / 70 / 68 | 375 | 20:46 |
+| `scen_realiste` | NIC5 | 169 / 106 / 61 / 67 | 403 | 21:13 |
+| `scen_central` | NIC5 | 222 / 97 / 71 / 59 | 449 | 21:59 |
+
+* **Wall clock, 14:22 → 21:59 (7 h 37 min).** The five NIC6 chains took 3.0–4.2 h, the five NIC5 chains 5.5–7.5 h
+  (queue waits included). Later horizons: 28–40 min on NIC6 (32 threads) against 59–106 min on NIC5 (16 threads).
+* **Peak memory (`MaxRSS` of the solve step).**
+  * NIC5, 16 threads: **28.6–33.0 GiB, 37–42 % of the 80 GB request** (2030 is the largest horizon).
+  * NIC6, 32 threads: **48.6–58.0 GiB, 83–99 % of the 58.6 GiB request.** Five solves were at 98–99 %
+    (58.0 GiB on `scen_nuc4gw` 2030 and `scen_test_lowccs_ptx` 2030, 57.8 on `scen_nuc4gw_noccsccgt` 2040).
+    The probes quoted in §9.1 item 8 (up to 50 GB) understated it. Nothing was killed, but there is **no
+    headroom**: see §11 F9.
+* **Process-emissions load and new code paths (runbook §5.7), all ten trees.**
+  * `Process-emissions load at BEWAL` 3 946.10 / 3 875.28 / 3 880.12 kt/a in the 2030 / 2040 / 2050 `add_brownfield` logs
+    (not 5 433.90 / 5 108.04).
+  * `Capped BEWAL CO2 capture at 2000 / 6000 / 8000 kt/a, overage at 1000 EUR/t` in every horizon's `*_python.log`.
+  * `Pinned BEWAL industry CC capture to ≥ 4145.3 / 5119.6 kt/a` (2040 / 2050) in every tree but `scen_test_lowccs_ptx`, whose floor is off by design.
+  * `Offering the restart of Tihange 1 at BEWAL in 2040: up to 962 MW_e, nuclear retrofit cost (285095 EUR/MW_e/a, 10 years)` in the three S2 trees, in no other.
+
+### 9.3 Landing and post-processing (10–11 Oct)
+
+* **NIC6 family** (5 trees): pulled and post-processed 17:47–18:47 by the earlier session (`land_one.sh` / `land_two.sh`,
+  `/sylvain/mount/pypsa-wal-data/batch_20261010_scripts/`). **NIC5 family** (5 trees): pulled and post-processed
+  22:49–23:11 on 10 Oct, about 4 min per tree.
+* Per tree, strictly one heavy step at a time, each in `cluster/capped.sh` (no swap): `pull` (1 min, 1.3 GB), local
+  `postprocess` (touch, CSVs, plots; peak 3.5–4.1 GB), `ptx_report.py` (3.1–3.6 GB), `review_run.py` (5.2–5.8 GB),
+  `check_heat_profile_fidelity.py` (3.1–3.6 GB). No step approached its cap.
+* **Not done at landing, done in §9.4:** pypsa2html, TIMES Sankeys and indicators, HTML publication, S3 upload, Explorer extraction.
+* **A silent failure, found on 11 Oct.** The landing's `postprocess` runs `network_cost_report.py` and `bill_harmonisation.py`
+  through `$LOCAL_RUN`. `LOCAL_RUN` was the Snakemake-only wrapper `smk_lowmem.sh` (it does `shift; … snakemake …`), so the
+  step ran `snakemake … network_cost_report.py` and failed with only a warning (`post_<s>.out`). **None of the ten trees had
+  `network_costs_calibrated.csv`, `network_cost_segments.csv` or `bill_harmonisation.csv`**; the cost-segment plot died on it.
+  Run for all ten on 11 Oct (`netcost_all.sh`, §9.4). The 6 Oct driver ran these two scripts directly, which is why the
+  6 Oct tree has them. **Fix to make:** `cmd_postprocess` must not route plain Python through a Snakemake wrapper (§11 F10).
+
+### 9.4 Publication of 11 Oct (office computer, Claude desktop agent)
+
+**Policy** (Sylvain, 5 Oct): the pypsa.squoilin.eu pages and the *test* Explorer are internal; only agreed final scenarios go to the official Explorer.
+Everything here goes to S3 `test/`, `https://pypsa.squoilin.eu` and the test Explorer. **Date stamp pinned to 20261010** (the batch day) for all
+folders although the work ran 10 Oct 23:00 → 11 Oct. Drivers and scripts: `/sylvain/mount/pypsa-wal-data/batch_20261010_scripts/`
+(`publish_batch.sh A|B`, `netcost_all.sh`, `html_lowmem_gc.py`, `add_banner.py`, `pub_record.sh`); logs `cluster/logs/publish_*_20261010.log`,
+`publish_batch_20261011*.out`, `ram_publish_20261011.tsv` (one line per minute: available RAM, swap, disk).
+
+| time (11 Oct) | step | result |
+|---|---|---|
+| 09:00 | state read | both orchestrators 35/35, five NIC5 trees not yet pulled |
+| 09:01–09:05 | **`datapypsa` env rebuilt** (the ClimAct extractor's env, lost with the old conda; Sylvain approved) | pypsa 0.35.2, pandas 2.2.3, dask 2026.8.0; 4.0 GB peak |
+| 09:05–09:14 | **validation**: re-extraction of the archived 6 Oct central | **49/49 pypsa CSVs and 3/3 strategy CSVs byte-identical** to the published 7 Oct set (7.5 GB peak) |
+| 09:16–10:25 | **Phase A**: ClimAct extraction, S3 upload (raw tree + Explorer sets), one scenario at a time | ten extractions of 6–7 min (7.6 GB peak, under a 10 GB cap); every Explorer set **53 files, none empty** (49 pypsa + 3 strategy + 1 `.vd`) |
+| 09:27–10:20 | `network_cost_report.py` + `bill_harmonisation.py` for the ten trees (§9.3) | 30/30 files, peaks 2.7–4.2 GB |
+| 10:25–10:33 | Phase B, first attempt | **pypsa2html OOM-killed** at the 10.5 GB cap (anonymous RSS 10.6 GB): see issue 3 below |
+| 10:40–11:23 | `scen_central` report rebuilt with `html_lowmem_gc.py` | 91 pages, exit 0, **peak 5.4 GB**, 43 min |
+| 11:23–18:55 | Phase B for the ten: pypsa2html, Sankeys, indicators, hub, banner, rsync to pypsa.squoilin.eu, S3 re-sync | **all ten live**, HTTP 200 on hub / report / Sankey; 91 pages each, 38–53 min per scenario, peak 5.3–5.4 GB |
+
+**Memory discipline.** Every heavy step ran under `cluster/capped.sh` (cgroup, no swap) and the shared `flock`, so nothing overlapped:
+extraction 7.5–7.6 GB, `network_cost_report` 3.2–4.2 GB, pypsa2html 5.4 GB. The 10.5 GB cap did what it is for: the OOM kill (issue 3)
+hit the step, not the desktop. Swap used by the desktop rose from 1.3 GB (10 Oct) to ~2.9 GB after the first extractions and drifted to 3.7 GB by 19:00.
+**Measured floor of `MemAvailable` over the whole publication (09:14–18:55, `ram_publish_20261011.tsv`): 2.6 GB, during the pypsa2html attempt that was OOM-killed; 7.0 GB or more in Phase B. No new desktop core dump** (`coredumpctl`: last entry is `xapp-sn-watcher` of 10 Oct 22:42, before this session's work).
+
+**Issues of the publication, and what was done.**
+1. **`datapypsa` gone** (above). Rebuilt with the documented command; validated byte for byte before use.
+2. **First launch failed in 20 s for all ten**: `nic5.sh extract` needs a system `python3` with PyYAML, and the driver had the miniforge `bin` first on
+   `PATH` (its base python3 has none). Fixed by putting miniforge last; the first driver was killed by PID, nothing had run.
+3. **pypsa2html was OOM-killed twice** (cache bound 2, then 1) at 10.5 GB, where the 6 Oct build had peaked at 7.8 GB. The 10 Oct pypsa2html writes
+   more pages, and the `Network` objects it evicts hold reference cycles that are freed only when the cycle collector runs, so RSS saw-tooths
+   from 6.6 to over 10 GB. Fix, in a wrapper only (pypsa2html untouched): `html_lowmem_gc.py` = cache 1 + a daemon thread running
+   `gc.collect()` and `malloc_trim(0)` every 2 s. Peak 5.4 GB, same run time.
+4. **`plot_cost_segments.py`** failed until the network-cost CSVs existed (§9.3); it writes one git-ignored `docs/figures/cost_segments.*`
+   (overwritten per run), so it is not part of the publication and was not re-run for a scenario set.
+5. **A disk stall** while a plot step started right after an extraction: swap (`/dev/sdb2`) and `/sylvain/mount` share one spindle, and a
+   `git diff --stat` I ran at the same moment kept both in uninterruptible wait for ~3 min (95 % util, ~140 IOPS). Cleared by itself; the diff was
+   my mistake, not the driver's.
+6. **A permission question blocked the turn for ~10 h** (the `datapypsa` rebuild needed approval, asked at 23:15, answered at 09:00). The landing of the five
+   NIC5 trees had finished at 23:11; nothing was lost, but the publication started 10 h later than it could have.
+
+**Hub banners.** The hub page of `scen_nuc4gw`, `scen_nuc4gw_biomethane_industrie`, `scen_nuc4gw_noccsccgt` and `scen_noco2cap` says that the TIMES side is the
+S1 placeholder; `scen_test_lowccs_ptx` says TEST; `scen_realiste` says internal / older TIMES base (`add_banner.py`, inserted after the hub is built and before the rsync).
+The Explorer labels of the first four end in `-times-placeholder`.
+
+**Final state (measured 11 Oct 18:55 with `pub_record.sh`: `curl` HEAD on the three pages, `aws s3 ls`).** All ten scenarios published, **0 failures**.
+Each pypsa2html report is 91 pages (40 sections skipped for lack of data, 0 failed), built in 38–53 min at a 5.3–5.4 GB peak; Phase B total 11:23 → 18:55.
+Raw trees now hold the HTML (124 files) and the three network-cost CSVs.
+
+| scenario | pypsa.squoilin.eu (hub / pypsa / Sankey) | raw results on S3 `test/pypsa_raw_results/` | Explorer folder `test/scenarios/` |
+|---|---|---|---|
+| `scen_central` | [https://pypsa.squoilin.eu/scen_central_20261010/](https://pypsa.squoilin.eu/scen_central_20261010/) (200 / 200 / 200) | 329 files, 1.34 GB (124 html) | `times-pypsa__scen_central-2010-1h__20261010` (53 files, 0 empty) |
+| `scen_nuc4gw` | [https://pypsa.squoilin.eu/scen_nuc4gw_20261010/](https://pypsa.squoilin.eu/scen_nuc4gw_20261010/) (200 / 200 / 200) | 329 files, 1.34 GB (124 html) | `times-pypsa__scen_nuc4gw-2010-1h-times-placeholder__20261010` (53 files, 0 empty) |
+| `scen_biomethane_industrie` | [https://pypsa.squoilin.eu/scen_biomethane_industrie_20261010/](https://pypsa.squoilin.eu/scen_biomethane_industrie_20261010/) (200 / 200 / 200) | 329 files, 1.34 GB (124 html) | `times-pypsa__scen_biomethane_industrie-2010-1h__20261010` (53 files, 0 empty) |
+| `scen_nuc4gw_biomethane_industrie` | [https://pypsa.squoilin.eu/scen_nuc4gw_biomethane_industrie_20261010/](https://pypsa.squoilin.eu/scen_nuc4gw_biomethane_industrie_20261010/) (200 / 200 / 200) | 329 files, 1.34 GB (124 html) | `times-pypsa__scen_nuc4gw_biomethane_industrie-2010-1h-times-placeholder__20261010` (53 files, 0 empty) |
+| `scen_noccsccgt` | [https://pypsa.squoilin.eu/scen_noccsccgt_20261010/](https://pypsa.squoilin.eu/scen_noccsccgt_20261010/) (200 / 200 / 200) | 329 files, 1.34 GB (124 html) | `times-pypsa__scen_noccsccgt-2010-1h__20261010` (53 files, 0 empty) |
+| `scen_nuc4gw_noccsccgt` | [https://pypsa.squoilin.eu/scen_nuc4gw_noccsccgt_20261010/](https://pypsa.squoilin.eu/scen_nuc4gw_noccsccgt_20261010/) (200 / 200 / 200) | 329 files, 1.33 GB (124 html) | `times-pypsa__scen_nuc4gw_noccsccgt-2010-1h-times-placeholder__20261010` (53 files, 0 empty) |
+| `scen_retardnucleaire` | [https://pypsa.squoilin.eu/scen_retardnucleaire_20261010/](https://pypsa.squoilin.eu/scen_retardnucleaire_20261010/) (200 / 200 / 200) | 329 files, 1.35 GB (124 html) | `times-pypsa__scen_retardnucleaire-2010-1h__20261010` (53 files, 0 empty) |
+| `scen_realiste` | [https://pypsa.squoilin.eu/scen_realiste_20261010/](https://pypsa.squoilin.eu/scen_realiste_20261010/) (200 / 200 / 200) | 329 files, 1.35 GB (124 html) | `times-pypsa__scen_realiste-2010-1h__20261010` (53 files, 0 empty) |
+| `scen_noco2cap` | [https://pypsa.squoilin.eu/scen_noco2cap_20261010/](https://pypsa.squoilin.eu/scen_noco2cap_20261010/) (200 / 200 / 200) | 329 files, 1.33 GB (124 html) | `times-pypsa__scen_noco2cap-2010-1h-times-placeholder__20261010` (53 files, 0 empty) |
+| `scen_test_lowccs_ptx` | [https://pypsa.squoilin.eu/scen_test_lowccs_ptx_20261010/](https://pypsa.squoilin.eu/scen_test_lowccs_ptx_20261010/) (200 / 200 / 200) | 329 files, 1.35 GB (124 html) | `times-pypsa__scen_test_lowccs_ptx-2010-1h__20261010` (53 files, 0 empty) |
+
+* Explorer test site: https://explorer.test.wallonie.climact.com/ (click **Clear cache** if a scenario is missing). **Not verified in the dropdown** (no browser session used here).
+* Internal only (policy of 5 Oct); nothing was sent to `prod/`.
+* The four `-times-placeholder` labels and the hub banners must be replaced when ICEDD's exports land (§11.6 item 4).
+
 
 ### 9.x Files changed on 2026-10-10 (uncommitted)
 
@@ -611,6 +796,15 @@ Not run. To be filled from the launch on, following the 6 Oct log's §5 runbook,
 | `cluster/config.sh`, `cluster/nic5.sh`, `cluster/cluster_setup.sh`, `cluster/config_cluster_nic6.yaml` (new) | `REMOTE=nic6`: 32-core / 60 GB solves, 9-core `add_brownfield`, Gurobi module licence, per-cluster job record; NIC5 unchanged |
 | `config/pypsa2html.yaml` | the four new scenarios pre-registered, commented out |
 | `results/walloon/scen_central_6h` | the 30 Sep 6 h tree and the first 10 Oct test moved to `results/_archive_pre20261010/` |
+
+**Changed on 11 Oct (uncommitted, same checkout):**
+
+| file | change |
+|---|---|
+| `config/pypsa2html.yaml` | the nine scenarios of this batch registered again (the 10 Oct vintage); `scen_realiste` label "(internal)"; taxshift pair, `realiste_nets` / `nobnd30` and the route twin stay out (backup `…/batch_20261010_scripts/pypsa2html.yaml.before_20261011`) |
+| `run_from_office_computer.md` | §3b: measured NIC6 memory and speed, cross-cluster noise; §7: pypsa2html OOM and the gc fix; new §7.5, the publication chain on this machine |
+| `docs/logs/2026-10-10_cabinet_batch_nuc3_nuc4_2010_1h.md` | status, §9.2–§9.4, §11 |
+| `results/walloon/<s>/csvs/{network_costs_calibrated,network_cost_segments,bill_harmonisation}.csv`, `html/` | produced for the ten trees (not in git) |
 
 ---
 
@@ -640,3 +834,252 @@ Feasibility only. Not batch results, and not comparable with any 1 h run.
 * **The load correction halves the 2040 carbon rent.**
 * **The room it frees goes to industrial BECCS and gas CC, not to CCGT CC.** CCGT CC stays at
   about 0 in 2040 at 6 h. What CCS on CCGT looks like at 1 h is for the batch to tell (§8 Q2).
+
+---
+
+## 11. Critical review (11 Oct 2026)
+
+**Scope.** All ten trees, read after landing, following [`docs/run-review-checklist.md`](../run-review-checklist.md).
+Evidence: `review_run.py` and `check_heat_profile_fidelity.py` on every tree (`cluster/logs/review_<s>.out`,
+`heatfid_<s>.out`; the same script on the archived 6 Oct central as a differential, `review_archived_central_20261006.out`),
+`ptx_report.csv`, `metrics.csv`, `nodal_capacities.csv`, `nodal_energy_balance.csv`, the effective `configs/`, the cluster
+`sacct` records, and five networks (BEWAL nuclear links of `scen_nuc4gw` and `scen_central`, 2040 and 2050).
+**Not done:** no re-solve, no resolution sensitivity (level 8), no cross-scenario pypsa2html report, no TIMES-side check of
+the S2 exports (they do not exist yet); level 7 is limited to what `review_run.py` compares.
+
+**Reading guide.** The S1 family and `scen_realiste` solved on NIC5 (16 Gurobi threads); the S2 family, `scen_noco2cap` and
+`scen_test_lowccs_ptx` on NIC6 (32 threads). F8 shows that this does not matter for the comparisons below.
+
+### 11.1 Provenance (level 0): pass with caveats
+
+* **Code.** pypsa-wal `4f2a5d21` (all the physics of this batch is committed in it; five commits since the 6 Oct central's
+  `f6d0f7aa`) plus the uncommitted cluster scripts of §9.1; TIMES_PyPSA `c6f93e2`; pypsa2html `5e8fc7d`. Environment: the pinned NIC5
+  lock on all three machines (pypsa 1.2.1, linopy 0.6.1, gurobipy 13.0.2).
+* **Effective configs** (`configs/config.base_s_adm___<year>.yaml`): the four horizons of each tree identical apart from
+  `planning_horizons`; weather 2010 (snapshots 2010-01-01 → 2011-01-01 and cutout `europe-2010-sarah3-era5`), 1 h,
+  `co2_capture_limit.enable: true`, `fill_lifetime: {nuclear: 40}` in all ten. Diffing each NIC5/NIC6 pair gives only the
+  scenario's own keys plus `cpus 16 → 32`, `mem_mb 80000 → 60000` and Gurobi `threads 16 → 32`; `scen_noco2cap` differs from the
+  central by the three `budget_national` blocks (2030 / 2040 / 2050: 0.45 / 0.25 (BEWAL 0.15) / 0.05 → 1.0 for BEBRU, BEVLG and BEWAL); `scen_test_lowccs_ptx` by the lever-D
+  export cap (3 000 kt, 500 €/t) and the industrial floor switched off.
+* **TIMES side (`sector.times_file`).**
+
+  | scenario | `.vd` read | status |
+  |---|---|---|
+  | `scen_central`, `scen_noco2cap`, `scen_test_lowccs_ptx`, `scen_nuc4gw` | `scen_central_v01_261002_0210.vd` | real for the central and the PtX test (by design); **placeholder** for `scen_nuc4gw` and `scen_noco2cap` |
+  | `scen_biomethane_industrie`, `scen_nuc4gw_biomethane_industrie` | `scen_sensibilite_biomethane_industrie_v01_261002_0210.vd` | placeholder for the S2 one |
+  | `scen_noccsccgt`, `scen_nuc4gw_noccsccgt` | `scen_sensibilite_central_noccsccgt_261002_0210.vd` | placeholder for the S2 one |
+  | `scen_retardnucleaire` | `scen_sensibilite_retardnucleaire_261002_0210.vd` | real (2 Oct export) |
+  | `scen_realiste` | `scen_sensibilite_realiste_260929_3009.vd` | **30 Sep export**, older TIMES base; its 2025 is not row-identical to the central's |
+
+  The four placeholders carry S1's demand, industrial capture floor (4 145 / 5 120 kt in 2040 / 2050, seen in their `*_python.log`),
+  TIMES Sankeys and indicators. The published hub pages of those four say so (banner, §9.4); the Explorer labels end in
+  `-times-placeholder`.
+
+### 11.2 Commit intent (level 0b): pass
+
+Previous production run: the 6 Oct central (`f6d0f7aa`). Every mechanism that changed since, with the observable in these trees:
+
+| mechanism (commit `4f2a5d21`) | what it claimed | observable here | verdict |
+|---|---|---|---|
+| Capture cap `sector.co2_capture_limit` | BEWAL capture ≤ 2 000 / 6 000 / 8 000 kt, overage valve 1 000 €/t | `Capped BEWAL CO2 capture at …` in every horizon of every `*_python.log`; capture total ≤ cap in 30 of 30 scenario-horizons, **overage 0 in all**; the cap binds in 2040 in 8 of 10 trees (dual −17 to −207 €/t), in 2050 only in `scen_retardnucleaire` (8.00 Mt, −85 €/t) | pass |
+| Corrected process-CO₂ load | 3 946 / 3 875 / 3 880 kt, not 5 434 / 5 108 | `Process-emissions load at BEWAL: 3946.10 / 3875.28 / 3880.12` in all ten `add_brownfield` logs; process capture 3.67–3.75 Mt in 2040 / 2050 (0.95 × 3 875 = 3.68) | pass |
+| Tihange 1 restart (`electricity.nuclear_restart`) | one extendable link, ≤ 962 MW_e, offered once in 2040, priced as the Tihange 3 extension | offer line only in the three S2 logs; link `BEWAL nuclear Tihange 1 restart` has p_nom 2 951 MW_th = **962 MW_e**, capital cost 92 941 €/MW_th/a = **285 095 €/MW_e/a**, 10 years, capacity factor **87.1 %** (7.34 TWh_e in 2040), renewed in 2050 as a retrofit; BEWAL nuclear **1 992 / 3 962 MW_e** (S1: 1 030 / 3 000) | pass |
+| New nuclear 60 years | annuity 875 → 843 kEUR/MW_e/a | `BEWAL nuclear-2025`: capital cost 274 677 €/MW_th/a = **842.6 kEUR/MW_e/a** | pass |
+| `existing_capacities.fill_lifetime` | foreign reactors keep their 40 years | the foreign-nuclear rows of `review_run.py` are **identical** to the archived 6 Oct central (NL 515 vs 485 MW, GB 8 664 vs 5 900 and 4 690 vs 2 800, FR 59 758 vs 54 000) | pass |
+| `scen_noco2cap` | national caps lifted 2030–2050, system budget kept | caps 1.0 in the config; national-cap dual 0 in 2030 / 2040 / 2050; system CO₂ dual kept (−99 / −118 / −664 €/t) | pass |
+| NIC6 route (32 threads, 60 GB, Gurobi 13.0.1 module) | same model, different machine | identical-by-construction LPs agree to ~1e-6 on the objective and ≤ 15 MW on any generator, link or storage-unit capacity (F8) | pass |
+
+### 11.3 Verdict per level
+
+| level | verdict | note |
+|---|---|---|
+| 0 provenance | pass with caveats | four placeholder TIMES sides; `scen_realiste` on the 30 Sep base |
+| 0b commit intent | pass | §11.2 |
+| 1 solve | pass, one operational warning | 40 of 40 optimal, `Crossover 0`, "large bounds / rhs" warnings as always; **NIC6 memory at 83–99 % of the request** (F9) |
+| 2 soft link | pass, pre-existing caveat | EV, industry, aviation and every transferred carrier match TIMES to ±0.00 %; heat load closes to 3e-6 TWh; 2050 biomass-boiler under-delivery (F11) |
+| 3 accounting | pass | all balances close to 0.00 %; one false positive (F10) |
+| 4 constraints | pass with caveats | aggregate nuclear caps met (BEWAL 1 992 / 3 962 MW_e in S2); import cap binds in every horizon; foreign-nuclear FAILs unchanged since 6 Oct (F11); **2040 is decided by stacked binding constraints** (F4) |
+| 5 realism | pass with caveats | capacity factors in range; build rates above history (F12) |
+| 6 prices and costs | partial | objective and `total costs` disagree in sign for some pairs (F2); not a reading of observed prices |
+| 7 TIMES consistency | limited | S2 and `noco2cap` have no TIMES counterpart yet; PyPSA price about 2× TIMES in three horizons (F14) |
+| 8 robustness | partial | 6 Oct → 10 Oct (F3) and cross-cluster noise (F8) done; resolution sensitivity not |
+
+### 11.4 Findings, ranked by whether they change a headline number
+
+Headline numbers, BEWAL (`cluster`: NIC5 = 16 threads, NIC6 = 32):
+
+**2040** (BEWAL; capacities MW as in `nodal_capacities.csv`; duals EUR/t; price EUR/MWh)
+
+| scenario | cluster | capture Mt (cap) | CCGT CC Mt | capture-cap dual | national-cap dual | price mean | CCGT | CCGT CC | battery disch. | ground PV | objective bn |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `central` | NIC5 | 6.00 (6) | 0.51 | -118 | -141 | 94.8 | 3,441 | 478 | 2,934 | 6,495 | 263.74 |
+| `nuc4gw` | NIC6 | 6.00 (6) | 0.00 | -17 | -29 | 90.2 | 3,369 | 0 | 2,270 | 6,387 | 263.39 |
+| `biomethane_industrie` | NIC5 | 6.00 (6) | 0.51 | -118 | -141 | 94.8 | 3,437 | 479 | 2,937 | 6,394 | 263.74 |
+| `nuc4gw_biomethane_industrie` | NIC6 | 6.00 (6) | 0.00 | -17 | -29 | 90.2 | 3,368 | 0 | 2,270 | 6,285 | 263.39 |
+| `noccsccgt` | NIC5 | 6.00 (6) | 0.00 | -120 | -144 | 95.0 | 4,074 | 0 | 2,939 | 6,748 | 263.78 |
+| `nuc4gw_noccsccgt` | NIC6 | 6.00 (6) | 0.00 | -18 | -30 | 90.3 | 3,399 | 0 | 2,312 | 6,748 | 263.42 |
+| `retardnucleaire` | NIC5 | 6.00 (6) | 0.54 | -117 | -140 | 94.8 | 3,382 | 505 | 2,965 | 7,463 | 263.73 |
+| `realiste` | NIC5 | 6.00 (6) | 0.30 | -207 | -237 | 99.9 | 3,779 | 277 | 2,364 | 4,063 | 278.34 |
+| `noco2cap` | NIC6 | 5.56 (6) | 0.00 | -0 | -0 | 90.1 | 7,322 | 0 | 418 | 1,510 | 266.22 |
+| `test_lowccs_ptx` | NIC6 | 5.49 (6) | 0.00 | -0 | -229 | 98.4 | 3,782 | 0 | 3,520 | 6,495 | 264.30 |
+
+**2050** (BEWAL; capacities MW as in `nodal_capacities.csv`; duals EUR/t; price EUR/MWh)
+
+| scenario | cluster | capture Mt (cap) | CCGT CC Mt | capture-cap dual | national-cap dual | price mean | CCGT | CCGT CC | battery disch. | ground PV | objective bn |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `central` | NIC5 | 6.98 (8) | 0.41 | -0 | -0 | 106.9 | 2,550 | 884 | 5,653 | 13,000 | 284.76 |
+| `nuc4gw` | NIC6 | 6.66 (8) | 0.23 | -0 | -0 | 105.5 | 2,478 | 511 | 3,531 | 6,808 | 285.08 |
+| `biomethane_industrie` | NIC5 | 7.14 (8) | 0.28 | -0 | -0 | 106.8 | 2,545 | 622 | 5,452 | 13,000 | 284.70 |
+| `nuc4gw_biomethane_industrie` | NIC6 | 6.95 (8) | 0.23 | -0 | -0 | 105.4 | 2,477 | 512 | 3,166 | 5,982 | 285.03 |
+| `noccsccgt` | NIC5 | 6.13 (8) | 0.00 | -0 | -0 | 107.4 | 3,183 | 0 | 6,286 | 13,000 | 283.81 |
+| `nuc4gw_noccsccgt` | NIC6 | 6.13 (8) | 0.00 | -0 | -0 | 105.7 | 2,973 | 0 | 4,162 | 6,824 | 284.12 |
+| `retardnucleaire` | NIC5 | 8.00 (8) | 2.35 | -85 | -0 | 112.2 | 2,491 | 4,207 | 8,328 | 13,000 | 283.76 |
+| `realiste` | NIC5 | 7.34 (8) | 0.12 | -0 | -0 | 106.2 | 2,888 | 277 | 5,377 | 13,000 | 283.47 |
+| `noco2cap` | NIC6 | 6.60 (8) | 0.00 | -0 | -0 | 106.5 | 6,431 | 0 | 5,316 | 12,199 | 283.51 |
+| `test_lowccs_ptx` | NIC6 | 6.87 (8) | 0.26 | -0 | -0 | 107.2 | 2,890 | 553 | 5,729 | 13,000 | 284.28 |
+
+**F1. CCS on CCGT "actif par défaut à partir de 2040" (§2 item 2) is not what the model delivers, and in S2 it is absent.**
+* 2040 CCGT CC: 0.51 Mt (478 MW_e) in the S1 central and its biomethane twin, 0.54 Mt in `retardnucleaire`, 0.30 in `realiste`, **0 in every S2
+  run, in both `noccsccgt` runs (by construction), in `noco2cap` and in the PtX test.** TIMES S1 keeps 1.85 Mt of power CCS in 2040.
+* The central's 0.51 Mt and the S2 runs' 0.51 Mt of *gas-for-industry* CC are the **same tonnes taken by a different route**: with the
+  cap at 6 Mt both fill it to 6.00 (process 3.67 + biomass-for-industry 1.82 + one 0.51 Mt route). The choice between the two is a
+  margin flip, and its price signal is small: the capture-cap dual falls from −118 to −17 €/t between S1 and S2 (F2).
+* Why PyPSA gives the room to something else: with the 4 145 kt floor met by 5.49 Mt of industrial capture, PyPSA's industry already
+  uses 1.3 Mt more of the 6 Mt than TIMES's (4.15 Mt), which is what TIMES leaves for power.
+* **To act on:** §8 Q2 stands. If the cabinet needs CCGT CC in S2, the lever is an explicit `p_nom_min` on BEWAL `CCGT CC` in 2040, stated
+  in the annex; the alternative is to cap industrial capture at TIMES's tonnage instead of only flooring it. Do not present the
+  S1 0.51 Mt as a result: it is the marginal route.
+
+**F2. Tihange 1 (S2 − S1) relaxes the Walloon CO₂ constraints, and its electricity goes to export and to ground PV, not to the Walloon bill.**
+
+| | 2040 S1 → S2 | 2050 S1 → S2 |
+|---|---|---|
+| BEWAL nuclear, TWh_e | 7.90 → 15.19 (+7.29) | 22.45 → 29.50 (+7.05) |
+| BEWAL gas power (CCGT + CC), TWh_e | 9.27 → 7.02 (−2.25) | 3.05 → 1.91 (−1.14) |
+| net BE balance on the BEWAL AC line, TWh (negative = export) | +0.16 → −3.54 (**+3.7 TWh more export**) | +5.87 → +6.30 |
+| ground PV, MW (output TWh) | 6 495 → 6 387 (6.30 → 6.19) | **13 000 → 6 808** (12.54 → 6.61, −5.9) |
+| battery discharger, MW | 2 934 → 2 270 | 5 653 → 3 531 |
+| national CO₂ cap dual, €/t | **−141 → −29** | 0 → 0 |
+| capture-cap dual, €/t | −118 → −17 | – |
+| electricity import cap, shadow price €/MWh (net import TWh) | −59.5 (+4.88) → −8.1 (+0.86) | −17.2 → −1.3 |
+| mean electricity price, €/MWh | 94.8 → 90.2 | 106.9 → 105.5 |
+
+* In 2050 the central sits on the 13 GW ground-PV potential: any extra firm supply displaces PV (962 MW of nuclear ≈ 6 GW of PV at CF 11 %).
+* **Objective and `total costs` disagree.** Objective: −0.35 bn in 2040, +0.32 bn in 2050; `total costs` (`metrics.csv`, which prices existing
+  assets): −0.35 and −0.48 bn. The restart link alone costs 285 095 €/MW_e/a × 962 MW = 0.274 bn/a. Do not quote either as "the cost of
+  Tihange 1", and not at all for 2040 (F5).
+
+**F3. The 6 Oct central's 2040 numbers are superseded: the capture cap and the corrected load moved them.** New central vs the archived one
+(same TIMES export, both on NIC5):
+
+| 2040, BEWAL | 6 Oct central | 10 Oct central | change |
+|---|---:|---:|---|
+| CCGT CC, MW (Mt captured) | 1 713 (1.94) | 478 (0.51) | −72 % |
+| gas-for-industry CC, MW | 1 001 | 0 | |
+| ground PV, MW | 4 653 | 6 495 | +1 842 |
+| battery discharger, MW | 1 320 | 2 934 | +1 613 |
+| national CO₂ cap dual, €/t (effective BEWAL price) | −19.5 (132) | **−140.6 (252)** | 7× (1.9×) |
+| mean electricity price, €/MWh | 90.5 | 94.8 | +4.3 |
+| objective, bn EUR | 264.33 | 263.74 | −0.59 |
+
+2025 and 2030 capacities are identical, so the model change acts from 2040. The 2025 objective moved by +0.05 bn
+(335.28 → 335.33), which is above the solver tolerance and has not been traced.
+**The 7 Oct publication (6 Oct central) shows the old 2040 picture; the new pages are dated 20261010.**
+
+**F4. 2040 is decided by stacked hard constraints, not by cost.** In the S1 central four constraints bind at once in 2040:
+the Walloon national CO₂ cap (−141 €/t), the 6 Mt capture cap (−118 €/t), the electricity import cap (−59.5 €/MWh, 6.47 TWh
+one-way) and the biomass limit (−27.9). The S2 runs relax the first three by 5×, 7× and 7×. Any 2040 comparison between scenarios
+(PV, batteries, CCGT CC, price) mostly measures which of these constraints a change relieves. Read the duals next to every 2040 number.
+
+**F5. 2040 biogas toggles between scenarios and contaminates cost and price comparisons.** BEWAL biogas used in 2040: 4.67 TWh
+(`e_sum_max`) in every NIC5 run and the PtX test; **2.15 TWh in the three S2 runs; 1.02 TWh in `noco2cap`.** The effective Walloon CO₂ price
+(252 → 139 €/t in S2) crosses the block's break-even (instructions.md, "reading operational costs"). Part of the S2 2040 price and
+objective drop is the block, not Tihange 1.
+
+**F6. `scen_noco2cap`: without the Belgian national caps Wallonia turns to gas, and the central's 2040 PV and battery build disappears.**
+* 2030: no capture at all (process CC 0 against 1.28 Mt) and objective −1.7 bn.
+* 2040: CCGT 7 322 MW (3 441) and 18.5 TWh of gas power (9.3), ground PV 1 510 MW (6 495), battery 418 MW (2 934), mean price 90.1 (94.8).
+  So the central's 2040 PV and storage are a response to the national cap.
+* The system CO₂ price is kept (−99 / −118 / −664 €/t), so this is **not TIMES's "pas de contrainte CO₂"** run (§2 item 8, caveat unchanged);
+  the AEA fines are not modelled.
+
+**F7. `scen_realiste`.** 2030 uncapped (CO₂ dual 0, price 74.9 against 100 €/MWh), objective −8.3 bn in 2030 and **+14.6 bn in 2040**
+(inherited 2030 gas build, then the 2040 caps bite: national dual −237 €/t, capture dual −207 €/t). Heat-pin gap 3.77 TWh_th, 3× the others.
+Older TIMES base. Internal only.
+
+**F8. Cross-cluster comparability holds (a positive finding that closes the §9.1 caveat).** For the S1/S2 pairs, 2025 and 2030 are the
+same LP. Their objectives agree to ≤ 1e-6 (335.3315 vs 335.3315; 372.8779 vs 372.8779). Of 727 components (stores and the EU primary-supply rows excluded) 0–17 differ by
+more than 1 MW and **none by more than 15 MW** (largest: GB offshore wind, 14 MW, 2030). The excluded rows are degenerate: `oil primary` at the EU bus
+differs by 0.1 % and the fuel stores by tens of MWh. Two independent pairs (central / biomethane against their S2 twins) show the same S2 pattern. The S2 − S1
+differences above (hundreds of MW to GW, duals ×5–7) are therefore model effects. The same holds for `noco2cap` and the PtX test against the central.
+
+**F9. NIC6 memory has no headroom.** `MaxRSS` of the 20 NIC6 solves: 48.6–58.0 GiB, **83–99 % of the 58.6 GiB request**; five solves at
+98–99 % (58.0 GiB on `scen_nuc4gw` 2030 and the PtX test 2030). NIC5 at 16 threads: 28.6–33.0 GiB of 80 GB. Nothing was killed, but the
+next scenario with a slightly larger LP would be. The 75 GB bump of §9.1 item 8 reached two solves only (`scen_nuc4gw` and `scen_nuc4gw_biomethane_industrie`, 2040; they peaked at 53.6 and 55.2 GiB).
+**Before the next NIC6 batch:** `solving.mem_mb: 75000` in `cluster/config_cluster_nic6.yaml` (keep `cpus` = `threads` = 32 if
+`sbatch --test-only` accepts it; otherwise `cpus: 40`, `threads: 32`).
+
+**F10. Tooling findings.**
+* **Silent failure of the network-cost step at landing** (§9.3): all ten trees lacked `network_costs_calibrated.csv`,
+  `network_cost_segments.csv` and `bill_harmonisation.csv` until run on 11 Oct. `cmd_postprocess` sends plain Python through `$LOCAL_RUN`.
+  It must call `conda run … python …` directly and `die` (not `warn`) when the files are missing.
+* `review_run.py` raises a **false FAIL on `tes_se`** in four trees (`nuc4gw`, `nuc4gw_biomethane_industrie`, `noccsccgt`,
+  `nuc4gw_noccsccgt`): in 1.02–1.27 TWh, out 0.97–1.19 TWh, gap −0.058 to −0.081 TWh = 5.7–6.3 % of throughput. That is the thermal store's
+  standing loss; the check treats any gap above 0.05 TWh and 2 % on a storage node as a mapping hole (the central stays just under it).
+  Exempt storage losses, or compare against the store's `standing_loss`.
+* `review_run.py` exits 1 whenever a FAIL exists, which `conda run` prints as an `ERROR` line; harmless, but it hid a real failure on 10 Oct
+  only because everyone had learned to ignore it. A "known failures" list (F11) would make a *new* FAIL visible.
+* `cluster/probe.sh` cannot map the UUID-named Slurm jobs of snakemake-executor-slurm 2.7 to scenarios; the session wrote `probe_both.sh`.
+* `pull` overwrites the local `cluster/logs/orchestrate.log` with whichever cluster was pulled last: copy each under its own name.
+
+**F11. Pre-existing and unchanged since 6 Oct (not caused by this batch).**
+* **Foreign-nuclear aggregate FAILs (9 in every tree, 10 with F10):** NL 515 vs 485 MW (2025, 2030), GB 8 664 vs 5 900 (2025) and 4 690 vs
+  2 800 MW (2030), FR 59 758 vs 54 000 MW (2050), and four DE rows of "0 vs 0". Same numbers in the archived 6 Oct central
+  (`review_run.py` 170 / 30 / 14 / 9). Cause: `add_CCL_constraints` does not subtract existing capacity from the generator `max` (checklist §4.1).
+  They change no Walloon number but they sit in every review.
+* **2050 biomass-boiler under-delivery** (pinned heat not delivered, the heat pump absorbs it): 1.19 TWh_th in the central, 1.28 in `nuc4gw`,
+  0.08 in `retardnucleaire`, 3.77 in `realiste` (undelivered share 8–84 %). Heat load still closes to 3e-6 TWh.
+
+**F12. Build rates above history (same warnings as before).** BEWAL onwind +480 MW/yr 2025 → 2030; ground PV +548 MW/yr 2030 → 2040;
+rooftop PV +596 and +628 MW/yr; zero-capital-cost capacities in 2050 (distribution grid 7.8 GW, gas pipeline 7.5 GW, BEV charger 4.2 GW, …)
+are not results.
+
+**F13. Do not read ±1 bn between scenarios.** `noccsccgt` is 0.95 bn *cheaper* than the central in 2050 although it has fewer options: the
+myopic path (different 2040 build) and a different TIMES export (its own capture floors) differ. Objectives are annual system costs of
+different myopic paths, not comparable at the 0.3 % level.
+
+**F14. PyPSA's wholesale price is about twice TIMES's in three of four horizons (level 7; `csvs/bill_harmonisation.csv`, run on 11 Oct).**
+BE zonal time-average price, PyPSA vs TIMES, `scen_central`: 2025 105.1 vs 51.3 €/MWh (+105 %), 2030 118.3 vs 67.0 (+77 %),
+2040 106.5 vs 96.9 (+10 %, the only pass), 2050 112.5 vs 60.6 (+86 %). Gas 17–22 % above TIMES in every horizon. 18–19 of the 20 rows
+are `GAP` in every tree I opened (`scen_central`, `scen_nuc4gw`). TIMES averages its own timeslices; PyPSA prices 8 760 hours with a CO₂ dual
+of 77–653 €/t. The 2040 agreement is a consequence of F4 (the stacked constraints raise PyPSA's 2040 price), not of better agreement.
+Any bill or price quoted from PyPSA next to TIMES needs this table and the "bills use the Belgian zonal HV price" rule of instructions.md.
+
+### 11.5 Numbers that must not be published as-is
+
+| number | why |
+|---|---|
+| any 2040 CCGT CC / "CCS on CCGT" tonnage or capacity | marginal route, flips between S1 and S2 with a 17 €/t price signal (F1); the cabinet's "active by default" is not met in S2 |
+| a cost, a price delta or a CO₂ price for "Tihange 1" | objective and `total costs` disagree in sign in 2050; the 2040 delta contains the biogas toggle and three relaxed constraints (F2, F4, F5) |
+| the S2 trio's and `noco2cap`'s TIMES-side figures (demand, Sankeys, indicators, industrial floor) | S1's export, a placeholder until ICEDD delivers (§11.1) |
+| `noco2cap` as "TIMES without CO₂ constraint" | system price kept, endogenous; AEA fines not modelled (F6) |
+| the 7 Oct pages and any 2040 figure from the 6 Oct central | superseded by the capture cap and the corrected load (F3) |
+| 2025 horizon values | an optimisation of the base year, not a calibration (checklist §5.1) |
+| 2050 ground PV in S1 (13 000 MW) | it is the potential cap, not an optimum |
+| the 2050 Walloon heat mix by technology | biomass boilers under-delivered by 8–84 % (F11) |
+| any PyPSA electricity price or bill set beside TIMES's | about 2× TIMES in 2025, 2030 and 2050 (F14) |
+| `scen_realiste` anything | older TIMES base, 2030 uncapped by design |
+
+### 11.6 Follow-up actions
+
+1. **NIC6 memory** to 75 000 MB before the next NIC6 batch (F9).
+2. **Fix `cmd_postprocess`** (plain Python off the Snakemake wrapper; fail on missing network-cost files) and add a guard test (F10).
+3. **`review_run.py`:** exempt `tes_se` standing losses; add a known-failures list for the nine foreign-nuclear rows; avoid the misleading
+   non-zero exit (F10, F11).
+4. **ICEDD:** the S2 exports (3 + `noco2cap`), the Tihange 1 profile and the 2030 `CO2STG01` bound of 2 Mt (§8 Q1a, Q4); then §5b swaps the
+   placeholders and these four pages and Explorer sets are replaced.
+5. **Cabinet / Sylvain:** the CCS-on-CCGT lever (F1) and whether the endogenous system CO₂ price is an acceptable "maintien des ETS" (§8 Q3).
+6. Trace the +0.05 bn 2025 objective shift between the 6 and 10 Oct centrals (F3); it is above solver tolerance.
+7. Build the **cross-scenario pypsa2html report** (S1 vs S2 on one page) once the exports land; the per-scenario pages built today do not
+   compare scenarios.
+8. Keep `datapypsa` (§9.4) and the publication drivers (`/sylvain/mount/pypsa-wal-data/batch_20261010_scripts/`) for the next batch.

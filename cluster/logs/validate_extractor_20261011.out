@@ -1,0 +1,116 @@
+### 09:05 extract (validation) | RAM avail 11811 MB
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 0.35.2)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 0.35.2)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 0.35.2)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 0.35.2)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores
+INFO:scripts.graph_extraction_plots:Exported figures to folder : /sylvain/svn/climact-pypsa-eur_results_extraction-88d352b59aa4/analysis/graph_data/v6/times-pypsa__validate_central__20261007
+INFO:scripts.graph_extraction_transform:Transforming data
+INFO:scripts.graph_extraction_transform:Exported files to folder : /sylvain/svn/climact-pypsa-eur_results_extraction-88d352b59aa4/analysis/graph_data/v6/times-pypsa__validate_central__20261007
+INFO:scripts.graph_extraction_transform:Exporting contextual data to /sylvain/svn/climact-pypsa-eur_results_extraction-88d352b59aa4/analysis/graph_data
+INFO:scripts.graph_extraction_load_st:Exporting data to streamlit
+INFO:scripts.graph_extraction_load_st:Exporting contextual data
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Direct Air Carbon Capture for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Transmission losses for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Ammonia production for vector Electricity is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Hydrogen production for vector Electricity is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Methanol production for vector Electricity is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Shipping for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Coal/Lignite for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Gas (Allam Cycle) for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Micro gas CHP for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Gas CC (CCGT) for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Nuclear (SMR) for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Methanol power for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Oil (Turbojet) for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology V2G for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Electrobiofuels production for vector Oil does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Biomass CHP CC for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Coal/Lignite for vector Electricity is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Gas (Allam Cycle) for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Micro gas CHP for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Gas CC (CCGT) for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Nuclear (SMR) for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Fuel Cell for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Pumped Hydro Storage for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology H2 turbine for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Methanol power for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Oil (Turbojet) for vector Electricity is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology V2G for vector Electricity does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Haber-Bosch for vector Ammonia is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Fischer-Tropsch for vector Oil is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Methanol production for vector Methanol is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Electrolysis for vector Hydrogen is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Steam Methane Reforming for vector Hydrogen is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Steam Methane Reforming CC for vector Hydrogen is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Bad Node] Technology Hydrogen production CC for vector CO2 captured is present in the network, but not for node Wallonia.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Technology Direct Air Carbon Capture for vector CO2 captured does not seem to be present in the network.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Central heat production for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Ammonia production for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Methanol production for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Ammonia production for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Methanol production for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Ammonia production for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Methanol production for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Ammonia production for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Methanol production for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Hydrogen production for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Hydrogen production for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Hydrogen production for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Hydrogen production for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Biomass CHP for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Biomass CHP CC for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Biomass CHP CC for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Biomass CHP CC for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Biomass CHP CC for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Coal/Lignite for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Coal/Lignite for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Coal/Lignite for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Coal/Lignite for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CHP for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas (Allam Cycle) for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas (Allam Cycle) for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas (Allam Cycle) for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas (Allam Cycle) for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Micro gas CHP for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Micro gas CHP for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Micro gas CHP for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Micro gas CHP for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas (OCGT) for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CC (CCGT) for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CC (CCGT) for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CC (CCGT) for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CC (CCGT) for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CHP CC for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CHP CC for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CHP CC for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CC (OCGT) for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Gas CC (OCGT) for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Fuel Cell for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Fuel Cell for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Fuel Cell for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Fuel Cell for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector H2 turbine for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector H2 turbine for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector H2 turbine for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector H2 turbine for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Methanol power for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Methanol power for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Methanol power for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Methanol power for vector Electricity does not seem to be present for node wl for year 2050.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Oil (Turbojet) for vector Electricity does not seem to be present for node wl for year 2025.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Oil (Turbojet) for vector Electricity does not seem to be present for node wl for year 2030.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Oil (Turbojet) for vector Electricity does not seem to be present for node wl for year 2040.
+WARNING:scripts.graph_extraction_strategy_metrics:[STRAT_METRICS][Not Present] Profile of sector Oil (Turbojet) for vector Electricity does not seem to be present for node wl for year 2050.
+INFO:__main__:Done for None (20261007_walloon_validate_central)
+CAPPED label=validate limit=10G exit=0 peak_GB=7,5
+### 09:14 extract exit=0
+new set: 49 files; published set: 49 files
+pypsa csvs: identical=49 different=0 missing=0
+strategy strategy_metrics.csv identical
+strategy strategy_metrics_mapping.csv identical
+strategy strategy_metrics_t.csv identical
+VALIDATE_DONE

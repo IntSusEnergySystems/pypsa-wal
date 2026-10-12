@@ -1,0 +1,287 @@
+[1;33m[nic5] WARNING:[0m postprocess runs LOCALLY after pull.
+[1;33m[nic5] WARNING:[0m Step 1 uses Snakemake --touch on solved networks only (does NOT re-run Gurobi).
+[1;34m[nic5][0m Touching solved networks (Snakemake --touch)
+Using workflow specific profile profiles/default for setting default command line arguments.
+Config file config/config.default.yaml is extended by additional config specified via the command line.
+Config file config/plotting.default.yaml is extended by additional config specified via the command line.
+Assuming unrestricted shared filesystem usage.
+
+SNAKEMAKE
+=========
+  Date: 2026-10-10 23:03:16
+  Workflow ID: c4b306f5-0d7b-4b0a-bec7-c675ef23b745
+  Platform: Linux-6.14.0-33-generic-x86_64-with-glibc2.39
+  Host: pcbureau
+  User: sylvain
+  Snakemake version: 9.25.1
+  Python version: 3.13.13 | packaged by conda-forge | (main, Apr  8 2026, 02:00:33) [GCC 14.3.0]
+  Command: /sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/bin/snakemake --resources mem_mb=20000 --configfile config/config.walloon.yaml --cores 1 --rerun-triggers mtime --touch -- results/walloon/scen_realiste/networks/base_s_adm___2025.nc results/walloon/scen_realiste/networks/base_s_adm___2030.nc results/walloon/scen_realiste/networks/base_s_adm___2040.nc results/walloon/scen_realiste/networks/base_s_adm___2050.nc
+  Snakefile: /sylvain/mount/git/pypsa-wal/Snakefile
+  Base directory: /sylvain/mount/git/pypsa-wal
+  Run directory: /sylvain/mount/git/pypsa-wal
+  Working directory: /sylvain/mount/git/pypsa-wal
+  Config file(s): [PosixPath('/sylvain/mount/git/pypsa-wal/config/config.walloon.yaml'), 'config/config.default.yaml', 'config/plotting.default.yaml']
+  Config MD5: 28197a167bdcd2f5d28a4b8a67d7e9c3
+
+Building DAG of jobs...
+Nothing to be done (all requested files are present and up to date).
+[1;34m[nic5][0m Running summary plots and CSVs
+Using workflow specific profile profiles/default for setting default command line arguments.
+Config file config/config.default.yaml is extended by additional config specified via the command line.
+Config file config/plotting.default.yaml is extended by additional config specified via the command line.
+Assuming unrestricted shared filesystem usage.
+
+SNAKEMAKE
+=========
+  Date: 2026-10-10 23:03:32
+  Workflow ID: 156d9e23-2189-4f41-81b5-82d447f5570e
+  Platform: Linux-6.14.0-33-generic-x86_64-with-glibc2.39
+  Host: pcbureau
+  User: sylvain
+  Snakemake version: 9.25.1
+  Python version: 3.13.13 | packaged by conda-forge | (main, Apr  8 2026, 02:00:33) [GCC 14.3.0]
+  Command: /sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/bin/snakemake --resources mem_mb=20000 --configfile config/config.walloon.yaml --cores 4 --rerun-triggers mtime --printshellcmds -- results/walloon/scen_realiste/csvs/costs.csv results/walloon/scen_realiste/graphs/costs.svg results/walloon/scen_realiste/csvs/cumulative_costs.csv
+  Snakefile: /sylvain/mount/git/pypsa-wal/Snakefile
+  Base directory: /sylvain/mount/git/pypsa-wal
+  Run directory: /sylvain/mount/git/pypsa-wal
+  Working directory: /sylvain/mount/git/pypsa-wal
+  Config file(s): [PosixPath('/sylvain/mount/git/pypsa-wal/config/config.walloon.yaml'), 'config/config.default.yaml', 'config/plotting.default.yaml']
+  Config MD5: 28197a167bdcd2f5d28a4b8a67d7e9c3
+
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 4
+Rules claiming more threads will be scaled down.
+Provided resources: mem_mb=Resource("mem_mb", 20000)
+Conda environments: ignored
+Job stats:
+job                      count
+---------------------  -------
+make_summary                 4
+make_global_summary          1
+make_cumulative_costs        1
+plot_summary                 1
+total                        7
+
+Select jobs to execute...
+Execute 2 jobs...
+
+[Sat Oct 10 23:03:44 2026]
+Creating optimization results summary statistics
+localrule make_summary:
+    input: results/walloon/scen_realiste/networks/base_s_adm___2025.nc
+    output: results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2025.csv
+    log: results/walloon/scen_realiste/logs/make_summary_s_adm___2025.log
+    jobid: 1
+    benchmark: results/walloon/scen_realiste/benchmarks/make_summary_s_adm___2025
+    reason: Missing output files: results/walloon/scen_realiste/csvs/individual/costs_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2025.csv
+    wildcards: run=scen_realiste, clusters=adm, opts=, sector_opts=, planning_horizons=2025
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+
+[Sat Oct 10 23:03:44 2026]
+Creating optimization results summary statistics
+localrule make_summary:
+    input: results/walloon/scen_realiste/networks/base_s_adm___2040.nc
+    output: results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2040.csv
+    log: results/walloon/scen_realiste/logs/make_summary_s_adm___2040.log
+    jobid: 144
+    benchmark: results/walloon/scen_realiste/benchmarks/make_summary_s_adm___2040
+    reason: Missing output files: results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2040.csv
+    wildcards: run=scen_realiste, clusters=adm, opts=, sector_opts=, planning_horizons=2040
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+Select jobs to execute...
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 1.2.1)
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 1.2.1)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+[Sat Oct 10 23:04:23 2026]
+Finished jobid: 1 (Rule: make_summary)
+1 of 7 steps (14%) done
+Execute 1 jobs...
+
+[Sat Oct 10 23:04:23 2026]
+Creating optimization results summary statistics
+localrule make_summary:
+    input: results/walloon/scen_realiste/networks/base_s_adm___2030.nc
+    output: results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2030.csv
+    log: results/walloon/scen_realiste/logs/make_summary_s_adm___2030.log
+    jobid: 119
+    benchmark: results/walloon/scen_realiste/benchmarks/make_summary_s_adm___2030
+    reason: Missing output files: results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2030.csv
+    wildcards: run=scen_realiste, clusters=adm, opts=, sector_opts=, planning_horizons=2030
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+Select jobs to execute...
+[Sat Oct 10 23:04:23 2026]
+Finished jobid: 144 (Rule: make_summary)
+2 of 7 steps (29%) done
+Execute 1 jobs...
+
+[Sat Oct 10 23:04:23 2026]
+Creating optimization results summary statistics
+localrule make_summary:
+    input: results/walloon/scen_realiste/networks/base_s_adm___2050.nc
+    output: results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2050.csv
+    log: results/walloon/scen_realiste/logs/make_summary_s_adm___2050.log
+    jobid: 169
+    benchmark: results/walloon/scen_realiste/benchmarks/make_summary_s_adm___2050
+    reason: Missing output files: results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2050.csv
+    wildcards: run=scen_realiste, clusters=adm, opts=, sector_opts=, planning_horizons=2050
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 1.2.1)
+INFO:pypsa.network.io:New version 1.4.0 available! (Current: 1.2.1)
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+INFO:pypsa.network.io:Imported network 'Unnamed Network' has buses, carriers, generators, global_constraints, lines, links, loads, storage_units, stores, sub_networks
+[Sat Oct 10 23:05:02 2026]
+Finished jobid: 169 (Rule: make_summary)
+3 of 7 steps (43%) done
+[Sat Oct 10 23:05:03 2026]
+Finished jobid: 119 (Rule: make_summary)
+4 of 7 steps (57%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Sat Oct 10 23:05:03 2026]
+Creating global summary of optimization results for all scenarios
+localrule make_global_summary:
+    input: results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2050.csv
+    output: results/walloon/scen_realiste/csvs/costs.csv, results/walloon/scen_realiste/csvs/capacities.csv, results/walloon/scen_realiste/csvs/energy.csv, results/walloon/scen_realiste/csvs/energy_balance.csv, results/walloon/scen_realiste/csvs/capacity_factors.csv, results/walloon/scen_realiste/csvs/metrics.csv, results/walloon/scen_realiste/csvs/curtailment.csv, results/walloon/scen_realiste/csvs/prices.csv, results/walloon/scen_realiste/csvs/weighted_prices.csv, results/walloon/scen_realiste/csvs/market_values.csv, results/walloon/scen_realiste/csvs/nodal_costs.csv, results/walloon/scen_realiste/csvs/nodal_capacities.csv, results/walloon/scen_realiste/csvs/nodal_energy_balance.csv, results/walloon/scen_realiste/csvs/nodal_capacity_factors.csv
+    log: results/walloon/scen_realiste/logs/make_global_summary.log
+    jobid: 0
+    benchmark: results/walloon/scen_realiste/benchmarks/make_global_summary
+    reason: Missing output files: results/walloon/scen_realiste/csvs/costs.csv, results/walloon/scen_realiste/csvs/energy_balance.csv, results/walloon/scen_realiste/csvs/energy.csv; Input files updated by another job: results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacities_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/nodal_energy_balance_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_costs_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/prices_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/energy_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/costs_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/curtailment_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/nodal_capacity_factors_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/weighted_prices_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2050.csv, results/walloon/scen_realiste/csvs/individual/market_values_s_adm___2030.csv, results/walloon/scen_realiste/csvs/individual/capacity_factors_s_adm___2040.csv, results/walloon/scen_realiste/csvs/individual/capacities_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/metrics_s_adm___2025.csv, results/walloon/scen_realiste/csvs/individual/energy_balance_s_adm___2030.csv
+    wildcards: run=scen_realiste
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=8000, mem=8 GB, mem_mib=7630
+Shell command: None
+INFO:__main__:Creating global summary for costs
+INFO:__main__:Creating global summary for capacities
+INFO:__main__:Creating global summary for energy
+INFO:__main__:Creating global summary for energy_balance
+INFO:__main__:Creating global summary for capacity_factors
+INFO:__main__:Creating global summary for metrics
+INFO:__main__:Creating global summary for curtailment
+INFO:__main__:Creating global summary for prices
+INFO:__main__:Creating global summary for weighted_prices
+INFO:__main__:Creating global summary for market_values
+INFO:__main__:Creating global summary for nodal_costs
+INFO:__main__:Creating global summary for nodal_capacities
+INFO:__main__:Creating global summary for nodal_energy_balance
+INFO:__main__:Creating global summary for nodal_capacity_factors
+[Sat Oct 10 23:05:08 2026]
+Finished jobid: 0 (Rule: make_global_summary)
+5 of 7 steps (71%) done
+Select jobs to execute...
+Execute 2 jobs...
+
+[Sat Oct 10 23:05:08 2026]
+Plotting summary statistics and results
+localrule plot_summary:
+    input: results/walloon/scen_realiste/csvs/costs.csv, results/walloon/scen_realiste/csvs/energy.csv, results/walloon/scen_realiste/csvs/energy_balance.csv, resources/eurostat_energy_balances.csv, data/ghg_emissions/archive/v23/UNFCCC_v23.csv
+    output: results/walloon/scen_realiste/graphs/costs.svg, results/walloon/scen_realiste/graphs/energy.svg, results/walloon/scen_realiste/graphs/balances-energy.svg
+    log: results/walloon/scen_realiste/logs/plot_summary.log
+    jobid: 192
+    reason: Input files updated by another job: results/walloon/scen_realiste/csvs/costs.csv, results/walloon/scen_realiste/csvs/energy_balance.csv, results/walloon/scen_realiste/csvs/energy.csv
+    wildcards: run=scen_realiste
+    threads: 2
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=10000, mem=10 GB, mem_mib=9537
+Shell command: None
+
+[Sat Oct 10 23:05:08 2026]
+Calculating cumulative costs over time horizon
+localrule make_cumulative_costs:
+    input: results/walloon/scen_realiste/csvs/costs.csv
+    output: results/walloon/scen_realiste/csvs/cumulative_costs.csv
+    log: results/walloon/scen_realiste/logs/make_cumulative_costs.log
+    jobid: 193
+    benchmark: results/walloon/scen_realiste/benchmarks/make_cumulative_costs
+    reason: Input files updated by another job: results/walloon/scen_realiste/csvs/costs.csv
+    wildcards: run=scen_realiste
+    resources: tmpdir=/sylvain/mount/pypsa-wal-data/tmp, mem_mb=4000, mem=4 GB, mem_mib=3815
+Shell command: None
+[Sat Oct 10 23:05:12 2026]
+Finished jobid: 193 (Rule: make_cumulative_costs)
+6 of 7 steps (86%) done
+INFO:__main__:Dropping technology with costs below 1 EUR billion per year
+INFO:__main__:Total system cost of 544 EUR billion per year
+INFO:__main__:Dropping all technology with energy consumption or production below 50.0 TWh/a
+INFO:__main__:Total energy of 134 TWh/a
+[Sat Oct 10 23:05:18 2026]
+Finished jobid: 192 (Rule: plot_summary)
+7 of 7 steps (100%) done
+Complete log(s): /sylvain/mount/git/pypsa-wal/.snakemake/log/2026-10-10T230329.959091.snakemake.log
+[1;34m[nic5][0m Network cost report + TIMES bill harmonisation: results/walloon/scen_realiste
+Traceback (most recent call last):
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/site-packages/snakemake/cli.py", line 2393, in main
+    parser, args = parse_args(argv)
+                   ~~~~~~~~~~^^^^^^
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/site-packages/snakemake/cli.py", line 1903, in parse_args
+    args = parser.parse_args(argv)
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/site-packages/configargparse.py", line 1048, in parse_args
+    args, argv = self.parse_known_args(
+                 ~~~~~~~~~~~~~~~~~~~~~^
+        args=args,
+        ^^^^^^^^^^
+    ...<3 lines>...
+        ignore_help_args=False,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/site-packages/configargparse.py", line 1266, in parse_known_args
+    namespace, unknown_args = argparse.ArgumentParser.parse_known_args(
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, args=args, namespace=namespace
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/argparse.py", line 1936, in parse_known_args
+    return self._parse_known_args2(args, namespace, intermixed=False)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/argparse.py", line 1965, in _parse_known_args2
+    namespace, args = self._parse_known_args(args, namespace, intermixed)
+                      ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/argparse.py", line 2216, in _parse_known_args
+    start_index = consume_optional(start_index)
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/argparse.py", line 2140, in consume_optional
+    take_action(action, args, option_string)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/argparse.py", line 2041, in take_action
+    action(self, namespace, argument_values, option_string)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/site-packages/snakemake/common/argparse.py", line 56, in __call__
+    parsed = parse_func(values)
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/site-packages/snakemake/resources.py", line 1014, in <lambda>
+    return lambda exprs: cls.parse(
+                         ~~~~~~~~~^
+        exprs,
+        ^^^^^^
+        allow_expressions=allow_expressions,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        defaults=defaults,
+        ^^^^^^^^^^^^^^^^^^
+    )
+    ^
+
+  File "/sylvain/mount/pypsa-wal-data/miniforge3/envs/pypsa-eur/lib/python3.13/site-packages/snakemake/resources.py", line 1044, in parse
+    unparsed = dict([cls.decode_arg(expr) for expr in exprs])
+
+ValueError: dictionary update sequence element #1 has length 1; 2 is required
+
+ERROR conda.cli.main_run:execute(148): `conda run snakemake --resources mem_mb=20000 scripts/walloon_scripts/network_cost_report.py results/walloon/scen_realiste` failed. (See above for error)
+[1;33m[nic5] WARNING:[0m network cost reporting failed for results/walloon/scen_realiste (see /sylvain/mount/git/pypsa-wal/cluster/logs/postprocess.log)
+[1;34m[nic5][0m Post-processing complete (log: /sylvain/mount/git/pypsa-wal/cluster/logs/postprocess.log).
+[1;34m[nic5][0m SKIP_S3_UPLOAD=1 — skipping S3 upload (run: /sylvain/mount/git/pypsa-wal/./cluster/nic5.sh upload)
+CAPPED label=post limit=10G exit=0 peak_GB=3,5

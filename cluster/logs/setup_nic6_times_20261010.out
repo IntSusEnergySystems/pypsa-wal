@@ -1,0 +1,35 @@
+[1;34m[nic5][0m One-time cluster setup on nic6
+=== [1/4] Miniforge ===
+Miniforge already present.
+=== [2/4] conda environment 'pypsa-eur' ===
+Env exists; leaving it as is (conda env remove -n pypsa-eur first to rebuild from /scratch/ulg/thermlab/squoilin/pypsa-wal/envs/pypsa-eur_nic5_explicit.txt).
+Obtaining file:///scratch/ulg/thermlab/squoilin/TIMES_PyPSA
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: times-pypsa
+  Building editable for times-pypsa (pyproject.toml): started
+  Building editable for times-pypsa (pyproject.toml): finished with status 'done'
+  Created wheel for times-pypsa: filename=times_pypsa-0.1.0-0.editable-py3-none-any.whl size=24420 sha256=284ca3541848cd9e96f3c48689e7530d2366a90b33339feed5fbd674f02015ae
+  Stored in directory: /tmpscratch/ulg/thermlab/squoilin/pip-ephem-wheel-cache-n9kgqmar/wheels/4f/ab/bb/997d03ffcda469d08ce5f37b7eea0e40c88639a47bae3e4849
+Successfully built times-pypsa
+Installing collected packages: times-pypsa
+Successfully installed times-pypsa-0.1.0
+=== [3/4] Gurobi licence (token server) ===
+Copied /opt/cecisw/arch/2025b/software/Gurobi/13.0.1-GCCcore-14.3.0/gurobi.lic -> /home/ulg/thermlab/squoilin/gurobi.lic
+=== [4/4] sanity checks ===
+  pypsa      1.2.1
+  linopy     0.6.1
+  snakemake  9.25.1
+  gurobipy   13.0.2
+Set parameter LicenseID to value 2419530
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "nic5.uliege.be"
+  gurobi licence : OK (token checkout succeeded)
+=== setup done ===
+[1;34m[nic5][0m Setup finished.

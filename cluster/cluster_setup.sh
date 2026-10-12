@@ -36,10 +36,25 @@ source "$MINIFORGE/etc/profile.d/conda.sh"
 echo "=== [2/4] conda environment '$ENV_NAME' ==="
 # EDIT (2026-08-14): strip the local `-e ../TIMES_PyPSA` pip section before
 # creating/updating the remote env — the sibling checkout does not exist on
-# the cluster, and the solve chain does not import times_pypsa.
+# the cluster, and the solve jobs do not run it (the DAG planner imports it: see the install below).
 # The awk state machine deletes the marker comment and the pip block iff it
 # contains exactly the expected `-e ../TIMES_PyPSA` line; any other pip
 # content (a sed range would silently eat the rest of the file) aborts setup.
+# EDIT (2026-10-10): build from an exact package lock when one is shipped. An unpinned
+# build of envs/environment.yaml on a fresh NIC6 gave pypsa 1.3 / linopy 0.9 / pandas 3,
+# while every NIC5 solve so far ran pypsa 1.2.1 / linopy 0.6.1 / pandas 2.3.3.
+# envs/pypsa-eur_nic5_explicit.txt = `conda list --explicit --md5` of the NIC5 env;
+# snakemake itself is the one pip package of that env.
+ENV_LOCK="$REPO/envs/pypsa-eur_nic5_explicit.txt"
+if [ -r "$ENV_LOCK" ]; then
+    if conda env list | grep -qE "^\s*${ENV_NAME}\s"; then
+        echo "Env exists; leaving it as is (conda env remove -n $ENV_NAME first to rebuild from $ENV_LOCK)."
+    else
+        conda create -y -n "$ENV_NAME" --file "$ENV_LOCK"
+        conda run --no-capture-output -n "$ENV_NAME" python -m pip install --no-deps "snakemake==9.25.1"
+        conda clean --all -y >/dev/null 2>&1 || true   # CÉCI $HOME is quota-limited in files
+    fi
+else
 ENV_YAML_LOCAL="$REPO/envs/environment.yaml"
 ENV_YAML_REMOTE="$(mktemp /tmp/environment.cluster.XXXXXX.yaml)"
 if ! awk '
@@ -62,6 +77,16 @@ if conda env list | grep -qE "^\s*${ENV_NAME}\s"; then
     conda env update -n "$ENV_NAME" -f "$ENV_YAML_REMOTE" --prune
 else
     conda env create -n "$ENV_NAME" -f "$ENV_YAML_REMOTE"
+fi
+fi
+
+# times_pypsa, editable, from the sibling copy that `nic5.sh setup` ships next to the repo.
+# Needed for DAG planning (rules/build_sector.smk imports it), not for the solve itself.
+TP="$(dirname "$REPO")/TIMES_PyPSA"
+if [ -d "$TP" ]; then
+    conda run --no-capture-output -n "$ENV_NAME" python -m pip install --no-deps -e "$TP"
+else
+    echo "WARNING: $TP missing; snakemake cannot plan the DAG without times_pypsa"
 fi
 
 echo "=== [3/4] Gurobi licence (token server) ==="

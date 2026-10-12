@@ -107,11 +107,13 @@ scenarios:
     label: Central
     results_dir: results/walloon/scen_central
     resources_dir: resources/walloon/scen_central
-  # 2026-10-06: the five sensitivities below are the 4 Oct vintage (TIMES route
+  # 2026-10-06: the sensitivities below were the 4 Oct vintage (TIMES route
   # open in the central, no transmission fix f6d0f7aa, old biogas cap), while
-  # scen_central is the 6 Oct re-run (route closed, ICEDD biogas cap in every
-  # horizon). Commented out so the central's comparison charts do not draw them
-  # as comparable; re-enable each one once it is re-run on the 6 Oct inputs.
+  # scen_central was the 6 Oct re-run (route closed, ICEDD biogas cap in every
+  # horizon), so they were commented out. 2026-10-11: biomethane_industrie,
+  # noccsccgt, realiste and retardnucleaire were re-solved in the 10 Oct batch
+  # and are enabled again. The taxshift pair, realiste_nets / nobnd30 and the
+  # route twin stay out: their trees are the 13 Sep / 4 Oct vintage.
   # - name: scen_taxshift
   #   label: Tax shift — single surcharge
   #   results_dir: results/walloon/scen_taxshift
@@ -120,10 +122,10 @@ scenarios:
   #   label: Tax shift — full regional
   #   results_dir: results/walloon/scen_taxshift_plus
   #   resources_dir: resources/walloon/scen_taxshift_plus
-  # - name: scen_biomethane_industrie
-  #   label: Biomethane reserved for industry
-  #   results_dir: results/walloon/scen_biomethane_industrie
-  #   resources_dir: resources/walloon/scen_biomethane_industrie
+  - name: scen_biomethane_industrie
+    label: Biomethane reserved for industry
+    results_dir: results/walloon/scen_biomethane_industrie
+    resources_dir: resources/walloon/scen_biomethane_industrie
   # - name: scen_realiste_nets
   #   label: Realistic 2030 — non-ETS kept
   #   results_dir: results/walloon/scen_realiste_nets
@@ -132,48 +134,49 @@ scenarios:
   #   label: Realistic 2030 — no 2030 target
   #   results_dir: results/walloon/scen_realiste_nobnd30
   #   resources_dir: resources/walloon/scen_realiste_nobnd30
-  # - name: scen_retardnucleaire
-  #   label: New nuclear deferred beyond 2050
-  #   results_dir: results/walloon/scen_retardnucleaire
-  #   resources_dir: resources/walloon/scen_retardnucleaire
-  # - name: scen_noccsccgt
-  #   label: No capture on power plants, endogenous CO2 disposal
-  #   results_dir: results/walloon/scen_noccsccgt
-  #   resources_dir: resources/walloon/scen_noccsccgt
+  - name: scen_retardnucleaire
+    label: New nuclear deferred beyond 2050
+    results_dir: results/walloon/scen_retardnucleaire
+    resources_dir: resources/walloon/scen_retardnucleaire
+  - name: scen_noccsccgt
+    label: No capture on power plants, endogenous CO2 disposal
+    results_dir: results/walloon/scen_noccsccgt
+    resources_dir: resources/walloon/scen_noccsccgt
   # - name: scen_noccsccgt_route
   #   label: No capture on power plants, TIMES disposal route kept
   #   results_dir: results/walloon/scen_noccsccgt_route
   #   resources_dir: resources/walloon/scen_noccsccgt_route
-  # - name: scen_realiste
-  #   label: Realistic 2030 deployment (not for publication)
-  #   results_dir: results/walloon/scen_realiste
-  #   resources_dir: resources/walloon/scen_realiste
+  - name: scen_realiste
+    label: Realistic 2030 deployment (internal)
+    results_dir: results/walloon/scen_realiste
+    resources_dir: resources/walloon/scen_realiste
   # 2026-10-10 batch (docs/logs/2026-10-10_cabinet_batch_nuc3_nuc4_2010_1h.md):
   # the 4 GW family and the internal no-CO2-cap run. Uncomment each entry, and
   # the 3 GW sensitivities above, once its 10 Oct-vintage tree is pulled.
-  # - name: scen_nuc4gw
-  #   label: 4 GW nuclear (Tihange 1 restarted)
-  #   results_dir: results/walloon/scen_nuc4gw
-  #   resources_dir: resources/walloon/scen_nuc4gw
-  # - name: scen_nuc4gw_biomethane_industrie
-  #   label: 4 GW nuclear, biomethane reserved for industry
-  #   results_dir: results/walloon/scen_nuc4gw_biomethane_industrie
-  #   resources_dir: resources/walloon/scen_nuc4gw_biomethane_industrie
-  # - name: scen_nuc4gw_noccsccgt
-  #   label: 4 GW nuclear, no capture on power plants
-  #   results_dir: results/walloon/scen_nuc4gw_noccsccgt
-  #   resources_dir: resources/walloon/scen_nuc4gw_noccsccgt
-  # - name: scen_noco2cap
-  #   label: No Belgian CO2 cap, system cap kept (internal)
-  #   results_dir: results/walloon/scen_noco2cap
-  #   resources_dir: resources/walloon/scen_noco2cap
-  # TEST, not a cabinet scenario (30 Sep batch log §12). Shown next to the 1 Oct
-  # central on Sylvain's request; commented out for the October batch because
-  # its tree is the 1 Oct vintage (30 Sep exports, must-runs on in the central).
-  # - name: scen_test_lowccs_ptx
-  #   label: TEST - Walloon CO2 export capped at 3 Mt/a, power-to-fuel
-  #   results_dir: results/walloon/scen_test_lowccs_ptx
-  #   resources_dir: resources/walloon/scen_test_lowccs_ptx
+  # All ten trees were pulled and registered on 2026-10-11.
+  - name: scen_nuc4gw
+    label: 4 GW nuclear (Tihange 1 restarted)
+    results_dir: results/walloon/scen_nuc4gw
+    resources_dir: resources/walloon/scen_nuc4gw
+  - name: scen_nuc4gw_biomethane_industrie
+    label: 4 GW nuclear, biomethane reserved for industry
+    results_dir: results/walloon/scen_nuc4gw_biomethane_industrie
+    resources_dir: resources/walloon/scen_nuc4gw_biomethane_industrie
+  - name: scen_nuc4gw_noccsccgt
+    label: 4 GW nuclear, no capture on power plants
+    results_dir: results/walloon/scen_nuc4gw_noccsccgt
+    resources_dir: resources/walloon/scen_nuc4gw_noccsccgt
+  - name: scen_noco2cap
+    label: No Belgian CO2 cap, system cap kept (internal)
+    results_dir: results/walloon/scen_noco2cap
+    resources_dir: resources/walloon/scen_noco2cap
+  # TEST, not a cabinet scenario (30 Sep batch log §12; 10 Oct batch log §1 #10).
+  # It follows the central (same export, side files, capture cap) plus lever D.
+  # Re-enabled on 2026-10-11 with the 10 Oct tree.
+  - name: scen_test_lowccs_ptx
+    label: TEST - Walloon CO2 export capped at 3 Mt/a, power-to-fuel
+    results_dir: results/walloon/scen_test_lowccs_ptx
+    resources_dir: resources/walloon/scen_test_lowccs_ptx
   # NUCLEAR CAPEX SWEEP — a sensitivity, not six scenarios (2026-09-13).
   #
   # DISABLED for the 30 Sep batch: the six points were solved on 13 Sep (TIMES
