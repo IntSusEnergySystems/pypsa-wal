@@ -61,10 +61,11 @@ VD_COLUMNS = [
 # Walloon region code in TIMES-WAL.
 REGION = "RW"
 
-# One-way annual electricity inflow. `solve_network.py` documents the PyPSA
-# analogue (`Import_p`) as the hourly positive part of BEWAL net inflow summed
-# over the year — including the other Belgian regions, because TIMES-WAL's
-# system boundary is Wallonia.
+# Annual electricity imports. Since 2026-10-13 the PyPSA cap bounds the annual
+# NET balance of BEWAL (imports - exports, `self_sufficiency.measure:
+# net_annual`), as the TIMES constraint does; before it was the hourly positive
+# part of the net inflow (`Import_p`). Intra-Belgian flows count, because
+# TIMES-WAL's system boundary is Wallonia.
 IMPORT_PROCESS = "Transfo_Imp"
 
 # Rooftop = buildings + large roof + residential homes; the denominator adds

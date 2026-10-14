@@ -1,7 +1,7 @@
-# Extracted from scen_sensibilite_biomethane_industrie_v01_261002_0210.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# Extracted from scen_central_v1_3gw_biomethane_261009_0910.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
 # TIMES STORAGEMININD VAR_FOut of CO2STOCK, kt/a.
 year,kt
-2035,2518.835017
-2040,4137.945514
-2045,5147.168966
-2050,5119.624991
+2035,2480.977488
+2040,4147.209519
+2045,5147.209519
+2050,4712.743667

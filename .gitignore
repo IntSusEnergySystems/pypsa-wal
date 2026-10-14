@@ -112,6 +112,7 @@ data/walloon/*.vdt
 .DS_Store
 
 cluster/logs/*.log
+cluster/logs/*
 cluster/.last_jobs
 cluster/logs/orchestrate.pid
 cluster/logs/bisectA.pid

@@ -1677,11 +1677,19 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
     keeps that machinery and adds an **absolute TWh** right-hand side scoped
     to a list of nodes (BEWAL).
 
-    What the variable measures: the **hourly positive part of net cross-border
-    inflow**, summed over the year. Exports never net imports off
-    (``Import_p >= 0``), which is the right analogue of the TIMES
-    ``Transfo_Imp`` process — also a one-way annual flow — and is *not* the
-    annual net balance. B6 fixed three defects in the expression: AC and DC
+    What the cap measures is set by ``settings["measure"]``:
+
+    * ``net_annual`` (default, absolute mode): the **annual net balance** --
+      imports minus exports, summed over every hour and every border. This is
+      what the TIMES constraint bounds. No auxiliary variable.
+    * ``hourly_positive``: the **hourly positive part of net cross-border
+      inflow**, summed over the year (``Import_p >= 0``). Exports taken in
+      other hours never net imports off, so it sits far above the annual net
+      balance (2026-09-07 run, 2050: 10.0 TWh capped vs 7.6 TWh net, 24.5 TWh
+      gross inflow). It was the behaviour until 2026-10-13 and is kept to
+      reproduce older runs. The fraction mode always uses it.
+
+    B6 fixed three defects in the expression: AC and DC
     were capped separately (so the bound was the larger, not the sum), the
     ``-reversed`` leg of every DC pair was filtered out (so DC imports were
     invisible), and both flows were inflated (``/ s_max_pu`` on lines,
@@ -1695,7 +1703,21 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
     if requested is not None:
         requested = [str(x) for x in requested]
 
-    logger.info("Adding self sufficiency constraint (mode=%s)", mode)
+    measure = settings.get("measure", "net_annual")
+    if measure not in ("net_annual", "hourly_positive"):
+        raise ValueError(
+            "self_sufficiency.measure must be 'net_annual' or "
+            f"'hourly_positive', got {measure!r}"
+        )
+    # Only the absolute (TWh) cap has a net variant; the fraction mode keeps the
+    # original one-way formulation.
+    net_annual = mode == "absolute" and measure == "net_annual"
+
+    logger.info(
+        "Adding self sufficiency constraint (mode=%s, measure=%s)",
+        mode,
+        measure if mode == "absolute" else "hourly_positive",
+    )
 
     rhs_twh = None
     if mode == "absolute":
@@ -1730,12 +1752,13 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
         logger.warning("Self-sufficiency: no matching locations, skip")
         return
 
-    n.model.add_variables(
-        coords={"bus": locations.rename("bus"), "snapshot": n.snapshots},
-        dims=("bus", "snapshot"),
-        name="Import_p",
-        lower=0,
-    )
+    if not net_annual:
+        n.model.add_variables(
+            coords={"bus": locations.rename("bus"), "snapshot": n.snapshots},
+            dims=("bus", "snapshot"),
+            name="Import_p",
+            lower=0,
+        )
 
     cross_region_lines = n.lines.loc[
         (group(n.lines, b="bus0") != group(n.lines, b="bus1")).to_numpy()
@@ -1754,7 +1777,7 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
                 cross_region_links.carrier.isin(["DC"])
             ]
 
-    import_buses = list(n.model["Import_p"].indexes["bus"])
+    import_buses = list(locations)
 
     # One expression over AC and DC together. Adding a constraint per component
     # made `Import_p` the *larger* of the two nets rather than their sum. B6.
@@ -1811,15 +1834,24 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
         net = (inflow - outflow).reindex({bus_dim: import_buses}, fill_value=0)
         net_total = net if net_total is None else net_total + net
 
-    if net_total is not None:
-        n.model.add_constraints(
-            n.model["Import_p"] >= net_total,
-            name="import_positive",
+    if net_annual:
+        if net_total is None:
+            logger.warning("Self-sufficiency: no cross-region lines or links, skip")
+            return
+        # Annual net balance: imports - exports, each counted as it arrives
+        # (line losses booked half at each end, DC through `efficiency`).
+        imported_elec = (net_total * n.snapshot_weightings.generators).sum(
+            "snapshot"
         )
-
-    imported_elec = (
-        n.model["Import_p"] * n.snapshot_weightings.generators
-    ).sum("snapshot")
+    else:
+        if net_total is not None:
+            n.model.add_constraints(
+                n.model["Import_p"] >= net_total,
+                name="import_positive",
+            )
+        imported_elec = (
+            n.model["Import_p"] * n.snapshot_weightings.generators
+        ).sum("snapshot")
 
     if mode == "absolute":
         rhs_mwh = float(rhs_twh) * 1e6
@@ -1845,10 +1877,12 @@ def add_selfsufficiency_constraints(n, settings, planning_horizons=None):
             )
         logger.info(
             "Capped electricity imports at %s to %.2f TWh/a "
-            "(one-way annual inflow, AC + DC, includes the other Belgian "
-            "regions).",
+            "(%s, AC + DC, includes the other Belgian regions).",
             import_buses,
             float(rhs_twh),
+            "annual net balance, imports - exports"
+            if net_annual
+            else "sum of the hourly positive net inflow",
         )
         return
 

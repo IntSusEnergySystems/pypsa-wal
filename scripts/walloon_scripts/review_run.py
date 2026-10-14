@@ -1070,11 +1070,16 @@ def check_ntc(nets, ntc_dir: Path, rep: Report) -> None:
 def check_import_cap(nets, rep: Report) -> None:
     """Level 4.3b — the BEWAL electricity import cap (item 6a).
 
-    Recomputes what the constraint measures rather than trusting it: the hourly
-    positive part of the node's **net** inflow, AC lines plus both legs of every
-    cross-region DC pair, counted as it *arrives* (line losses are booked half
-    at each end, DC through ``efficiency``). Intra-Belgian flows count — TIMES-
-    WAL's boundary is Wallonia, so electricity from Flanders is an import.
+    Recomputes what the constraint measures rather than trusting it. Two
+    quantities, AC lines plus both legs of every cross-region DC pair, counted
+    as they *arrive* (line losses are booked half at each end, DC through
+    ``efficiency``): the **annual net balance** (imports - exports; what the
+    cap bounds since 2026-10-13, ``measure: net_annual``) and the older
+    **hourly positive part** of the net inflow (``measure: hourly_positive``).
+    The cap is exceeded only if the net balance is above it, which holds for
+    both measures; the one that sits on the cap is reported as binding.
+    Intra-Belgian flows count — TIMES-WAL's boundary is Wallonia, so
+    electricity from Flanders is an import.
     """
     sec = "4.3b · electricity import cap (item 6a)"
     reported = False
@@ -1110,12 +1115,14 @@ def check_import_cap(nets, rep: Report) -> None:
             net = pd.concat(flows, axis=1).sum(axis=1)
             one_way = float(net.clip(lower=0).mul(w).sum()) / 1e6
             balance = float(net.mul(w).sum()) / 1e6
-            msg = (f"{y} {node}: one-way inflow {one_way:.2f} TWh vs cap {cap:.2f} "
-                   f"| net balance {balance:+.2f} TWh | mu {mu:,.2f} EUR/MWh")
-            if one_way > cap * 1.001:
+            msg = (f"{y} {node}: annual net balance {balance:+.2f} TWh vs cap {cap:.2f} "
+                   f"| hourly-positive inflow {one_way:.2f} TWh | mu {mu:,.2f} EUR/MWh")
+            if balance > cap * 1.001:
                 rep.fail(sec, "import cap exceeded — " + msg)
+            elif balance > cap * 0.999:
+                rep.ok(sec, "binding (net balance) — " + msg)
             elif one_way > cap * 0.999:
-                rep.ok(sec, "binding — " + msg)
+                rep.ok(sec, "binding (hourly-positive measure) — " + msg)
             else:
                 rep.ok(sec, msg)
     if not reported:
