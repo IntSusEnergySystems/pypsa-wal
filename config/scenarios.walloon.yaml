@@ -372,7 +372,7 @@ scen_central:
     # central data files (no key of this block changed): the TIMES CO2 route
     # closed in every horizon, and the ICEDD biogas cap on total Walloon
     # biogas from 2025. docs/logs/2026-10-06_scen_central_2010_1h_noroute_biogas.md.
-    times_file: data/walloon/scen_central_v01_261002_0210.vd
+    times_file: data/walloon/scen_central_v1_3gw_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -412,7 +412,7 @@ scen_central_6h:
   sector:
     # Same export as scen_central, so that its side files (extracted from it)
     # describe the demands this twin actually runs on.
-    times_file: data/walloon/scen_central_v01_261002_0210.vd
+    times_file: data/walloon/scen_central_v1_3gw_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -490,7 +490,7 @@ scen_taxshift_plus:
 
 scen_biomethane_industrie:
   sector:
-    times_file: data/walloon/scen_sensibilite_biomethane_industrie_v01_261002_0210.vd
+    times_file: data/walloon/scen_central_v1_3gw_biomethane_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -673,7 +673,7 @@ scen_central_2013:
   atlite:
     default_cutout: europe-2013-sarah3-era5
   sector:
-    times_file: data/walloon/scen_central_v01_261002_0210.vd
+    times_file: data/walloon/scen_central_v1_3gw_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -909,7 +909,7 @@ scen_nuctip_4500:
 # Export of 2026-10-02 (…_261002_0210): same 2025 as the 2 Oct central, row for row.
 scen_noccsccgt:
   sector:
-    times_file: data/walloon/scen_sensibilite_central_noccsccgt_261002_0210.vd
+    times_file: data/walloon/scen_central_v1_3gw_no_ccs_ccgt_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -946,7 +946,7 @@ scen_noccsccgt:
 # alone" against the central: noccsccgt - central does that now.
 scen_noccsccgt_route:
   sector:
-    times_file: data/walloon/scen_sensibilite_central_noccsccgt_261002_0210.vd
+    times_file: data/walloon/scen_central_v1_3gw_no_ccs_ccgt_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -1064,7 +1064,7 @@ scen_realiste:
 # is imported. On 5 Oct it captured 7.04 Mt in 2040: the cap will bind there.
 scen_test_lowccs_ptx:
   sector:
-    times_file: data/walloon/scen_central_v01_261002_0210.vd
+    times_file: data/walloon/scen_central_v1_3gw_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
@@ -1115,22 +1115,24 @@ scen_test_lowccs_ptx:
 # nuclear rows + 962 MW from 2035; the noccsccgt rows for the CCS sensitivity),
 # and `nuclear_restart` below offers the restart.
 #
-# TIMES EXPORTS: NONE YET (S3 checked 2026-10-10, latest = times_20261002_*).
-# Until ICEDD exports the 4 GW runs, each block reads its S1 counterpart's
-# export and side files (PLACEHOLDERS, marked below). Swap them with the S1
-# re-exports, per docs/logs/2026-10-10_cabinet_batch_nuc3_nuc4_2010_1h.md §5.
+# TIMES EXPORTS (12 Oct 2026): the six `*_261009_0910.vd` exports of
+# s3://intervectoriel/test/scenarios/times_20261009_* (v1_3gw = S1, v2_4gw = S2,
+# each with the biomethane and no-CCS-on-CCGT variants). Each block reads its own
+# export and its own side files (times_pv_rooftop_share_<s>.csv,
+# times_industrial_capture_<s>.csv, from extract_times_softlink_values.py).
+# The nuclear pins stay the generated ones (central + 962 MW); see the 12 Oct
+# batch log for the comparison with ICEDD's config/central_4GW.csv.
 scen_nuc4gw:
   sector:
-    # PLACEHOLDER: S1 central export, until the 4 GW central is exported.
-    times_file: data/walloon/scen_central_v01_261002_0210.vd
+    times_file: data/walloon/scen_central_v2_4gw_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_central.csv
+      file: data/walloon/times_pv_rooftop_share_scen_nuc4gw.csv
     industry_cc_floor:
       enable: true
       node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_central.csv
+      file: data/walloon/times_industrial_capture_scen_nuc4gw.csv
   electricity:
     retrofit_nuclear_once: false
     walloon_potentials: data/walloon/custom_potentials_scen_nuc4gw.csv
@@ -1153,16 +1155,15 @@ scen_nuc4gw:
 
 scen_nuc4gw_biomethane_industrie:
   sector:
-    # PLACEHOLDER: S1 biomethane export, until the 4 GW one is exported.
-    times_file: data/walloon/scen_sensibilite_biomethane_industrie_v01_261002_0210.vd
+    times_file: data/walloon/scen_central_v2_4gw_biomethane_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_biomethane_industrie.csv
+      file: data/walloon/times_pv_rooftop_share_scen_nuc4gw_biomethane_industrie.csv
     industry_cc_floor:
       enable: true
       node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_biomethane_industrie.csv
+      file: data/walloon/times_industrial_capture_scen_nuc4gw_biomethane_industrie.csv
   electricity:
     retrofit_nuclear_once: false
     walloon_potentials: data/walloon/custom_potentials_scen_nuc4gw_biomethane_industrie.csv
@@ -1185,16 +1186,15 @@ scen_nuc4gw_biomethane_industrie:
 
 scen_nuc4gw_noccsccgt:
   sector:
-    # PLACEHOLDER: S1 NoCCSCCGT export, until the 4 GW one is exported.
-    times_file: data/walloon/scen_sensibilite_central_noccsccgt_261002_0210.vd
+    times_file: data/walloon/scen_central_v2_4gw_no_ccs_ccgt_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL
-      file: data/walloon/times_pv_rooftop_share_scen_noccsccgt.csv
+      file: data/walloon/times_pv_rooftop_share_scen_nuc4gw_noccsccgt.csv
     industry_cc_floor:
       enable: true
       node: BEWAL
-      file: data/walloon/times_industrial_capture_scen_noccsccgt.csv
+      file: data/walloon/times_industrial_capture_scen_nuc4gw_noccsccgt.csv
   electricity:
     retrofit_nuclear_once: false
     walloon_potentials: data/walloon/custom_potentials_scen_nuc4gw_noccsccgt.csv
@@ -1228,10 +1228,10 @@ scen_nuc4gw_noccsccgt:
 # scen_realiste does for 2030, so no intra-Belgian leakage is created. Not the
 # same experiment as TIMES's in 2050, where the system price is far above any
 # ETS projection: read the 2050 horizon with that in mind.
-# TIMES EXPORT: NONE YET. PLACEHOLDER = S1 central export and side files.
+# TIMES EXPORT: none of its own. It follows the S1 central export (v1_3gw, 9 Oct) and its side files.
 scen_noco2cap:
   sector:
-    times_file: data/walloon/scen_central_v01_261002_0210.vd
+    times_file: data/walloon/scen_central_v1_3gw_261009_0910.vd
     rooftop_floor:
       enable: true
       node: BEWAL

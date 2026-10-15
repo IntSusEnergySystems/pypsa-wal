@@ -39,29 +39,27 @@ BATCH = [
     "scen_test_lowccs_ptx",
 ]
 # The .vd each batch scenario must read. A block left on an older export runs
-# without complaint and is a different scenario. Until ICEDD exports the
-# October batch, every entry is a 2 Oct export (scen_realiste: 30 Sep) and the
-# S2 / noco2cap entries are their S1 counterpart's (PLACEHOLDER_OF below).
-# Update this table together with the blocks when the new exports land.
+# without complaint and is a different scenario. 12 Oct 2026: the six 9 Oct
+# exports (v1_3gw = S1, v2_4gw = S2) are wired in; scen_realiste (30 Sep) and
+# scen_retardnucleaire (2 Oct) have no newer export, and scen_noco2cap and the
+# PtX test follow the S1 central's (PLACEHOLDER_OF below).
+# Update this table together with the blocks when new exports land.
 BATCH_VD = {
-    "scen_central": "scen_central_v01_261002_0210.vd",
-    "scen_biomethane_industrie": "scen_sensibilite_biomethane_industrie_v01_261002_0210.vd",
-    "scen_noccsccgt": "scen_sensibilite_central_noccsccgt_261002_0210.vd",
-    "scen_nuc4gw": "scen_central_v01_261002_0210.vd",
-    "scen_nuc4gw_biomethane_industrie": "scen_sensibilite_biomethane_industrie_v01_261002_0210.vd",
-    "scen_nuc4gw_noccsccgt": "scen_sensibilite_central_noccsccgt_261002_0210.vd",
+    "scen_central": "scen_central_v1_3gw_261009_0910.vd",
+    "scen_biomethane_industrie": "scen_central_v1_3gw_biomethane_261009_0910.vd",
+    "scen_noccsccgt": "scen_central_v1_3gw_no_ccs_ccgt_261009_0910.vd",
+    "scen_nuc4gw": "scen_central_v2_4gw_261009_0910.vd",
+    "scen_nuc4gw_biomethane_industrie": "scen_central_v2_4gw_biomethane_261009_0910.vd",
+    "scen_nuc4gw_noccsccgt": "scen_central_v2_4gw_no_ccs_ccgt_261009_0910.vd",
     "scen_realiste": "scen_sensibilite_realiste_260929_3009.vd",
     "scen_retardnucleaire": "scen_sensibilite_retardnucleaire_261002_0210.vd",
-    "scen_noco2cap": "scen_central_v01_261002_0210.vd",
-    "scen_test_lowccs_ptx": "scen_central_v01_261002_0210.vd",
+    "scen_noco2cap": "scen_central_v1_3gw_261009_0910.vd",
+    "scen_test_lowccs_ptx": "scen_central_v1_3gw_261009_0910.vd",
 }
-# Scenarios with no TIMES export yet, reading their S1 counterpart's .vd and
-# side files. Remove an entry when its own export is wired in: the side-file
-# test then requires the scenario's own extracted files again.
+# Scenarios with no TIMES export of their own, reading their S1 counterpart's
+# .vd and side files. Remove an entry when its own export is wired in: the
+# side-file test then requires the scenario's own extracted files again.
 PLACEHOLDER_OF = {
-    "scen_nuc4gw": "scen_central",
-    "scen_nuc4gw_biomethane_industrie": "scen_biomethane_industrie",
-    "scen_nuc4gw_noccsccgt": "scen_noccsccgt",
     "scen_noco2cap": "scen_central",
 }
 # S2 = S1 + Tihange 1: each 4 GW scenario and the 3 GW one it mirrors.
@@ -565,12 +563,18 @@ def test_nuc4gw_overrides_match_the_generator():
 
 @pytest.mark.parametrize("s2,s1", list(S2_OF_S1.items()))
 def test_s2_block_mirrors_s1(scenarios, s2, s1):
-    """Same TIMES side, same soft-link blocks; only the nuclear files and the restart differ."""
+    """Same soft-link blocks, each on its own TIMES export (since 12 Oct); the nuclear files and the restart differ."""
     a, b = dict(scenarios[s2]), dict(scenarios[s1])
     assert a["electricity"]["nuclear_restart"] == {"enable": True}
     assert "nuclear_restart" not in (b.get("electricity") or {})
-    assert a["sector"] == b["sector"], f"{s2} must read {s1}'s export and side files (for now)"
-    assert a["self_sufficiency"] == b["self_sufficiency"]
+    assert set(a["sector"]) == set(b["sector"])
+    assert Path(a["sector"]["times_file"]).name == BATCH_VD[s2]
+    assert a["sector"]["times_file"] != b["sector"]["times_file"], f"{s2} must read its own export"
+    for key in ("rooftop_floor", "industry_cc_floor"):
+        assert a["sector"][key]["enable"] == b["sector"][key]["enable"]
+        assert a["sector"][key]["node"] == b["sector"][key]["node"]
+        assert Path(a["sector"][key]["file"]).stem.endswith(s2), f"{s2}: {key} -> {a['sector'][key]['file']}"
+    assert set(a["self_sufficiency"]) == set(b["self_sufficiency"])
     assert a["electricity"]["retrofit_nuclear_once"] is False
     for block, key in (("solving", "agg_p_nom_limits"), ("costs", "custom_cost_fn"),
                        ("electricity", "walloon_potentials")):

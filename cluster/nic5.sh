@@ -488,16 +488,20 @@ cmd_postprocess() {
     # remembered to run them by hand -- and the cost chart then silently fell
     # back to ClimAct's uncalibrated Distribution/Transport segments. Run before
     # the upload so the two CSVs travel with the tree. A failure is reported,
-    # not fatal: the solved results are unaffected. NETWORK_COST_REPORT=0 skips.
+    # fatal if a CSV is missing (12 Oct 2026, review F10). NETWORK_COST_REPORT=0 skips.
     if [ "${NETWORK_COST_REPORT:-1}" = "1" ]; then
-        local d
+        local d f
         for d in $(run_dirs); do
             msg "Network cost report + TIMES bill harmonisation: results/${d}"
-            if ! (cd "$REPO" && $LOCAL_RUN python scripts/walloon_scripts/network_cost_report.py \
-                    "results/${d}" && $LOCAL_RUN python scripts/walloon_scripts/bill_harmonisation.py \
-                    "results/${d}") 2>&1 | tee -a "$log"; then
-                warn "network cost reporting failed for results/${d} (see $log)"
-            fi
+            # Plain Python, NOT $LOCAL_RUN: LOCAL_RUN may be a Snakemake-only wrapper
+            # (smk_lowmem.sh), which turned these two calls into `snakemake ... network_cost_report.py`
+            # and lost the CSVs silently for ten trees on 10-11 Oct 2026.
+            (cd "$REPO" && $LOCAL_PYTHON scripts/walloon_scripts/network_cost_report.py "results/${d}" \
+                && $LOCAL_PYTHON scripts/walloon_scripts/bill_harmonisation.py "results/${d}") 2>&1 | tee -a "$log" || true
+            for f in network_costs_calibrated network_cost_segments bill_harmonisation; do
+                [ -s "$REPO/results/${d}/csvs/${f}.csv" ] \
+                    || die "network cost reporting left no results/${d}/csvs/${f}.csv (see $log); NETWORK_COST_REPORT=0 skips it"
+            done
         done
     fi
 

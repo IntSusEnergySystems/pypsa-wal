@@ -7,9 +7,12 @@
 Item 6a: TIMES Transfo_Imp is 2.94 / 6.47 / 10 TWh (2030/40/50). Grouped by
 location, BEWAL imports include Flanders and Brussels.
 
-`Import_p` is the hourly positive part of net cross-border inflow, summed over
-the year — the analogue of TIMES's one-way `Transfo_Imp`, not the annual net
-balance. B6 fixed what that expression actually contained: AC and DC were
+Since 2026-10-13 the cap bounds the **annual net balance** (imports - exports
+summed over all hours and borders), which is what the TIMES constraint bounds
+(`measure: net_annual`, the default). The previous measure -- `Import_p`, the
+hourly positive part of the net inflow, summed over the year -- is kept as
+`measure: hourly_positive` and tested below. B6 fixed what that expression
+actually contained: AC and DC were
 constrained separately (bound = the larger, not the sum), the `-reversed` leg
 of every DC pair was filtered out (so DC *imports* never appeared), and both
 flows were scaled up (`/ s_max_pu`, `/ efficiency`) instead of physical.
@@ -75,11 +78,27 @@ def test_absolute_cap_rhs_is_twh_not_a_fraction():
         planning_horizons="2050",
     )
     assert "GlobalConstraint-import_limit_BEWAL" in n.model.constraints
-    assert "import_positive" in n.model.constraints
+    # default measure = annual net balance: no auxiliary variable, no hourly floor
+    assert "Import_p" not in n.model.variables
+    assert "import_positive" not in n.model.constraints
     rhs = float(n.model.constraints["GlobalConstraint-import_limit_BEWAL"].rhs.item())
     assert rhs == pytest.approx(10.0 * 1e6)
+
+
+def test_hourly_positive_measure_keeps_its_variable():
+    n = _toy()
+    n.optimize.create_model()
+    _apply(n, measure="hourly_positive")
     assert "Import_p" in n.model.variables
+    assert "import_positive" in n.model.constraints
     assert list(n.model.variables["Import_p"].indexes["bus"]) == ["BEWAL"]
+
+
+def test_unknown_measure_is_refused():
+    n = _toy()
+    n.optimize.create_model()
+    with pytest.raises(ValueError, match="measure"):
+        _apply(n, measure="gross")
 
 
 def test_year_without_a_cap_is_skipped():
@@ -102,7 +121,12 @@ def test_import_variable_cannot_go_negative():
     n.optimize.create_model()
     add_selfsufficiency_constraints(
         n,
-        {"mode": "absolute", "nodes": ["BEWAL"], "limit_twh": 10.0},
+        {
+            "mode": "absolute",
+            "nodes": ["BEWAL"],
+            "limit_twh": 10.0,
+            "measure": "hourly_positive",
+        },
         planning_horizons="2050",
     )
     lower = n.model.variables["Import_p"].lower
@@ -155,10 +179,15 @@ def _toy_with_dc(load_mw: float = 10.0) -> pypsa.Network:
     return n
 
 
-def _apply(n, twh=10.0):
+def _apply(n, twh=10.0, measure="net_annual"):
     add_selfsufficiency_constraints(
         n,
-        {"mode": "absolute", "nodes": ["BEWAL"], "limit_twh": twh},
+        {
+            "mode": "absolute",
+            "nodes": ["BEWAL"],
+            "limit_twh": twh,
+            "measure": measure,
+        },
         planning_horizons="2050",
     )
 
@@ -167,9 +196,15 @@ def test_ac_and_dc_share_one_constraint():
     """B6: two constraints made `Import_p` the larger net, never the sum."""
     n = _toy_with_dc()
     n.optimize.create_model()
-    _apply(n)
+    _apply(n, measure="hourly_positive")
     names = [c for c in n.model.constraints if c.startswith("import_positive")]
     assert names == ["import_positive"], names
+    # net measure: the single capped expression is the one GlobalConstraint
+    n = _toy_with_dc()
+    n.optimize.create_model()
+    _apply(n)
+    names = [c for c in n.model.constraints if c.startswith("GlobalConstraint-import")]
+    assert names == ["GlobalConstraint-import_limit_BEWAL"], names
 
 
 def test_dc_imports_are_counted():
@@ -266,6 +301,18 @@ def test_line_losses_enter_the_import_expression():
     assert "Line-loss" in n.model.variables, "fixture did not enable losses"
     _apply(n, twh=0.5)
     loss_labels = set(n.model.variables["Line-loss"].labels.values.ravel().tolist())
+    used = set(
+        n.model.constraints["GlobalConstraint-import_limit_BEWAL"]
+        .vars.values.ravel()
+        .tolist()
+    )
+    assert loss_labels <= used, (
+        "Line-loss is missing from the net import cap: the cap is charging the "
+        "importer for energy lost in the line"
+    )
+    n = _toy(load_mw=100.0)
+    n.optimize.create_model(transmission_losses=2)
+    _apply(n, twh=0.5, measure="hourly_positive")
     used = set(n.model.constraints["import_positive"].vars.values.ravel().tolist())
     assert loss_labels <= used, (
         "Line-loss is missing from `import_positive`: the cap is charging the "
@@ -279,4 +326,56 @@ def test_import_expression_ignores_losses_when_they_are_off():
     n.optimize.create_model()  # transmission_losses defaults to 0
     assert "Line-loss" not in n.model.variables
     _apply(n, twh=0.5)
+    assert "GlobalConstraint-import_limit_BEWAL" in n.model.constraints
+    n = _toy(load_mw=100.0)
+    n.optimize.create_model()
+    _apply(n, twh=0.5, measure="hourly_positive")
     assert "import_positive" in n.model.constraints
+
+
+def _toy_export_hour(measure: str):
+    """Hour 0: BEWAL has no cheap generation and must import; hour 1: it exports.
+
+    BEVLG's generator is dear (50) and its load large, so BEWAL's cheap plant
+    (1 EUR/MWh, available in hour 1 only) exports to it. The cap is tiny.
+    """
+    n = _toy(load_mw=100.0)
+    n.add(
+        "Generator",
+        "wal-cheap",
+        bus="BEWAL",
+        p_nom=1000,
+        marginal_cost=1,
+        p_max_pu=[0.0, 1.0],
+        carrier="AC",
+    )
+    n.generators.loc["vlg", "marginal_cost"] = 50.0
+    n.add("Load", "vlg-load", bus="BEVLG", p_set=500.0)
+    n.optimize.create_model()
+    _apply(n, twh=0.01, measure=measure)  # 10 GWh, i.e. 2.3 MW of hour-0 import
+    try:
+        status, _ = n.optimize.solve_model(solver_name="highs")
+    except Exception as exc:  # pragma: no cover - depends on the local solver
+        pytest.skip(f"no LP solver: {exc}")
+    if status not in ("ok", "optimal"):
+        pytest.skip(f"solver status {status}")
+    return n
+
+
+def test_net_cap_lets_exports_offset_imports():
+    """The cap is imports - exports over the year, as TIMES bounds it.
+
+    Hour 0 imports 100 MW (cheaper than the 100 EUR/MWh extendable plant), hour 1
+    exports ~500 MW: the annual net balance is strongly negative, so the tiny cap
+    is respected and the import is not replaced by local build.
+    """
+    n = _toy_export_hour("net_annual")
+    assert float(n.generators_t.p["wal"].iloc[0]) < 1.0
+    balance = float((-n.lines_t.p0["x"] * n.snapshot_weightings.generators).sum())
+    assert balance <= 0.01e6 + 1
+
+
+def test_hourly_positive_cap_ignores_exports_in_other_hours():
+    """The old measure charged hour 0's import in full, whatever hour 1 exported."""
+    n = _toy_export_hour("hourly_positive")
+    assert float(n.generators_t.p["wal"].iloc[0]) > 90.0

@@ -241,7 +241,7 @@ EXPLORER_TYPE="${EXPLORER_TYPE-times-pypsa}"
 #  * TIMES .vd files that no active scenario names. -L turns 15 symlinks into
 #    1.1 GB of real files; the September batch needed 8 of them (605 MB). The
 #    include below names the exports of the batch in run.name — the October
-#    batch: `*_261002_0210.vd` (ICEDD's 2 Oct central + three sensitivities)
+#    batch: `*_261002_0210.vd` (ICEDD's 2 Oct exports) and `*_261009_0910.vd` (the six of 9 Oct)
 #    and `*_260929_3009.vd`, of which only scen_realiste's is still read.
 #    Update it with the batch.
 #
@@ -261,6 +261,7 @@ PUSH_EXCLUDES="${PUSH_EXCLUDES-\
 --exclude resources/walloon/scen_test_2013_6h \
 --exclude resources/walloon/scen_demande_haute \
 --include data/walloon/*_261002_0210.vd \
+--include data/walloon/*_261009_0910.vd \
 --include data/walloon/scen_sensibilite_realiste_260929_3009.vd \
 --exclude data/walloon/*.vd}"
 
@@ -268,6 +269,9 @@ PUSH_EXCLUDES="${PUSH_EXCLUDES-\
 # How to run the local environment (used by `nic5.sh prepare` / `postprocess`).
 # --no-capture-output: stream Snakemake progress to the terminal (conda run buffers by default).
 LOCAL_RUN="${LOCAL_RUN:-conda run --no-capture-output -n pypsa-eur}"
+# Plain Python in the same env, for scripts that are not Snakemake targets (never routed through LOCAL_RUN,
+# which a driver may set to a Snakemake-only wrapper).
+LOCAL_PYTHON="${LOCAL_PYTHON:-conda run --no-capture-output -n pypsa-eur python}"
 LOCAL_CORES="${LOCAL_CORES:-16}"
 
 # --- Intervectoriel S3 (Wallonie Explorer) -----------------------------------

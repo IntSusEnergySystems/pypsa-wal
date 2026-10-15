@@ -205,6 +205,15 @@ ssh nic6 "scontrol update JobId=<id> TimeLimit=00:30:00"        # a user may low
 * If a job is pending with a start time of tomorrow, look at `squeue --me --format='%i %T %C %l %r %S'`
   first, before blaming the partition.
 
+**12-13 Oct batch (8 runs, NIC6 + NIC5), what it settled.**
+* **NIC6 memory: 75 000 MB is required, not optional.** With 32 Gurobi threads the 24 NIC6 solves peaked at 50-59.0 GiB (`MaxRSS` of the `.0` step); seven were above 56 GiB and one at 59.0, i.e. above the old 58.6 GiB request.
+  `cluster/config_cluster_nic6.yaml` now asks `cpus: 40`, `mem_mb: 75000` (40 x 1 900 MB passes the submit check) and keeps Gurobi `threads: 32`; the solve script does not read `snakemake.threads`. Worst solve: 81 % of the request.
+* A full NIC6 (other users' multi-day jobs, 22 of 2 304 cores idle) still started all six 40-core solves within 50 minutes, with a 6 h limit and 30 min `add_brownfield` jobs.
+* Speed: NIC6 about 2x NIC5 on the same LP (2025: 81 min vs 186 min; later horizons 28-50 min vs 53-102 min). Objectives of the identical LPs agree to 1e-6.
+* `cmd_postprocess` runs `network_cost_report.py` / `bill_harmonisation.py` through `$LOCAL_PYTHON` (never `$LOCAL_RUN`) and dies if a CSV is missing: the `smk_lowmem.sh` wrapper can now stay in `LOCAL_RUN`.
+* Publication with the new pypsa2html: 91 pages in 2 min, 3.4 GB peak; a whole scenario (ClimAct extraction, plot, S3, report, hub, rsync) about 10 min. The desktop app still crashed twice (SIGILL, 12 Oct 17:03 and 13 Oct 05:47) when an ad-hoc script ran beside an extraction: keep to one step at a time.
+* Driver scripts of the batch: `/sylvain/mount/pypsa-wal-data/batch_20261012_scripts/` (`prepare.sh`, `land_all_b2.sh`, `publish_batch_b2.sh`, `probe_both_b2.sh`, `sacct_table.py`).
+
 **Open points:** `$HOME` holds ~284 k files (Miniforge) against the stated 200 k quota; nothing was
 refused so far, but `conda clean --all` is run after every env build to keep it down.
 Because the two clusters use 16 and 32 Gurobi threads, a pair split across them (S1 on NIC5, S2 on NIC6)
@@ -352,6 +361,7 @@ What is certain is the budget below, and that the swap makes it worse.
 | one network loaded in `python` for an ad-hoc look | 2–3 GB |
 | pypsa2html alone, **network caches bounded to 2** (`batch_20261006_scripts/html_lowmem.py`, 6 Oct) | **7.8 GB** (36 min) |
 | pypsa2html inside `postprocess`, unbounded (6 Oct, other scenario trees on disk) | **> 10 GB**: OOM-killed in a 10 GB cap |
+| **pypsa2html, new library (`c306378`, 12 Oct), one scenario, caches bounded to 4** (`batch_20261012_scripts/html_lowmem_gc.py <s> 4`) | **3.1-3.8 GB, 2.3 min** (see the 12 Oct paragraph below) |
 
 **pypsa2html (6–7 Oct).**
 * **Fixed in pypsa2html on 7 Oct:** `model.network_cache_size` is now a real process-wide bound.
@@ -373,6 +383,42 @@ drives it: the `Network` objects pypsa2html evicts hold reference cycles and are
 sawtooth from ~6.6 to over 10 GB between collections. `batch_20261010_scripts/html_lowmem_gc.py` adds a daemon thread that runs
 `gc.collect()` and `malloc_trim(0)` every 2 s (pypsa2html itself untouched) and bounds the cache to 1: **peak about 5-6 GB**, similar run time.
 Use it instead of the stock rule on this machine until pypsa2html frees its networks itself.
+
+**pypsa2html, 12 Oct (supersedes the 11 Oct paragraph and the "bounded to 2" figures above: 2 min per scenario, 3-4 GB).**
+pypsa2html `c306378` (12 Oct) frees evicted networks (a forced collection on eviction, and the per-horizon node resolver holds its network by weak
+reference), so the gc thread is no longer what keeps the memory down. The cache bound was kept at 2 by habit and it was then the whole cost:
+a scenario report reads the four horizons in the same cycle (2025, 2030, 2040, 2050, over and over) for every page and region, and an LRU cache
+of 2 against a cycle of 4 **never hits**. Every page reloaded its networks from disk.
+
+| `scen_central`, 1 h, 4 horizons | caches bounded to 2 | caches bounded to **4** |
+|---|---|---|
+| network loads (`networks: loading` in `logs/pypsa2html.log`) | **656** (~3 s each) | **4** |
+| report build (`build_site`) | **1 996 s (33 min)** | **145 s (2.4 min)** |
+| peak RSS (`capped.sh`, cgroup) | 3.2 GB | 3.7-3.8 GB |
+| pages written / sections skipped / failed | 91 / 40 / 0 | 91 / 40 / 0 |
+
+The other nine scenarios of the 10 Oct batch, all at cache 4: build 134-142 s, peak 3.1-3.8 GB, 4 loads each. One whole publication
+(build, hub, banner, rsync, S3 re-sync) takes about 4 min per scenario, so the nine scenarios took 36 min (18:13-18:49) where the cache-2 pace was
+about 35 min *per scenario* for the build alone: **about 14x faster on the report, and the batch is no longer the long step.**
+
+* **Use 4 on this machine** (`html_lowmem_gc.py <scenario> 4`, and `model.network_cache_size: 4` in `config/pypsa2html.yaml`). With the new library the
+  report fits the 9.5 GB cap three times over; the old advice (1 or 2) only applies to pypsa2html before 12 Oct.
+* The cache must be **at least the number of planning horizons** (4 here). Bound it below that and the build becomes I/O bound again with no memory gain
+  worth having: watch `grep -c 'networks: loading' results/walloon/<s>/logs/pypsa2html.log`, which should be about the horizon count, not hundreds.
+* **Output is unchanged.** `scen_central` rebuilt at cache 4 against the cache-2 build: 91 files, same names; after removing random element ids and
+  timestamps, 81 are byte-identical, and in the 10 dispatch pages the traces are the same set but come in a different order (the series order is not
+  deterministic between two builds, it is not caused by the cache).
+* The new library also writes `html/pypsa/summaries/<scenario>/summary.{csv,json}` per scenario and builds a **comparison report from those summaries only**
+  (no network is opened): `pypsa2html compare --config config/pypsa2html.yaml <summary.json of each run> --reference scen_central`, 112 s, 0.2 GB, output in
+  `results/walloon/compare/` (23 pages, 21 MB). It was published to `https://pypsa.squoilin.eu/compare_20261010/` with the same key and host as the scenario
+  folders (`rsync -a --delete` of `results/walloon/compare/` into `/home/pypsa/public_html/compare_20261010/`).
+  Pass the `summary.json` paths: with `results/walloon/<s>` it reports "missing summary" because the summaries sit under `html/pypsa/summaries/<s>/`.
+  The comparison draws all ten runs side by side, including the internal ones (`scen_realiste`, `scen_noco2cap`, `scen_test_lowccs_ptx`) and the S2 runs whose
+  TIMES side is a placeholder: the banner of the scenario hubs does not appear on it.
+* `config/pypsa2html.yaml`: `landing.page` and `output.pages` now say `key_figures` (the old `overview` still loads, with a warning, and is moved to the
+  comparison report); a `compare:` block sets the reference run and `results/walloon/compare`.
+* Driver: `/sylvain/mount/pypsa-wal-data/batch_20261012_scripts/publish_batch.sh B [scenarios]` (copy of the 10 Oct one, cache 4, same pinned date so the
+  published folders are replaced). `cleanup-metadata` reports "metadata not present" after a rebuild: harmless, the driver treats it as non-fatal.
 
 ### 7.1 Rules
 

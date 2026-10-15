@@ -1,0 +1,8 @@
+# Extracted from scen_central_v2_4gw_biomethane_261009_0910.vd by scripts/walloon_scripts/extract_times_softlink_values.py.
+# Rooftop share of TIMES PV capacity (VAR_Cap, plant PV only).
+year,share,rooftop_gw,utility_gw
+2030,0.668848,4.650319,2.302412
+2035,0.747115,7.499749,2.538536
+2040,0.802008,10.282870,2.538536
+2045,0.821665,11.696093,2.538536
+2050,0.821665,11.696093,2.538536

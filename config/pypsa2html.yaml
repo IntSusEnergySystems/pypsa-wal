@@ -24,15 +24,17 @@ model:
   opts: ""
   sector_opts: ""
   planning_horizons: null      # discovered from the solved networks
-  # Process-wide bound on solved networks kept in RAM (pypsa2html, 2026-10-06).
-  # The office computer (16 GB) cannot hold four 1 h networks (~2.5 GB each):
-  # unbounded, `generate_html_report` was OOM-killed in a 10 GB cap; at 2 it
-  # peaks at 7.8 GB and takes ~36 min per scenario instead of a few minutes.
-  # null on a big machine. docs/logs/2026-10-06_scen_central_2010_1h_noroute_biogas.md I1.
-  # Since the split into scenario and comparison reports (2026-10-12) a
-  # scenario report no longer loads any other scenario's networks, so this
-  # bound only has to hold one run's horizons.
-  network_cache_size: 2
+  # Process-wide bound on solved networks kept in RAM. It must be at least the
+  # number of planning horizons (4): a report reads the horizons in a cycle, and an
+  # LRU cache smaller than the cycle never hits, so every page reloads its
+  # networks. With pypsa2html >= 12 Oct 2026 (evicted networks are freed) a bound
+  # of 4 builds a scenario in ~2.4 min at 3.1-3.8 GB; a bound of 2 took 33 min
+  # (656 loads) for the same pages. null on a big machine.
+  # run_from_office_computer.md section 7, "pypsa2html, 12 Oct".
+  # A scenario report no longer loads any other scenario's networks (the
+  # comparison is a separate report), so this bound only has to hold one run's
+  # horizons — and those horizons are why the bound is 4, not 2.
+  network_cache_size: 4
 
 nodes:
   detect: true
@@ -255,8 +257,9 @@ output:
   # From results/walloon/<run>/html/pypsa/ to the comparison report.
   compare_url: ../../../compare/index.html
 
-# The comparison report: built from the scenarios' summary.csv/summary.json,
-# so a scenario listed above but not solved yet -- or solved on another
+# Comparison report (pypsa2html >= 12 Oct 2026): built from the scenarios'
+# summary.json files (`pypsa2html compare`), never from the networks.
+# A scenario listed above but not solved yet -- or solved on another
 # machine and not pulled -- is listed as "not compared" instead of breaking it.
 # Mixed vintages are flagged on its Scenarios page (the I2 issue of the
 # 6 Oct log) rather than silently drawn side by side.
