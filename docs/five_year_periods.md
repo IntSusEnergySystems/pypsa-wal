@@ -158,7 +158,7 @@ Verified, not assumed:
 | **NTCs** | `data/walloon/ntc_2035.csv` and `ntc_2045.csv` are present and in sync (226 rows, 5 managed each). |
 | **Aggregate capacity caps** | `agg_p_nom_minmax_demande_haute.csv` already carries `2035` and `2045` min/max column pairs. |
 | **National CO2 budget** | `budget_national` is `year_rule: interp`, so `--check` computes 2035 = 0.35 and 2045 = 0.15 by itself and `--write` fills them in. No manual work. |
-| **Discount rates / costs** | `discount_rates{,_car11}.csv` and `custom_costs.csv` are horizon-independent — in sync in both configurations. |
+| **Discount rates / costs** | `discount_rates{,_car11}.csv` is horizon-independent. `custom_costs.csv` was too when this was written. It has had per-horizon rows since 2026-09-05, and they lacked 2035/2045 until 2026-10-17 (common_parameters.md §3.13). |
 | **Heat vintage grouping** | `grouping_years_heat` ends at 2019 (historical stock only), so planning horizons do not touch it. |
 
 ---

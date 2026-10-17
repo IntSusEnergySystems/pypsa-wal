@@ -550,6 +550,12 @@ def _write(path: Path, frame: pd.DataFrame, before: pd.DataFrame, patch: Patch) 
 def patch_costs(df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool) -> Patch:
     """Patch data/walloon/custom_costs.csv from `cost:<tech>:<param>` targets."""
     patch = Patch(path=COSTS_FILE)
+    # Expanded over every grid's horizons, as in `patch_potentials`. The file is
+    # shared with config.walloon_5y.yaml, and process_cost_data.py only reads a
+    # row whose planning_horizon equals the solved year (or `all`): before
+    # 2026-10-17 the per-horizon rows stopped at 2025/2030/2040/2050, so a 5-year
+    # run silently fell back to technology-data at 2035/2045.
+    horizons = tuple(sorted(set(horizons) | known_horizons()))
     targets = collect_targets(df, "cost", horizons, nparts=2)
     # `cost:<tech>:discount rate` rows are per-technology overrides of the
     # sector hurdle rate: resolve_hurdle_rates writes them to the generated
@@ -562,6 +568,7 @@ def patch_costs(df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool) -> P
     patch.rows = len(frame)
 
     seen: set[tuple[str, ...]] = set()
+    per_horizon: dict[tuple[str, ...], set[int]] = {}
     for i, row in frame.iterrows():
         key = (row["technology"], row["parameter"])
         tgt = targets.get(key)
@@ -573,6 +580,8 @@ def patch_costs(df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool) -> P
             continue
         seen.add(key)
         patch.managed += 1
+        if row["planning_horizon"] != "all":
+            per_horizon.setdefault(key, set()).add(int(row["planning_horizon"]))
 
         if not units_compatible(tgt.unit, row["unit"]):
             patch.errors.append(
@@ -618,6 +627,15 @@ def patch_costs(df: pd.DataFrame, horizons: tuple[int, ...], dry_run: bool) -> P
             f"{COSTS_FILE.name}: no row for active target cost:{tgt.label} "
             f"(origin {tgt.origin}) — add it to the file or set status=none"
         )
+    # A technology split into per-horizon rows must cover every horizon.
+    for key, years in sorted(per_horizon.items()):
+        missing = sorted(set(horizons) - years)
+        if missing:
+            patch.errors.append(
+                f"{COSTS_FILE.name}: {'/'.join(key)} has no row for {missing}. "
+                "process_cost_data.py matches the horizon exactly, so those "
+                "horizons would silently keep the technology-data value."
+            )
 
     if not dry_run and patch.ok and patch.changes:
         _write(COSTS_FILE, frame, before, patch)
