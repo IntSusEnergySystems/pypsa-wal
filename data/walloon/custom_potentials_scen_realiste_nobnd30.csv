@@ -35,12 +35,12 @@ BEWAL,onwind,p_nom_max,6500,MW,2050,PNEC Wallon et EDORA,"• Potentiel techniqu
 • Les statistiques d'installation (fin 2024) indique que la Wallonie est sur la bonne trajectoire pour atteindre son objectif de production de 6200 GWh étoliens onshore annuels (PNEC wallon - scénario WAM)
 • Ces 6200 GWh sont traduits en 2700 MW de puissance installée.
 • Potentiel éolien additionnel estimé à 3,8 GW à l’horizon 2050, sur base des projets en étude d’incidences (source : EDORA). Valeur intégrant les contraintes actuelles, les effets de repowering et l’évolution vers des turbines plus puissantes.",
-BEWAL,solar,p_nom_max,13000,MW,2025,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
-BEWAL,solar,p_nom_max,13000,MW,2030,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
-BEWAL,solar,p_nom_max,13000,MW,2035,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
-BEWAL,solar,p_nom_max,13000,MW,2040,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
-BEWAL,solar,p_nom_max,13000,MW,2045,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
-BEWAL,solar,p_nom_max,13000,MW,2050,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
+BEWAL,solar,p_nom_max,6500,MW,2025,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
+BEWAL,solar,p_nom_max,6500,MW,2030,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
+BEWAL,solar,p_nom_max,6500,MW,2035,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
+BEWAL,solar,p_nom_max,6500,MW,2040,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
+BEWAL,solar,p_nom_max,6500,MW,2045,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
+BEWAL,solar,p_nom_max,6500,MW,2050,"Cluster TWEED, Livre blanc de l'agrivoltaïsme (2025), Energie Commune, Renouvelle (2025)",Somme du potentiel des friches industrielles et de l'agrivoltaïsme,
 BEWAL,solar rooftop,p_nom_max,46000,MW,2025,"Energie Commune, Cartographie solaire de la Région Wallonne (2024)",Somme du potentiel des installations en toiture de bâtiments et d'ombrières de parking,
 BEWAL,solar rooftop,p_nom_max,46000,MW,2030,"Energie Commune, Cartographie solaire de la Région Wallonne (2024)",Somme du potentiel des installations en toiture de bâtiments et d'ombrières de parking,
 BEWAL,solar rooftop,p_nom_max,46000,MW,2035,"Energie Commune, Cartographie solaire de la Région Wallonne (2024)",Somme du potentiel des installations en toiture de bâtiments et d'ombrières de parking,

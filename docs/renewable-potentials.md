@@ -72,7 +72,7 @@ Onshore and solar potentials are **left as PyPSA-Eur calculates them**. They are
 ordinary technical potentials — 3.0× Germany's 2045 ambition, 24× France's PPE3
 target — which is what a technical potential should look like. The only local
 overrides are Wallonia's, where PNEC-PACE / EDORA data is better than the raster:
-`BEWAL onwind 6 500`, `BEWAL solar 13 000`, `BEWAL solar rooftop 46 000` MW.
+`BEWAL onwind 6 500`, `BEWAL solar 13 000` (**6 500 since 2026-10-17**, ground PV capped at 6.5 GW for every scenario; sensitivity run: `docs/logs/2026-10-16_scen_central_pv65_2010_1h.md`), `BEWAL solar rooftop 46 000` MW.
 
 > **The `BEWAL onwind 6 500` override has now been checked against a full
 > land-and-siting calculation** (22 Sep 2026, revised 23 Sep 2026).
