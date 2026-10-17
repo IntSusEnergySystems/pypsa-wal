@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+# NIC6 solver overlay + the documented numerical escalation (NumericFocus 3, ScaleFlag 2).
+# Same cores / memory as cluster/config_cluster_nic6.yaml (40 cpus, 75 000 MB, Gurobi 32 threads).
+# Used on 2026-10-17 for the 2040 and 2050 solves of scen_central after the barrier of the plain
+# solve stopped "Sub-optimal" at iteration 400 (the solve script refuses to export an uncertified
+# network). Select with CLUSTER_CONFIG=cluster/config_cluster_nic6_numericfocus.yaml.
+# See docs/logs/2026-09-13_cabinet_batch_all14_2010_1h.md S14.1 for the earlier escalation.
+solving:
+  mem_mb: 75000
+  cpus: 40
+  solver_options:
+    gurobi-default:
+      threads: 32
+      BarHomogeneous: 1
+      NumericFocus: 3
+      ScaleFlag: 2

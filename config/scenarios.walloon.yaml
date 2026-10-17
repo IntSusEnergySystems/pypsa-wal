@@ -399,8 +399,9 @@ scen_central:
 # Renewable-cost sensitivity of the central (17 Oct 2026): the cost of renewable
 # technologies - wind, PV, hydro, geothermal, solar heat and the biogas chain (investment,
 # FOM, VOM, fuel, lifetime; list in scripts/walloon_scripts/build_flat_res_costs.py) - is held flat at
-# its 2025 value in every horizon, i.e. no learning after 2025. Everything else, the 2025
-# solve included, is the central. The cost file is GENERATED from custom_costs.csv and the
+# its 2025 value in every horizon, i.e. no learning after 2025. Everything else is the
+# central (the 2025 cost tables are identical, but the 2025 objective is +0.02 % because the
+# onshore-wind VOM of the base electricity network follows costs.year, see the script docstring). The cost file is GENERATED from custom_costs.csv and the
 # technology-data 2025 table: never hand-edit it, re-run the script when the central costs
 # change (test_flat_res_costs.py fails on a stale file).
 # docs/logs/2026-10-17_scen_central_flat_res_costs_2010_1h.md.

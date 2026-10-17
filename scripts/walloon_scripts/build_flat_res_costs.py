@@ -20,8 +20,12 @@ This script reads the two sources once and writes the scenario copy:
   one ``all`` row carrying the 2025 value is added, in the unit of its source row so
   that ``process_cost_data._convert_to_MW`` treats it exactly like the original.
 
-Efficiency and discount rates are not touched. Nothing else moves: a 2025
-solve of the flat scenario is the central's 2025 solve.
+Efficiency and discount rates are not touched. The per-horizon cost tables of the two
+scenarios are identical in 2025 (``test_flat_res_costs.py``), but the two 2025 LPs are
+not: the generators of the base electricity network take their marginal cost from the
+table of ``costs.year`` (2050), not from the horizon, so the central carries the 2050
+(learned) onshore-wind VOM of 1.623 EUR/MWh in every horizon while this scenario carries
+the frozen 1.9035. 17 Oct 2026: +6.5e7 EUR (+0.02 %) on the 2025 objective.
 
     python scripts/walloon_scripts/build_flat_res_costs.py           # write
     python scripts/walloon_scripts/build_flat_res_costs.py --check   # exit 1 if stale
