@@ -1197,11 +1197,35 @@ scenarios:
 landing:
   scenario: scen_demande_haute
   node: BEWAL
-  page: overview
+  page: key_figures
 
 output:
-  dir: results/walloon/{scenario}/html
+  dir: results/walloon/{scenario}/html/pypsa
+  compare_url: ../../../compare/index.html   # link to the comparison report
+
+compare:
+  reference: scen_central
+  dir: results/walloon/compare
 ```
+
+pypsa2html writes **two reports** (pypsa2html D24, 2026-10-12):
+
+* a **scenario report** per run (`results/walloon/<run>/html/pypsa/`), which
+  describes that run only — no scenario dropdown, no cross-scenario chart —
+  opens on its *Key figures* and writes `summary.csv` / `summary.json` beside
+  its pages;
+* a **comparison report** (`results/walloon/compare/`), built from those summary
+  files without reopening any network: key figures side by side with the
+  difference to `scen_central`, comparison charts with a difference view, the
+  sweeps, and a *Scenarios* page that flags runs of different vintages.
+
+The key figures are pypsa2html's packaged set plus the Walloon ones declared
+under `kpis:` in [`config/pypsa2html.yaml`](config/pypsa2html.yaml): the
+national-cap and import-cap duals, CCGT with and without capture, and — read
+from `csvs/ptx_report.csv`, which the `ptx_report` rule now writes for every
+run — the net CO2 export, the capture-cap dual and overage and the PtX
+throughput. `comparison.csv` holds them all, with the difference to the
+reference: what the §9.7 tables of the batch logs were assembled from by hand.
 
 Nothing lists the horizons or the eight nodes — both are read from the
 networks. Add a scenario by appending three lines to `scenarios:`. The `BE`
@@ -1239,11 +1263,11 @@ sensitivities:
 ```
 
 A scenario carrying `sensitivity:` is a **sweep point**: it gets no pages of its
-own, never appears in the scenario dropdown, and is excluded from the
-cross-scenario overview. Each sweep becomes one section of the shared
-**Sensitivity analyses** page, with the swept value on the x axis and one line
-per planning horizon (a second dropdown view transposes it to one line per
-swept value over time).
+own (its build writes only its summary file) and is never set beside the
+scenarios of the comparison. Each sweep becomes one section of the
+**Sensitivity analyses** page of the *comparison report*, with the swept value
+on the x axis and one line per planning horizon (a second dropdown view
+transposes it to one line per swept value over time).
 
 `rows:` are summed and matched case-insensitively against the extracted table's
 row labels. A row the run did not build reads **zero** — a point on the curve —
@@ -1262,8 +1286,9 @@ Cross-references are validated at load: a marker naming an undeclared sweep, a
 sweep with no points, and two points at the same value are all errors, because
 each is otherwise a silently missing or doubled marker on a published curve.
 
-**Adding a sweep changes the left navigation, so the whole site has to be
-rebuilt** — the page list is rendered into every page. See
+Adding a sweep only changes the comparison report: rebuild it with
+`pypsa2html compare` once the points' summaries exist (`pypsa2html summarize
+-s scen_nuctip_4500 …` writes them without pages). See
 [pypsa2html D22](https://github.com/squoilin/pypsa2html/blob/main/docs/DESIGN_DECISIONS.md).
 
 ### Where the output goes
@@ -1273,14 +1298,17 @@ scenario's own results tree**, next to `csvs/`, `graphs/` and `networks/`:
 
 ```
 results/walloon/
-├── index.html                          ← cross-scenario site entry (pypsa2html)
+├── compare/                            ← comparison report (pypsa2html)
+│   ├── index.html  BEWAL_key_figures_compare.html  scenarios_compare.html  …
+│   └── comparison.csv                  ← every key figure, with Δ to the reference
 ├── scen_demande_haute/
 │   ├── csvs/  graphs/  maps/  networks/  explorer/  logs/
 │   └── html/
 │       ├── index.html                  ← pypsa-wal hub (links the two reports)
-│       ├── pypsa/                      ← pypsa2html (library, unmodified)
+│       ├── pypsa/                      ← pypsa2html scenario report (library, unmodified)
 │       │   ├── index.html
-│       │   ├── BEWAL_overview_scen_demande_haute.html
+│       │   ├── BEWAL_key_figures_scen_demande_haute.html
+│       │   ├── summary.csv  summary.json   ← what the comparison reads
 │       │   └── …
 │       ├── times/                      ← TIMES Sankeys (times_pypsa)
 │       └── indicators/                 ← TIMES indicator trajectories (times_pypsa)
@@ -1292,7 +1320,8 @@ results/walloon/
 
 pypsa2html is a general library; we do not add Walloon-specific links to it.
 TIMES pages therefore live in `html/times/`, and `html/index.html` is a tiny
-hub this repo owns. The scenario switcher uses relative links inside `pypsa/`.
+hub this repo owns. A scenario report links only within its own `pypsa/`
+folder, plus the "Compare scenarios" link to `results/walloon/compare/`.
 
 ### Commands
 
@@ -1314,16 +1343,24 @@ Build the report for the most recent scenario:
 pypsa2html build --config /home/sylvain/svn/pypsa2html/config/pypsa-wal.yaml --scenario scen_demande_haute
 ```
 
-Build all three scenarios, including the cross-scenario overview page:
+Build all scenarios, then the comparison report (from their summaries):
 
 ```bash
 pypsa2html build --config /home/sylvain/svn/pypsa2html/config/pypsa-wal.yaml
 ```
 
+Compare whatever is solved, in any order, without rebuilding a scenario — the
+reference is `compare.reference` unless `--reference` is given; a tree whose
+summary is missing is listed as "not compared":
+
+```bash
+pypsa2html compare --config config/pypsa2html.yaml results/walloon/scen_central results/walloon/scen_nuc4gw
+```
+
 Open it:
 
 ```bash
-xdg-open results/walloon/index.html
+xdg-open results/walloon/compare/index.html
 ```
 
 Other useful invocations:
@@ -1331,6 +1368,9 @@ Other useful invocations:
 | Command | Purpose |
 |---------|---------|
 | `pypsa2html pages` | List the section ids you can switch off under `plots:` |
+| `pypsa2html kpis -c <cfg> [--summary <dir>]` | List the key figures, and the row labels a summary carries |
+| `pypsa2html summarize -c <cfg> -s <run>` | Write a run's summary files only (e.g. sweep points, or on the cluster) |
+| `pypsa2html compare -c <cfg> <dirs…> --recompute` | Rebuild a missing or stale summary from its results tree |
 | `pypsa2html build -c <cfg> -o /tmp/report` | Write elsewhere without editing the config |
 | `pypsa2html build -c <cfg> -v` | Debug logging |
 
@@ -1341,14 +1381,24 @@ Other useful invocations:
 
 [`rules/pypsa2html.smk`](rules/pypsa2html.smk) is included from the `Snakefile`.
 If `pypsa2html` is importable, `rule all` builds
-`results/walloon/<scenario>/html/pypsa/index.html`; if it is not, the rule is never
-defined and the workflow is unaffected. The project config is
+`results/walloon/<scenario>/html/pypsa/index.html` (and its `summary.json`,
+after the `ptx_report` rule); if it is not, the rules are never defined and the
+workflow is unaffected. The project config is
 [`config/pypsa2html.yaml`](config/pypsa2html.yaml) (Walloon paths, not the copy
 in the library checkout).
 
 ```bash
 snakemake --configfile config/config.walloon.yaml --cores 1 \
   results/walloon/scen_demande_haute/html/pypsa/index.html
+```
+
+The comparison report is the rule `generate_html_comparison`, whose inputs are
+the compared runs' `summary.json` (`pypsa2html: compare:` in the workflow config,
+else `run.name`). It is not part of `all`; build it once the batch is solved —
+`COMPARE=1 ./cluster/nic5.sh postprocess` adds it to the postprocess targets:
+
+```bash
+snakemake --configfile config/config.walloon.yaml --cores 1 results/walloon/compare/index.html
 ```
 
 ### Publishing HTML to pypsa.squoilin.eu

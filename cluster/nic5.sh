@@ -144,6 +144,14 @@ postprocess_targets() {
         echo "results/${d}/logs/html_published.url"
     fi
     done
+    # Comparison report of the runs (pypsa2html, rule generate_html_comparison),
+    # built from their html/pypsa/summary.json -- no network is loaded. Opt-in
+    # with COMPARE=1 once the whole batch is solved: its inputs are every run's
+    # report, so a partial batch would make Snakemake build the missing ones.
+    # The runs are `pypsa2html: compare:` in the workflow config, else run.name.
+    if [ "${COMPARE:-0}" = "1" ] && [ "${PYPSA2HTML:-1}" = "1" ]; then
+        echo "results/${RUN_PREFIX:+${RUN_PREFIX}/}compare/index.html"
+    fi
 }
 
 verify_run_success() {

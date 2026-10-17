@@ -14,6 +14,10 @@ rebuilding it.
 The fix keeps the Walloon literature figure as the **2025 anchor** and scales
 2030/2040/2050 by technology-data's own rate for that technology. These tests
 pin the three things that can silently undo it.
+
+Since 2026-10-17 the six Walloon overrides follow the Danish Energy Agency's
+August 2026 data instead (common_parameters.md §3.13) — technology-data v0.14.0
+still carries DEA's 2022 PV chapter, which falls about twice as fast.
 """
 
 from __future__ import annotations
@@ -35,6 +39,20 @@ ARCHIVE = ROOT / "data" / "costs" / "archive" / "v0.14.0"
 MASTER = ROOT / "config" / "input_parameters_for_models.csv"
 CUSTOM_COSTS = ROOT / "data" / "walloon" / "custom_costs.csv"
 HURDLES = ROOT / "data" / "walloon" / "discount_rates.csv"
+
+# Investment relative to 2025 in the Danish Energy Agency data sheets "Updated
+# August 2026": el & DH v0019 (22 PV, 20 onshore) and renewable fuels v0015
+# (81 biogas small, 91 upgrading small). Rooftop = mean of residential and
+# commercial/industrial. 2045 (and 2035 where DEA has no column) interpolated.
+DEA_2026 = {
+    "solar-utility": (0.9342, 0.8775, 0.8320, 0.8032, 0.7744),
+    "solar-utility single-axis tracking": (0.9369, 0.8809, 0.8357, 0.8067, 0.7777),
+    "solar-rooftop": (0.9189, 0.8539, 0.8030, 0.7716, 0.7403),
+    "onwind": (0.9679, 0.9523, 0.9367, 0.9285, 0.9204),
+    "biogas": (0.8700, 0.8550, 0.8400, 0.8150, 0.7900),
+    "biogas upgrading": (0.7800, 0.7224, 0.6648, 0.6374, 0.6100),
+}
+DEA_2026_YEARS = (2030, 2035, 2040, 2045, 2050)
 
 
 @pytest.fixture(scope="module")
@@ -107,6 +125,8 @@ def test_investment_trajectories_follow_technology_data(technology_data):
     """
     offenders = []
     for tech, values in _active_investment_targets().items():
+        if tech in DEA_2026:
+            continue  # follows DEA 2026, pinned below
         if tech not in technology_data.index:
             continue  # e.g. `nuclear retrofit`: no catalogue entry to follow
         years = sorted(set(values) & set(HORIZONS))
@@ -123,6 +143,25 @@ def test_investment_trajectories_follow_technology_data(technology_data):
     assert not offenders, "investment trajectory does not follow technology-data:\n" + "\n".join(
         offenders
     )
+
+
+def test_walloon_overrides_follow_dea_2026():
+    """The six Walloon anchors carry DEA's 2026 rate on all six horizons.
+
+    2035 and 2045 are anchored explicitly: ``custom_costs.csv`` is matched on the
+    exact horizon, so a 5-year run needs its own rows there.
+    """
+    targets = _active_investment_targets()
+    offenders = []
+    for tech, ratios in DEA_2026.items():
+        values = targets[tech]
+        missing = sorted(set((2025,) + DEA_2026_YEARS) - set(values))
+        assert not missing, f"{tech}: no master-CSV row for {missing}"
+        for year, want in zip(DEA_2026_YEARS, ratios):
+            got = values[year] / values[2025]
+            if abs(got - want) > 5e-4:
+                offenders.append(f"{tech} @ {year}: x{got:.4f} vs DEA 2026 x{want:.4f}")
+    assert not offenders, "Walloon override off the DEA 2026 trajectory:\n" + "\n".join(offenders)
 
 
 @pytest.mark.parametrize(

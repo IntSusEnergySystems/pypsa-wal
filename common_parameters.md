@@ -223,6 +223,10 @@ which is also what makes the FOM percentage coherent again.
 | `cost:biogas:investment` | 1547.779 | 1346.568 | 1300.134 | 1222.745 | `biogas` |
 | `cost:biogas upgrading:investment` | 306.790 | 254.467 | 203.953 | 187.142 | `biogas upgrading` |
 
+> **Superseded 2026-10-17.** These rates came from DEA's 2022 PV chapter. The six rows
+> now follow DEA's August 2026 data and carry explicit 2035/2045 anchors — see §3.13.
+> The table above is the 2026-09-05 state.
+
 `nuclear` (9 500 EUR/kW_e) stays flat — technology-data's nuclear is flat too.
 `nuclear retrofit` (1 800) stays flat: it has no catalogue entry to follow.
 Everything else was already learning, because PyPSA-origin targets *are* the
@@ -286,6 +290,113 @@ TIMES's feedstock cost per MWh of biogas is 25.4 / 37.9 / 43.2 in 2030 / 2040 / 
 units reproduce CLIMA.A's EUR2021 gas price, i.e. ≈ ×1.22 for EUR2025. Details are in
 [`docs/biogas.md`](docs/biogas.md) §8. Whether to adopt TIMES's Walloon feedstock cost
 instead of ENSPRESO's is left open (§8, still open).
+
+### 3.13 DEA's 2026 data flatten the PV learning curves — CLOSED (applied 2026-10-17)
+
+**Where the §3.11 slope comes from.** technology-data v0.14.0 (13 Feb 2026,
+[doi:10.5281/zenodo.18631155](https://doi.org/10.5281/zenodo.18631155)) reads two
+Danish Energy Agency (DEA) & Energinet data sheets:
+
+* *Technology Data – Generation of Electricity and District Heating*, data sheet of
+  March 2022 (catalogue version 0011).
+  * PV is chapter 22, as revised in version 0010 (Feb 2022), in 2020 €.
+  * Onshore wind is chapter 20, in 2015 €. This is before DEA updated that chapter in Feb 2024.
+* *Technology Data for Renewable Fuels*, data sheet version 0014 (Jan 2024).
+  * Biogas is chapter 81 ("Basic plant, small"); upgrading is chapter 82 ("3,000 Nm3 per h").
+
+The 2022 PV sheet has no 2025 column. technology-data puts 2025 halfway between
+2020 and 2030. For utility PV that gives 562.5 → **473.1** → 383.7 EUR2020/kW_e, which
+is where §3.11's ×0.8111 comes from.
+
+**What DEA publishes now** (ens.dk, both workbooks "Updated August 2026"):
+
+* El & DH data sheet version 0019:
+  * chapter 22 PV was rewritten on 2026-08-26;
+  * chapter 20 onshore was updated on 2024-02-24.
+* Renewable-fuels data sheet version 0015:
+  * biogas (81) and upgrading (now 91) are as updated in April 2023.
+
+The DEA PV technology brief (Aug 2026) cuts the PV learning explicitly. The 15 %
+learning rate now applies to modules and inverters only. Those are a minor share of
+plant cost; glass, silver, balance of plant and installation learn little. Deployment
+follows the IEA WEO 2025 STEPS.
+
+**Comparison.** Investment cost in EUR2025/kW: kW_e for PV and wind, kW of gas output for biogas.
+
+* **A** = the master-CSV rows from 2026-09-05 to 2026-10-17: the Walloon 2025 value
+  shared with TIMES, carried forward by the technology-data v0.14.0 slope (§3.11).
+* **B** = the DEA 2026 central estimate. It is converted 2020 → 2025 with the HICP factor
+  1.257335 (§4.3).
+* **C** = A's 2025 value × B's own year/2025 ratio. This is the §3.11 rule applied to the
+  2026 data, and what the master CSV carries since 2026-10-17.
+
+| Technology | Series | 2025 | 2030 | 2040 | 2050 | 2050 vs 2025 |
+|---|---|---:|---:|---:|---:|---:|
+| **Utility PV (fixed)** | A. 2026-09-05 rows | 526 | 426 | 357 | 325 | −38 % |
+|  | B. DEA 2026 | 749 | 699 | 623 | 580 | −23 % |
+|  | C. Walloon 2025 × DEA 2026 slope (applied) | 526 | 491 | 438 | 407 | −23 % |
+| **Utility PV (single-axis tracking)** | A. 2026-09-05 rows | 571 | 470 | 397 | 364 | −36 % |
+|  | B. DEA 2026 | 814 | 763 | 680 | 633 | −22 % |
+|  | C. Walloon 2025 × DEA 2026 slope (applied) | 571 | 535 | 477 | 444 | −22 % |
+| **Rooftop PV** | A. 2026-09-05 rows | 920 | 735 | 606 | 549 | −40 % |
+|  | B. DEA 2026 | 1 038 | 953 | 833 | 768 | −26 % |
+|  | C. Walloon 2025 × DEA 2026 slope (applied) | 920 | 846 | 739 | 681 | −26 % |
+| **Onshore wind** | A. 2026-09-05 rows | 1 450 | 1 394 | 1 316 | 1 296 | −11 % |
+|  | B. DEA 2026 | 1 489 | 1 442 | 1 395 | 1 371 | −8 % |
+|  | C. Walloon 2025 × DEA 2026 slope (applied) | 1 450 | 1 404 | 1 358 | 1 335 | −8 % |
+| **Biogas plant** | A. 2026-09-05 rows | 1 548 | 1 347 | 1 300 | 1 223 | −21 % |
+|  | B. DEA 2026 | 1 298 | 1 129 | 1 090 | 1 026 | −21 % |
+|  | C. Walloon 2025 × DEA 2026 slope (applied) | 1 548 | 1 347 | 1 300 | 1 223 | −21 % |
+| **Biogas upgrading** | A. 2026-09-05 rows | 307 | 254 | 204 | 187 | −39 % |
+|  | B. DEA 2026 | 243 | 189 | 161 | 148 | −39 % |
+|  | C. Walloon 2025 × DEA 2026 slope (applied) | 307 | 239 | 204 | 187 | −39 % |
+
+**What the table says.**
+
+* **PV is where it matters.** In 2050, C is above A by +25 % (fixed), +22 % (tracking)
+  and +24 % (rooftop). For fixed PV the gap is already +15 % in 2030.
+* **Onshore wind** moves by +3 % in 2050.
+* **Biogas plant is unchanged.** The 2026 chapter keeps the same 2025→2050 ratios.
+* **Biogas upgrading** keeps the same 2040/2050 values but falls faster to 2030 (239 vs 254).
+* **B is not a candidate value.** Our 2025 levels are Walloon (IEA PVPS, Edora, Valbiom);
+  DEA's 2025 prices come from interviews with Danish developers in 2026. Our utility-PV
+  2025 level is 30 % below B.
+
+**Caveats on B (A and C do not depend on them).**
+
+* *Price year.* The PV sheets say 2020 €, both in their `priceyear` column and in
+  note N. The workbook's Intro sheet says the 22x sheets are in 2025 €. If the Intro is
+  right, the PV rows of B must be divided by 1.257 (utility PV 2025: 595 instead of 749).
+* *Rooftop* is the 50/50 mean of "Rooftop PV residential" and "Rooftop PV
+  comm.&industrial", as in technology-data's `solar-rooftop`.
+* *PV per kW_e* uses DEA's DC/AC ratio of 1.3. The 2022 sheet used 1.25.
+
+**Applied (2026-10-17).** All six targets now follow C, with 2035 and 2045 anchored
+explicitly as well:
+
+| target | 2035 | 2045 |
+|---|---:|---:|
+| `cost:solar-utility:investment` | 461.387 | 422.349 |
+| `cost:solar-utility single-axis tracking:investment` | 502.747 | 460.425 |
+| `cost:solar-rooftop:investment` | 785.787 | 710.046 |
+| `cost:onwind:investment` | 1380.887 | 1346.397 |
+| `cost:biogas:investment` | 1323.351 | 1261.440 |
+| `cost:biogas upgrading:investment` | 221.625 | 195.547 |
+
+* For PV, 2035 is DEA's own 2035 column. Every other 2035/2045 value is linear between
+  DEA's 10-year columns. Each row's `note_complementaire` quotes its factors and the DEA sheet.
+* **Fix for the 5-year runs.** `process_cost_data.py` reads a `custom_costs.csv` row
+  only when its horizon matches exactly (or is `all`). The per-horizon rows stopped at
+  2025/2030/2040/2050, so `config.walloon_5y.yaml` fell back to technology-data at
+  2035/2045. This affected all 12 per-horizon entries: the six investments, plus the
+  oil/coal/gas/biogas fuels, `battery storage` lifetime and `HVAC overhead` investment.
+  * Every `custom_costs*.csv` (central plus 15 scenario copies) now has 2035/2045 rows.
+  * `patch_costs` now expands over every grid's horizons, as `patch_potentials` does.
+  * `--check` now fails if a per-horizon technology lacks a horizon.
+* `--write --all-scenarios` was run, and `--check --all-scenarios` passes.
+* [`test/test_cost_learning.py`](test/test_cost_learning.py) now pins the six DEA 2026
+  ratios, all six horizons included.
+* **Results produced before 2026-10-17 use the old slope; re-run before quoting PV.**
 
 ---
 
