@@ -1,6 +1,6 @@
 # scen_central_flat_res_costs — renewable costs (biogas included) flat at their 2025 value (NIC6, 1 h, weather 2010)
 
-**Status (17 Oct 2026): solved 4/4 optimal, landed, pypsa2html published. Comparison with the new central pending (central 2040/2050 still solving, see its log). §11 NOT written. Committed.**
+**Status (17 Oct 2026): solved 4/4 optimal, landed, pypsa2html published. Compared with the new central (its log §7). §11 NOT written. Committed.**
 Operator: Claude desktop agent, office computer, on S. Quoilin's instruction. Sister run: [`2026-10-17_scen_central_new_costs_pv65_2010_1h.md`](2026-10-17_scen_central_new_costs_pv65_2010_1h.md).
 
 ## 1. Identification
@@ -38,7 +38,7 @@ BEWAL (GW installed / TWh), from the solved networks:
 | offshore | 0 | 0 | 0 |
 
 Whole model (6 countries), GW: onwind 200 / 183 / 255, solar 355 / 336 / 592, offwind 111 / 167 / 283 (2030 / 40 / 50).
-Comparison with the central: see the central's log (pending).
+Comparison with the new central: [`2026-10-17_scen_central_new_costs_pv65_2010_1h.md`](2026-10-17_scen_central_new_costs_pv65_2010_1h.md) §7. Objective above the central: 2025 +0.02 % (artefact, §3), 2030 +0.61 %, 2040 +1.6 %, **2050 +5.7 % (+1.64e10 EUR)**.
 `review_run.py`: 170 PASS / 30 INFO / 14 WARN / 9 FAIL = the nine known foreign-nuclear rows (F11). Heat-profile fidelity residual 2.05e-6 TWh.
 
 ## 8. Publication
@@ -47,10 +47,10 @@ https://pypsa.squoilin.eu/scen_central_flat_res_costs_20261017/ (hub, pypsa2html
 ## 9. Issues and fixes
 1. **Postprocess pulled the pypsa2html report in.** Since the merge of origin/development_plan the hub target (`html/index.html`, requested because `TIMES_SANKEY=1`) depends on `generate_html_report`, so `nic5.sh postprocess` started an HTML build under the plain 10 GB cap and the Snakemake run died before `network_cost_report.py` (0 of 3 network-cost CSVs). Fix: `land_0617.sh` sets `TIMES_SANKEY=0`; the publish phase builds hub, Sankeys and report under their own caps. The aborted attempt was killed by PID and the tree re-landed.
 2. **`summary.json`.** The merged `rules/pypsa2html.smk` declares `html/pypsa/summary.json` as an output; the installed pypsa2html (`26305ed`) writes it to `html/pypsa/summaries/<scenario>/`. The hub dry run then planned a second report build and the safety check aborted the publish. Fix in `publish_0617.sh` (step 1b): copy the summary up one level and `snakemake --touch` the report rule (runs nothing). Not fixed in the repo: the rule and the library disagree on the path (to settle with the pypsa2html author).
-3. The central's 2040 solve failed (sub-optimal barrier), see its log. Not this scenario.
+3. The central's 2040 solve stalled on plain settings and was solved with NumericFocus (central log §9.1). This scenario solved on plain settings in every horizon.
 
 ## 10. Follow-ups
-* Compare with the new central once its 2040/2050 are in (capacities, costs by technology, prices).
+* The comparison with the central is in its log (objectives, BEWAL and model-wide capacities); costs by technology and prices are not analysed.
 * Solid-biomass conversion plants are not frozen; extend `FLAT_TECHNOLOGIES` if they should be.
 * Settle the `summary.json` location (item 9.2) and the `costs.year = 2050` marginal-cost quirk (item 3 above) with the model owners.
 
