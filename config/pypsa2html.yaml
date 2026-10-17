@@ -109,6 +109,11 @@ scenarios:
     label: Central
     results_dir: results/walloon/scen_central
     resources_dir: resources/walloon/scen_central
+  # 2026-10-17: renewable costs (biogas included) held flat at their 2025 value.
+  - name: scen_central_flat_res_costs
+    label: Central, renewable costs flat at 2025
+    results_dir: results/walloon/scen_central_flat_res_costs
+    resources_dir: resources/walloon/scen_central_flat_res_costs
   # 2026-10-06: the sensitivities below were the 4 Oct vintage (TIMES route
   # open in the central, no transmission fix f6d0f7aa, old biogas cap), while
   # scen_central was the 6 Oct re-run (route closed, ICEDD biogas cap in every

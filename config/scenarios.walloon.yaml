@@ -396,6 +396,42 @@ scen_central:
       2040: 6.47
       2050: 10.0
 
+# Renewable-cost sensitivity of the central (17 Oct 2026): the cost of renewable
+# technologies - wind, PV, hydro, geothermal, solar heat and the biogas chain (investment,
+# FOM, VOM, fuel, lifetime; list in scripts/walloon_scripts/build_flat_res_costs.py) - is held flat at
+# its 2025 value in every horizon, i.e. no learning after 2025. Everything else, the 2025
+# solve included, is the central. The cost file is GENERATED from custom_costs.csv and the
+# technology-data 2025 table: never hand-edit it, re-run the script when the central costs
+# change (test_flat_res_costs.py fails on a stale file).
+# docs/logs/2026-10-17_scen_central_flat_res_costs_2010_1h.md.
+scen_central_flat_res_costs:
+  sector:
+    times_file: data/walloon/scen_central_v1_3gw_261009_0910.vd
+    rooftop_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_pv_rooftop_share_scen_central.csv
+    industry_cc_floor:
+      enable: true
+      node: BEWAL
+      file: data/walloon/times_industrial_capture_scen_central.csv
+  electricity:
+    retrofit_nuclear_once: false
+  costs:
+    custom_cost_fn: data/walloon/custom_costs_scen_central_flat_res_costs.csv
+  solving:
+    agg_p_nom_limits:
+      file: data/walloon/agg_p_nom_minmax_demande_haute.csv
+  self_sufficiency:
+    self_sufficiency_constraint: true
+    mode: absolute
+    nodes:
+    - BEWAL
+    limit_twh:
+      2030: 2.94
+      2040: 6.47
+      2050: 10.0
+
 # Local 6 h validation of the 2026-09-22 package (rooftop floor replacing the
 # rooftop share, `solar-hsat` removed, per-vintage sequestration ceiling fixed,
 # `threshold_capacity` 0 -> 10). Identical to `scen_central` in every other
